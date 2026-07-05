@@ -26,6 +26,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.ReflogEntry;
+import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -46,8 +47,8 @@ class JGitCompatibilityCanaryTest {
 
   @Test
   void writesReadsUpdatesRefsAndWalksCommitUsingPublicJGitApis() throws Exception {
-    try (Git git = Git.init().setDirectory(workTree.toFile()).call();
-        Repository repository = git.getRepository()) {
+    try (Git git = Git.init().setDirectory(workTree.toFile()).call()) {
+      Repository repository = git.getRepository();
       String content = "hello JGit compatibility\n";
       ObjectId blobId;
       ObjectId treeId;
@@ -125,7 +126,9 @@ class JGitCompatibilityCanaryTest {
   }
 
   private static void assertReflog(Repository repository, ObjectId commitId) throws Exception {
-    ReflogEntry entry = repository.getReflogReader(Constants.R_HEADS + "main").getLastEntry();
+    ReflogReader reader = repository.getReflogReader(Constants.R_HEADS + "main");
+    assertNotNull(reader);
+    ReflogEntry entry = reader.getLastEntry();
     assertNotNull(entry);
     assertEquals(commitId, entry.getNewId());
   }
