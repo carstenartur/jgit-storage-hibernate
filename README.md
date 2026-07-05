@@ -2,42 +2,67 @@
 
 Hibernate-backed storage backend for JGit repositories.
 
-`jgit-storage-hibernate` provides a database-backed repository implementation for JGit. The goal is to persist Git pack data, references, reflogs and optional searchable history projections in relational databases through Hibernate ORM and Hibernate Search.
+`jgit-storage-hibernate` provides database-backed repository infrastructure for JGit. It persists Git pack data, reftable data, refs/reflog projections and optional searchable history projections in relational databases through Hibernate ORM and Hibernate Search.
 
 The project is intended for applications that need Git semantics without relying on a filesystem-backed `.git` directory, for example versioned domain models, collaborative editors, audit trails and searchable history.
 
 ## Status
 
-This repository is being bootstrapped as an independent infrastructure module. The initial implementation should be extracted and consolidated from the existing `carstenartur/jgit` Hibernate storage work, instead of copying the same storage code into every consuming application.
+This repository is being bootstrapped as an independent infrastructure module. The initial implementation consolidates the existing Hibernate storage work from `carstenartur/jgit`, `carstenartur/sandbox` and the database-backed JGit adapter used in `carstenartur/Taxonomy`.
 
-The first technical milestone is a feasibility spike:
+The first extracted architecture is intentionally split into modules:
 
 ```text
-JGit Repository API
-  -> dedicated jgit-storage-hibernate facade
-  -> Hibernate-backed DFS/Reftable storage adapter
-  -> relational database
-  -> optional Hibernate Search projections
+jgit-storage-hibernate-parent
+  ├─ jgit-storage-hibernate-core
+  │    Hibernate/JGit repository, object database, reftable refs, reflog rows
+  │
+  └─ jgit-storage-hibernate-search
+       Optional Hibernate Search projections for commits, blobs and paths
 ```
+
+This keeps the core storage backend consumable without forcing Lucene, JDT or future embedding dependencies on every application.
 
 ## Design stance
 
 - The project is not a fork of JGit.
 - The project is not affiliated with the Eclipse Foundation.
-- JGit internals must be encapsulated behind this module and must not leak into consuming applications.
-- Consuming applications should depend on a stable facade, not on `org.eclipse.jgit.internal.*` packages.
+- JGit internals are encapsulated in implementation packages and must not leak into consuming applications.
+- Consuming applications should depend on the public `io.github.carstenartur.jgit.storage.hibernate` facade, not on `org.eclipse.jgit.internal.*` packages.
 - The initial Java baseline is Java 17 to align with modern JGit releases and remain usable from Java 21 applications.
 - The license is BSD-3-Clause, chosen to stay close to JGit's Eclipse Distribution License / BSD-3-Clause-compatible licensing model.
 
+## Modules
+
+### jgit-storage-hibernate-core
+
+Core database-backed JGit repository implementation.
+
+Responsibilities:
+
+- open a JGit `Repository` backed by Hibernate-managed database tables;
+- persist Git pack and reftable files as database rows;
+- provide database-backed reflog read/write support;
+- keep all JGit DFS/Reftable internal API usage inside implementation packages;
+- expose a small stable facade for consuming applications.
+
+### jgit-storage-hibernate-search
+
+Optional search/indexing module.
+
+Responsibilities:
+
+- provide Hibernate Search projection entities for commit metadata, text blobs and file paths;
+- provide a small query service for searchable Git history;
+- serve as the future home for Java-aware indexing, file-type strategies and optional embedding support.
+
 ## Planned capabilities
 
-- Open or create a JGit repository backed by Hibernate-managed database tables.
-- Persist Git pack data and reftable data in relational databases.
-- Persist and read reflogs.
-- Support atomic reference updates through database transactions where technically possible.
-- Provide optional Hibernate Search projections for searchable Git history.
-- Provide tests for H2 first, then PostgreSQL, MariaDB/MySQL and SQL Server.
-- Keep all JGit internal API usage isolated in implementation packages.
+- H2-backed integration test for repository create/open/write/read/reopen.
+- PostgreSQL, MariaDB/MySQL and SQL Server compatibility tests.
+- Semantically stable public API.
+- Explicit compatibility tests for JGit internal API usage.
+- Optional advanced search modules for Java-aware tokenization and embeddings.
 
 ## Non-goals
 
