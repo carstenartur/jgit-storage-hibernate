@@ -1,6 +1,6 @@
 # Consuming jgit-storage-hibernate
 
-This project publishes two Maven artifacts:
+This project publishes a parent POM plus two consumer-facing Maven artifacts:
 
 ```text
 io.github.carstenartur:jgit-storage-hibernate-core

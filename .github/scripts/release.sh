@@ -2,7 +2,6 @@
 set -euo pipefail
 
 : "${RELEASE_VERSION:?RELEASE_VERSION is required}"
-: "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
 NEXT_VERSION_INPUT=${NEXT_VERSION_INPUT:-}
 SKIP_TESTS=${SKIP_TESTS:-false}
@@ -69,7 +68,7 @@ else
   mvn -B verify
 fi
 
-if grep -R "SNAPSHOT" --include="pom.xml" . | grep -v "target/" | grep -v "\.git/"; then
+if grep -R "SNAPSHOT" --include="pom.xml" --exclude-dir=target --exclude-dir=.git .; then
   echo "::error::SNAPSHOT references still found in pom.xml files after release version update"
   exit 1
 fi
