@@ -1,0 +1,28 @@
+{
+  "title": "jgit-storage-hibernate",
+  "description": "Hibernate-backed database storage backend for JGit repositories.",
+  "version": "0.1.0-SNAPSHOT",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "BSD-3-Clause",
+  "creators": [
+    {
+      "name": "Hammer, Carsten",
+      "affiliation": "Independent"
+    }
+  ],
+  "keywords": [
+    "JGit",
+    "Hibernate",
+    "Git",
+    "database-backed storage",
+    "version control"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/carstenartur/jgit-storage-hibernate",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

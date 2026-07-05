@@ -1,5 +1,17 @@
 # jgit-storage-hibernate
 
+[![Java CI with Maven](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/coverage.json)](docs/badges/coverage.json)
+[![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/tests.json)](docs/badges/tests.json)
+[![JMH Benchmarks](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
+[![JMH Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](docs/badges/performance.json)
+[![Publish Snapshot](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml)
+[![Release](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml)
+[![Java 17+](https://img.shields.io/badge/Java-17%2B-blue)](pom.xml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+[![Maven: GitHub Packages](https://img.shields.io/badge/Maven-GitHub%20Packages-blue)](docs/consuming.md)
+[![Citation: CFF](https://img.shields.io/badge/Citation-CFF-blue)](CITATION.cff)
+
 Hibernate-backed storage backend for JGit repositories.
 
 `jgit-storage-hibernate` provides a database-backed repository implementation for JGit. The goal is to persist Git pack data, references, reflogs and optional searchable history projections in relational databases through Hibernate ORM and Hibernate Search.
@@ -10,7 +22,7 @@ The project is intended for applications that need Git semantics without relying
 
 This repository is being bootstrapped as an independent infrastructure module. The initial implementation consolidates the reusable parts of the existing `carstenartur/jgit` and `sandbox-jgit-storage-hibernate` work, instead of copying the same storage code into every consuming application.
 
-The first technical milestone is a releaseable core plus an optional search module:
+The first technical milestone is a releasable core plus optional search and benchmark modules:
 
 ```text
 JGit Repository API
@@ -20,6 +32,8 @@ JGit Repository API
   -> jgit-storage-hibernate-search
        -> Hibernate Search commit/history projections
        -> Lucene-backed full-text search
+  -> jgit-storage-hibernate-benchmarks
+       -> JMH benchmarks for storage operations
 ```
 
 ## Modules
@@ -28,8 +42,9 @@ JGit Repository API
 |---|---|---|
 | `jgit-storage-hibernate-core` | Database-backed JGit repository storage for packs, reftables and queryable reflogs. | Applications that need Git semantics without filesystem-backed `.git` directories. |
 | `jgit-storage-hibernate-search` | Optional commit/history projections and full-text search over messages, paths and indexed text content. | Applications that want searchable Git history through Hibernate Search/Lucene. |
+| `jgit-storage-hibernate-benchmarks` | JMH benchmarks for core repository operations. | CI, maintainers and release reviewers; not a runtime dependency. |
 
-This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search or future Java/JDT-specific analysis dependencies. Java source analysis, embeddings and REST server functionality remain extension candidates and are not part of the core storage artifact.
+This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search, JMH or future Java/JDT-specific analysis dependencies. Java source analysis, embeddings and REST server functionality remain extension candidates and are not part of the core storage artifact.
 
 ## Design stance
 
@@ -49,6 +64,56 @@ This split is intentional. Simple consumers should not have to carry Lucene, Hib
 - Support JGit reftable reference updates through the DFS abstraction.
 - Index Git commit metadata, paths and text content in the optional search module.
 - Provide H2 integration tests for the core and search modules.
+- Provide JMH benchmarks for core repository operations.
+
+## Quality metrics
+
+Coverage and test-count badges are generated from JaCoCo and Surefire reports during CI. Performance metrics are generated from JMH JSON output in `.github/workflows/performance.yml`; the badge shows the first reported JMH benchmark score and the full JSON is uploaded as a workflow artifact.
+
+## Consuming
+
+See [docs/consuming.md](docs/consuming.md) for Maven repository setup, dependency snippets and the recommended first `audio-analyzer` integration path.
+
+Core dependency:
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-core</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+Optional search dependency:
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-search</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+The benchmark module is not intended as a runtime dependency.
+
+## Release and citation metadata
+
+The repository includes release and citation metadata:
+
+- [CITATION.cff](CITATION.cff)
+- [CITATION.md](CITATION.md)
+- [.zenodo.json](.zenodo.json)
+- [codemeta.json](codemeta.json)
+- [docs/release-process.md](docs/release-process.md)
+
+GitHub Packages publishing is prepared through:
+
+- `.github/workflows/publish-snapshot.yml`
+- `.github/workflows/release.yml`
+- `.github/scripts/release.sh`
+- `.github/scripts/update-release-metadata.py`
+
+A DOI can be added after the first GitHub Release has been archived by Zenodo or another DOI provider.
 
 ## Non-goals
 

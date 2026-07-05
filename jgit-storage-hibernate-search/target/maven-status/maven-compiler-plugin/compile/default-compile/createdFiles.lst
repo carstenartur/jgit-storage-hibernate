@@ -1,0 +1,5 @@
+io/github/carstenartur/jgit/storage/hibernate/search/entity/GitCommitIndex.class
+io/github/carstenartur/jgit/storage/hibernate/search/service/GitHistorySearchService.class
+io/github/carstenartur/jgit/storage/hibernate/search/service/CommitIndexer$TreeText.class
+io/github/carstenartur/jgit/storage/hibernate/search/service/CommitIndexer.class
+io/github/carstenartur/jgit/storage/hibernate/search/SearchEntities.class

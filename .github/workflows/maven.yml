@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -32,9 +32,33 @@ jobs:
           tail -n 80 build.log
           exit $status
 
+      - name: Generate coverage and test-count badges
+        if: always()
+        run: python3 .github/scripts/generate-metrics-badges.py
+
       - name: Upload Maven build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: maven-build-log
           path: build.log
+
+      - name: Upload badge metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badge-metrics
+          path: docs/badges/*.json
+
+      - name: Update badge data on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+        run: |
+          if git diff --quiet -- docs/badges; then
+            echo "Badge data unchanged"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add docs/badges/*.json
+          git commit -m "Update build metric badges [skip ci]"
+          git push
