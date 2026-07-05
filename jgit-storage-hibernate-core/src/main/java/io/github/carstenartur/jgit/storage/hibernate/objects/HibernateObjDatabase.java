@@ -206,6 +206,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   @Override
   public long getApproximateObjectCount() {
+    // Pack-blob storage does not maintain a reliable object-level count.
     return 0L;
   }
 
