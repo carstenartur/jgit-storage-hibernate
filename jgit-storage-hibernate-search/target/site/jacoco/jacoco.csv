@@ -1,6 +1,0 @@
-GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
-jgit-storage-hibernate Search,io.github.carstenartur.jgit.storage.hibernate.search.service,CommitIndexer.TreeText,0,9,0,0,0,1,0,1,0,1
-jgit-storage-hibernate Search,io.github.carstenartur.jgit.storage.hibernate.search.service,GitHistorySearchService,109,71,4,2,35,16,8,3,5,3
-jgit-storage-hibernate Search,io.github.carstenartur.jgit.storage.hibernate.search.service,CommitIndexer,105,216,14,8,30,52,12,7,2,6
-jgit-storage-hibernate Search,io.github.carstenartur.jgit.storage.hibernate.search.entity,GitCommitIndex,22,51,0,0,8,23,7,14,7,14
-jgit-storage-hibernate Search,io.github.carstenartur.jgit.storage.hibernate.search,SearchEntities,0,3,0,0,0,1,0,1,0,1
