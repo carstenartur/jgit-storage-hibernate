@@ -30,3 +30,7 @@ updates:
           - "org.apache.maven.plugins:maven-shade-plugin"
           - "org.codehaus.mojo:versions-maven-plugin"
           - "org.jacoco:jacoco-maven-plugin"
+    ignore:
+      - dependency-name: "org.eclipse.jgit:org.eclipse.jgit"
+        update-types:
+          - "version-update:semver-major"
