@@ -10,7 +10,7 @@ The project is intended for applications that need Git semantics without relying
 
 This repository is being bootstrapped as an independent infrastructure module. The initial implementation consolidates the reusable parts of the existing `carstenartur/jgit` and `sandbox-jgit-storage-hibernate` work, instead of copying the same storage code into every consuming application.
 
-The first technical milestone is a releaseable core plus an optional search module:
+The first technical milestone is a releasable core plus an optional search module:
 
 ```text
 JGit Repository API
@@ -49,6 +49,49 @@ This split is intentional. Simple consumers should not have to carry Lucene, Hib
 - Support JGit reftable reference updates through the DFS abstraction.
 - Index Git commit metadata, paths and text content in the optional search module.
 - Provide H2 integration tests for the core and search modules.
+
+## Consuming
+
+See [docs/consuming.md](docs/consuming.md) for Maven repository setup, dependency snippets and the recommended first `audio-analyzer` integration path.
+
+Core dependency:
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-core</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+Optional search dependency:
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-search</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+## Release and citation metadata
+
+The repository includes release and citation metadata:
+
+- [CITATION.cff](CITATION.cff)
+- [CITATION.md](CITATION.md)
+- [.zenodo.json](.zenodo.json)
+- [codemeta.json](codemeta.json)
+- [docs/release-process.md](docs/release-process.md)
+
+GitHub Packages publishing is prepared through:
+
+- `.github/workflows/publish-snapshot.yml`
+- `.github/workflows/release.yml`
+- `.github/scripts/release.sh`
+- `.github/scripts/update-release-metadata.py`
+
+A DOI can be added after the first GitHub Release has been archived by Zenodo or another DOI provider.
 
 ## Non-goals
 
