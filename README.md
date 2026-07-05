@@ -12,6 +12,7 @@
 [![Maven: GitHub Packages](https://img.shields.io/badge/Maven-GitHub%20Packages-blue)](docs/consuming.md)
 [![Citation: CFF](https://img.shields.io/badge/Citation-CFF-blue)](CITATION.cff)
 
+
 Hibernate-backed storage backend for JGit repositories.
 
 `jgit-storage-hibernate` provides a database-backed repository implementation for JGit. The goal is to persist Git pack data, references, reflogs and optional searchable history projections in relational databases through Hibernate ORM and Hibernate Search.
