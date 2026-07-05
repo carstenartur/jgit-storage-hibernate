@@ -11,7 +11,7 @@
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 [![Maven: GitHub Packages](https://img.shields.io/badge/Maven-GitHub%20Packages-blue)](docs/consuming.md)
 [![Citation: CFF](https://img.shields.io/badge/Citation-CFF-blue)](CITATION.cff)
-
+https://doi.org/10.5281/zenodo.21210132
 
 Hibernate-backed storage backend for JGit repositories.
 
