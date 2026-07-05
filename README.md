@@ -3,8 +3,8 @@
 [![Java CI with Maven](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/coverage.json)](docs/badges/coverage.json)
 [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/tests.json)](docs/badges/tests.json)
-[![Performance Smoke](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
-[![Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](docs/badges/performance.json)
+[![JMH Benchmarks](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
+[![JMH Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](docs/badges/performance.json)
 [![Publish Snapshot](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml)
 [![Release](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml)
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-blue)](pom.xml)
@@ -22,7 +22,7 @@ The project is intended for applications that need Git semantics without relying
 
 This repository is being bootstrapped as an independent infrastructure module. The initial implementation consolidates the reusable parts of the existing `carstenartur/jgit` and `sandbox-jgit-storage-hibernate` work, instead of copying the same storage code into every consuming application.
 
-The first technical milestone is a releasable core plus an optional search module:
+The first technical milestone is a releasable core plus optional search and benchmark modules:
 
 ```text
 JGit Repository API
@@ -32,6 +32,8 @@ JGit Repository API
   -> jgit-storage-hibernate-search
        -> Hibernate Search commit/history projections
        -> Lucene-backed full-text search
+  -> jgit-storage-hibernate-benchmarks
+       -> JMH benchmarks for storage operations
 ```
 
 ## Modules
@@ -40,8 +42,9 @@ JGit Repository API
 |---|---|---|
 | `jgit-storage-hibernate-core` | Database-backed JGit repository storage for packs, reftables and queryable reflogs. | Applications that need Git semantics without filesystem-backed `.git` directories. |
 | `jgit-storage-hibernate-search` | Optional commit/history projections and full-text search over messages, paths and indexed text content. | Applications that want searchable Git history through Hibernate Search/Lucene. |
+| `jgit-storage-hibernate-benchmarks` | JMH benchmarks for core repository operations. | CI, maintainers and release reviewers; not a runtime dependency. |
 
-This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search or future Java/JDT-specific analysis dependencies. Java source analysis, embeddings and REST server functionality remain extension candidates and are not part of the core storage artifact.
+This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search, JMH or future Java/JDT-specific analysis dependencies. Java source analysis, embeddings and REST server functionality remain extension candidates and are not part of the core storage artifact.
 
 ## Design stance
 
@@ -61,10 +64,11 @@ This split is intentional. Simple consumers should not have to carry Lucene, Hib
 - Support JGit reftable reference updates through the DFS abstraction.
 - Index Git commit metadata, paths and text content in the optional search module.
 - Provide H2 integration tests for the core and search modules.
+- Provide JMH benchmarks for core repository operations.
 
 ## Quality metrics
 
-Coverage and test-count badges are generated from JaCoCo and Surefire reports during CI. The performance badge is a CI smoke measurement for the core H2 repository lifecycle test, not a stable microbenchmark.
+Coverage and test-count badges are generated from JaCoCo and Surefire reports during CI. Performance metrics are generated from JMH JSON output in `.github/workflows/performance.yml`; the badge shows the first reported JMH benchmark score and the full JSON is uploaded as a workflow artifact.
 
 ## Consuming
 
@@ -89,6 +93,8 @@ Optional search dependency:
   <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
+
+The benchmark module is not intended as a runtime dependency.
 
 ## Release and citation metadata
 
