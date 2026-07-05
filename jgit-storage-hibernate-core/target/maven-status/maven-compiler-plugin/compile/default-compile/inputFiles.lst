@@ -1,0 +1,16 @@
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/DefaultHibernateGitStorage.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/DefaultHibernateRepositoryFactory.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/HibernateGitStorage.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/HibernateRepositoryFactory.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/HibernateStorageException.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryName.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/config/HibernateSessionFactoryProvider.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitPackEntity.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitReflogEntity.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/HibernateObjDatabase.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/package-info.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateRefDatabase.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateReflogReader.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateReflogWriter.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/repository/HibernateRepository.java
+/home/runner/work/jgit-storage-hibernate/jgit-storage-hibernate/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/repository/HibernateRepositoryBuilder.java
