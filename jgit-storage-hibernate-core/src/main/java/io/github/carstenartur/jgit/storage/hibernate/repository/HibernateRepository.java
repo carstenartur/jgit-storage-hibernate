@@ -6,57 +6,82 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-package io.github.carstenartur.jgit.storage.hibernate.internal.repository;
+package io.github.carstenartur.jgit.storage.hibernate.repository;
 
-import io.github.carstenartur.jgit.storage.hibernate.internal.objects.HibernateObjDatabase;
-import io.github.carstenartur.jgit.storage.hibernate.internal.refs.HibernateRefDatabase;
-import io.github.carstenartur.jgit.storage.hibernate.internal.refs.HibernateReflogReader;
-import io.github.carstenartur.jgit.storage.hibernate.internal.refs.HibernateReflogWriter;
+import io.github.carstenartur.jgit.storage.hibernate.objects.HibernateObjDatabase;
+import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
+import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
+import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import java.io.IOException;
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogReader;
 import org.hibernate.SessionFactory;
 
-/** A JGit repository whose pack and reftable data is stored through Hibernate. */
+/**
+ * A JGit repository stored in a relational database through Hibernate.
+ *
+ * <p>This implementation uses JGit's DFS/Reftable storage abstractions internally. Consumers should
+ * depend on the public facade package instead of importing this class directly unless they need JGit
+ * repository-level integration.
+ */
 public class HibernateRepository extends DfsRepository {
 
-  private final HibernateObjDatabase objdb;
-  private final HibernateRefDatabase refdb;
+  private final HibernateObjDatabase objectDatabase;
+  private final HibernateRefDatabase refDatabase;
   private final HibernateReflogWriter reflogWriter;
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private String gitwebDescription;
 
+  /**
+   * Create a repository from a builder.
+   *
+   * @param builder configured repository builder
+   */
   public HibernateRepository(HibernateRepositoryBuilder builder) {
     super(builder);
     this.sessionFactory = builder.getSessionFactory();
     this.repositoryName = builder.getRepositoryName();
-    this.objdb = new HibernateObjDatabase(this, new DfsReaderOptions(), sessionFactory, repositoryName);
-    this.refdb = new HibernateRefDatabase(this);
+    this.objectDatabase =
+        new HibernateObjDatabase(this, builder.getReaderOptions(), sessionFactory, repositoryName);
+    this.refDatabase = new HibernateRefDatabase(this);
     this.reflogWriter = new HibernateReflogWriter(sessionFactory, repositoryName);
   }
 
   @Override
   public HibernateObjDatabase getObjectDatabase() {
-    return objdb;
+    return objectDatabase;
   }
 
   @Override
   public RefDatabase getRefDatabase() {
-    return refdb;
+    return refDatabase;
   }
 
+  /**
+   * Return the logical database repository name.
+   *
+   * @return repository name
+   */
   public String getRepositoryName() {
     return repositoryName;
   }
 
+  /**
+   * Return the Hibernate session factory.
+   *
+   * @return session factory
+   */
   public SessionFactory getSessionFactory() {
     return sessionFactory;
   }
 
+  /**
+   * Return the queryable reflog writer.
+   *
+   * @return reflog writer
+   */
   public HibernateReflogWriter getReflogWriter() {
     return reflogWriter;
   }
@@ -67,13 +92,12 @@ public class HibernateRepository extends DfsRepository {
   }
 
   @Override
-  @Nullable
   public String getGitwebDescription() {
     return gitwebDescription;
   }
 
   @Override
-  public void setGitwebDescription(@Nullable String description) {
+  public void setGitwebDescription(String description) {
     this.gitwebDescription = description;
   }
 }

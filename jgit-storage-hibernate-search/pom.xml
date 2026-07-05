@@ -12,32 +12,34 @@
 
   <artifactId>jgit-storage-hibernate-search</artifactId>
   <packaging>jar</packaging>
-
   <name>jgit-storage-hibernate Search</name>
-  <description>Optional Hibernate Search projections and query APIs for database-backed JGit history.</description>
+  <description>
+    Optional Hibernate Search projections and query services for database-backed JGit history.
+  </description>
 
   <dependencies>
     <dependency>
-      <groupId>${project.groupId}</groupId>
+      <groupId>io.github.carstenartur</groupId>
       <artifactId>jgit-storage-hibernate-core</artifactId>
     </dependency>
+
     <dependency>
       <groupId>org.hibernate.search</groupId>
       <artifactId>hibernate-search-mapper-orm</artifactId>
+      <version>${hibernate-search.version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.hibernate.search</groupId>
       <artifactId>hibernate-search-backend-lucene</artifactId>
+      <version>${hibernate-search.version}</version>
     </dependency>
+
     <dependency>
-      <groupId>org.eclipse.jdt</groupId>
-      <artifactId>ecj</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jdt</groupId>
-      <artifactId>org.eclipse.jdt.core</artifactId>
-      <optional>true</optional>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <version>${h2.version}</version>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
@@ -46,4 +48,24 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-javadoc-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
 </project>

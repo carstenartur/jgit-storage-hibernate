@@ -1,10 +1,14 @@
 /*
  * Copyright (C) 2026, Carsten Hammer and contributors.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the BSD 3-Clause License.
+ *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-package io.github.carstenartur.jgit.storage.hibernate.internal.refs;
+package io.github.carstenartur.jgit.storage.hibernate.refs;
 
-import io.github.carstenartur.jgit.storage.hibernate.internal.entity.GitReflogEntity;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
 import java.io.IOException;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -18,12 +22,20 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
-/** Reads persistent reflog entries from the database. */
+/** Reads queryable reflog entries from the {@code git_reflog} table. */
 public class HibernateReflogReader implements ReflogReader {
+
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private final String refName;
 
+  /**
+   * Create a reader.
+   *
+   * @param sessionFactory Hibernate session factory
+   * @param repositoryName logical repository name
+   * @param refName reference name
+   */
   public HibernateReflogReader(SessionFactory sessionFactory, String repositoryName, String refName) {
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
@@ -53,7 +65,8 @@ public class HibernateReflogReader implements ReflogReader {
       List<GitReflogEntity> entities =
           session
               .createQuery(
-                  "FROM GitReflogEntity r WHERE r.repositoryName = :repo AND r.refName = :ref ORDER BY r.id DESC",
+                  "FROM GitReflogEntity r WHERE r.repositoryName = :repo AND r.refName = :ref "
+                      + "ORDER BY r.id DESC",
                   GitReflogEntity.class)
               .setParameter("repo", repositoryName)
               .setParameter("ref", refName)
@@ -67,16 +80,16 @@ public class HibernateReflogReader implements ReflogReader {
     }
   }
 
-  static class DbReflogEntry implements ReflogEntry {
+  private static final class DbReflogEntry implements ReflogEntry {
     private final ObjectId oldId;
     private final ObjectId newId;
-    private final PersonIdent author;
+    private final PersonIdent who;
     private final String comment;
 
-    DbReflogEntry(GitReflogEntity entity) {
+    private DbReflogEntry(GitReflogEntity entity) {
       this.oldId = entity.getOldId() != null ? ObjectId.fromString(entity.getOldId()) : ObjectId.zeroId();
       this.newId = entity.getNewId() != null ? ObjectId.fromString(entity.getNewId()) : ObjectId.zeroId();
-      this.author =
+      this.who =
           new PersonIdent(
               entity.getWhoName() != null ? entity.getWhoName() : "",
               entity.getWhoEmail() != null ? entity.getWhoEmail() : "",
@@ -86,18 +99,28 @@ public class HibernateReflogReader implements ReflogReader {
     }
 
     @Override
-    public ObjectId getOldId() { return oldId; }
+    public ObjectId getOldId() {
+      return oldId;
+    }
 
     @Override
-    public ObjectId getNewId() { return newId; }
+    public ObjectId getNewId() {
+      return newId;
+    }
 
     @Override
-    public PersonIdent getWho() { return author; }
+    public PersonIdent getWho() {
+      return who;
+    }
 
     @Override
-    public String getComment() { return comment; }
+    public String getComment() {
+      return comment;
+    }
 
     @Override
-    public CheckoutEntry parseCheckout() { return null; }
+    public CheckoutEntry parseCheckout() {
+      return null;
+    }
   }
 }

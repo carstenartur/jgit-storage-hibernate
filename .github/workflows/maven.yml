@@ -2,7 +2,7 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, extract-core-hibernate-storage ]
   pull_request:
     branches: [ main ]
 
@@ -25,4 +25,16 @@ jobs:
           cache: maven
 
       - name: Build
-        run: mvn -B verify
+        run: |
+          set +e
+          mvn -B -q verify > build.log 2>&1
+          status=$?
+          tail -n 80 build.log
+          exit $status
+
+      - name: Upload Maven build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-build-log
+          path: build.log
