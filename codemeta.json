@@ -3,7 +3,7 @@
   "@type": "SoftwareSourceCode",
   "name": "jgit-storage-hibernate",
   "description": "Hibernate-backed database storage backend for JGit repositories.",
-  "version": "0.1.1-SNAPSHOT",
+  "version": "0.1.1",
   "codeRepository": "https://github.com/carstenartur/jgit-storage-hibernate",
   "license": "https://spdx.org/licenses/BSD-3-Clause.html",
   "programmingLanguage": "Java",
@@ -16,5 +16,6 @@
       "familyName": "Hammer",
       "url": "https://github.com/carstenartur"
     }
-  ]
+  ],
+  "datePublished": "2026-07-05"
 }
