@@ -6,6 +6,7 @@ abstract: "Hibernate-backed database storage backend for JGit repositories."
 authors:
   - family-names: "Hammer"
     given-names: "Carsten"
+    orcid: "https://orcid.org/0009-0005-1047-6381"
 repository-code: "https://github.com/carstenartur/jgit-storage-hibernate"
 url: "https://github.com/carstenartur/jgit-storage-hibernate"
 license: "BSD-3-Clause"
