@@ -109,6 +109,13 @@
         <artifactId>jgit-storage-hibernate-core</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <!-- Pin the upper bound to resolve convergence between jakarta.xml.bind-api (2.1.0)
+           and jaxb-core/angus-activation (2.1.1) transitive pulls from hibernate-core -->
+      <dependency>
+        <groupId>jakarta.activation</groupId>
+        <artifactId>jakarta.activation-api</artifactId>
+        <version>2.1.1</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 

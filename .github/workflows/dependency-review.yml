@@ -3,6 +3,9 @@ name: Dependency Review
 on:
   pull_request:
     branches: [ main ]
+    paths:
+      - '**/pom.xml'
+      - '.github/workflows/dependency-review.yml'
 
 permissions:
   contents: read
