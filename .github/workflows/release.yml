@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version without leading v, for example 0.1.0. Must match the current SNAPSHOT base.'
+        required: true
+        type: string
+      next_development_version:
+        description: 'Next development version, for example 0.1.1-SNAPSHOT. Leave empty to increment patch.'
+        required: false
+        type: string
+        default: ''
+      skip_tests:
+        description: 'Skip tests during release build'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Validate without pushing commits, tags, packages or GitHub releases'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, publish and prepare next development version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Run release script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          NEXT_VERSION_INPUT: ${{ inputs.next_development_version }}
+          SKIP_TESTS: ${{ inputs.skip_tests }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          SOURCE_BRANCH: ${{ github.ref_name }}
+        run: |
+          chmod +x .github/scripts/release.sh .github/scripts/update-release-metadata.py
+          .github/scripts/release.sh
