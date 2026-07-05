@@ -124,7 +124,7 @@
       <dependency>
         <groupId>org.jboss.logging</groupId>
         <artifactId>jboss-logging</artifactId>
-        <version>3.6.0.Final</version>
+        <version>3.6.3.Final</version>
       </dependency>
       <!-- Pin the upper bound to resolve convergence between jakarta.xml.bind-api (2.1.0)
            and jaxb-core/angus-activation (2.1.1) transitive pulls from hibernate-core -->
