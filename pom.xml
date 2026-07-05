@@ -65,7 +65,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <jgit.version>7.7.0.202606012155-r</jgit.version>
-    <hibernate.version>6.6.13.Final</hibernate.version>
+    <hibernate.version>7.4.4.Final</hibernate.version>
     <hibernate-search.version>7.2.0.Final</hibernate-search.version>
     <junit.version>6.1.1</junit.version>
     <h2.version>2.3.232</h2.version>
