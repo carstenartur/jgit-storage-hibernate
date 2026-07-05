@@ -109,6 +109,23 @@
         <artifactId>jgit-storage-hibernate-core</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <!-- Pin upper bounds to resolve transitive convergence conflicts caused by
+           hibernate-search-mapper-orm pulling older versions than hibernate-core -->
+      <dependency>
+        <groupId>org.hibernate.orm</groupId>
+        <artifactId>hibernate-core</artifactId>
+        <version>${hibernate.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.hibernate.common</groupId>
+        <artifactId>hibernate-commons-annotations</artifactId>
+        <version>7.0.3.Final</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jboss.logging</groupId>
+        <artifactId>jboss-logging</artifactId>
+        <version>3.6.0.Final</version>
+      </dependency>
       <!-- Pin the upper bound to resolve convergence between jakarta.xml.bind-api (2.1.0)
            and jaxb-core/angus-activation (2.1.1) transitive pulls from hibernate-core -->
       <dependency>

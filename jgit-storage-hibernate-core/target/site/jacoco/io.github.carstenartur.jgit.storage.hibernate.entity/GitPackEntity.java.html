@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GitPackEntity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jgit-storage-hibernate Core</a> &gt; <a href="index.source.html" class="el_package">io.github.carstenartur.jgit.storage.hibernate.entity</a> &gt; <span class="el_source">GitPackEntity.java</span></div><h1>GitPackEntity.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2026, Carsten Hammer and contributors.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the BSD 3-Clause License.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+package io.github.carstenartur.jgit.storage.hibernate.entity;
+
+import jakarta.persistence.Basic;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Nationalized;
+import org.hibernate.type.SqlTypes;
+
+/** Entity representing one persisted pack-related file, such as PACK, IDX or REFTABLE. */
+@Entity
+@Table(
+    name = &quot;git_packs&quot;,
+    indexes = {
+      @Index(name = &quot;idx_pack_repo&quot;, columnList = &quot;repository_name&quot;),
+      @Index(name = &quot;idx_pack_repo_name&quot;, columnList = &quot;repository_name, pack_name&quot;),
+      @Index(name = &quot;idx_pack_repo_committed&quot;, columnList = &quot;repository_name, committed&quot;)
+    },
+    uniqueConstraints = {
+      @UniqueConstraint(
+          name = &quot;uk_pack_repo_name_ext&quot;,
+          columnNames = {&quot;repository_name&quot;, &quot;pack_name&quot;, &quot;pack_extension&quot;})
+    })
+<span class="fc" id="L40">public class GitPackEntity {</span>
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @Nationalized
+  @Column(name = &quot;repository_name&quot;, nullable = false, length = 255)
+  private String repositoryName;
+
+  @Nationalized
+  @Column(name = &quot;pack_name&quot;, nullable = false, length = 255)
+  private String packName;
+
+  @Column(name = &quot;pack_extension&quot;, nullable = false, length = 32)
+  private String packExtension;
+
+  @JdbcTypeCode(SqlTypes.LONG32VARBINARY)
+  @Basic(fetch = FetchType.LAZY)
+  @Column(name = &quot;data&quot;, nullable = false)
+  private byte[] data;
+
+  @Column(name = &quot;file_size&quot;, nullable = false)
+  private long fileSize;
+
+  @Column(name = &quot;committed&quot;, nullable = false)
+  private boolean committed;
+
+  @Column(name = &quot;created_at&quot;, nullable = false)
+  private Instant createdAt;
+
+  @Column(name = &quot;committed_at&quot;)
+  private Instant committedAt;
+
+  public Long getId() {
+<span class="fc" id="L75">    return id;</span>
+  }
+
+  public void setId(Long id) {
+<span class="nc" id="L79">    this.id = id;</span>
+<span class="nc" id="L80">  }</span>
+
+  public String getRepositoryName() {
+<span class="nc" id="L83">    return repositoryName;</span>
+  }
+
+  public void setRepositoryName(String repositoryName) {
+<span class="fc" id="L87">    this.repositoryName = repositoryName;</span>
+<span class="fc" id="L88">  }</span>
+
+  public String getPackName() {
+<span class="nc" id="L91">    return packName;</span>
+  }
+
+  public void setPackName(String packName) {
+<span class="fc" id="L95">    this.packName = packName;</span>
+<span class="fc" id="L96">  }</span>
+
+  public String getPackExtension() {
+<span class="nc" id="L99">    return packExtension;</span>
+  }
+
+  public void setPackExtension(String packExtension) {
+<span class="fc" id="L103">    this.packExtension = packExtension;</span>
+<span class="fc" id="L104">  }</span>
+
+  public byte[] getData() {
+<span class="fc" id="L107">    return data;</span>
+  }
+
+  public void setData(byte[] data) {
+<span class="fc" id="L111">    this.data = data;</span>
+<span class="fc" id="L112">  }</span>
+
+  public long getFileSize() {
+<span class="nc" id="L115">    return fileSize;</span>
+  }
+
+  public void setFileSize(long fileSize) {
+<span class="fc" id="L119">    this.fileSize = fileSize;</span>
+<span class="fc" id="L120">  }</span>
+
+  public boolean isCommitted() {
+<span class="nc" id="L123">    return committed;</span>
+  }
+
+  public void setCommitted(boolean committed) {
+<span class="fc" id="L127">    this.committed = committed;</span>
+<span class="fc" id="L128">  }</span>
+
+  public Instant getCreatedAt() {
+<span class="nc" id="L131">    return createdAt;</span>
+  }
+
+  public void setCreatedAt(Instant createdAt) {
+<span class="fc" id="L135">    this.createdAt = createdAt;</span>
+<span class="fc" id="L136">  }</span>
+
+  public Instant getCommittedAt() {
+<span class="nc" id="L139">    return committedAt;</span>
+  }
+
+  public void setCommittedAt(Instant committedAt) {
+<span class="fc" id="L143">    this.committedAt = committedAt;</span>
+<span class="fc" id="L144">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

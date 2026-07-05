@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: io.github.carstenartur.jgit.storage.hibernate.search.GitHistorySearchH2Test
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.843 s -- in io.github.carstenartur.jgit.storage.hibernate.search.GitHistorySearchH2Test
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.159 s -- in io.github.carstenartur.jgit.storage.hibernate.search.GitHistorySearchH2Test

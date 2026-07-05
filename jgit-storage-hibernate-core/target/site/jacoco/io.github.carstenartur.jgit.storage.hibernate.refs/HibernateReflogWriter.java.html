@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HibernateReflogWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jgit-storage-hibernate Core</a> &gt; <a href="index.source.html" class="el_package">io.github.carstenartur.jgit.storage.hibernate.refs</a> &gt; <span class="el_source">HibernateReflogWriter.java</span></div><h1>HibernateReflogWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (C) 2026, Carsten Hammer and contributors.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the BSD 3-Clause License.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+package io.github.carstenartur.jgit.storage.hibernate.refs;
+
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
+import java.time.Instant;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
+
+/** Writes queryable reflog entries to the {@code git_reflog} table. */
+public class HibernateReflogWriter {
+
+  private final SessionFactory sessionFactory;
+  private final String repositoryName;
+
+  /**
+   * Create a writer.
+   *
+   * @param sessionFactory Hibernate session factory
+   * @param repositoryName logical repository name
+   */
+<span class="fc" id="L31">  public HibernateReflogWriter(SessionFactory sessionFactory, String repositoryName) {</span>
+<span class="fc" id="L32">    this.sessionFactory = sessionFactory;</span>
+<span class="fc" id="L33">    this.repositoryName = repositoryName;</span>
+<span class="fc" id="L34">  }</span>
+
+  /**
+   * Append a reflog entry.
+   *
+   * @param refName reference name
+   * @param oldId old object id, or {@code null}
+   * @param newId new object id, or {@code null}
+   * @param who actor
+   * @param message reflog message
+   */
+  public void log(String refName, ObjectId oldId, ObjectId newId, PersonIdent who, String message) {
+<span class="fc" id="L46">    GitReflogEntity entry = new GitReflogEntity();</span>
+<span class="fc" id="L47">    entry.setRepositoryName(repositoryName);</span>
+<span class="fc" id="L48">    entry.setRefName(refName);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">    entry.setOldId(oldId != null ? oldId.name() : ObjectId.zeroId().name());</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">    entry.setNewId(newId != null ? newId.name() : ObjectId.zeroId().name());</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">    if (who != null) {</span>
+<span class="fc" id="L52">      entry.setWhoName(who.getName());</span>
+<span class="fc" id="L53">      entry.setWhoEmail(who.getEmailAddress());</span>
+<span class="fc" id="L54">      entry.setWhen(who.getWhenAsInstant());</span>
+    } else {
+<span class="nc" id="L56">      entry.setWhen(Instant.now());</span>
+    }
+<span class="fc" id="L58">    entry.setMessage(message);</span>
+
+<span class="fc" id="L60">    try (Session session = sessionFactory.openSession()) {</span>
+<span class="fc" id="L61">      Transaction transaction = session.beginTransaction();</span>
+      try {
+<span class="fc" id="L63">        session.persist(entry);</span>
+<span class="fc" id="L64">        transaction.commit();</span>
+<span class="nc" id="L65">      } catch (RuntimeException e) {</span>
+<span class="nc" id="L66">        transaction.rollback();</span>
+<span class="nc" id="L67">        throw e;</span>
+<span class="fc" id="L68">      }</span>
+    }
+<span class="fc" id="L70">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
