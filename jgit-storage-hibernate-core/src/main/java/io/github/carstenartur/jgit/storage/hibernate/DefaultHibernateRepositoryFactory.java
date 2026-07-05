@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.util.Objects;
 
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
-import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepositoryBuilder;
 import org.hibernate.SessionFactory;
 
 /** Default factory that opens Hibernate-backed JGit repositories from a {@link SessionFactory}. */
@@ -34,10 +33,7 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
     Objects.requireNonNull(repositoryName, "repositoryName");
     try {
       HibernateRepository repository =
-          new HibernateRepositoryBuilder()
-              .setSessionFactory(sessionFactory)
-              .setRepositoryName(repositoryName.value())
-              .build();
+          HibernateRepository.create(sessionFactory, repositoryName.value());
       if (!repository.exists()) {
         repository.create(true);
       }

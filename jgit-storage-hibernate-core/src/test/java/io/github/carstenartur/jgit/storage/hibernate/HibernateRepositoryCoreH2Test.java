@@ -16,7 +16,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
-import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepositoryBuilder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
@@ -56,11 +55,7 @@ class HibernateRepositoryCoreH2Test {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     repositoryName = "core-h2-" + TEST_COUNTER.incrementAndGet();
     provider = new HibernateSessionFactoryProvider(h2Properties(repositoryName));
-    repository =
-        new HibernateRepositoryBuilder()
-            .setSessionFactory(provider.getSessionFactory())
-            .setRepositoryName(repositoryName)
-            .build();
+    repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     repository.create(true);
   }
 
@@ -120,11 +115,7 @@ class HibernateRepositoryCoreH2Test {
     updateRef("refs/heads/main", commitId);
     repository.close();
 
-    repository =
-        new HibernateRepositoryBuilder()
-            .setSessionFactory(provider.getSessionFactory())
-            .setRepositoryName(repositoryName)
-            .build();
+    repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
 
     Ref ref = repository.exactRef("refs/heads/main");
     assertNotNull(ref);

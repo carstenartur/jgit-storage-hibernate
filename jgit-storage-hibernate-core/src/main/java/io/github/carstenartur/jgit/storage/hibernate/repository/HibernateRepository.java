@@ -39,7 +39,7 @@ public class HibernateRepository extends DfsRepository {
    *
    * @param builder configured repository builder
    */
-  public HibernateRepository(HibernateRepositoryBuilder builder) {
+  HibernateRepository(HibernateRepositoryBuilder builder) {
     super(builder);
     this.sessionFactory = builder.getSessionFactory();
     this.repositoryName = builder.getRepositoryName();
@@ -47,6 +47,22 @@ public class HibernateRepository extends DfsRepository {
         new HibernateObjDatabase(this, builder.getReaderOptions(), sessionFactory, repositoryName);
     this.refDatabase = new HibernateRefDatabase(this);
     this.reflogWriter = new HibernateReflogWriter(sessionFactory, repositoryName);
+  }
+
+  /**
+   * Create a repository for the given logical repository name.
+   *
+   * @param sessionFactory Hibernate session factory
+   * @param repositoryName logical repository name
+   * @return configured repository instance
+   * @throws IOException if repository cannot be built
+   */
+  public static HibernateRepository create(SessionFactory sessionFactory, String repositoryName)
+      throws IOException {
+    return new HibernateRepositoryBuilder()
+        .setSessionFactory(sessionFactory)
+        .setRepositoryName(repositoryName)
+        .build();
   }
 
   @Override

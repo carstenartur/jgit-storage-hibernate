@@ -206,17 +206,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   @Override
   public long getApproximateObjectCount() {
-    try (Session session = sessionFactory.openSession()) {
-      Long count =
-          session
-              .createQuery(
-                  "SELECT COUNT(DISTINCT p.packName) FROM GitPackEntity p "
-                      + "WHERE p.repositoryName = :repo AND p.committed = true",
-                  Long.class)
-              .setParameter("repo", repositoryName)
-              .uniqueResult();
-      return count != null ? count.longValue() : 0L;
-    }
+    return 0L;
   }
 
   private static final class HibernatePackOutputStream extends DfsOutputStream {
@@ -279,12 +269,14 @@ public class HibernateObjDatabase extends DfsObjDatabase {
             entity.setPackName(packName);
             entity.setPackExtension(packExtension);
             entity.setCreatedAt(Instant.now());
-            session.persist(entity);
           }
           entity.setData(bytes);
           entity.setFileSize(bytes.length);
           entity.setCommitted(false);
           entity.setCommittedAt(null);
+          if (entity.getId() == null) {
+            session.persist(entity);
+          }
           transaction.commit();
         } catch (RuntimeException e) {
           transaction.rollback();

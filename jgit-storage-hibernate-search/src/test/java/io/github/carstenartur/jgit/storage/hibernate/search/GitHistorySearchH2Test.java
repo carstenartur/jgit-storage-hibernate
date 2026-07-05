@@ -13,7 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
-import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepositoryBuilder;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitIndexer;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
@@ -47,7 +46,7 @@ class GitHistorySearchH2Test {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     repositoryName = "history-h2-" + TEST_COUNTER.incrementAndGet();
     provider = new HibernateSessionFactoryProvider(h2Properties(repositoryName), SearchEntities.annotatedClasses());
-    repository = new HibernateRepositoryBuilder().setSessionFactory(provider.getSessionFactory()).setRepositoryName(repositoryName).build();
+    repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     repository.create(true);
   }
 

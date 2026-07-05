@@ -10,12 +10,13 @@ package io.github.carstenartur.jgit.storage.hibernate.repository;
 
 import java.io.IOException;
 import java.util.Objects;
+import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryBuilder;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.hibernate.SessionFactory;
 
-/** Builder for {@link HibernateRepository}. */
-public class HibernateRepositoryBuilder
+/** Internal builder for {@link HibernateRepository}. */
+class HibernateRepositoryBuilder
     extends DfsRepositoryBuilder<HibernateRepositoryBuilder, HibernateRepository> {
 
   private SessionFactory sessionFactory;
@@ -70,7 +71,9 @@ public class HibernateRepositoryBuilder
       throw new IllegalArgumentException("repositoryName is required");
     }
     Objects.requireNonNull(sessionFactory, "sessionFactory");
-    setup();
+    if (getReaderOptions() == null) {
+      setReaderOptions(new DfsReaderOptions());
+    }
     if (getRepositoryDescription() == null
         || getRepositoryDescription().getRepositoryName() == null
         || getRepositoryDescription().getRepositoryName().isBlank()) {
