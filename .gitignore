@@ -1,0 +1,24 @@
+# Maven
+/target/
+
+# Java
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# IDEs
+/.idea/
+*.iml
+/.classpath
+/.project
+/.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local runtime data
+/.data/
+/.h2/
+/lucene-indexes/
