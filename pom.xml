@@ -44,6 +44,19 @@
     <tag>HEAD</tag>
   </scm>
 
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
+    </repository>
+    <snapshotRepository>
+      <id>github</id>
+      <name>GitHub Packages Snapshots</name>
+      <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
+    </snapshotRepository>
+  </distributionManagement>
+
   <properties>
     <java.version>17</java.version>
     <maven.compiler.release>${java.version}</maven.compiler.release>
@@ -61,6 +74,7 @@
     <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
     <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+    <versions-maven-plugin.version>2.18.0</versions-maven-plugin.version>
   </properties>
 
   <repositories>
@@ -131,6 +145,11 @@
             <failOnWarnings>false</failOnWarnings>
             <additionalJOption>-Xdoclint:none</additionalJOption>
           </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>versions-maven-plugin</artifactId>
+          <version>${versions-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
