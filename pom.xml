@@ -80,7 +80,7 @@
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
     <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-    <linkage-checker-enforcer-rules.version>1.5.7</linkage-checker-enforcer-rules.version>
+    <linkage-checker-enforcer-rules.version>1.5.15</linkage-checker-enforcer-rules.version>
   </properties>
 
   <repositories>
