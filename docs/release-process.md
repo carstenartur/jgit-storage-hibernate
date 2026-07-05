@@ -9,6 +9,9 @@ The release publishes:
 - `io.github.carstenartur:jgit-storage-hibernate-parent`
 - `io.github.carstenartur:jgit-storage-hibernate-core`
 - `io.github.carstenartur:jgit-storage-hibernate-search`
+- `io.github.carstenartur:jgit-storage-hibernate-benchmarks`
+
+The benchmark artifact is for CI and release review. Runtime consumers should normally depend only on `jgit-storage-hibernate-core` and optionally `jgit-storage-hibernate-search`.
 
 The GitHub Release also contains built JARs and metadata files.
 
@@ -27,6 +30,10 @@ release_version = 0.1.0
 ```
 
 The workflow validates the current snapshot version, sets the release version, updates citation metadata, runs `mvn verify`, deploys to GitHub Packages, creates a tag and GitHub Release, then bumps to the next development snapshot.
+
+## Benchmarks
+
+JMH benchmarks live in `jgit-storage-hibernate-benchmarks` and are run by `.github/workflows/performance.yml`.
 
 ## DOI and Zenodo
 
