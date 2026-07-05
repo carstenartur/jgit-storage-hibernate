@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "label": "perf smoke",
+  "label": "JMH",
   "message": "not run",
   "color": "lightgrey"
 }
