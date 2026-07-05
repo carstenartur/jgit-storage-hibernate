@@ -1,6 +1,10 @@
 # jgit-storage-hibernate
 
 [![Java CI with Maven](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/coverage.json)](docs/badges/coverage.json)
+[![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/tests.json)](docs/badges/tests.json)
+[![Performance Smoke](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
+[![Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](docs/badges/performance.json)
 [![Publish Snapshot](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml)
 [![Release](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml)
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-blue)](pom.xml)
@@ -57,6 +61,10 @@ This split is intentional. Simple consumers should not have to carry Lucene, Hib
 - Support JGit reftable reference updates through the DFS abstraction.
 - Index Git commit metadata, paths and text content in the optional search module.
 - Provide H2 integration tests for the core and search modules.
+
+## Quality metrics
+
+Coverage and test-count badges are generated from JaCoCo and Surefire reports during CI. The performance badge is a CI smoke measurement for the core H2 repository lifecycle test, not a stable microbenchmark.
 
 ## Consuming
 
