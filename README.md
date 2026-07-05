@@ -8,17 +8,28 @@ The project is intended for applications that need Git semantics without relying
 
 ## Status
 
-This repository is being bootstrapped as an independent infrastructure module. The initial implementation should be extracted and consolidated from the existing `carstenartur/jgit` Hibernate storage work, instead of copying the same storage code into every consuming application.
+This repository is being bootstrapped as an independent infrastructure module. The initial implementation consolidates the reusable parts of the existing `carstenartur/jgit` and `sandbox-jgit-storage-hibernate` work, instead of copying the same storage code into every consuming application.
 
-The first technical milestone is a feasibility spike:
+The first technical milestone is a releaseable core plus an optional search module:
 
 ```text
 JGit Repository API
-  -> dedicated jgit-storage-hibernate facade
-  -> Hibernate-backed DFS/Reftable storage adapter
-  -> relational database
-  -> optional Hibernate Search projections
+  -> jgit-storage-hibernate-core
+       -> Hibernate-backed DFS/Reftable storage adapter
+       -> relational database
+  -> jgit-storage-hibernate-search
+       -> Hibernate Search commit/history projections
+       -> Lucene-backed full-text search
 ```
+
+## Modules
+
+| Module | Purpose | Intended consumers |
+|---|---|---|
+| `jgit-storage-hibernate-core` | Database-backed JGit repository storage for packs, reftables and queryable reflogs. | Applications that need Git semantics without filesystem-backed `.git` directories. |
+| `jgit-storage-hibernate-search` | Optional commit/history projections and full-text search over messages, paths and indexed text content. | Applications that want searchable Git history through Hibernate Search/Lucene. |
+
+This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search or future Java/JDT-specific analysis dependencies. Java source analysis, embeddings and REST server functionality remain extension candidates and are not part of the core storage artifact.
 
 ## Design stance
 
@@ -29,15 +40,15 @@ JGit Repository API
 - The initial Java baseline is Java 17 to align with modern JGit releases and remain usable from Java 21 applications.
 - The license is BSD-3-Clause, chosen to stay close to JGit's Eclipse Distribution License / BSD-3-Clause-compatible licensing model.
 
-## Planned capabilities
+## Current capabilities
 
 - Open or create a JGit repository backed by Hibernate-managed database tables.
 - Persist Git pack data and reftable data in relational databases.
-- Persist and read reflogs.
-- Support atomic reference updates through database transactions where technically possible.
-- Provide optional Hibernate Search projections for searchable Git history.
-- Provide tests for H2 first, then PostgreSQL, MariaDB/MySQL and SQL Server.
-- Keep all JGit internal API usage isolated in implementation packages.
+- Keep newly written pack extensions hidden until JGit commits the pack, avoiding visible half-written pack rows.
+- Persist and read queryable reflog entries.
+- Support JGit reftable reference updates through the DFS abstraction.
+- Index Git commit metadata, paths and text content in the optional search module.
+- Provide H2 integration tests for the core and search modules.
 
 ## Non-goals
 
@@ -45,6 +56,33 @@ JGit Repository API
 - This project does not replace JGit.
 - This project does not define domain-specific workflow models.
 - This project should not contain application-specific logic from Audio Analyzer, Taxonomy or Sandbox.
+- This project should not expose JGit internal package types through public APIs.
+
+## Basic usage
+
+```java
+Properties properties = new Properties();
+properties.put("hibernate.connection.url", "jdbc:h2:mem:demo;DB_CLOSE_DELAY=-1");
+properties.put("hibernate.connection.driver_class", "org.h2.Driver");
+properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+properties.put("hibernate.hbm2ddl.auto", "update");
+
+try (HibernateSessionFactoryProvider provider = new HibernateSessionFactoryProvider(properties)) {
+    HibernateRepositoryFactory factory =
+        new DefaultHibernateRepositoryFactory(provider.getSessionFactory());
+
+    try (HibernateGitStorage storage = factory.open(new RepositoryName("demo"))) {
+        Repository repository = storage.repository();
+        // Use standard JGit APIs here.
+    }
+}
+```
+
+For search projections, create the session factory with the additional search entities:
+
+```java
+new HibernateSessionFactoryProvider(properties, SearchEntities.annotatedClasses());
+```
 
 ## Expected consumers
 
