@@ -9,3 +9,28 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      jgit:
+        patterns:
+          - "org.eclipse.jgit:org.eclipse.jgit"
+      hibernate:
+        patterns:
+          - "org.hibernate.orm:hibernate-core"
+          - "org.hibernate.search:hibernate-search-mapper-orm"
+          - "org.hibernate.search:hibernate-search-backend-lucene"
+      build-plugins:
+        patterns:
+          - "org.apache.maven.plugins:maven-compiler-plugin"
+          - "org.apache.maven.plugins:maven-enforcer-plugin"
+          - "org.apache.maven.plugins:maven-surefire-plugin"
+          - "org.apache.maven.plugins:maven-jar-plugin"
+          - "org.apache.maven.plugins:maven-source-plugin"
+          - "org.apache.maven.plugins:maven-javadoc-plugin"
+          - "org.apache.maven.plugins:maven-shade-plugin"
+          - "org.codehaus.mojo:versions-maven-plugin"
+          - "org.jacoco:jacoco-maven-plugin"
+    ignore:
+      - dependency-name: "org.eclipse.jgit:org.eclipse.jgit"
+        update-types:
+          - "version-update:semver-major"
