@@ -1,4 +1,4 @@
-name: Performance Smoke
+name: JMH Benchmarks
 
 on:
   workflow_dispatch:
@@ -11,8 +11,8 @@ permissions:
   contents: write
 
 jobs:
-  performance-smoke:
-    name: Repository lifecycle performance smoke
+  jmh:
+    name: Hibernate storage JMH benchmarks
     runs-on: ubuntu-latest
 
     steps:
@@ -26,31 +26,32 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Run core integration-test performance smoke
-        run: |
-          mkdir -p target/performance
-          set +e
-          /usr/bin/time -f "%e" -o target/performance/seconds.txt \
-            mvn -B -q -pl jgit-storage-hibernate-core -Dtest=HibernateRepositoryCoreH2Test test \
-            > target/performance/performance.log 2>&1
-          status=$?
-          tail -n 80 target/performance/performance.log
-          exit $status
+      - name: Build benchmark jar
+        run: mvn -B -q -pl jgit-storage-hibernate-benchmarks -am package -DskipTests
 
-      - name: Generate performance badge
+      - name: Run JMH benchmarks
+        run: |
+          mkdir -p target/benchmarks
+          java -jar jgit-storage-hibernate-benchmarks/target/benchmarks.jar \
+            -wi 1 -i 3 -f 1 -r 1s -w 1s \
+            -rf json -rff target/benchmarks/jmh-result.json \
+            '.*HibernateRepositoryBenchmark.*' \
+            | tee target/benchmarks/jmh-output.txt
+
+      - name: Generate JMH performance badge
         if: always()
         run: |
-          if [ -f target/performance/seconds.txt ]; then
-            python3 .github/scripts/write-performance-badge.py "$(cat target/performance/seconds.txt)"
+          if [ -f target/benchmarks/jmh-result.json ]; then
+            python3 .github/scripts/write-performance-badge.py target/benchmarks/jmh-result.json
           fi
 
-      - name: Upload performance results
+      - name: Upload JMH benchmark results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: performance-smoke-results
+          name: jmh-benchmark-results
           path: |
-            target/performance/*
+            target/benchmarks/*
             docs/badges/performance.json
 
       - name: Update performance badge data on main
@@ -63,5 +64,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add docs/badges/performance.json
-          git commit -m "Update performance badge [skip ci]"
+          git commit -m "Update JMH performance badge [skip ci]"
           git push
