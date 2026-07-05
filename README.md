@@ -1,5 +1,13 @@
 # jgit-storage-hibernate
 
+[![Java CI with Maven](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
+[![Publish Snapshot](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml)
+[![Release](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml)
+[![Java 17+](https://img.shields.io/badge/Java-17%2B-blue)](pom.xml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+[![Maven: GitHub Packages](https://img.shields.io/badge/Maven-GitHub%20Packages-blue)](docs/consuming.md)
+[![Citation: CFF](https://img.shields.io/badge/Citation-CFF-blue)](CITATION.cff)
+
 Hibernate-backed storage backend for JGit repositories.
 
 `jgit-storage-hibernate` provides a database-backed repository implementation for JGit. The goal is to persist Git pack data, references, reflogs and optional searchable history projections in relational databases through Hibernate ORM and Hibernate Search.
