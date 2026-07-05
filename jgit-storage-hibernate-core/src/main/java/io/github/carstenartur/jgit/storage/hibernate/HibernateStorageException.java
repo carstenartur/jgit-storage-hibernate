@@ -11,10 +11,21 @@ package io.github.carstenartur.jgit.storage.hibernate;
 /** Runtime exception raised by the Hibernate-backed storage facade. */
 public class HibernateStorageException extends RuntimeException {
 
+  /**
+   * Create an exception with a message.
+   *
+   * @param message error message
+   */
   public HibernateStorageException(String message) {
     super(message);
   }
 
+  /**
+   * Create an exception with a message and cause.
+   *
+   * @param message error message
+   * @param cause root cause
+   */
   public HibernateStorageException(String message, Throwable cause) {
     super(message, cause);
   }
