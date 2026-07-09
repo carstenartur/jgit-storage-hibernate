@@ -12,7 +12,7 @@ The CI workflow `.github/workflows/jgit-compatibility.yml` verifies the full Mav
 | `7.6.0.202603022253-r` | Intermediate compatibility line. |
 | `7.7.0.202606012155-r` | Current primary version used by the parent POM. |
 
-Each version is tested on Java 17 and Java 21. Java 17 remains the release baseline; Java 21 protects consuming applications that run newer JVMs.
+Each version is tested on Java 21. Java 21 is the project baseline for the storage, search and optional Java/JDT analysis modules.
 
 ## Maven guardrails
 
@@ -55,5 +55,5 @@ Before merging a dependency update:
 1. Check that the normal Maven workflow is green.
 2. Check that the JGit compatibility matrix is green.
 3. For JGit updates, confirm that the supported matrix in this document and the workflow still matches the support policy.
-4. For Hibernate, Hibernate Search or Lucene updates, consider running the optional linkage profile.
+4. For Hibernate, Hibernate Search, Lucene or JDT Core updates, consider running the optional linkage profile.
 5. Do not merge JGit major-version jumps without an explicit compatibility review.
