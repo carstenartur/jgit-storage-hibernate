@@ -88,7 +88,7 @@ public class JavaJdtAnalyzer {
     } catch (RuntimeException e) {
       run.setStatus(JavaAnalysisStatus.FAILED);
       run.setCompletedAt(Instant.now());
-      run.setFailureMessage(e.getMessage());
+      run.setFailureMessage(e.toString());
       return new JavaAnalysisResult(run, List.of(), List.of());
     }
   }
@@ -106,8 +106,9 @@ public class JavaJdtAnalyzer {
     if (configuration.resolveBindings()) {
       parser.setResolveBindings(true);
       parser.setBindingsRecovery(configuration.recoverBindings());
+      String[] classpath = mergeClasspathAndModulepath(configuration);
       parser.setEnvironment(
-          configuration.classpathEntries().toArray(String[]::new),
+          classpath,
           configuration.sourcepathEntries().toArray(String[]::new),
           encodings(configuration),
           configuration.includeRunningVmBootClasspath());
@@ -121,9 +122,18 @@ public class JavaJdtAnalyzer {
       return null;
     }
     if (configuration.encodings().size() != configuration.sourcepathEntries().size()) {
-      return null;
+      throw new IllegalArgumentException(
+          "encodings count (" + configuration.encodings().size()
+              + ") must match sourcepathEntries count ("
+              + configuration.sourcepathEntries().size() + ")");
     }
     return configuration.encodings().toArray(String[]::new);
+  }
+
+  private static String[] mergeClasspathAndModulepath(JavaAnalysisConfiguration configuration) {
+    List<String> merged = new ArrayList<>(configuration.classpathEntries());
+    merged.addAll(configuration.modulepathEntries());
+    return merged.toArray(String[]::new);
   }
 
   private static Map<String, String> compilerOptions(JavaAnalysisConfiguration configuration) {
@@ -289,7 +299,7 @@ public class JavaJdtAnalyzer {
       symbol.setSignature(signature);
       symbol.setReturnType(returnType(node, binding));
       symbol.setParameterTypes(parameterTypes(node, binding));
-      symbol.setModifiers(Modifier.toString(node.getModifiers()));
+      symbol.setModifiers(modifiersToString(node));
       symbol.setAnnotations(annotations(node));
       symbol.setRawBindingKey(JavaBindingKeys.rawKey(binding));
       symbol.setDeclarationBindingKey(JavaBindingKeys.declarationKey(binding));
@@ -318,7 +328,7 @@ public class JavaJdtAnalyzer {
         symbol.setSignature(node.getType().toString() + " " + simpleName);
         symbol.setReturnType(null);
         symbol.setParameterTypes(null);
-        symbol.setModifiers(Modifier.toString(node.getModifiers()));
+        symbol.setModifiers(modifiersToString(node));
         symbol.setAnnotations(annotations(node));
         symbol.setRawBindingKey(JavaBindingKeys.rawKey(binding));
         symbol.setDeclarationBindingKey(JavaBindingKeys.declarationKey(binding));
@@ -354,30 +364,28 @@ public class JavaJdtAnalyzer {
     @Override
     public boolean visit(SimpleType node) {
       addTypeReference(node, node.resolveBinding(), node.toString());
-      return true;
+      return false;
     }
 
     @Override
     public boolean visit(QualifiedType node) {
       addTypeReference(node, node.resolveBinding(), node.toString());
-      return true;
+      return false;
     }
 
     @Override
     public boolean visit(NameQualifiedType node) {
       addTypeReference(node, node.resolveBinding(), node.toString());
-      return true;
+      return false;
     }
 
     @Override
     public boolean visit(ParameterizedType node) {
-      addTypeReference(node, node.resolveBinding(), node.toString());
       return true;
     }
 
     @Override
     public boolean visit(ArrayType node) {
-      addTypeReference(node, node.resolveBinding(), node.toString());
       return true;
     }
 
@@ -412,7 +420,7 @@ public class JavaJdtAnalyzer {
       symbol.setSignature(qualifiedName);
       symbol.setReturnType(null);
       symbol.setParameterTypes(null);
-      symbol.setModifiers(Modifier.toString(node.getModifiers()));
+      symbol.setModifiers(modifiersToString(node));
       symbol.setAnnotations(annotations(node));
       symbol.setRawBindingKey(JavaBindingKeys.rawKey(binding));
       symbol.setDeclarationBindingKey(JavaBindingKeys.declarationKey(binding));
@@ -525,10 +533,12 @@ public class JavaJdtAnalyzer {
       return node.getReturnType2() == null ? null : node.getReturnType2().toString();
     }
 
+    @SuppressWarnings("unchecked")
     private String annotations(BodyDeclaration declaration) {
-      return declaration.modifiers().stream()
+      List<Object> mods = (List<Object>) declaration.modifiers();
+      return mods.stream()
           .filter(Annotation.class::isInstance)
-          .map(Object::toString)
+          .map(m -> ((Annotation) m).toString())
           .reduce((left, right) -> left + "\n" + right)
           .orElse(null);
     }
@@ -548,6 +558,16 @@ public class JavaJdtAnalyzer {
     private void popDeclaringType() {
       declaringTypes.pop();
       declaringSymbolKeys.pop();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String modifiersToString(BodyDeclaration node) {
+      List<Object> mods = (List<Object>) node.modifiers();
+      return mods.stream()
+          .filter(Modifier.class::isInstance)
+          .map(m -> ((Modifier) m).getKeyword().toString())
+          .reduce((a, b) -> a + " " + b)
+          .orElse(null);
     }
   }
 }
