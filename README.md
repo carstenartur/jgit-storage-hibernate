@@ -7,7 +7,7 @@
 [![JMH Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](docs/badges/performance.json)
 [![Publish Snapshot](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml)
 [![Release](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml)
-[![Java 17+](https://img.shields.io/badge/Java-17%2B-blue)](pom.xml)
+[![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)](pom.xml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 [![Maven: GitHub Packages](https://img.shields.io/badge/Maven-GitHub%20Packages-blue)](docs/consuming.md)
 [![Citation: CFF](https://img.shields.io/badge/Citation-CFF-blue)](CITATION.cff)
@@ -23,7 +23,7 @@ The project is intended for applications that need Git semantics without relying
 
 This repository is being bootstrapped as an independent infrastructure module. The initial implementation consolidates the reusable parts of the existing `carstenartur/jgit` and `sandbox-jgit-storage-hibernate` work, instead of copying the same storage code into every consuming application.
 
-The first technical milestone is a releasable core plus optional search and benchmark modules:
+The first technical milestone is a releasable core plus optional search, Java analysis and benchmark modules:
 
 ```text
 JGit Repository API
@@ -33,6 +33,9 @@ JGit Repository API
   -> jgit-storage-hibernate-search
        -> Hibernate Search commit/history projections
        -> Lucene-backed full-text search
+  -> jgit-storage-hibernate-java-analysis
+       -> JDT Core based Java structure and binding projections
+       -> binding-aware Java symbol/reference search
   -> jgit-storage-hibernate-benchmarks
        -> JMH benchmarks for storage operations
 ```
@@ -43,9 +46,10 @@ JGit Repository API
 |---|---|---|
 | `jgit-storage-hibernate-core` | Database-backed JGit repository storage for packs, reftables and queryable reflogs. | Applications that need Git semantics without filesystem-backed `.git` directories. |
 | `jgit-storage-hibernate-search` | Optional commit/history projections and full-text search over messages, paths and indexed text content. | Applications that want searchable Git history through Hibernate Search/Lucene. |
+| `jgit-storage-hibernate-java-analysis` | Optional Java/JDT analysis, binding-aware Java symbol/reference projections and Hibernate Search entities. | Applications that want Java-specific search over Git history without Eclipse UI, cleanup or quickfix dependencies. |
 | `jgit-storage-hibernate-benchmarks` | JMH benchmarks for core repository operations. | CI, maintainers and release reviewers; not a runtime dependency. |
 
-This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search, JMH or future Java/JDT-specific analysis dependencies. Java source analysis, embeddings and REST server functionality remain extension candidates and are not part of the core storage artifact.
+This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search, JDT Core, JMH or future Java/JDT-specific analysis dependencies. Java source analysis remains optional and does not expose JDT AST or binding types through public APIs.
 
 ## Design stance
 
@@ -53,7 +57,7 @@ This split is intentional. Simple consumers should not have to carry Lucene, Hib
 - The project is not affiliated with the Eclipse Foundation.
 - JGit internals must be encapsulated behind this module and must not leak into consuming applications.
 - Consuming applications should depend on a stable facade, not on `org.eclipse.jgit.internal.*` packages.
-- The initial Java baseline is Java 17 to align with modern JGit releases and remain usable from Java 21 applications.
+- The Java baseline is Java 21 to align the storage, search and Java/JDT analysis modules with the current Sandbox toolchain.
 - The license is BSD-3-Clause, chosen to stay close to JGit's Eclipse Distribution License / BSD-3-Clause-compatible licensing model.
 
 ## Current capabilities
@@ -64,6 +68,7 @@ This split is intentional. Simple consumers should not have to carry Lucene, Hib
 - Persist and read queryable reflog entries.
 - Support JGit reftable reference updates through the DFS abstraction.
 - Index Git commit metadata, paths and text content in the optional search module.
+- Analyze Java source snapshots with JDT Core and persist binding-aware symbol/reference projections in the optional Java analysis module.
 - Provide H2 integration tests for the core and search modules.
 - Provide JMH benchmarks for core repository operations.
 
@@ -91,6 +96,16 @@ Optional search dependency:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+Optional Java analysis dependency:
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
@@ -123,6 +138,7 @@ A DOI can be added after the first GitHub Release has been archived by Zenodo or
 - This project does not define domain-specific workflow models.
 - This project should not contain application-specific logic from Audio Analyzer, Taxonomy or Sandbox.
 - This project should not expose JGit internal package types through public APIs.
+- The Java analysis module should not contain Eclipse UI, cleanup, quickfix or copied JDT-internal implementation classes.
 
 ## Basic usage
 
@@ -148,6 +164,12 @@ For search projections, create the session factory with the additional search en
 
 ```java
 new HibernateSessionFactoryProvider(properties, SearchEntities.annotatedClasses());
+```
+
+For Java analysis projections, also register:
+
+```java
+JavaAnalysisEntities.annotatedClasses();
 ```
 
 ## Expected consumers
