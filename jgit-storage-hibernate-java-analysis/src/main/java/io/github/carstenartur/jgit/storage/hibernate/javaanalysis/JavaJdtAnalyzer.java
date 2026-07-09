@@ -538,7 +538,7 @@ public class JavaJdtAnalyzer {
       List<Object> mods = (List<Object>) declaration.modifiers();
       return mods.stream()
           .filter(Annotation.class::isInstance)
-          .map(m -> ((Annotation) m).toString())
+          .map(Object::toString)
           .reduce((left, right) -> left + "\n" + right)
           .orElse(null);
     }
@@ -567,7 +567,7 @@ public class JavaJdtAnalyzer {
           .filter(Modifier.class::isInstance)
           .map(m -> ((Modifier) m).getKeyword().toString())
           .reduce((a, b) -> a + " " + b)
-          .orElse(null);
+          .orElse("");
     }
   }
 }
