@@ -138,7 +138,7 @@
       <dependency>
         <groupId>jakarta.activation</groupId>
         <artifactId>jakarta.activation-api</artifactId>
-        <version>2.1.1</version>
+        <version>2.1.4</version>
       </dependency>
       <!-- Pin the upper bound to resolve convergence across org.eclipse.jdt.core transitive
            dependencies that pull different versions of org.eclipse.equinox.common -->
