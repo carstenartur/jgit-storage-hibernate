@@ -9,6 +9,22 @@ The roadmap deliberately reuses concepts already proven in the author's related 
 
 Application-specific UI, Eclipse cleanup code and Taxonomy domain models stay in their original projects. Only reusable history, projection, query and analysis concepts belong here.
 
+## Current status vs planned scope
+
+Implemented in this repository today:
+
+- database-backed JGit object/ref/reflog storage,
+- generic commit/blob/path/full-text projections,
+- binding-aware Java analysis, semantic diff, symbol timelines and versioned software graph,
+- versioned architecture DSL projections, semantic diff and code-to-architecture drift analysis.
+
+Planned in this roadmap:
+
+- end-to-end semantic history query and demonstrator workflows (fixtures, one-command runs and usage docs),
+- generic candidate lifecycle extraction from Sandbox concepts,
+- structured DSL analysis SPI generalization beyond the existing architecture DSL parser,
+- architecture drift workflows combining multiple projection types at scale.
+
 ## Product vision
 
 > Turn Git from a text archive into a queryable semantic history and software knowledge graph.
@@ -21,7 +37,7 @@ The differentiator is not merely storing Git in a relational database. The diffe
 - architecture elements and relations stored through pluggable DSL projections,
 - evidence and provenance linking every derived fact to repository, commit, blob, analyzer version and binding context.
 
-## Architectural principles
+## Guiding principles
 
 1. **Git remains authoritative.** Semantic tables and indexes are reproducible projections.
 2. **Stable identities are first-class.** Files are not enough; methods, types, relations and architecture elements need durable semantic keys.
@@ -58,7 +74,41 @@ jgit-storage-hibernate-dsl-analysis
 
 The module split should be introduced only as functionality justifies it. The current Java analysis module can host the first implementation while APIs stabilize.
 
-## Roadmap
+## Target capabilities
+
+- binding-aware Java project analysis at a commit,
+- stable symbol identity across moves and renames,
+- semantic diff and symbol timelines,
+- versioned call/inheritance/dependency graphs,
+- semantic query API and demonstrator,
+- reusable mining candidate lifecycle,
+- generic structured DSL analysis SPI,
+- architecture drift detection combining code and DSL projections.
+
+## Implementation sequence
+
+### Foundation
+
+- [ ] [#21 — commit-specific classpath resolution and batch JDT analysis](https://github.com/carstenartur/jgit-storage-hibernate/issues/21)
+- [ ] [#22 — projection lifecycle, staleness and incremental reindexing](https://github.com/carstenartur/jgit-storage-hibernate/issues/22)
+
+### Semantic Java history
+
+- [ ] [#23 — semantic diff and symbol timeline](https://github.com/carstenartur/jgit-storage-hibernate/issues/23)
+- [ ] [#24 — versioned call, inheritance and dependency graph](https://github.com/carstenartur/jgit-storage-hibernate/issues/24)
+- [ ] [#25 — semantic history query API and executable demonstrator](https://github.com/carstenartur/jgit-storage-hibernate/issues/25)
+
+### Reusable extraction from related projects
+
+- [ ] [#26 — generic semantic candidate lifecycle based on Sandbox mining concepts](https://github.com/carstenartur/jgit-storage-hibernate/issues/26)
+- [ ] [#27 — structured DSL analysis and semantic diff SPI based on Taxonomy concepts](https://github.com/carstenartur/jgit-storage-hibernate/issues/27)
+- [ ] [#28 — architecture drift detection combining code graphs and DSL constraints](https://github.com/carstenartur/jgit-storage-hibernate/issues/28)
+
+### Visibility and adoption
+
+- [ ] [#29 — quick start, query cookbook, diagrams and benchmarks](https://github.com/carstenartur/jgit-storage-hibernate/issues/29)
+
+## Roadmap details
 
 ### Phase 1 — Reliable semantic projection foundation
 
@@ -171,8 +221,14 @@ The project documentation should grow around executable use cases rather than im
 - clear distinction between authoritative Git data and rebuildable projections,
 - links to Sandbox and Taxonomy as reference consumers and upstream sources of proven concepts.
 
-## Success criteria
+## Acceptance criteria
 
-The roadmap has succeeded when a new visitor can run one command and answer a question that normal Git cannot answer directly, such as:
+- [ ] At least one end-to-end demonstrator answers a question normal Git cannot answer directly.
+- [ ] Documentation clearly distinguishes current features from planned features.
+- [ ] A symbol can be followed across moves/renames with matching evidence.
+- [ ] Code and architecture projections can be compared at versioned points in time.
+- [ ] Mining findings can be persisted, validated and promoted through a generic lifecycle.
+
+A representative demonstrator question:
 
 > Which methods changed signature in this release, which callers are affected, and where did those methods move during their history?
