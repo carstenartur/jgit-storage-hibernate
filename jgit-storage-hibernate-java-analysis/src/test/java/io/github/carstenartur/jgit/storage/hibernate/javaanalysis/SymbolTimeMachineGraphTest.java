@@ -42,8 +42,8 @@ class SymbolTimeMachineGraphTest {
     assertTrue(before.edges().stream().anyMatch(edge -> edge.kind() == JavaGraphEdgeKind.CALLS));
     assertTrue(before.edges().stream().anyMatch(edge -> edge.kind() == JavaGraphEdgeKind.IMPLEMENTS));
     assertTrue(before.edges().stream().anyMatch(edge -> edge.kind() == JavaGraphEdgeKind.OVERRIDES));
-    assertFalse(JavaGraphDelta.between(before, after).added().isEmpty()
-        && JavaGraphDelta.between(before, after).removed().isEmpty());
+    JavaGraphDelta delta = JavaGraphDelta.between(before, after);
+    assertFalse(delta.added().isEmpty() && delta.removed().isEmpty());
 
     JavaGraphEdge saveCall = before.edges().stream()
         .filter(edge -> edge.kind() == JavaGraphEdgeKind.CALLS)

@@ -22,12 +22,16 @@ final class JavaHierarchyGraph {
 
   static List<JavaGraphEdge> extract(JavaProjectAnalysisResult analysis) {
     Map<String, JavaSymbolIndex> typesByName = new HashMap<>();
+    Map<String, JavaSymbolIndex> typesByPathAndSimpleName = new HashMap<>();
     Map<String, List<JavaSymbolIndex>> methodsByDeclaringType = new HashMap<>();
     for (JavaSymbolIndex symbol : analysis.symbols()) {
       if (isType(symbol)) {
         typesByName.put(symbol.getSimpleName(), symbol);
         if (symbol.getQualifiedName() != null) {
           typesByName.put(symbol.getQualifiedName(), symbol);
+        }
+        if (symbol.getPath() != null) {
+          typesByPathAndSimpleName.put(symbol.getPath() + ":" + symbol.getSimpleName(), symbol);
         }
       } else if (symbol.getSymbolKind() == JavaSymbolKind.METHOD) {
         methodsByDeclaringType.computeIfAbsent(symbol.getDeclaringType(), ignored -> new ArrayList<>()).add(symbol);
@@ -38,7 +42,10 @@ final class JavaHierarchyGraph {
     for (JavaSourceSnapshot source : analysis.project().sources().values()) {
       Matcher matcher = TYPE_DECLARATION.matcher(source.source());
       while (matcher.find()) {
-        JavaSymbolIndex child = typesByName.get(matcher.group(2));
+        JavaSymbolIndex child = typesByPathAndSimpleName.get(source.path() + ":" + matcher.group(2));
+        if (child == null) {
+          child = typesByName.get(matcher.group(2));
+        }
         if (child == null) {
           continue;
         }
@@ -55,7 +62,8 @@ final class JavaHierarchyGraph {
       }
       for (JavaSymbolIndex childMethod : methodsByDeclaringType.getOrDefault(childType.getQualifiedName(), List.of())) {
         for (JavaSymbolIndex parentMethod : methodsByDeclaringType.getOrDefault(parentType.getQualifiedName(), List.of())) {
-          if (sameMethodShape(childMethod, parentMethod)) {
+          if (sameMethodShape(childMethod, parentMethod)
+              && canOverride(childMethod) && canOverride(parentMethod)) {
             edges.add(new JavaGraphEdge(
                 childMethod.getRepositoryName(), childMethod.getCommitId(), JavaGraphEdgeKind.OVERRIDES,
                 childMethod.getStableSemanticKey(), parentMethod.getStableSemanticKey(),
@@ -77,8 +85,13 @@ final class JavaHierarchyGraph {
     if (rawParents == null || rawParents.isBlank()) {
       return;
     }
-    for (String rawParent : rawParents.split(",")) {
-      String name = rawParent.trim().replaceAll("<.*>", "");
+    for (String rawParent : splitTopLevel(rawParents)) {
+      String name = rawParent.contains("<")
+          ? rawParent.substring(0, rawParent.indexOf('<')).trim()
+          : rawParent.trim();
+      if (name.isBlank()) {
+        continue;
+      }
       JavaSymbolIndex parent = typesByName.get(name);
       String target = parent == null
           ? "TYPE:" + name + ":"
@@ -90,9 +103,36 @@ final class JavaHierarchyGraph {
     }
   }
 
+  private static List<String> splitTopLevel(String rawParents) {
+    List<String> result = new ArrayList<>();
+    int depth = 0;
+    int start = 0;
+    for (int i = 0; i < rawParents.length(); i++) {
+      char c = rawParents.charAt(i);
+      if (c == '<') {
+        depth++;
+      } else if (c == '>') {
+        depth--;
+      } else if (c == ',' && depth == 0) {
+        result.add(rawParents.substring(start, i).trim());
+        start = i + 1;
+      }
+    }
+    result.add(rawParents.substring(start).trim());
+    return result;
+  }
+
   private static boolean sameMethodShape(JavaSymbolIndex left, JavaSymbolIndex right) {
     return Objects.equals(left.getSimpleName(), right.getSimpleName())
         && Objects.equals(left.getParameterTypes(), right.getParameterTypes());
+  }
+
+  private static boolean canOverride(JavaSymbolIndex method) {
+    String mods = method.getModifiers();
+    if (mods == null) {
+      return true;
+    }
+    return !mods.contains("static") && !mods.contains("private");
   }
 
   private static boolean isType(JavaSymbolIndex symbol) {

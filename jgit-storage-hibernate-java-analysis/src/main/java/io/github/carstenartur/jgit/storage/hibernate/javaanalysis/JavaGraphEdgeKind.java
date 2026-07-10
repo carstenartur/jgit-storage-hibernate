@@ -6,7 +6,6 @@ public enum JavaGraphEdgeKind {
   CALLS,
   CONSTRUCTS,
   READS_FIELD,
-  WRITES_FIELD,
   REFERENCES_TYPE,
   EXTENDS,
   IMPLEMENTS,

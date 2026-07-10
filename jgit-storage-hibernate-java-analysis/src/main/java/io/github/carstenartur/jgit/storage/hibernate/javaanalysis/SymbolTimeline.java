@@ -9,6 +9,9 @@ public record SymbolTimeline(String logicalId, List<SymbolTimelineEntry> entries
   public SymbolTimeline {
     Objects.requireNonNull(logicalId, "logicalId");
     entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
+    if (entries.isEmpty()) {
+      throw new IllegalArgumentException("entries must not be empty");
+    }
   }
 
   public SymbolTimelineEntry first() { return entries.getFirst(); }

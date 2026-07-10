@@ -18,6 +18,8 @@ public final class JavaSoftwareGraph {
   private final JavaProjectAnalysisResult analysis;
   private final Map<String, JavaSymbolIndex> symbols;
   private final List<JavaGraphEdge> edges;
+  private final Map<String, List<JavaGraphEdge>> incomingByTarget;
+  private final Map<String, List<JavaGraphEdge>> outgoingBySource;
 
   private JavaSoftwareGraph(
       JavaProjectAnalysisResult analysis,
@@ -26,6 +28,14 @@ public final class JavaSoftwareGraph {
     this.analysis = analysis;
     this.symbols = Map.copyOf(symbols);
     this.edges = List.copyOf(edges);
+    Map<String, List<JavaGraphEdge>> incoming = new HashMap<>();
+    Map<String, List<JavaGraphEdge>> outgoing = new HashMap<>();
+    for (JavaGraphEdge edge : this.edges) {
+      incoming.computeIfAbsent(edge.targetSemanticKey(), k -> new ArrayList<>()).add(edge);
+      outgoing.computeIfAbsent(edge.sourceSemanticKey(), k -> new ArrayList<>()).add(edge);
+    }
+    this.incomingByTarget = Map.copyOf(incoming);
+    this.outgoingBySource = Map.copyOf(outgoing);
   }
 
   public static JavaSoftwareGraph from(JavaProjectAnalysisResult analysis) {
@@ -38,9 +48,9 @@ public final class JavaSoftwareGraph {
     }
     List<JavaGraphEdge> edges = new ArrayList<>();
     for (JavaReferenceIndex reference : analysis.references()) {
-      String source = enclosingSymbolKey(analysis.symbols(), reference);
+      String source = reference.getSourceSymbolKey();
       if (source == null) {
-        source = reference.getSourceSymbolKey();
+        source = enclosingSymbolKey(analysis.symbols(), reference);
       }
       String target = reference.getTargetStableSemanticKey();
       JavaGraphEdgeKind kind = edgeKind(reference.getReferenceKind());
@@ -60,11 +70,11 @@ public final class JavaSoftwareGraph {
   public List<JavaGraphEdge> edges() { return edges; }
 
   public List<JavaGraphEdge> outgoing(String semanticKey) {
-    return edges.stream().filter(edge -> edge.sourceSemanticKey().equals(semanticKey)).toList();
+    return outgoingBySource.getOrDefault(semanticKey, List.of());
   }
 
   public List<JavaGraphEdge> incoming(String semanticKey) {
-    return edges.stream().filter(edge -> edge.targetSemanticKey().equals(semanticKey)).toList();
+    return incomingByTarget.getOrDefault(semanticKey, List.of());
   }
 
   public Set<String> transitiveImpact(String semanticKey, int maxDepth) {

@@ -33,6 +33,9 @@ public class JavaGraphEdgeIndex {
   @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  @GenericField @Column(name = "analysis_run_id")
+  private Long analysisRunId;
+
   @KeywordField @Column(name = "repository_name", nullable = false, length = 255)
   private String repositoryName;
 
@@ -74,6 +77,8 @@ public class JavaGraphEdgeIndex {
 
   public Long getId() { return id; }
   public void setId(Long id) { this.id = id; }
+  public Long getAnalysisRunId() { return analysisRunId; }
+  public void setAnalysisRunId(Long analysisRunId) { this.analysisRunId = analysisRunId; }
   public String getRepositoryName() { return repositoryName; }
   public void setRepositoryName(String repositoryName) { this.repositoryName = repositoryName; }
   public String getCommitId() { return commitId; }
