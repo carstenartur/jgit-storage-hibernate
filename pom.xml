@@ -24,51 +24,300 @@
     <module>jgit-storage-hibernate-benchmarks</module>
   </modules>
 
-  <licenses><license><name>BSD-3-Clause</name><url>https://spdx.org/licenses/BSD-3-Clause.html</url><distribution>repo</distribution></license></licenses>
-  <developers><developer><id>carstenartur</id><name>Carsten Hammer</name><url>https://github.com/carstenartur</url></developer></developers>
-  <scm><connection>scm:git:https://github.com/carstenartur/jgit-storage-hibernate.git</connection><developerConnection>scm:git:https://github.com/carstenartur/jgit-storage-hibernate.git</developerConnection><url>https://github.com/carstenartur/jgit-storage-hibernate</url><tag>HEAD</tag></scm>
-  <distributionManagement><repository><id>github</id><name>GitHub Packages</name><url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url></repository><snapshotRepository><id>github</id><name>GitHub Packages Snapshots</name><url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url></snapshotRepository></distributionManagement>
+  <licenses>
+    <license>
+      <name>BSD-3-Clause</name>
+      <url>https://spdx.org/licenses/BSD-3-Clause.html</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>carstenartur</id>
+      <name>Carsten Hammer</name>
+      <url>https://github.com/carstenartur</url>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/carstenartur/jgit-storage-hibernate.git</connection>
+    <developerConnection>scm:git:https://github.com/carstenartur/jgit-storage-hibernate.git</developerConnection>
+    <url>https://github.com/carstenartur/jgit-storage-hibernate</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
+    </repository>
+    <snapshotRepository>
+      <id>github</id>
+      <name>GitHub Packages Snapshots</name>
+      <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
+    </snapshotRepository>
+  </distributionManagement>
 
   <properties>
-    <java.version>21</java.version><maven.compiler.release>${java.version}</maven.compiler.release>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <jgit.version>7.7.0.202606012155-r</jgit.version><hibernate.version>6.6.13.Final</hibernate.version><hibernate-search.version>7.2.0.Final</hibernate-search.version><junit.version>6.1.1</junit.version><h2.version>2.4.240</h2.version><jmh.version>1.37</jmh.version><jdt.core.version>3.46.0</jdt.core.version>
-    <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version><maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version><maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version><maven-jar-plugin.version>3.5.0</maven-jar-plugin.version><maven-source-plugin.version>3.4.0</maven-source-plugin.version><maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version><maven-shade-plugin.version>3.6.2</maven-shade-plugin.version><versions-maven-plugin.version>2.21.0</versions-maven-plugin.version><jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version><linkage-checker-enforcer-rules.version>1.5.15</linkage-checker-enforcer-rules.version>
+    <java.version>21</java.version>
+    <maven.compiler.release>${java.version}</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <jgit.version>7.7.0.202606012155-r</jgit.version>
+    <hibernate.version>6.6.13.Final</hibernate.version>
+    <hibernate-search.version>7.2.0.Final</hibernate-search.version>
+    <junit.version>6.1.1</junit.version>
+    <h2.version>2.4.240</h2.version>
+    <jmh.version>1.37</jmh.version>
+    <jdt.core.version>3.46.0</jdt.core.version>
+
+    <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+    <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+    <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
+    <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+    <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+    <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
+    <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+    <linkage-checker-enforcer-rules.version>1.5.15</linkage-checker-enforcer-rules.version>
   </properties>
 
-  <repositories><repository><id>jgit-releases</id><url>https://repo.eclipse.org/content/repositories/jgit-releases/</url></repository></repositories>
+  <repositories>
+    <repository>
+      <id>jgit-releases</id>
+      <url>https://repo.eclipse.org/content/repositories/jgit-releases/</url>
+    </repository>
+  </repositories>
 
-  <dependencyManagement><dependencies>
-    <dependency><groupId>org.junit</groupId><artifactId>junit-bom</artifactId><version>${junit.version}</version><type>pom</type><scope>import</scope></dependency>
-    <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><version>${jgit.version}</version></dependency>
-    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-core</artifactId><version>${project.version}</version></dependency>
-    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-search</artifactId><version>${project.version}</version></dependency>
-    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-java-analysis</artifactId><version>${project.version}</version></dependency>
-    <dependency><groupId>org.hibernate.orm</groupId><artifactId>hibernate-core</artifactId><version>${hibernate.version}</version></dependency>
-    <dependency><groupId>org.hibernate.common</groupId><artifactId>hibernate-commons-annotations</artifactId><version>7.0.3.Final</version></dependency>
-    <dependency><groupId>org.jboss.logging</groupId><artifactId>jboss-logging</artifactId><version>3.6.3.Final</version></dependency>
-    <dependency><groupId>jakarta.activation</groupId><artifactId>jakarta.activation-api</artifactId><version>2.1.4</version></dependency>
-    <dependency><groupId>org.eclipse.platform</groupId><artifactId>org.eclipse.equinox.common</artifactId><version>3.20.400</version></dependency>
-    <dependency><groupId>org.eclipse.platform</groupId><artifactId>org.eclipse.core.runtime</artifactId><version>3.34.200</version></dependency>
-    <dependency><groupId>org.eclipse.platform</groupId><artifactId>org.eclipse.osgi</artifactId><version>3.24.200</version></dependency>
-  </dependencies></dependencyManagement>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jgit</groupId>
+        <artifactId>org.eclipse.jgit</artifactId>
+        <version>${jgit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.carstenartur</groupId>
+        <artifactId>jgit-storage-hibernate-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.carstenartur</groupId>
+        <artifactId>jgit-storage-hibernate-search</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.carstenartur</groupId>
+        <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Pin upper bounds to resolve transitive convergence conflicts caused by
+           hibernate-search-mapper-orm pulling older versions than hibernate-core -->
+      <dependency>
+        <groupId>org.hibernate.orm</groupId>
+        <artifactId>hibernate-core</artifactId>
+        <version>${hibernate.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.hibernate.common</groupId>
+        <artifactId>hibernate-commons-annotations</artifactId>
+        <version>7.0.3.Final</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jboss.logging</groupId>
+        <artifactId>jboss-logging</artifactId>
+        <version>3.6.3.Final</version>
+      </dependency>
+      <!-- Pin the upper bound to resolve convergence between jakarta.xml.bind-api (2.1.0)
+           and jaxb-core/angus-activation (2.1.1) transitive pulls from hibernate-core -->
+      <dependency>
+        <groupId>jakarta.activation</groupId>
+        <artifactId>jakarta.activation-api</artifactId>
+        <version>2.1.4</version>
+      </dependency>
+      <!-- Pin the upper bound to resolve convergence across org.eclipse.jdt.core transitive
+           dependencies that pull different versions of org.eclipse.equinox.common -->
+      <dependency>
+        <groupId>org.eclipse.platform</groupId>
+        <artifactId>org.eclipse.equinox.common</artifactId>
+        <version>3.20.400</version>
+      </dependency>
+      <!-- Pin upper bounds to resolve convergence across org.eclipse.jdt.core transitive
+           dependencies that pull different versions of these Eclipse platform artifacts -->
+      <dependency>
+        <groupId>org.eclipse.platform</groupId>
+        <artifactId>org.eclipse.core.runtime</artifactId>
+        <version>3.34.200</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.platform</groupId>
+        <artifactId>org.eclipse.osgi</artifactId>
+        <version>3.24.200</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <build>
-    <pluginManagement><plugins>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>${maven-enforcer-plugin.version}</version></plugin>
-      <plugin><artifactId>maven-compiler-plugin</artifactId><version>${maven-compiler-plugin.version}</version><configuration><release>${java.version}</release><showWarnings>true</showWarnings><showDeprecation>true</showDeprecation><encoding>${project.build.sourceEncoding}</encoding></configuration></plugin>
-      <plugin><artifactId>maven-surefire-plugin</artifactId><version>${maven-surefire-plugin.version}</version><configuration><useModulePath>false</useModulePath></configuration></plugin>
-      <plugin><artifactId>maven-jar-plugin</artifactId><version>${maven-jar-plugin.version}</version></plugin>
-      <plugin><artifactId>maven-source-plugin</artifactId><version>${maven-source-plugin.version}</version><executions><execution><id>attach-sources</id><phase>verify</phase><goals><goal>jar-no-fork</goal></goals></execution></executions></plugin>
-      <plugin><artifactId>maven-javadoc-plugin</artifactId><version>${maven-javadoc-plugin.version}</version><configuration><failOnWarnings>false</failOnWarnings><additionalJOption>-Xdoclint:none</additionalJOption></configuration></plugin>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>${maven-shade-plugin.version}</version></plugin>
-      <plugin><groupId>org.codehaus.mojo</groupId><artifactId>versions-maven-plugin</artifactId><version>${versions-maven-plugin.version}</version></plugin>
-      <plugin><groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>${jacoco-maven-plugin.version}</version></plugin>
-    </plugins></pluginManagement>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
+          <configuration>
+            <release>${java.version}</release>
+            <showWarnings>true</showWarnings>
+            <showDeprecation>true</showDeprecation>
+            <encoding>${project.build.sourceEncoding}</encoding>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven-surefire-plugin.version}</version>
+          <configuration>
+            <useModulePath>false</useModulePath>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${maven-jar-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>${maven-source-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>jar-no-fork</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>${maven-javadoc-plugin.version}</version>
+          <configuration>
+            <failOnWarnings>false</failOnWarnings>
+            <additionalJOption>-Xdoclint:none</additionalJOption>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${maven-shade-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>versions-maven-plugin</artifactId>
+          <version>${versions-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco-maven-plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
-      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><executions><execution><id>enforce-dependency-consistency</id><phase>validate</phase><goals><goal>enforce</goal></goals><configuration><rules><requireMavenVersion><version>[3.8.6,)</version></requireMavenVersion><requireJavaVersion><version>[${java.version},)</version></requireJavaVersion><dependencyConvergence/><requireUpperBoundDeps/><banDuplicatePomDependencyVersions/></rules></configuration></execution></executions></plugin>
-      <plugin><groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><executions><execution><id>prepare-agent</id><goals><goal>prepare-agent</goal></goals></execution><execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution></executions></plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-dependency-consistency</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>[3.8.6,)</version>
+                </requireMavenVersion>
+                <requireJavaVersion>
+                  <version>[${java.version},)</version>
+                </requireJavaVersion>
+                <dependencyConvergence />
+                <requireUpperBoundDeps />
+                <banDuplicatePomDependencyVersions />
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
-  <profiles><profile><id>dependency-linkage</id><build><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><dependencies><dependency><groupId>com.google.cloud.tools</groupId><artifactId>linkage-checker-enforcer-rules</artifactId><version>${linkage-checker-enforcer-rules.version}</version></dependency></dependencies><executions><execution><id>enforce-linkage-checker</id><phase>verify</phase><goals><goal>enforce</goal></goals><configuration><rules><LinkageCheckerRule implementation="com.google.cloud.tools.dependencies.enforcer.LinkageCheckerRule"><reportOnlyReachable>true</reportOnlyReachable></LinkageCheckerRule></rules></configuration></execution></executions></plugin></plugins></build></profile></profiles>
+
+  <profiles>
+    <profile>
+      <id>dependency-linkage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <dependencies>
+              <dependency>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>linkage-checker-enforcer-rules</artifactId>
+                <version>${linkage-checker-enforcer-rules.version}</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <id>enforce-linkage-checker</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <LinkageCheckerRule implementation="com.google.cloud.tools.dependencies.enforcer.LinkageCheckerRule">
+                      <reportOnlyReachable>true</reportOnlyReachable>
+                    </LinkageCheckerRule>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
