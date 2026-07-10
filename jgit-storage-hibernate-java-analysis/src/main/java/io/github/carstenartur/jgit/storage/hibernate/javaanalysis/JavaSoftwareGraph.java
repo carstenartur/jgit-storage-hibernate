@@ -48,15 +48,10 @@ public final class JavaSoftwareGraph {
         continue;
       }
       edges.add(new JavaGraphEdge(
-          reference.getRepositoryName(),
-          reference.getCommitId(),
-          kind,
-          source,
-          target,
-          reference.getPath(),
-          reference.getStartLine(),
-          reference.getBindingStatus()));
+          reference.getRepositoryName(), reference.getCommitId(), kind, source, target,
+          reference.getPath(), reference.getStartLine(), reference.getBindingStatus()));
     }
+    edges.addAll(JavaHierarchyGraph.extract(analysis));
     return new JavaSoftwareGraph(analysis, symbols, edges);
   }
 
