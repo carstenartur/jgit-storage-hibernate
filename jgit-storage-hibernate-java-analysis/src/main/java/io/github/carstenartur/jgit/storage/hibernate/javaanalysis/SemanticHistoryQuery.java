@@ -25,22 +25,26 @@ public final class SemanticHistoryQuery {
   }
 
   public List<JavaSymbolIndex> symbolsNamed(String simpleName) {
+    Objects.requireNonNull(simpleName, "simpleName");
     return symbols(symbol -> simpleName.equals(symbol.getSimpleName()));
   }
 
   public List<JavaSymbolIndex> methodsReturning(String qualifiedTypeName) {
+    Objects.requireNonNull(qualifiedTypeName, "qualifiedTypeName");
     return symbols(
         symbol -> symbol.getSymbolKind() == JavaSymbolKind.METHOD
             && qualifiedTypeName.equals(symbol.getReturnType()));
   }
 
   public List<JavaReferenceIndex> referencesToSemanticKey(String stableSemanticKey) {
+    Objects.requireNonNull(stableSemanticKey, "stableSemanticKey");
     return result.references().stream()
         .filter(reference -> stableSemanticKey.equals(reference.getTargetStableSemanticKey()))
         .toList();
   }
 
   public List<JavaReferenceIndex> methodInvocationsNamed(String methodName) {
+    Objects.requireNonNull(methodName, "methodName");
     return result.references().stream()
         .filter(reference -> reference.getReferenceKind() == JavaReferenceKind.METHOD_INVOCATION)
         .filter(reference -> methodName.equals(reference.getReferenceName()))

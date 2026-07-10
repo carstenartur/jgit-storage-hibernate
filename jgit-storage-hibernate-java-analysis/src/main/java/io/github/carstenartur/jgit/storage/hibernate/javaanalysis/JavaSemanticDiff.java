@@ -62,7 +62,7 @@ public final class JavaSemanticDiff {
       changes.add(new SemanticChange(SemanticChangeKind.SIGNATURE_CHANGED, before, after, confidence, evidence));
     }
     if (!Objects.equals(before.getModifiers(), after.getModifiers())) {
-      changes.add(new SemanticChange(SemanticChangeKind.VISIBILITY_CHANGED, before, after, confidence, evidence));
+      changes.add(new SemanticChange(SemanticChangeKind.MODIFIERS_CHANGED, before, after, confidence, evidence));
     }
     if (!Objects.equals(before.getAnnotations(), after.getAnnotations())) {
       changes.add(new SemanticChange(SemanticChangeKind.ANNOTATIONS_CHANGED, before, after, confidence, evidence));

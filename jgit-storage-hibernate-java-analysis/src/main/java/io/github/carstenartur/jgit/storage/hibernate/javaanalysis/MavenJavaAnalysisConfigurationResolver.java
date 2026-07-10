@@ -25,9 +25,10 @@ import org.xml.sax.InputSource;
 /**
  * Lightweight Maven model resolver for commit snapshots.
  *
- * <p>It reads parent properties, modules, source roots and dependency coordinates from POM files and
- * maps already available dependencies to the local Maven repository. It deliberately does not download
- * artifacts; unresolved coordinates remain explicit diagnostics.
+ * <p>It reads properties from each discovered POM together with properties inherited from ancestor
+ * POMs in the same repository tree, plus modules, source roots and dependency coordinates. It does
+ * not parse Maven {@code <parent>} chains or download artifacts; unresolved coordinates remain
+ * explicit diagnostics.
  */
 public final class MavenJavaAnalysisConfigurationResolver {
 
@@ -59,21 +60,27 @@ public final class MavenJavaAnalysisConfigurationResolver {
     Set<String> modules = new LinkedHashSet<>();
     Set<String> classpath = new LinkedHashSet<>();
     List<String> unresolved = new ArrayList<>();
-    Map<String, String> inheritedProperties = new HashMap<>();
-    String sourceLevel = "21";
+    String sourceLevel = null;
 
     List<String> pomPaths = repositoryFiles.keySet().stream()
         .filter(path -> path.equals("pom.xml") || path.endsWith("/pom.xml"))
         .sorted()
         .toList();
+    Map<String, Element> projects = new HashMap<>();
+    Map<String, Map<String, String>> declaredProperties = new HashMap<>();
     for (String pomPath : pomPaths) {
       Element project = parse(repositoryFiles.get(pomPath));
-      Map<String, String> properties = new HashMap<>(inheritedProperties);
-      properties.putAll(readProperties(project));
-      sourceLevel = firstNonBlank(
-          resolve(properties.get("maven.compiler.release"), properties),
-          resolve(properties.get("maven.compiler.source"), properties),
-          sourceLevel);
+      projects.put(pomPath, project);
+      declaredProperties.put(pomPath, readProperties(project));
+    }
+    for (String pomPath : pomPaths) {
+      Element project = projects.get(pomPath);
+      Map<String, String> properties = effectiveProperties(pomPath, declaredProperties);
+      sourceLevel = preferSourceLevel(
+          sourceLevel,
+          firstNonBlank(
+              resolve(properties.get("maven.compiler.release"), properties),
+              resolve(properties.get("maven.compiler.source"), properties)));
 
       String moduleBase = pomPath.equals("pom.xml") ? "" : pomPath.substring(0, pomPath.length() - "pom.xml".length());
       String configuredSource = text(project, "build", "sourceDirectory");
@@ -106,11 +113,10 @@ public final class MavenJavaAnalysisConfigurationResolver {
           unresolved.add(coordinate(groupId, artifactId, version));
         }
       }
-      inheritedProperties.putAll(properties);
     }
 
     JavaAnalysisConfiguration configuration = new JavaAnalysisConfiguration(
-        sourceLevel,
+        sourceLevel == null ? "21" : sourceLevel,
         BindingMode.RECOVERY,
         List.copyOf(classpath),
         List.of(),
@@ -119,6 +125,38 @@ public final class MavenJavaAnalysisConfigurationResolver {
         true,
         JavaAnalysisConfiguration.DEFAULT_ANALYZER_VERSION);
     return new Resolution(configuration, List.copyOf(sourceRoots), unresolved, List.copyOf(modules));
+  }
+
+  private static Map<String, String> effectiveProperties(
+      String pomPath, Map<String, Map<String, String>> declaredProperties) {
+    Map<String, String> properties = new HashMap<>();
+    for (String ancestorPomPath : ancestorPomPaths(pomPath, declaredProperties.keySet())) {
+      properties.putAll(declaredProperties.get(ancestorPomPath));
+    }
+    return properties;
+  }
+
+  private static List<String> ancestorPomPaths(String pomPath, Set<String> knownPomPaths) {
+    List<String> ancestors = new ArrayList<>();
+    if (knownPomPaths.contains("pom.xml")) {
+      ancestors.add("pom.xml");
+    }
+    if (pomPath.equals("pom.xml")) {
+      return ancestors;
+    }
+    List<String> nestedAncestors = new ArrayList<>();
+    String currentDirectory = pomPath.substring(0, pomPath.length() - "/pom.xml".length());
+    while (!currentDirectory.isEmpty()) {
+      String ancestorPomPath = currentDirectory + "/pom.xml";
+      if (knownPomPaths.contains(ancestorPomPath)) {
+        nestedAncestors.add(ancestorPomPath);
+      }
+      int slash = currentDirectory.lastIndexOf('/');
+      currentDirectory = slash < 0 ? "" : currentDirectory.substring(0, slash);
+    }
+    java.util.Collections.reverse(nestedAncestors);
+    ancestors.addAll(nestedAncestors);
+    return ancestors;
   }
 
   private static Element parse(String xml) {
@@ -226,6 +264,32 @@ public final class MavenJavaAnalysisConfigurationResolver {
 
   private static boolean isBlank(String value) {
     return value == null || value.isBlank();
+  }
+
+  private static String preferSourceLevel(String current, String candidate) {
+    if (isBlank(candidate)) {
+      return current;
+    }
+    if (isBlank(current)) {
+      return candidate;
+    }
+    Integer currentRelease = featureRelease(current);
+    Integer candidateRelease = featureRelease(candidate);
+    if (currentRelease != null && candidateRelease != null) {
+      return candidateRelease > currentRelease ? candidate : current;
+    }
+    return candidate.compareTo(current) > 0 ? candidate : current;
+  }
+
+  private static Integer featureRelease(String sourceLevel) {
+    try {
+      if (sourceLevel.startsWith("1.")) {
+        return Integer.parseInt(sourceLevel.substring(2));
+      }
+      return Integer.parseInt(sourceLevel);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   private static String coordinate(String groupId, String artifactId, String version) {

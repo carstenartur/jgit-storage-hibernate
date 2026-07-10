@@ -74,7 +74,7 @@ The module split should be introduced only as functionality justifies it. The cu
 ### Phase 2 — Semantic history and symbol time machine
 
 - Match symbols across parent/child commits using binding keys, stable semantic keys and structural fingerprints.
-- Persist semantic change events: add, remove, rename, move, signature change, visibility change, inheritance change, annotation change and body change.
+- Persist semantic change events: add, remove, rename, move, signature change, modifier change, inheritance change, annotation change and body change.
 - Build a symbol timeline API independent of file renames.
 - Add semantic commit summaries and impact counts.
 

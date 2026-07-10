@@ -63,7 +63,11 @@ public final class JavaProjectAnalyzer {
         }
         return new JavaProjectAnalysisResult(project, files, symbols, references, problems, errors);
       } finally {
-        deleteRecursively(sourceRoot);
+        try {
+          deleteRecursively(sourceRoot);
+        } catch (IOException ignored) {
+          // Best-effort cleanup: successful analysis should not fail because temp files cannot be deleted.
+        }
       }
     } catch (IOException e) {
       throw new IllegalStateException("Could not materialize project sources for JDT analysis", e);
