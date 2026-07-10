@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-parent</artifactId><version>0.1.3-SNAPSHOT</version></parent>
+  <artifactId>jgit-storage-hibernate-architecture</artifactId>
+  <name>jgit-storage-hibernate Versioned Architecture</name>
+  <description>Versioned architecture DSL SPI, evidence, constraints and code-to-architecture drift detection.</description>
+  <dependencies>
+    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-java-analysis</artifactId></dependency>
+    <dependency><groupId>org.hibernate.orm</groupId><artifactId>hibernate-core</artifactId><version>${hibernate.version}</version></dependency>
+    <dependency><groupId>org.hibernate.search</groupId><artifactId>hibernate-search-mapper-orm</artifactId><version>${hibernate-search.version}</version></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins><plugin><artifactId>maven-compiler-plugin</artifactId></plugin><plugin><artifactId>maven-surefire-plugin</artifactId></plugin><plugin><artifactId>maven-source-plugin</artifactId></plugin><plugin><artifactId>maven-javadoc-plugin</artifactId></plugin></plugins></build>
+</project>
