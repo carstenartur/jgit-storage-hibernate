@@ -1,41 +1,57 @@
 # jgit-storage-hibernate-java-analysis
 
-Optional Java/JDT analysis module for `jgit-storage-hibernate`.
+Optional Java/JDT semantic-history module for `jgit-storage-hibernate`.
 
-This module is intentionally separate from the generic storage and search modules. It parses Java source snapshots, asks JDT Core for bindings, and emits stable Hibernate/Hibernate Search projections for Java declarations and references.
+## Implemented capabilities
 
-## Scope
-
-The module is for read-only analysis and indexing, not for Eclipse cleanups, quick fixes, UI markers or source rewriting.
-
-It uses:
-
-- Java 21 as source and build baseline
-- JDT Core as parser and binding resolver
-- own DTOs/entities as public API
-- Hibernate ORM / Hibernate Search annotations for persistence and search
-
-It deliberately does not expose JDT AST or binding types from public APIs.
+- analyze one `JavaSourceSnapshot` or a complete `JavaProjectSnapshot`
+- materialize a shared source tree so JDT can resolve sibling compilation units
+- resolve Maven modules, source level, source roots and locally available dependency jars
+- preserve unresolved dependency coordinates as diagnostics
+- persist symbols, references, binding quality and analysis provenance
+- persist projection lifecycle state
+- compare project snapshots with `JavaSemanticDiff`
+- query symbols and references through `SemanticHistoryQuery`
+- run the executable `SemanticHistoryDemo`
 
 ## Binding model
 
-The first schema is binding-aware. Symbols and references store both syntax-level data and semantic binding data:
+The schema is binding-aware from the start. Symbols and references contain syntax-level data plus:
 
-- binding status: `NONE`, `PARTIAL`, `RECOVERED`, `FULL`, `FAILED`
+- `BindingStatus`
 - raw JDT binding key
 - declaration binding key
-- declaring type binding key
-- type binding key
-- stable semantic key computed by this module
+- declaring/type binding keys
+- stable semantic key
 
-This allows incomplete classpaths to be represented explicitly instead of silently degrading the index to text-only search.
+Incomplete classpaths are not hidden. Recovered and partial bindings remain visible and queryable.
 
-## Main entry points
+## Project analysis
 
-- `JavaJdtAnalyzer` analyzes one `JavaSourceSnapshot`
-- `JavaAnalysisConfiguration` describes source level, classpath/sourcepath/modulepath hashes and binding mode
-- `JavaAnalysisEntities.annotatedClasses()` returns the entity classes to register with Hibernate
+```java
+JavaProjectAnalysisResult result =
+    new JavaProjectAnalyzer().analyze(projectSnapshot, configuration);
+```
 
-## Current limitations
+`JavaProjectAnalyzer` creates a temporary source tree and adds it to the configured source path. This enables cross-file binding without an Eclipse workspace.
 
-This is an MVP. It records declarations, imports, type references, annotations, constructor calls, method calls and field accesses. It does not yet build a full call graph, override graph or Maven/Gradle classpath resolver.
+## Maven context
+
+```java
+var resolution =
+    new MavenJavaAnalysisConfigurationResolver().resolve(repositoryFiles);
+```
+
+The resolver is deterministic: it uses artifacts already present in the local Maven repository and reports missing coordinates instead of downloading them implicitly.
+
+## Semantic diff
+
+```java
+List<SemanticChange> changes = new JavaSemanticDiff().compare(before, after);
+```
+
+Matching uses declaration/raw binding keys, stable semantic keys and a guarded declaration-shape heuristic. Every change includes confidence and matching evidence.
+
+## Public API boundary
+
+The public API exposes module-owned DTOs and entities. JDT AST and binding objects remain implementation details. The module contains no Eclipse UI, cleanup or quickfix code.

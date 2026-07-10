@@ -4,180 +4,162 @@
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/coverage.json)](docs/badges/coverage.json)
 [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/tests.json)](docs/badges/tests.json)
 [![JMH Benchmarks](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
-[![JMH Performance](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](docs/badges/performance.json)
 [![Publish Snapshot](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/publish-snapshot.yml)
 [![Release](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/release.yml)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)](pom.xml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
-[![Maven: GitHub Packages](https://img.shields.io/badge/Maven-GitHub%20Packages-blue)](docs/consuming.md)
-[![Citation: CFF](https://img.shields.io/badge/Citation-CFF-blue)](CITATION.cff)
+
 https://doi.org/10.5281/zenodo.21210132
 
-Hibernate-backed storage backend for JGit repositories.
+## Turn Git into a queryable semantic history
 
-`jgit-storage-hibernate` provides a database-backed repository implementation for JGit. The goal is to persist Git pack data, references, reflogs and optional searchable history projections in relational databases through Hibernate ORM and Hibernate Search.
+`jgit-storage-hibernate` combines database-backed JGit storage with rebuildable search and language-aware projections. Git remains authoritative; Hibernate, Hibernate Search and JDT make commits, Java symbols and references queryable.
 
-The project is intended for applications that need Git semantics without relying on a filesystem-backed `.git` directory, for example versioned domain models, collaborative editors, audit trails and searchable history.
+The semantic-history MVP can now analyze all Java sources of a commit, resolve sibling compilation units through a shared JDT source path, derive Maven source/dependency context, compare two snapshots by semantic identity and query the resulting declarations and references.
 
-## Status
-
-This repository is being bootstrapped as an independent infrastructure module. The initial implementation consolidates the reusable parts of the existing `carstenartur/jgit` and `sandbox-jgit-storage-hibernate` work, instead of copying the same storage code into every consuming application.
-
-The first technical milestone is a releasable core plus optional search, Java analysis and benchmark modules:
+It is designed to answer questions ordinary line-based Git tools cannot answer directly:
 
 ```text
-JGit Repository API
+Which methods changed signature between two commits?
+Where did a declaration move?
+Which calls resolve to a given semantic method identity?
+Which references could not be resolved because the build context is incomplete?
+```
+
+## Implemented semantic-history MVP
+
+- binding-aware Java source and project snapshots,
+- project-wide analysis with a shared source tree,
+- lightweight Maven POM discovery for modules, source level, source roots and local dependencies,
+- explicit unresolved-dependency diagnostics,
+- persisted analysis provenance and binding quality,
+- persisted projection lifecycle state (`CURRENT`, `PARTIAL`, `STALE`, `FAILED`, ...),
+- semantic declaration matching by binding key, stable semantic key and guarded heuristics,
+- structured changes including add/remove/move/rename/signature/modifier/annotation/binding-quality changes,
+- public query facade without exposing JDT or Hibernate Search types,
+- executable `SemanticHistoryDemo`,
+- tests for multi-file analysis, Maven context and semantic signature changes.
+
+The next layer is persistent incremental indexing directly from JGit commits, followed by symbol timelines and a versioned call/inheritance/dependency graph. See [Semantic software history roadmap](docs/semantic-history-roadmap.md).
+
+## Architecture
+
+```text
+Git / JGit Repository API
   -> jgit-storage-hibernate-core
-       -> Hibernate-backed DFS/Reftable storage adapter
+       -> Hibernate-backed DFS/Reftable storage
        -> relational database
+
   -> jgit-storage-hibernate-search
-       -> Hibernate Search commit/history projections
-       -> Lucene-backed full-text search
+       -> generic commit/blob/path/full-text projections
+       -> Hibernate Search / Lucene
+
   -> jgit-storage-hibernate-java-analysis
-       -> JDT Core based Java structure and binding projections
-       -> binding-aware Java symbol/reference search
+       -> JavaProjectSnapshot
+       -> MavenJavaAnalysisConfigurationResolver
+       -> JavaProjectAnalyzer / JDT bindings
+       -> JavaSymbolIndex / JavaReferenceIndex
+       -> JavaSemanticDiff / SemanticHistoryQuery
+       -> JavaProjectionState
+
   -> jgit-storage-hibernate-benchmarks
-       -> JMH benchmarks for storage operations
+       -> JMH benchmarks
 ```
 
 ## Modules
 
-| Module | Purpose | Intended consumers |
-|---|---|---|
-| `jgit-storage-hibernate-core` | Database-backed JGit repository storage for packs, reftables and queryable reflogs. | Applications that need Git semantics without filesystem-backed `.git` directories. |
-| `jgit-storage-hibernate-search` | Optional commit/history projections and full-text search over messages, paths and indexed text content. | Applications that want searchable Git history through Hibernate Search/Lucene. |
-| `jgit-storage-hibernate-java-analysis` | Optional Java/JDT analysis, binding-aware Java symbol/reference projections and Hibernate Search entities. | Applications that want Java-specific search over Git history without Eclipse UI, cleanup or quickfix dependencies. |
-| `jgit-storage-hibernate-benchmarks` | JMH benchmarks for core repository operations. | CI, maintainers and release reviewers; not a runtime dependency. |
+| Module | Purpose |
+|---|---|
+| `jgit-storage-hibernate-core` | Database-backed JGit packs, refs, reftables and reflogs. |
+| `jgit-storage-hibernate-search` | Generic commit/history and full-text projections. |
+| `jgit-storage-hibernate-java-analysis` | Binding-aware project analysis, semantic diff, projection state and query API. |
+| `jgit-storage-hibernate-benchmarks` | JMH benchmarks; not a runtime dependency. |
 
-This split is intentional. Simple consumers should not have to carry Lucene, Hibernate Search, JDT Core, JMH or future Java/JDT-specific analysis dependencies. Java source analysis remains optional and does not expose JDT AST or binding types through public APIs.
+## Run the semantic history demo
+
+Build the project, then run the demo with the Java-analysis module and its dependencies on the classpath. The main class is:
+
+```text
+io.github.carstenartur.jgit.storage.hibernate.javaanalysis.demo.SemanticHistoryDemo
+```
+
+The demo creates two small project snapshots, analyzes both and prints structured changes such as moved declarations and signature changes.
+
+Core API flow:
+
+```java
+JavaProjectAnalysisResult before =
+    new JavaProjectAnalyzer().analyze(beforeSnapshot, configuration);
+JavaProjectAnalysisResult after =
+    new JavaProjectAnalyzer().analyze(afterSnapshot, configuration);
+
+List<SemanticChange> changes = new JavaSemanticDiff().compare(before, after);
+List<JavaReferenceIndex> calls =
+    new SemanticHistoryQuery(after).methodInvocationsNamed("save");
+```
+
+## Maven build-context resolution
+
+```java
+MavenJavaAnalysisConfigurationResolver.Resolution resolution =
+    new MavenJavaAnalysisConfigurationResolver().resolve(repositoryFiles);
+
+JavaAnalysisConfiguration configuration = resolution.configuration();
+List<String> unresolved = resolution.unresolvedDependencies();
+```
+
+The resolver intentionally does not download dependencies. It maps dependencies already present in the local Maven repository and reports missing coordinates explicitly. This keeps indexing deterministic and allows consumers to supply their own artifact-resolution policy.
+
+## Hibernate entity registration
+
+```java
+List<Class<?>> projectionEntities = new ArrayList<>();
+projectionEntities.addAll(SearchEntities.annotatedClasses());
+projectionEntities.addAll(JavaAnalysisEntities.annotatedClasses());
+
+try (HibernateSessionFactoryProvider provider =
+    new HibernateSessionFactoryProvider(properties, projectionEntities)) {
+  // use storage and projections
+}
+```
 
 ## Design stance
 
-- The project is not a fork of JGit.
-- The project is not affiliated with the Eclipse Foundation.
-- JGit internals must be encapsulated behind this module and must not leak into consuming applications.
-- Consuming applications should depend on a stable facade, not on `org.eclipse.jgit.internal.*` packages.
-- The Java baseline is Java 21 to align the storage, search and Java/JDT analysis modules with the current Sandbox toolchain.
-- The license is BSD-3-Clause, chosen to stay close to JGit's Eclipse Distribution License / BSD-3-Clause-compatible licensing model.
-
-## Current capabilities
-
-- Open or create a JGit repository backed by Hibernate-managed database tables.
-- Persist Git pack data and reftable data in relational databases.
-- Keep newly written pack extensions hidden until JGit commits the pack, avoiding visible half-written pack rows.
-- Persist and read queryable reflog entries.
-- Support JGit reftable reference updates through the DFS abstraction.
-- Index Git commit metadata, paths and text content in the optional search module.
-- Analyze Java source snapshots with JDT Core and persist binding-aware symbol/reference projections in the optional Java analysis module.
-- Provide H2 integration tests for the core and search modules.
-- Provide JMH benchmarks for core repository operations.
-
-## Quality metrics
-
-Coverage and test-count badges are generated from JaCoCo and Surefire reports during CI. Performance metrics are generated from JMH JSON output in `.github/workflows/performance.yml`; the badge shows the first reported JMH benchmark score and the full JSON is uploaded as a workflow artifact.
+- Git data is authoritative; semantic indexes are rebuildable projections.
+- Binding context and incomplete/recovered resolution are persisted explicitly.
+- JGit and JDT internal implementation types do not leak into public APIs.
+- Java analysis is optional and uses module-owned DTOs/entities.
+- Eclipse UI, cleanup and quickfix implementation code stay outside this module.
+- Java 21 is the project baseline.
+- License: BSD-3-Clause.
 
 ## Consuming
-
-See [docs/consuming.md](docs/consuming.md) for Maven repository setup, dependency snippets and the recommended first `audio-analyzer` integration path.
-
-Core dependency:
-
-```xml
-<dependency>
-  <groupId>io.github.carstenartur</groupId>
-  <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
-</dependency>
-```
-
-Optional search dependency:
-
-```xml
-<dependency>
-  <groupId>io.github.carstenartur</groupId>
-  <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
-</dependency>
-```
-
-Optional Java analysis dependency:
 
 ```xml
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.3-SNAPSHOT</version>
 </dependency>
 ```
 
-The benchmark module is not intended as a runtime dependency.
+See [docs/consuming.md](docs/consuming.md) for repository setup and all module dependencies.
 
-## Release and citation metadata
+## Documentation
 
-The repository includes release and citation metadata:
+- [Semantic software history roadmap](docs/semantic-history-roadmap.md)
+- [Consuming the modules](docs/consuming.md)
+- [JGit compatibility guardrails](docs/jgit-compatibility.md)
+- [Release process](docs/release-process.md)
+- [Citation metadata](CITATION.md)
 
-- [CITATION.cff](CITATION.cff)
-- [CITATION.md](CITATION.md)
-- [.zenodo.json](.zenodo.json)
-- [codemeta.json](codemeta.json)
-- [docs/release-process.md](docs/release-process.md)
+## Reference consumers and source concepts
 
-GitHub Packages publishing is prepared through:
+- **Sandbox:** Java diff/mining workflows, deterministic candidates and staged validation.
+- **Taxonomy:** structured DSL history, semantic diff, evidence and projection-staleness concepts.
+- **Audio Analyzer / Audioprocessor:** versioned domain-model consumer.
 
-- `.github/workflows/publish-snapshot.yml`
-- `.github/workflows/release.yml`
-- `.github/scripts/release.sh`
-- `.github/scripts/update-release-metadata.py`
-
-A DOI can be added after the first GitHub Release has been archived by Zenodo or another DOI provider.
-
-## Non-goals
-
-- This project is not a general Git hosting server.
-- This project does not replace JGit.
-- This project does not define domain-specific workflow models.
-- This project should not contain application-specific logic from Audio Analyzer, Taxonomy or Sandbox.
-- This project should not expose JGit internal package types through public APIs.
-- The Java analysis module should not contain Eclipse UI, cleanup, quickfix or copied JDT-internal implementation classes.
-
-## Basic usage
-
-```java
-Properties properties = new Properties();
-properties.put("hibernate.connection.url", "jdbc:h2:mem:demo;DB_CLOSE_DELAY=-1");
-properties.put("hibernate.connection.driver_class", "org.h2.Driver");
-properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
-properties.put("hibernate.hbm2ddl.auto", "update");
-
-try (HibernateSessionFactoryProvider provider = new HibernateSessionFactoryProvider(properties)) {
-    HibernateRepositoryFactory factory =
-        new DefaultHibernateRepositoryFactory(provider.getSessionFactory());
-
-    try (HibernateGitStorage storage = factory.open(new RepositoryName("demo"))) {
-        Repository repository = storage.repository();
-        // Use standard JGit APIs here.
-    }
-}
-```
-
-For search projections, create the session factory with the additional search entities:
-
-```java
-new HibernateSessionFactoryProvider(properties, SearchEntities.annotatedClasses());
-```
-
-For Java analysis projections, also register:
-
-```java
-JavaAnalysisEntities.annotatedClasses();
-```
-
-## Expected consumers
-
-- Audio Analyzer / Audioprocessor
-- Taxonomy
-- Sandbox
-- Other applications that need database-backed Git semantics for versioned domain models
+Application-specific UI and domain logic remain in those repositories.
 
 ## License
 
