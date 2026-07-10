@@ -38,7 +38,10 @@ public final class JavaSoftwareGraph {
     }
     List<JavaGraphEdge> edges = new ArrayList<>();
     for (JavaReferenceIndex reference : analysis.references()) {
-      String source = reference.getSourceSymbolKey();
+      String source = enclosingSymbolKey(analysis.symbols(), reference);
+      if (source == null) {
+        source = reference.getSourceSymbolKey();
+      }
       String target = reference.getTargetStableSemanticKey();
       JavaGraphEdgeKind kind = edgeKind(reference.getReferenceKind());
       if (source == null || target == null || kind == null) {
@@ -89,6 +92,26 @@ public final class JavaSoftwareGraph {
     }
     impacted.remove(semanticKey);
     return Set.copyOf(impacted);
+  }
+
+  private static String enclosingSymbolKey(
+      List<JavaSymbolIndex> symbols, JavaReferenceIndex reference) {
+    JavaSymbolIndex best = null;
+    for (JavaSymbolIndex symbol : symbols) {
+      if (!Objects.equals(symbol.getPath(), reference.getPath())) {
+        continue;
+      }
+      int referencePosition = reference.getStartPosition();
+      int symbolStart = symbol.getStartPosition();
+      int symbolEnd = symbolStart + symbol.getSourceLength();
+      if (referencePosition < symbolStart || referencePosition >= symbolEnd) {
+        continue;
+      }
+      if (best == null || symbol.getSourceLength() < best.getSourceLength()) {
+        best = symbol;
+      }
+    }
+    return best == null ? null : best.getStableSemanticKey();
   }
 
   private static JavaGraphEdgeKind edgeKind(JavaReferenceKind kind) {
