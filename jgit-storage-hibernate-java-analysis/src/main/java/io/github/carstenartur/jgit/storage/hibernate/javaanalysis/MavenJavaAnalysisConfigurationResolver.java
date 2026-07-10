@@ -119,12 +119,20 @@ public final class MavenJavaAnalysisConfigurationResolver {
         sourceLevel == null ? "21" : sourceLevel,
         BindingMode.RECOVERY,
         List.copyOf(classpath),
-        List.of(),
-        List.of(),
+        List.copyOf(sourceRoots),
+        encodings(sourceRoots.size()),
         List.of(),
         true,
         JavaAnalysisConfiguration.DEFAULT_ANALYZER_VERSION);
     return new Resolution(configuration, List.copyOf(sourceRoots), unresolved, List.copyOf(modules));
+  }
+
+  private static List<String> encodings(int count) {
+    List<String> encodings = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      encodings.add(java.nio.charset.StandardCharsets.UTF_8.name());
+    }
+    return List.copyOf(encodings);
   }
 
   private static Map<String, String> effectiveProperties(

@@ -76,12 +76,19 @@ public final class JavaProjectAnalyzer {
 
   private static JavaAnalysisConfiguration withSourceRoot(
       JavaAnalysisConfiguration configuration, Path sourceRoot) {
-    List<String> sourcepaths = new ArrayList<>(configuration.sourcepathEntries());
-    sourcepaths.add(sourceRoot.toAbsolutePath().toString());
-    List<String> encodings = new ArrayList<>();
-    for (int i = 0; i < sourcepaths.size(); i++) {
-      encodings.add(StandardCharsets.UTF_8.name());
+    List<String> sourcepaths = new ArrayList<>();
+    if (configuration.sourcepathEntries().isEmpty()) {
+      sourcepaths.add(sourceRoot.toAbsolutePath().toString());
+    } else {
+      for (String entry : configuration.sourcepathEntries()) {
+        Path path = Path.of(entry);
+        Path resolved = path.isAbsolute() ? path : safeResolve(sourceRoot, entry);
+        sourcepaths.add(resolved.toAbsolutePath().toString());
+      }
     }
+    List<String> encodings = configuration.encodings().isEmpty()
+        ? repeatedUtf8(sourcepaths.size())
+        : new ArrayList<>(configuration.encodings());
     return new JavaAnalysisConfiguration(
         configuration.sourceLevel(),
         configuration.bindingMode(),
@@ -91,6 +98,14 @@ public final class JavaProjectAnalyzer {
         configuration.modulepathEntries(),
         configuration.includeRunningVmBootClasspath(),
         configuration.analyzerVersion());
+  }
+
+  private static List<String> repeatedUtf8(int count) {
+    List<String> encodings = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      encodings.add(StandardCharsets.UTF_8.name());
+    }
+    return encodings;
   }
 
   private static void materialize(JavaProjectSnapshot project, Path sourceRoot) throws IOException {
