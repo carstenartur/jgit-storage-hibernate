@@ -20,6 +20,7 @@
     <module>jgit-storage-hibernate-core</module>
     <module>jgit-storage-hibernate-search</module>
     <module>jgit-storage-hibernate-java-analysis</module>
+    <module>jgit-storage-hibernate-architecture</module>
     <module>jgit-storage-hibernate-benchmarks</module>
   </modules>
 
@@ -114,6 +115,11 @@
       <dependency>
         <groupId>io.github.carstenartur</groupId>
         <artifactId>jgit-storage-hibernate-search</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.carstenartur</groupId>
+        <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
         <version>${project.version}</version>
       </dependency>
       <!-- Pin upper bounds to resolve transitive convergence conflicts caused by
