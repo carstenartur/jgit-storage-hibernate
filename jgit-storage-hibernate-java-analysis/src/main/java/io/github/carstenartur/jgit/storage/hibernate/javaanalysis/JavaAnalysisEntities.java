@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.javaanalysis;
 
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaAnalysisRun;
+import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaProjectionState;
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaReferenceIndex;
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaSymbolIndex;
 import java.util.List;
@@ -19,6 +20,10 @@ public final class JavaAnalysisEntities {
   private JavaAnalysisEntities() {}
 
   public static List<Class<?>> annotatedClasses() {
-    return List.of(JavaAnalysisRun.class, JavaSymbolIndex.class, JavaReferenceIndex.class);
+    return List.of(
+        JavaAnalysisRun.class,
+        JavaProjectionState.class,
+        JavaSymbolIndex.class,
+        JavaReferenceIndex.class);
   }
 }
