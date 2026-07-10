@@ -111,7 +111,7 @@ final class JavaHierarchyGraph {
       char c = rawParents.charAt(i);
       if (c == '<') {
         depth++;
-      } else if (c == '>') {
+      } else if (c == '>' && depth > 0) {
         depth--;
       } else if (c == ',' && depth == 0) {
         result.add(rawParents.substring(start, i).trim());
@@ -132,7 +132,12 @@ final class JavaHierarchyGraph {
     if (mods == null) {
       return true;
     }
-    return !mods.contains("static") && !mods.contains("private");
+    for (String token : mods.split("\\s+")) {
+      if ("static".equals(token) || "private".equals(token)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static boolean isType(JavaSymbolIndex symbol) {
