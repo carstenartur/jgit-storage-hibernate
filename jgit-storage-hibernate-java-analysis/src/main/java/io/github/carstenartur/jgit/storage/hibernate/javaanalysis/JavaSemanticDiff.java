@@ -29,7 +29,8 @@ public final class JavaSemanticDiff {
       Match match = findMatch(oldSymbol, after.symbols(), afterByIdentity, matchedAfter);
       if (match.symbol() == null) {
         changes.add(new SemanticChange(
-            SemanticChangeKind.REMOVED, oldSymbol, null, 1.0, "No declaration with matching binding or semantic identity"));
+            SemanticChangeKind.REMOVED, oldSymbol, null, 1.0,
+            "No declaration with matching binding or semantic identity"));
         continue;
       }
       JavaSymbolIndex newSymbol = match.symbol();
@@ -40,7 +41,8 @@ public final class JavaSemanticDiff {
     for (JavaSymbolIndex newSymbol : after.symbols()) {
       if (!matchedAfter.contains(newSymbol)) {
         changes.add(new SemanticChange(
-            SemanticChangeKind.ADDED, null, newSymbol, 1.0, "No declaration with matching binding or semantic identity"));
+            SemanticChangeKind.ADDED, null, newSymbol, 1.0,
+            "No declaration with matching binding or semantic identity"));
       }
     }
     return List.copyOf(changes);
@@ -80,7 +82,8 @@ public final class JavaSemanticDiff {
     for (String key : identityKeys(oldSymbol)) {
       JavaSymbolIndex candidate = indexed.get(key);
       if (candidate != null && !matched.contains(candidate)) {
-        return new Match(candidate, key.startsWith("binding:") ? 1.0 : 0.95, "Matched by " + key.substring(0, key.indexOf(':')));
+        return new Match(candidate, key.startsWith("binding:") ? 1.0 : 0.95,
+            "Matched by " + key.substring(0, key.indexOf(':')));
       }
     }
 
@@ -105,12 +108,16 @@ public final class JavaSemanticDiff {
     double score = 0.0;
     if (Objects.equals(left.getDeclaringType(), right.getDeclaringType())) {
       score += 0.25;
+    } else if (Objects.equals(simpleTypeName(left.getDeclaringType()), simpleTypeName(right.getDeclaringType()))) {
+      score += 0.20;
     }
     if (Objects.equals(left.getSimpleName(), right.getSimpleName())) {
       score += 0.30;
     }
     if (Objects.equals(left.getParameterTypes(), right.getParameterTypes())) {
       score += 0.25;
+    } else if (parameterCount(left.getParameterTypes()) == parameterCount(right.getParameterTypes())) {
+      score += 0.15;
     }
     if (Objects.equals(left.getReturnType(), right.getReturnType())) {
       score += 0.10;
@@ -121,7 +128,7 @@ public final class JavaSemanticDiff {
     if (Objects.equals(fileName(left.getPath()), fileName(right.getPath()))) {
       score += 0.05;
     }
-    return score;
+    return Math.min(score, 1.0);
   }
 
   private static Map<String, JavaSymbolIndex> index(List<JavaSymbolIndex> symbols) {
@@ -147,6 +154,21 @@ public final class JavaSemanticDiff {
     if (value != null && !value.isBlank()) {
       keys.add(prefix + value);
     }
+  }
+
+  private static int parameterCount(String parameters) {
+    if (parameters == null || parameters.isBlank()) {
+      return 0;
+    }
+    return parameters.split(",", -1).length;
+  }
+
+  private static String simpleTypeName(String qualifiedName) {
+    if (qualifiedName == null) {
+      return null;
+    }
+    int separator = Math.max(qualifiedName.lastIndexOf('.'), qualifiedName.lastIndexOf('$'));
+    return qualifiedName.substring(separator + 1);
   }
 
   private static String fileName(String path) {

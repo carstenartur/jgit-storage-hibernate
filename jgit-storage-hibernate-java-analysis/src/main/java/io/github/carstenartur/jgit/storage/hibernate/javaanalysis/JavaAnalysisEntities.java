@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.javaanalysis;
 
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaAnalysisRun;
+import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaGraphEdgeIndex;
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaProjectionState;
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaReferenceIndex;
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaSymbolIndex;
@@ -24,6 +25,7 @@ public final class JavaAnalysisEntities {
         JavaAnalysisRun.class,
         JavaProjectionState.class,
         JavaSymbolIndex.class,
-        JavaReferenceIndex.class);
+        JavaReferenceIndex.class,
+        JavaGraphEdgeIndex.class);
   }
 }
