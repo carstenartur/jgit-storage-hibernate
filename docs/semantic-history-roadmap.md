@@ -20,9 +20,9 @@ Implemented in this repository today:
 
 Planned in this roadmap:
 
-- reusable semantic history query and demonstrator workflows,
+- end-to-end semantic history query and demonstrator workflows (fixtures, one-command runs and usage docs),
 - generic candidate lifecycle extraction from Sandbox concepts,
-- structured DSL analysis SPI generalization from Taxonomy concepts,
+- structured DSL analysis SPI generalization beyond the existing architecture DSL parser,
 - architecture drift workflows combining multiple projection types at scale.
 
 ## Product vision
