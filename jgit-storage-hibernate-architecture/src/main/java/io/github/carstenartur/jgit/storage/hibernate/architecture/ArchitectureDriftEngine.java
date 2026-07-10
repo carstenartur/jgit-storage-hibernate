@@ -7,8 +7,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** Compares observed code graph relations with versioned architecture intent. */
@@ -25,19 +27,20 @@ public final class ArchitectureDriftEngine {
         ArchitectureDriftKind.AMBIGUOUS_MAPPING, null, null, null, null,
         "Code symbol " + key + " matches multiple architecture elements " + ids, List.of())));
 
+    Map<String, List<ArchitectureRule>> forbidIndex = buildForbidIndex(architecture);
     Set<String> observedRuleKeys = new HashSet<>();
     for (JavaGraphEdge edge : graph.edges()) {
       String sourceElement = mapping.elementFor(edge.sourceSemanticKey());
       String targetElement = mapping.elementFor(edge.targetSemanticKey());
       if (sourceElement == null || targetElement == null) continue;
       observedRuleKeys.add(ruleKey(edge.kind().name(), sourceElement, targetElement));
-      for (ArchitectureRule rule : architecture.rules()) {
-        if (matches(rule, edge, sourceElement, targetElement) && rule.effect() == ArchitectureRuleEffect.FORBID) {
-          findings.add(finding(
-              ArchitectureDriftKind.FORBIDDEN_RELATION, rule.id(), sourceElement, targetElement, edge,
-              "Observed " + edge.kind() + " violates rule " + rule.id() + ": " + rule.rationale(),
-              evidenceIds(architecture, rule)));
-        }
+      List<ArchitectureRule> forbidRules = forbidIndex.getOrDefault(
+          ruleKey(edge.kind().name(), sourceElement, targetElement), List.of());
+      for (ArchitectureRule rule : forbidRules) {
+        findings.add(finding(
+            ArchitectureDriftKind.FORBIDDEN_RELATION, rule.id(), sourceElement, targetElement, edge,
+            "Observed " + edge.kind() + " violates rule " + rule.id() + ": " + rule.rationale(),
+            evidenceIds(architecture, rule)));
       }
     }
 
@@ -69,11 +72,16 @@ public final class ArchitectureDriftEngine {
     return new ArchitectureDriftReport(architecture, mapping, findings);
   }
 
-  private static boolean matches(
-      ArchitectureRule rule, JavaGraphEdge edge, String sourceElement, String targetElement) {
-    return rule.edgeKind() == edge.kind()
-        && rule.sourceElementId().equals(sourceElement)
-        && rule.targetElementId().equals(targetElement);
+  private static Map<String, List<ArchitectureRule>> buildForbidIndex(ArchitectureSnapshot architecture) {
+    Map<String, List<ArchitectureRule>> index = new HashMap<>();
+    for (ArchitectureRule rule : architecture.rules()) {
+      if (rule.effect() == ArchitectureRuleEffect.FORBID) {
+        index.computeIfAbsent(
+            ruleKey(rule.edgeKind().name(), rule.sourceElementId(), rule.targetElementId()),
+            k -> new ArrayList<>()).add(rule);
+      }
+    }
+    return index;
   }
 
   private static List<String> evidenceIds(ArchitectureSnapshot architecture, ArchitectureRule rule) {

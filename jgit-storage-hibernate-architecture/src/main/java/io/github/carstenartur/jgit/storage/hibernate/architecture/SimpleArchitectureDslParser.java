@@ -48,8 +48,17 @@ public final class SimpleArchitectureDslParser implements ArchitectureDslParser 
         diagnostics.add("Line " + (i + 1) + ": " + exception.getMessage());
       }
     }
-    ArchitectureSnapshot snapshot = new ArchitectureSnapshot(
-        source.repositoryName(), source.commitId(), dslId(), "1", elements, relations, rules, evidence);
+    ArchitectureSnapshot snapshot;
+    try {
+      snapshot = new ArchitectureSnapshot(
+          source.repositoryName(), source.commitId(), dslId(), "1", elements, relations, rules, evidence);
+    } catch (IllegalArgumentException e) {
+      diagnostics.add(e.getMessage());
+      // Drop all rules and relations to produce a valid snapshot with diagnostics
+      snapshot = new ArchitectureSnapshot(
+          source.repositoryName(), source.commitId(), dslId(), "1",
+          elements, List.of(), List.of(), evidence);
+    }
     return new ArchitectureDslParseResult(snapshot, diagnostics);
   }
 

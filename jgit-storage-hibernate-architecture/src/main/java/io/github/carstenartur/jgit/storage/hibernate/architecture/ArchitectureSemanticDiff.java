@@ -51,7 +51,13 @@ public final class ArchitectureSemanticDiff {
 
   private static <T> Map<String, T> index(List<T> values, Function<T, String> idExtractor) {
     Map<String, T> result = new LinkedHashMap<>();
-    values.forEach(value -> result.put(idExtractor.apply(value), value));
+    for (T value : values) {
+      String id = idExtractor.apply(value);
+      if (result.containsKey(id)) {
+        throw new IllegalArgumentException("Duplicate stable ID in architecture snapshot: " + id);
+      }
+      result.put(id, value);
+    }
     return result;
   }
 }

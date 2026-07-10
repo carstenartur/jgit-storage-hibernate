@@ -1,7 +1,9 @@
 /* Copyright (C) 2026, Carsten Hammer and contributors. SPDX-License-Identifier: BSD-3-Clause */
 package io.github.carstenartur.jgit.storage.hibernate.architecture;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.JavaAnalysisConfiguration;
@@ -67,6 +69,64 @@ class VersionedArchitectureDriftTest {
     assertTrue(report.findings().stream().anyMatch(finding -> finding.kind() == ArchitectureDriftKind.MISSING_EVIDENCE));
   }
 
+  @Test
+  void parsesRelationStatement() {
+    ArchitectureDslParseResult result = new SimpleArchitectureDslParser().parse(
+        new ArchitectureDslSource("demo", "r1", "architecture/system.architecture", """
+            element api layer "API" packagePrefix=demo.api
+            element domain layer "Domain" packagePrefix=demo.domain
+            relation api-to-domain depends api -> domain
+            """));
+
+    assertTrue(result.diagnostics().isEmpty(), "Expected no parse diagnostics but got: " + result.diagnostics());
+    assertEquals(1, result.snapshot().relations().size());
+    ArchitectureRelation relation = result.snapshot().relations().getFirst();
+    assertEquals("api-to-domain", relation.id());
+    assertEquals("api", relation.sourceId());
+    assertEquals("domain", relation.targetId());
+  }
+
+  @Test
+  void parsesRelationWithUnknownEndpointIntoDiagnostic() {
+    ArchitectureDslParseResult result = new SimpleArchitectureDslParser().parse(
+        new ArchitectureDslSource("demo", "r2", "architecture/system.architecture", """
+            element api layer "API" packagePrefix=demo.api
+            relation api-to-missing depends api -> nonexistent
+            """));
+
+    assertFalse(result.diagnostics().isEmpty(), "Expected a diagnostic for unknown relation endpoint");
+    assertTrue(result.snapshot().relations().isEmpty(), "Snapshot should have no relations when endpoint is invalid");
+  }
+
+  @Test
+  void rejectsRuleWithUnknownElementIdIntoDiagnostic() {
+    ArchitectureDslParseResult result = new SimpleArchitectureDslParser().parse(
+        new ArchitectureDslSource("demo", "r3", "architecture/system.architecture", """
+            element api layer "API" packagePrefix=demo.api
+            rule bad-rule forbid REFERENCES_TYPE from api to nonexistent reason="test"
+            """));
+
+    assertFalse(result.diagnostics().isEmpty(), "Expected a diagnostic for unknown element ID in rule");
+    assertTrue(result.snapshot().rules().isEmpty(), "Snapshot should have no rules when element ID is invalid");
+  }
+
+  @Test
+  void semanticDiffRejectsDuplicateStableIds() {
+    ArchitectureSnapshot before = parse("dup-a", """
+        element api layer "API" packagePrefix=demo.api
+        element domain layer "Domain" packagePrefix=demo.domain
+        """);
+    // Construct a snapshot with a duplicate element ID manually (bypasses DSL parser)
+    ArchitectureElement dup = new ArchitectureElement("api", "layer", "Duplicate", Map.of());
+    assertThrows(IllegalArgumentException.class, () ->
+        new ArchitectureSemanticDiff().compare(before,
+            new ArchitectureSnapshot("demo", "dup-b", "simple-architecture", "1",
+                java.util.List.of(
+                    new ArchitectureElement("api", "layer", "API", Map.of()),
+                    dup),
+                java.util.List.of(), java.util.List.of(), java.util.List.of())));
+  }
+
   private static ArchitectureSnapshot parse(String commit, String content) {
     return new SimpleArchitectureDslParser().parse(
         new ArchitectureDslSource("demo", commit, "architecture/system.architecture", content)).snapshot();
@@ -74,11 +134,11 @@ class VersionedArchitectureDriftTest {
 
   private static JavaProjectSnapshot project() {
     Map<String, String> sources = Map.of(
-        "src/main/java/demo/db/Repository.java", """
+        "demo/db/Repository.java", """
             package demo.db;
             public class Repository { public void save() {} }
             """,
-        "src/main/java/demo/ui/Screen.java", """
+        "demo/ui/Screen.java", """
             package demo.ui;
             import demo.db.Repository;
             public class Screen { private Repository repository; }
