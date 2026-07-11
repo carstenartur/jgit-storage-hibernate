@@ -53,3 +53,13 @@ reopenAndResolveMain
 ```
 
 These benchmarks are intended to detect regressions and track broad performance trends, not to make absolute claims about all database backends or production workloads.
+
+## Semantic history benchmark direction
+
+The Java analysis module now exposes semantic-history queries that build on `JavaProjectAnalyzer`, `JavaSemanticDiff`, and `SemanticHistoryQuery`. A practical next benchmark slice is comparing two analyzed commit snapshots, measuring:
+
+- symbol extraction throughput
+- semantic diff throughput
+- query latency for moved symbols and impacted callers
+
+This keeps future semantic-history work aligned with the existing JMH-based performance tracking approach.
