@@ -70,11 +70,11 @@ class SemanticCandidateLifecycleTest {
   }
 
   @Test
-  void jsonRoundTripPreservesLifecycleAndEvidenceCount() {
+  void jsonRoundTripPreservesLifecycleAndEvidenceContent() {
     CandidateRegistry registry = new CandidateRegistry();
     CandidateId id = CandidateId.of("repo", "c1", "refactoring", "demo", "payload");
-    registry.register(id, CandidateEvidence.of("first"));
-    registry.register(id, CandidateEvidence.of("second"));
+    registry.register(id, CandidateEvidence.withExamples("Extract Method", "before code", "after code"));
+    registry.register(id, CandidateEvidence.of("second").withNegativeExample("not this"));
     registry.transition(id, CandidateLifecycle.VALIDATED);
 
     String json = registry.exportJson();
@@ -84,6 +84,12 @@ class SemanticCandidateLifecycleTest {
     assertEquals(1, imported.size());
     assertEquals(CandidateLifecycle.VALIDATED, candidate.lifecycle());
     assertEquals(2, candidate.evidence().size());
+    assertEquals("Extract Method", candidate.evidence().get(0).description());
+    assertEquals("before code", candidate.evidence().get(0).beforeExample());
+    assertEquals("after code", candidate.evidence().get(0).afterExample());
+    assertEquals("second", candidate.evidence().get(1).description());
+    assertEquals(1, candidate.evidence().get(1).negativeExamples().size());
+    assertEquals("not this", candidate.evidence().get(1).negativeExamples().get(0));
   }
 
   @Test

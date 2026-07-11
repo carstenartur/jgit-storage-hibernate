@@ -83,6 +83,11 @@ public final class JavaProjectAnalyzer {
       for (String entry : configuration.sourcepathEntries()) {
         Path path = Path.of(entry);
         Path resolved = path.isAbsolute() ? path : safeResolve(sourceRoot, entry);
+        try {
+          Files.createDirectories(resolved);
+        } catch (IOException e) {
+          throw new IllegalStateException("Cannot create source directory: " + resolved, e);
+        }
         sourcepaths.add(resolved.toAbsolutePath().toString());
       }
     }

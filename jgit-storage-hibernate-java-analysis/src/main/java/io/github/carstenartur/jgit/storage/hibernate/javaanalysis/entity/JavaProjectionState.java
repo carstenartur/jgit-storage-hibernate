@@ -59,7 +59,7 @@ public class JavaProjectionState {
   @Column(name = "reference_count", nullable = false)
   private int referenceCount;
 
-  @Column(name = "started_at", nullable = false)
+  @Column(name = "started_at")
   private Instant startedAt;
 
   @Column(name = "completed_at")

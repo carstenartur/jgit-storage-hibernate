@@ -44,13 +44,13 @@ class CommitClasspathResolutionTest {
     repositoryFiles.put("app/pom.xml", """
         <project><modelVersion>4.0.0</modelVersion></project>
         """);
-    repositoryFiles.put("src/main/java/demo/api/Store.java", """
+    repositoryFiles.put("api/src/main/java/demo/api/Store.java", """
         package demo.api;
         public class Store {
           public String save(String value) { return value; }
         }
         """);
-    repositoryFiles.put("src/main/java/demo/app/Client.java", """
+    repositoryFiles.put("app/src/main/java/demo/app/Client.java", """
         package demo.app;
         import demo.api.Store;
         public class Client {
@@ -62,7 +62,7 @@ class CommitClasspathResolutionTest {
     JavaProjectAnalysisResult result =
         new JavaProjectAnalyzer().analyze(
             project("repo", "c1", repositoryFiles),
-            JavaAnalysisConfiguration.java21BindingAware());
+            resolution.configuration());
     assertEquals("21", resolution.configuration().sourceLevel());
     assertTrue(resolution.sourceRoots().contains("api/src/main/java"));
     assertTrue(resolution.sourceRoots().contains("app/src/main/java"));
