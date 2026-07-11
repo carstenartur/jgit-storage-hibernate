@@ -296,6 +296,15 @@ public final class CandidateRegistry {
 
     private static SemanticCandidate buildCandidate(
         Map<String, String> values, List<CandidateEvidence> evidence) {
+      requireField(values, "repositoryName");
+      requireField(values, "sourceCommitId");
+      requireField(values, "category");
+      requireField(values, "analyzerName");
+      requireField(values, "semanticPayload");
+      requireField(values, "id");
+      requireField(values, "lifecycle");
+      requireField(values, "discoveredAt");
+      requireField(values, "lastModifiedAt");
       CandidateId id = new CandidateId(
           values.get("repositoryName"),
           values.get("sourceCommitId"),
@@ -310,6 +319,12 @@ public final class CandidateRegistry {
           Instant.parse(values.get("discoveredAt")),
           Instant.parse(values.get("lastModifiedAt")),
           values.getOrDefault("notes", ""));
+    }
+
+    private static void requireField(Map<String, String> values, String field) {
+      if (values.get(field) == null) {
+        throw new IllegalArgumentException("Candidate object missing required field '" + field + "'");
+      }
     }
 
     private List<CandidateEvidence> parseEvidenceArray() {
