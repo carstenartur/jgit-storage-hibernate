@@ -344,7 +344,7 @@ public final class CandidateRegistry {
       skipWhitespace();
       if (peek() == '}') {
         index++;
-        return new CandidateEvidence(values.get("description"), null, null, negativeExamples);
+        return buildEvidence(values, negativeExamples);
       }
       while (true) {
         String key = parseString();
@@ -367,14 +367,23 @@ public final class CandidateRegistry {
         }
         if (next == '}') {
           index++;
-          return new CandidateEvidence(
-              values.get("description"),
-              values.get("beforeExample"),
-              values.get("afterExample"),
-              negativeExamples);
+          return buildEvidence(values, negativeExamples);
         }
         throw new IllegalArgumentException("Unexpected character '" + next + "' at position " + index);
       }
+    }
+
+    private static CandidateEvidence buildEvidence(
+        Map<String, String> values, List<String> negativeExamples) {
+      String description = values.get("description");
+      if (description == null) {
+        throw new IllegalArgumentException("Evidence object missing required 'description' field");
+      }
+      return new CandidateEvidence(
+          description,
+          values.get("beforeExample"),
+          values.get("afterExample"),
+          negativeExamples);
     }
 
     private List<String> parseStringArray() {

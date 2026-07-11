@@ -82,13 +82,17 @@ public final class JavaProjectAnalyzer {
     } else {
       for (String entry : configuration.sourcepathEntries()) {
         Path path = Path.of(entry);
-        Path resolved = path.isAbsolute() ? path : safeResolve(sourceRoot, entry);
-        try {
-          Files.createDirectories(resolved);
-        } catch (IOException e) {
-          throw new IllegalStateException("Cannot create source directory: " + resolved, e);
+        if (path.isAbsolute()) {
+          sourcepaths.add(path.toAbsolutePath().toString());
+        } else {
+          Path resolved = safeResolve(sourceRoot, entry);
+          try {
+            Files.createDirectories(resolved);
+          } catch (IOException e) {
+            throw new IllegalStateException("Cannot create source directory: " + resolved, e);
+          }
+          sourcepaths.add(resolved.toAbsolutePath().toString());
         }
-        sourcepaths.add(resolved.toAbsolutePath().toString());
       }
     }
     List<String> encodings = configuration.encodings().isEmpty()
