@@ -1,7 +1,7 @@
 {
   "title": "jgit-storage-hibernate",
   "description": "Hibernate-backed database storage backend for JGit repositories.",
-  "version": "0.1.3-SNAPSHOT",
+  "version": "0.1.3",
   "upload_type": "software",
   "access_right": "open",
   "license": "BSD-3-Clause",
@@ -25,5 +25,6 @@
       "relation": "isSupplementTo",
       "scheme": "url"
     }
-  ]
+  ],
+  "publication_date": "2026-07-11"
 }
