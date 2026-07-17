@@ -151,7 +151,7 @@ try (HibernateSessionFactoryProvider provider =
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-architecture</artifactId>
-  <version>0.1.3-SNAPSHOT</version>
+  <version>0.1.4</version>
 </dependency>
 ```
 
