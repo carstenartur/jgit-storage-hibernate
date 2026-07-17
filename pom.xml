@@ -67,8 +67,9 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <jgit.version>7.7.0.202606012155-r</jgit.version>
-    <hibernate.version>6.6.13.Final</hibernate.version>
-    <hibernate-search.version>7.2.0.Final</hibernate-search.version>
+    <hibernate.version>7.4.5.Final</hibernate.version>
+    <hibernate-search.version>8.4.0.Final</hibernate-search.version>
+    <jakarta.xml.bind.version>4.0.5</jakarta.xml.bind.version>
     <junit.version>6.1.1</junit.version>
     <h2.version>2.4.240</h2.version>
     <jmh.version>1.37</jmh.version>
@@ -139,12 +140,16 @@
         <artifactId>jboss-logging</artifactId>
         <version>3.6.3.Final</version>
       </dependency>
-      <!-- Pin the upper bound to resolve convergence between jakarta.xml.bind-api (2.1.0)
-           and jaxb-core/angus-activation (2.1.1) transitive pulls from hibernate-core -->
+      <!-- Pin upper bounds for the Jakarta XML/activation stack used by Hibernate ORM. -->
       <dependency>
         <groupId>jakarta.activation</groupId>
         <artifactId>jakarta.activation-api</artifactId>
         <version>2.1.4</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.xml.bind</groupId>
+        <artifactId>jakarta.xml.bind-api</artifactId>
+        <version>${jakarta.xml.bind.version}</version>
       </dependency>
       <!-- Pin the upper bound to resolve convergence across org.eclipse.jdt.core transitive
            dependencies that pull different versions of org.eclipse.equinox.common -->
