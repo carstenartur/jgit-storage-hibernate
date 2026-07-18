@@ -9,6 +9,8 @@ These are not merely shorter spellings for simple JGit calls. They require query
 
 The Search module shifts revision traversal, first-parent diffing, text extraction and index construction to the point where commits enter the projection or an explicit reindex runs. Request-time work is then performed by relational indexes and Hibernate Search/Lucene. Java Analysis performs a comparable transformation for source code: it derives declarations, binding identities and semantic relations that are not present in Git itself.
 
+Every use case below is tied to an executable integration test. The documentation therefore describes behavior that the Maven build verifies rather than illustrative snippets that may drift independently of the implementation.
+
 ## Index once, query repeatedly
 
 Without a projection, every request must repeat work proportional to the relevant history:
@@ -71,7 +73,7 @@ List<GitCommitIndex> securityChanges =
             100);
 ```
 
-This is not equivalent to Git's normal path, log or grep operations. The query can search analyzed terms across commit messages, changed paths and selected changed-file contents using a maintained inverted index.
+This is not equivalent to Git's normal path, log or grep operations. The query searches analyzed terms across commit messages, changed paths and selected changed-file contents using a maintained inverted index.
 
 Application endpoints may expose both dimensions:
 
@@ -84,9 +86,18 @@ GET /audit/changes?author=alice@example.com
 GET /audit/search?q="dual control" OR fraud
 ```
 
-The executable
+### Integration-test contract
+
 [`CompoundCommitHistoryQueryH2Test`](../../jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java)
-creates commits by different authors in different subsystems and proves that only the commit satisfying all structured predicates is returned. It also proves that unchanged files are not mislabeled as changed.
+creates commits by different authors in different subsystems and timestamps. It verifies that:
+
+- only the commit matching author, path and interval together is returned;
+- unchanged files are not indexed as changed;
+- root and first-parent changed-path semantics remain intact;
+- path fragments containing `%` or `_` are treated literally.
+
+[`GitHistorySearchH2Test`](../../jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/GitHistorySearchH2Test.java)
+indexes a commit, closes the JGit repository and then searches its message, changed path and changed-file content. The successful queries after repository closure demonstrate that request-time full-text search uses the maintained projection rather than reopening and traversing the repository.
 
 ## Question 2: who used this Java type in each version?
 
@@ -139,9 +150,15 @@ release-2026-02 -> demo.risk.ApprovalPolicy
 
 The query accepted the **old qualified name** but still found usages after the package move because the type is followed as one logical symbol timeline.
 
-The executable
+### Integration-test contract
+
 [`JavaTypeUsageHistoryQueryTest`](../../jgit-storage-hibernate-java-analysis/src/test/java/io/github/carstenartur/jgit/storage/hibernate/javaanalysis/JavaTypeUsageHistoryQueryTest.java)
-analyzes two versions, moves the class, adds a new user and verifies both versions' code locations and binding quality.
+analyzes two versions of a Java project, moves `ApprovalPolicy` to another package and adds a second user. It verifies that:
+
+- both commits belong to one logical type history;
+- the old qualified name resolves the usages after the move;
+- the original and newly added usage locations are reported in the correct versions;
+- relation and binding quality remain visible and match the documented `RECOVERED` fixture result.
 
 ## Architectural difference
 
