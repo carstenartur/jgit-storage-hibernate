@@ -28,6 +28,13 @@ public final class SearchSchemaMigrations {
   public static final String SCHEMA_HISTORY_TABLE =
       "jgit_storage_hibernate_search_schema_history";
 
+  /** Baseline used when installing into a schema that contains only unrelated tables. */
+  public static final String PRE_MIGRATION_BASELINE_VERSION = "0";
+
+  /** Description for the pre-migration baseline of a new module installation. */
+  public static final String PRE_MIGRATION_BASELINE_DESCRIPTION =
+      "before jgit-storage-hibernate-search migrations";
+
   /** Search projection schema version already produced by version 0.1.4. */
   public static final String LEGACY_SCHEMA_VERSION = "0.1.4";
 
