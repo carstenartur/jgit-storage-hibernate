@@ -37,8 +37,8 @@ public final class CommitHistoryQuery {
     to = builder.to;
     limit = builder.limit;
 
-    if (limit <= 0) {
-      throw new IllegalArgumentException("limit must be greater than zero");
+    if (limit < 0) {
+      throw new IllegalArgumentException("limit must not be negative");
     }
     if (from != null && to != null && from.isAfter(to)) {
       throw new IllegalArgumentException("from must not be after to");
@@ -153,7 +153,7 @@ public final class CommitHistoryQuery {
     /**
      * Set the maximum number of results.
      *
-     * @param limit positive result limit
+     * @param limit non-negative result limit
      * @return this builder
      */
     public Builder limit(int limit) {
