@@ -10,12 +10,14 @@ package io.github.carstenartur.jgit.storage.hibernate.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.schema.SearchSchemaMigrations;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -35,9 +37,8 @@ import org.junit.jupiter.api.Test;
 class SearchSchemaMigrationIntegrationTest {
 
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
-  private static final String POSTGRES_URL_ENV = "JSGH_POSTGRES_URL";
-  private static final String POSTGRES_USER_ENV = "JSGH_POSTGRES_USER";
-  private static final String POSTGRES_PASSWORD_ENV = "JSGH_POSTGRES_PASSWORD";
+  private static final String H2_LEGACY_SCHEMA =
+      "/db/legacy/jgit-storage-hibernate/search/0.1.4/h2/schema.sql";
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
@@ -47,27 +48,13 @@ class SearchSchemaMigrationIntegrationTest {
   }
 
   @Test
-  void upgradesLegacyH2SchemaWithoutDataLoss() throws Exception {
+  void upgradesImmutableLegacyH2FixtureWithoutDataLoss() throws Exception {
     try (TestDatabase database = h2Database("upgrade")) {
       verifyLegacyUpgrade(database);
     }
   }
 
-  @Test
-  void migratesEmptyPostgreSqlDatabaseAndRestartsWithValidation() throws Exception {
-    try (TestDatabase database = postgresDatabase("empty")) {
-      verifyEmptyMigrationAndRestart(database);
-    }
-  }
-
-  @Test
-  void upgradesLegacyPostgreSqlSchemaWithoutDataLoss() throws Exception {
-    try (TestDatabase database = postgresDatabase("upgrade")) {
-      verifyLegacyUpgrade(database);
-    }
-  }
-
-  private static void verifyEmptyMigrationAndRestart(TestDatabase database) throws Exception {
+  static void verifyEmptyMigrationAndRestart(TestDatabase database) throws Exception {
     migrate(database, false);
     assertMigrationVersions(database);
 
@@ -81,9 +68,11 @@ class SearchSchemaMigrationIntegrationTest {
     }
   }
 
-  private static void verifyLegacyUpgrade(TestDatabase database) throws Exception {
+  static void verifyLegacyUpgrade(TestDatabase database) throws Exception {
+    installLegacySchema(database);
+
     Long projectionId;
-    try (HibernateSessionFactoryProvider provider = provider(database, "create")) {
+    try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
       projectionId = persistProjection(provider.getSessionFactory(), "legacy-object");
     }
 
@@ -133,6 +122,39 @@ class SearchSchemaMigrationIntegrationTest {
       assertEquals("Versioned migration projection", projection.getShortMessage());
       assertEquals("src/main/java/Example.java", projection.getChangedPaths());
     }
+  }
+
+  private static void installLegacySchema(TestDatabase database) throws IOException, SQLException {
+    String script = readResource(database.legacySchemaResource());
+    try (Connection connection = database.openConnection();
+        Statement statement = connection.createStatement()) {
+      for (String sql : sqlStatements(script)) {
+        statement.execute(sql);
+      }
+    }
+  }
+
+  private static String readResource(String resourceName) throws IOException {
+    try (InputStream input =
+        SearchSchemaMigrationIntegrationTest.class.getResourceAsStream(resourceName)) {
+      if (input == null) {
+        throw new IOException("missing test resource " + resourceName);
+      }
+      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+  }
+
+  private static List<String> sqlStatements(String script) {
+    StringBuilder withoutComments = new StringBuilder();
+    for (String line : script.lines().toList()) {
+      if (!line.stripLeading().startsWith("--")) {
+        withoutComments.append(line).append('\n');
+      }
+    }
+    return java.util.Arrays.stream(withoutComments.toString().split(";"))
+        .map(String::trim)
+        .filter(statement -> !statement.isEmpty())
+        .toList();
   }
 
   private static void migrate(TestDatabase database, boolean legacyBaseline) {
@@ -233,56 +255,16 @@ class SearchSchemaMigrationIntegrationTest {
         "org.hibernate.dialect.H2Dialect",
         CoreSchemaMigrations.H2_LOCATION,
         SearchSchemaMigrations.H2_LOCATION,
+        H2_LEGACY_SCHEMA,
         () -> {});
   }
 
-  private static TestDatabase postgresDatabase(String purpose) throws SQLException {
-    String baseUrl = System.getenv(POSTGRES_URL_ENV);
-    assumeTrue(
-        baseUrl != null && !baseUrl.isBlank(),
-        () -> POSTGRES_URL_ENV + " is not configured; PostgreSQL integration test skipped");
-    String username = environmentOrDefault(POSTGRES_USER_ENV, "postgres");
-    String password = environmentOrDefault(POSTGRES_PASSWORD_ENV, "postgres");
-    String schema =
-        "search_migration_" + purpose + "_" + TEST_COUNTER.incrementAndGet();
-
-    try (Connection connection = DriverManager.getConnection(baseUrl, username, password);
-        Statement statement = connection.createStatement()) {
-      statement.execute("create schema " + schema);
-    }
-
-    String schemaUrl = appendParameter(baseUrl, "currentSchema", schema);
-    return new TestDatabase(
-        schemaUrl,
-        username,
-        password,
-        "org.postgresql.Driver",
-        "org.hibernate.dialect.PostgreSQLDialect",
-        CoreSchemaMigrations.POSTGRESQL_LOCATION,
-        SearchSchemaMigrations.POSTGRESQL_LOCATION,
-        () -> {
-          try (Connection connection = DriverManager.getConnection(baseUrl, username, password);
-              Statement statement = connection.createStatement()) {
-            statement.execute("drop schema if exists " + schema + " cascade");
-          }
-        });
-  }
-
-  private static String appendParameter(String url, String key, String value) {
-    return url + (url.contains("?") ? "&" : "?") + key + "=" + value;
-  }
-
-  private static String environmentOrDefault(String name, String defaultValue) {
-    String value = System.getenv(name);
-    return value == null || value.isBlank() ? defaultValue : value;
-  }
-
   @FunctionalInterface
-  private interface SqlCleanup {
+  interface SqlCleanup {
     void run() throws SQLException;
   }
 
-  private record TestDatabase(
+  record TestDatabase(
       String url,
       String username,
       String password,
@@ -290,6 +272,7 @@ class SearchSchemaMigrationIntegrationTest {
       String hibernateDialect,
       String coreMigrationLocation,
       String searchMigrationLocation,
+      String legacySchemaResource,
       SqlCleanup cleanup)
       implements AutoCloseable {
 
