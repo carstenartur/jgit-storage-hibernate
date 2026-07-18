@@ -11,20 +11,54 @@ https://doi.org/10.5281/zenodo.21210132
 
 ## Git semantics, operated like application data
 
-JGit provides the authoritative Git object and repository model. `jgit-storage-hibernate` adds database-native persistence, rebuildable search projections, semantic code history and explainable architecture governance without replacing the standard JGit `Repository` API.
+JGit provides the authoritative Git object and repository model. `jgit-storage-hibernate` adds database-native persistence, transaction-safe pack/ref publication, rebuildable search projections, semantic code history and explainable architecture governance without replacing the standard JGit `Repository` API.
 
-Use it when Git is part of an application's domain model and must share the same database, transaction boundary, deployment process and operational controls as the rest of the application—without exposing `org.eclipse.jgit.internal.*` to consumers.
+Use it when Git is part of an application's domain model and repository state must live inside the same relational database, backup, deployment, access-control and lifecycle model as the rest of the application—without exposing `org.eclipse.jgit.internal.*` to consumers.
 
 ## What it adds on top of JGit
 
 | Need | What the project adds | Practical outcome |
 |---|---|---|
-| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage for packs, refs and reflogs | Repositories live in the relational database and follow normal backup, access-control and lifecycle practices. |
+| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with transactional pack publication for packs, refs and reflogs | Readers do not observe partially published pack rows, and repository data follows normal database backup and access-control practices. |
 | Search history without repeatedly walking the object graph | Rebuildable Hibernate Search/Lucene projections | Query commit messages, authors, paths and indexed text with structured and full-text search. |
 | Understand code evolution beyond line diffs | Binding-aware Java analysis, semantic diff and symbol timelines | Track declarations across revisions and calculate caller, type and inheritance impact. |
 | Keep architecture intent connected to implementation | Versioned rules, evidence, code mapping and drift evaluation | Produce deterministic findings that explain which rule was violated, where and why. |
 
 Git objects remain authoritative. Search, Java-analysis and architecture tables are derived projections and must be rebuildable.
+
+## Application use case: auditable approval workflows
+
+A purchasing platform publishes YAML approval workflows. It needs immutable versions and branches, but it also needs the repository inside PostgreSQL, transaction-safe publication, and repeated business-history queries such as:
+
+```text
+When was dual control introduced?
+Which workflow versions touched purchase-approval.yaml?
+Who published the currently active rule and which commit ID is deployed?
+```
+
+Plain Git/JGit supplies commits, trees, refs, merges and revision walking. It does not itself supply a relational storage backend, database transaction boundaries for pack publication, Flyway-managed repository tables or a Hibernate Search projection for these queries.
+
+With this project the application can:
+
+```java
+try (HibernateGitStorage storage =
+    new DefaultHibernateRepositoryFactory(sessionFactory)
+        .open(new RepositoryName("approval-workflows"))) {
+  Repository repository = storage.repository();
+
+  ObjectId commitId = commitWorkflow(repository, previousCommit, workflowYaml);
+  publishWithExpectedOldId(repository, "refs/heads/main", previousCommit, commitId);
+
+  new CommitIndexer(sessionFactory, "approval-workflows")
+      .indexCommit(repository, commitId);
+
+  List<GitCommitIndex> hits =
+      new GitHistorySearchService(sessionFactory)
+          .searchCommitText("approval-workflows", "dualcontrol", 20);
+}
+```
+
+The commit helper uses ordinary public JGit APIs. The database-backed repository, transactional publication protocol and query projection are supplied by this library. See the complete [approval-workflow use case](docs/use-cases/versioned-approval-workflows.md) and its [executable integration test](jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/VersionedApprovalWorkflowUseCaseTest.java).
 
 ## Module elevator pitches
 
@@ -86,7 +120,20 @@ try (HibernateSessionFactoryProvider provider =
 }
 ```
 
-Framework-managed applications can supply their own Hibernate `SessionFactory` and share a `DataSource`, transaction manager and persistence context with application entities.
+Framework-managed applications can supply their own Hibernate `SessionFactory` and share a `DataSource`, mappings and lifecycle with application entities.
+
+## Transaction-safe database publication
+
+Core uses explicit Hibernate transactions rather than presenting partially written database rows as repository state:
+
+- pack extensions are first persisted with `committed=false` and are invisible to `listPacks()` and `openFile(...)`;
+- publishing all extensions of a pack and deleting replaced packs happens in one transaction and rolls back on failure;
+- the Reftable ref database advertises atomic ref transactions, with Reftable files published through the same pack mechanism;
+- queryable reflog appends and Search projection upserts each run in their own transaction.
+
+This is the ACID benefit described in the original [JGit discussion #251](https://github.com/eclipse-jgit/jgit/discussions/251).
+
+The guarantee is deliberately **per storage operation**. The current implementation does not provide one ambient transaction spanning an arbitrary application entity, Git object insertion, ref publication, reflog append and Search indexing. `ObjectInserter.flush()`, `RefUpdate.update()` and `CommitIndexer.indexCommit(...)` are separate transactional steps; Search remains retryable derived state. See the [precise transaction contract and failure behavior](docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
 
 ## Versioned database contract
 
@@ -162,6 +209,7 @@ CI also checks JGit compatibility, dependency changes, JMH benchmarks and releas
 
 ## Documentation
 
+- [Application use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
 - [Consumer and migration operations guide](docs/consuming.md)
 - [Core module guide](jgit-storage-hibernate-core/README.md)
 - [Search module guide](jgit-storage-hibernate-search/README.md)
