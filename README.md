@@ -9,64 +9,83 @@
 
 https://doi.org/10.5281/zenodo.21210132
 
-## Git semantics, operated like application data
+## Git semantics, operated and queried like application data
 
-JGit provides the authoritative Git object and repository model. `jgit-storage-hibernate` adds database-native persistence, transaction-safe pack/ref publication, rebuildable search projections, semantic code history and explainable architecture governance without replacing the standard JGit `Repository` API.
+JGit provides the authoritative Git object and repository model. `jgit-storage-hibernate` adds database-native persistence, transaction-safe pack/ref publication, reusable commit-history queries, binding-aware Java history and explainable architecture governance without replacing the standard JGit `Repository` API.
 
 Use it when Git is part of an application's domain model and repository state must live inside the same relational database, backup, deployment, access-control and lifecycle model as the rest of the application—without exposing `org.eclipse.jgit.internal.*` to consumers.
+
+## Two questions that show the difference
+
+### Which changes did one person make in one subsystem during one interval?
+
+With JGit, an application can build this by walking commits, checking author metadata, diffing every candidate tree against its parent, filtering paths and sorting the result. The Search module turns that repeated algorithm into a projection and one compound database query:
+
+```java
+CommitHistoryQuery query =
+    CommitHistoryQuery.forRepository("payment-platform")
+        .authoredBy("alice@example.com")
+        .touchingPath("services/payments/fraud/")
+        .between(
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-03-31T23:59:59Z"))
+        .limit(100)
+        .build();
+
+List<GitCommitIndex> changes =
+    new GitHistorySearchService(sessionFactory).findChanges(query);
+```
+
+`CommitIndexer` stores paths actually changed relative to the first parent, not every path present in the snapshot. Root commits treat every path as changed; merge commits use first-parent semantics. Added and modified changed-file content is available for full-text search, and deleted files remain represented by path.
+
+### Which code locations used this Java class in each version?
+
+A token search can find `ApprovalPolicy` in one checkout. It cannot reliably prove which same-named type each occurrence binds to, follow the declaration after a package move, identify the enclosing declaration or expose binding quality.
+
+```java
+JavaTypeUsageHistory usageHistory =
+    new JavaTypeUsageHistoryQuery()
+        .find(orderedAnalyses, "demo.policy.ApprovalPolicy")
+        .orElseThrow();
+
+for (JavaTypeUsageHistory.Version version : usageHistory.versions()) {
+  System.out.println(version.commitId() + " -> " + version.type().getQualifiedName());
+  for (JavaTypeUsageHistory.UsageSite usage : version.usageSites()) {
+    System.out.printf(
+        "%s:%d %s %s binding=%s%n",
+        usage.path(),
+        usage.line(),
+        usage.relation(),
+        usage.sourceQualifiedName(),
+        usage.bindingStatus());
+  }
+}
+```
+
+The query combines `SymbolTimeMachine` with one binding-aware software graph per commit. An old qualified name can still lead to usages after the type moved or was renamed.
+
+These questions are not theoretically impossible with custom JGit/JDT code. The library value is that the storage protocol, first-parent change projection, compound query API, semantic identity model and cross-version graph query are supplied and regression-tested together.
+
+See the complete [change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md), the executable [compound history test](jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java) and the executable [Java usage test](jgit-storage-hibernate-java-analysis/src/test/java/io/github/carstenartur/jgit/storage/hibernate/javaanalysis/JavaTypeUsageHistoryQueryTest.java).
 
 ## What it adds on top of JGit
 
 | Need | What the project adds | Practical outcome |
 |---|---|---|
-| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with transactional pack publication for packs, refs and reflogs | Readers do not observe partially published pack rows, and repository data follows normal database backup and access-control practices. |
-| Search history without repeatedly walking the object graph | Rebuildable Hibernate Search/Lucene projections | Query commit messages, authors, paths and indexed text with structured and full-text search. |
-| Understand code evolution beyond line diffs | Binding-aware Java analysis, semantic diff and symbol timelines | Track declarations across revisions and calculate caller, type and inheritance impact. |
+| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with transactional pack publication | Readers do not observe partially published pack rows, and repository data follows database backup and access-control practices. |
+| Ask combined history questions repeatedly | First-parent changed-path projection plus author/path/time and full-text queries | Support and audit screens query indexed history instead of traversing and diffing every commit for every request. |
+| Understand Java evolution beyond tokens and lines | Binding-aware symbols, references, semantic diff, timelines and software graphs | Follow declarations through moves and ask which code locations used a logical type in each version. |
 | Keep architecture intent connected to implementation | Versioned rules, evidence, code mapping and drift evaluation | Produce deterministic findings that explain which rule was violated, where and why. |
 
 Git objects remain authoritative. Search, Java-analysis and architecture tables are derived projections and must be rebuildable.
-
-## Application use case: auditable approval workflows
-
-A purchasing platform publishes YAML approval workflows. It needs immutable versions and branches, but it also needs the repository inside PostgreSQL, transaction-safe publication, and repeated business-history queries such as:
-
-```text
-When was dual control introduced?
-Which workflow versions touched purchase-approval.yaml?
-Who published the currently active rule and which commit ID is deployed?
-```
-
-Plain Git/JGit supplies commits, trees, refs, merges and revision walking. It does not itself supply a relational storage backend, database transaction boundaries for pack publication, Flyway-managed repository tables or a Hibernate Search projection for these queries.
-
-With this project the application can:
-
-```java
-try (HibernateGitStorage storage =
-    new DefaultHibernateRepositoryFactory(sessionFactory)
-        .open(new RepositoryName("approval-workflows"))) {
-  Repository repository = storage.repository();
-
-  ObjectId commitId = commitWorkflow(repository, previousCommit, workflowYaml);
-  publishWithExpectedOldId(repository, "refs/heads/main", previousCommit, commitId);
-
-  new CommitIndexer(sessionFactory, "approval-workflows")
-      .indexCommit(repository, commitId);
-
-  List<GitCommitIndex> hits =
-      new GitHistorySearchService(sessionFactory)
-          .searchCommitText("approval-workflows", "dualcontrol", 20);
-}
-```
-
-The commit helper uses ordinary public JGit APIs. The database-backed repository, transactional publication protocol and query projection are supplied by this library. See the complete [approval-workflow use case](docs/use-cases/versioned-approval-workflows.md) and its [executable integration test](jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/VersionedApprovalWorkflowUseCaseTest.java).
 
 ## Module elevator pitches
 
 | Module | Elevator pitch | Choose it when... |
 |---|---|---|
 | `jgit-storage-hibernate-core` | Use the familiar JGit repository API while storing packs, refs, reftables and reflogs in the relational database your application already operates. | You need database-backed Git semantics and no search or code-analysis layer. |
-| `jgit-storage-hibernate-search` | Add rebuildable full-text and structured commit-history search instead of parsing the Git object graph for every query. | Users or services need fast history queries by message, author, path or indexed content. |
-| `jgit-storage-hibernate-java-analysis` | Go beyond line diffs with binding-aware symbol history, semantic change detection and transitive impact analysis across revisions. | You need to answer what a Java change means, not only which lines changed. |
+| `jgit-storage-hibernate-search` | Ask compound author/path/time and full-text questions over actual changed paths without re-walking and re-diffing history for every request. | Users or services need repeated audit, support or reporting queries. |
+| `jgit-storage-hibernate-java-analysis` | Follow binding-aware Java declarations and usage sites across commits, moves and semantic changes. | You need to know which declaration changed, who uses a type and which versions are affected. |
 | `jgit-storage-hibernate-architecture` | Version architecture intent beside the code and compare rules and evidence with the observed software graph. | You need explainable architecture drift, constraints and decision provenance. |
 | `jgit-storage-hibernate-benchmarks` | Measure storage operations through repeatable JMH workloads. | You maintain or review performance; it is not a runtime dependency. |
 
@@ -74,7 +93,7 @@ The commit helper uses ordinary public JGit APIs. The database-backed repository
 
 The documented release line is **0.1.5**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; H2 2.4.x is supported for tests, demos and lightweight development.
 
-### 1. Add the core dependency
+### 1. Add the Core dependency
 
 ```xml
 <dependency>
@@ -84,7 +103,7 @@ The documented release line is **0.1.5**. Java 21 is required. PostgreSQL 17 is 
 </dependency>
 ```
 
-Add `jgit-storage-hibernate-search` at the same version only when generic history search is needed.
+Add `jgit-storage-hibernate-search` and `jgit-storage-hibernate-java-analysis` at the same version only when their derived query layers are needed.
 
 ### 2. Apply the packaged migration before Hibernate starts
 
@@ -97,7 +116,7 @@ Flyway.configure()
     .migrate();
 ```
 
-A shared schema or an existing 0.1.4 installation requires a deliberate one-time baseline. Do not enable `baselineOnMigrate` blindly; follow the three provisioning runbooks in [docs/consuming.md](docs/consuming.md).
+A shared schema or an existing 0.1.4 installation requires a deliberate one-time baseline. Do not enable `baselineOnMigrate` blindly; follow the provisioning runbooks in [docs/consuming.md](docs/consuming.md).
 
 ### 3. Make Hibernate validate, not mutate, the production schema
 
@@ -133,7 +152,7 @@ Core uses explicit Hibernate transactions rather than presenting partially writt
 
 This is the ACID benefit described in the original [JGit discussion #251](https://github.com/eclipse-jgit/jgit/discussions/251).
 
-The guarantee is deliberately **per storage operation**. The current implementation does not provide one ambient transaction spanning an arbitrary application entity, Git object insertion, ref publication, reflog append and Search indexing. `ObjectInserter.flush()`, `RefUpdate.update()` and `CommitIndexer.indexCommit(...)` are separate transactional steps; Search remains retryable derived state. See the [precise transaction contract and failure behavior](docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
+The guarantee is deliberately **per storage operation**. The current implementation does not provide one ambient transaction spanning an arbitrary application entity, Git object insertion, ref publication, reflog append, Search indexing and Java analysis. Those are separate retryable steps. See the [precise transaction contract and failure behavior](docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
 
 ## Versioned database contract
 
@@ -148,7 +167,7 @@ The migration contract starts with the 0.1.4 schema and is published from 0.1.5 
 
 See [docs/consuming.md](docs/consuming.md) for fresh installation, shared-schema installation, 0.1.4 adoption, backup, failure handling, checksum policy, rollback strategy and multi-version upgrades.
 
-## Semantic history
+## Semantic history and impact
 
 ```java
 JavaProjectAnalysisResult before =
@@ -163,7 +182,7 @@ JavaGraphDelta graphDelta =
     JavaGraphDelta.between(JavaSoftwareGraph.from(before), JavaSoftwareGraph.from(after));
 ```
 
-Binding quality and unresolved dependencies are explicit diagnostics rather than hidden guesses.
+Binding quality and unresolved dependencies are explicit diagnostics rather than hidden guesses. See the [history query cookbook](docs/query-cookbook.md) for rename, move, impact and type-usage recipes.
 
 ## Architecture intent and drift
 
@@ -203,13 +222,15 @@ try (HibernateSessionFactoryProvider provider =
 
 ## Verification and compatibility
 
-`mvn verify` always exercises H2. When Docker is available, Testcontainers starts PostgreSQL 17.10 and runs the same fresh-install and 0.1.4-upgrade scenarios against a real database. The upgrade tests use immutable legacy DDL fixtures rather than regenerating the old schema from current entity mappings.
+`mvn verify` always exercises H2. When Docker is available, Testcontainers starts PostgreSQL 17.10 and runs fresh-install and 0.1.4-upgrade scenarios against a real database. The upgrade tests use immutable legacy DDL fixtures rather than regenerating the old schema from current entity mappings.
 
 CI also checks JGit compatibility, dependency changes, JMH benchmarks and release/documentation consistency. The release workflow refuses to publish when Maven versions, citation metadata, Java requirements or public dependency snippets disagree.
 
 ## Documentation
 
-- [Application use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
+- [Change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md)
+- [Approval-workflow use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
+- [History query cookbook](docs/query-cookbook.md)
 - [Consumer and migration operations guide](docs/consuming.md)
 - [Core module guide](jgit-storage-hibernate-core/README.md)
 - [Search module guide](jgit-storage-hibernate-search/README.md)
