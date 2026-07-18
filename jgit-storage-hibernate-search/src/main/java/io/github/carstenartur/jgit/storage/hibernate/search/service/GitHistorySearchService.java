@@ -78,7 +78,7 @@ public class GitHistorySearchService {
       hql.append(" AND c.authorEmail = :email");
     }
     if (query.pathFragment() != null) {
-      hql.append(" AND LOWER(c.changedPaths) LIKE :path");
+      hql.append(" AND LOWER(c.changedPaths) LIKE :path ESCAPE '!'");
     }
     if (query.from() != null) {
       hql.append(" AND c.commitTime >= :from");
@@ -99,7 +99,8 @@ public class GitHistorySearchService {
       }
       if (query.pathFragment() != null) {
         selection.setParameter(
-            "path", "%" + query.pathFragment().toLowerCase(Locale.ROOT) + "%");
+            "path",
+            "%" + escapeLikePattern(query.pathFragment().toLowerCase(Locale.ROOT)) + "%");
       }
       if (query.from() != null) {
         selection.setParameter("from", query.from());
@@ -178,6 +179,10 @@ public class GitHistorySearchService {
               .uniqueResult();
       return count != null ? count.longValue() : 0L;
     }
+  }
+
+  private static String escapeLikePattern(String value) {
+    return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
   }
 
   private List<GitCommitIndex> latestCommits(String repositoryName, int limit) {
