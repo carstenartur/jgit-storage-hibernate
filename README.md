@@ -9,41 +9,116 @@
 
 https://doi.org/10.5281/zenodo.21210132
 
-## Turn Git into a queryable semantic and architectural history
+## Git semantics, operated like application data
 
-`jgit-storage-hibernate` combines database-backed JGit storage with rebuildable semantic projections. Git remains authoritative; Hibernate, Hibernate Search and JDT make commits, Java symbols, software relations and architecture intent queryable.
+JGit provides the authoritative Git object and repository model. `jgit-storage-hibernate` adds database-native persistence, rebuildable search projections, semantic code history and explainable architecture governance without replacing the standard JGit `Repository` API.
 
-The project now contains three vertical layers:
+Use it when Git is part of an application's domain model and must share the same database, transaction boundary, deployment process and operational controls as the rest of the application—without exposing `org.eclipse.jgit.internal.*` to consumers.
 
-1. project-wide binding-aware Java analysis and semantic diff,
-2. symbol timelines plus a versioned call/type/inheritance/override graph,
-3. versioned architecture DSLs, evidence, constraints and code-to-architecture drift analysis.
+## What it adds on top of JGit
 
-It can answer questions such as:
+| Need | What the project adds | Practical outcome |
+|---|---|---|
+| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage for packs, refs and reflogs | Repositories live in the relational database and follow normal backup, access-control and lifecycle practices. |
+| Search history without repeatedly walking the object graph | Rebuildable Hibernate Search/Lucene projections | Query commit messages, authors, paths and indexed text with structured and full-text search. |
+| Understand code evolution beyond line diffs | Binding-aware Java analysis, semantic diff and symbol timelines | Track declarations across revisions and calculate caller, type and inheritance impact. |
+| Keep architecture intent connected to implementation | Versioned rules, evidence, code mapping and drift evaluation | Produce deterministic findings that explain which rule was violated, where and why. |
 
-```text
-Where did this method move and how did its signature change?
-Which callers and implementations are affected by this change?
-Which architecture rules changed between two commits?
-Which observed code dependencies violate the architecture at this commit?
-Which decisions justify a rule, and is that evidence still current?
+Git objects remain authoritative. Search, Java-analysis and architecture tables are derived projections and must be rebuildable.
+
+## Module elevator pitches
+
+| Module | Elevator pitch | Choose it when... |
+|---|---|---|
+| `jgit-storage-hibernate-core` | Use the familiar JGit repository API while storing packs, refs, reftables and reflogs in the relational database your application already operates. | You need database-backed Git semantics and no search or code-analysis layer. |
+| `jgit-storage-hibernate-search` | Add rebuildable full-text and structured commit-history search instead of parsing the Git object graph for every query. | Users or services need fast history queries by message, author, path or indexed content. |
+| `jgit-storage-hibernate-java-analysis` | Go beyond line diffs with binding-aware symbol history, semantic change detection and transitive impact analysis across revisions. | You need to answer what a Java change means, not only which lines changed. |
+| `jgit-storage-hibernate-architecture` | Version architecture intent beside the code and compare rules and evidence with the observed software graph. | You need explainable architecture drift, constraints and decision provenance. |
+| `jgit-storage-hibernate-benchmarks` | Measure storage operations through repeatable JMH workloads. | You maintain or review performance; it is not a runtime dependency. |
+
+## Five-minute production setup
+
+The documented release line is **0.1.5**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; H2 2.4.x is supported for tests, demos and lightweight development.
+
+### 1. Add the core dependency
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-core</artifactId>
+  <version>0.1.5</version>
+</dependency>
 ```
 
-## Implemented capabilities
+Add `jgit-storage-hibernate-search` at the same version only when generic history search is needed.
 
-- binding-aware project snapshots and multi-file JDT analysis,
-- Maven module/source/dependency context with explicit unresolved diagnostics,
-- semantic declaration diff and Symbol Time Machine,
-- versioned software graph and transitive impact analysis,
-- language-neutral `ArchitectureDslParser` SPI,
-- stable architecture elements, relations, rules and evidence,
-- semantic architecture diff by stable IDs,
-- code-to-architecture mapping through versioned selectors,
-- `ALLOW`, `FORBID` and `REQUIRE` architecture constraints,
-- deterministic drift findings with rule, element, code location and evidence provenance,
-- searchable projections for Java graph edges, architecture rules, evidence and drift findings.
+### 2. Apply the packaged migration before Hibernate starts
 
-## Architecture drift example
+```java
+Flyway.configure()
+    .dataSource(dataSource)
+    .locations(CoreSchemaMigrations.POSTGRESQL_LOCATION)
+    .table(CoreSchemaMigrations.SCHEMA_HISTORY_TABLE)
+    .load()
+    .migrate();
+```
+
+A shared schema or an existing 0.1.4 installation requires a deliberate one-time baseline. Do not enable `baselineOnMigrate` blindly; follow the three provisioning runbooks in [docs/consuming.md](docs/consuming.md).
+
+### 3. Make Hibernate validate, not mutate, the production schema
+
+```properties
+hibernate.hbm2ddl.auto=validate
+```
+
+`update` and `create-drop` are reserved for disposable local databases and isolated tests.
+
+### 4. Open the repository through the public facade
+
+```java
+try (HibernateSessionFactoryProvider provider =
+        new HibernateSessionFactoryProvider(properties);
+    HibernateGitStorage storage =
+        new DefaultHibernateRepositoryFactory(provider.getSessionFactory())
+            .open(new RepositoryName("workflows"))) {
+  Repository repository = storage.repository();
+  // Use normal public JGit APIs.
+}
+```
+
+Framework-managed applications can supply their own Hibernate `SessionFactory` and share a `DataSource`, transaction manager and persistence context with application entities.
+
+## Versioned database contract
+
+Core and Search package Flyway-compatible SQL resources for H2 and PostgreSQL in their own artifacts. They use separate history tables so both modules can evolve independently inside one application schema.
+
+| Artifact | H2 location | PostgreSQL location | History table |
+|---|---|---|---|
+| Core | `classpath:db/migration/jgit-storage-hibernate/core/h2` | `classpath:db/migration/jgit-storage-hibernate/core/postgresql` | `jgit_storage_hibernate_core_schema_history` |
+| Search | `classpath:db/migration/jgit-storage-hibernate/search/h2` | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` | `jgit_storage_hibernate_search_schema_history` |
+
+The migration contract starts with the 0.1.4 schema and is published from 0.1.5 onward. Application-specific workflow, session, audit and outbox tables are intentionally outside these locations.
+
+See [docs/consuming.md](docs/consuming.md) for fresh installation, shared-schema installation, 0.1.4 adoption, backup, failure handling, checksum policy, rollback strategy and multi-version upgrades.
+
+## Semantic history
+
+```java
+JavaProjectAnalysisResult before =
+    new JavaProjectAnalyzer().analyze(beforeSnapshot, configuration);
+JavaProjectAnalysisResult after =
+    new JavaProjectAnalyzer().analyze(afterSnapshot, configuration);
+
+List<SemanticChange> changes = new JavaSemanticDiff().compare(before, after);
+List<SymbolTimeline> timelines =
+    new SymbolTimeMachine().build(List.of(before, after));
+JavaGraphDelta graphDelta =
+    JavaGraphDelta.between(JavaSoftwareGraph.from(before), JavaSoftwareGraph.from(after));
+```
+
+Binding quality and unresolved dependencies are explicit diagnostics rather than hidden guesses.
+
+## Architecture intent and drift
 
 ```text
 element ui layer "UI" packagePrefix=com.example.ui
@@ -63,65 +138,9 @@ ArchitectureDriftReport report =
     new ArchitectureDriftEngine().evaluate(intent, observed);
 ```
 
-Findings include forbidden observed relations, missing required relations, unmapped or ambiguously mapped symbols, missing evidence and stale evidence.
+Findings cover forbidden observed relations, missing required relations, unmapped or ambiguous symbols, missing evidence and stale evidence.
 
-## Semantic history APIs
-
-```java
-JavaProjectAnalysisResult before =
-    new JavaProjectAnalyzer().analyze(beforeSnapshot, configuration);
-JavaProjectAnalysisResult after =
-    new JavaProjectAnalyzer().analyze(afterSnapshot, configuration);
-
-List<SemanticChange> codeChanges = new JavaSemanticDiff().compare(before, after);
-List<SymbolTimeline> timelines =
-    new SymbolTimeMachine().build(List.of(before, after));
-
-JavaSoftwareGraph beforeGraph = JavaSoftwareGraph.from(before);
-JavaSoftwareGraph afterGraph = JavaSoftwareGraph.from(after);
-JavaGraphDelta graphDelta = JavaGraphDelta.between(beforeGraph, afterGraph);
-
-List<ArchitectureChange> architectureChanges =
-    new ArchitectureSemanticDiff().compare(oldArchitecture, newArchitecture);
-```
-
-## Module architecture
-
-```text
-Git / JGit Repository API
-  -> jgit-storage-hibernate-core
-       -> Hibernate-backed DFS/Reftable storage
-
-  -> jgit-storage-hibernate-search
-       -> generic commit/blob/path/full-text projections
-
-  -> jgit-storage-hibernate-java-analysis
-       -> JDT bindings, semantic diff, timelines and software graph
-
-  -> jgit-storage-hibernate-architecture
-       -> DSL parser SPI
-       -> architecture elements/relations/rules/evidence
-       -> semantic DSL diff
-       -> code mapping and drift engine
-
-  -> jgit-storage-hibernate-benchmarks
-```
-
-## Architecture mapping selectors
-
-Architecture elements can select code using versioned attributes:
-
-- `codePattern`: regular expression against stable semantic keys,
-- `packagePrefix`: Java package prefix,
-- `pathPrefix`: repository source-path prefix.
-
-Exactly one match is expected. No match and multiple matches are visible drift findings rather than silent guesses.
-
-## Evidence and provenance
-
-Evidence can point to ADRs, requirements, tickets, source locations or external records. Each item carries repository, commit, path, optional line, rationale, confidence and extensible attributes. Rules may require evidence by ID. `validThroughCommit` can mark evidence that needs reassessment after the code graph advances.
-
-## Hibernate entity registration
+## Entity registration
 
 ```java
 List<Class<?>> projectionEntities = new ArrayList<>();
@@ -131,40 +150,33 @@ projectionEntities.addAll(ArchitectureEntities.annotatedClasses());
 
 try (HibernateSessionFactoryProvider provider =
     new HibernateSessionFactoryProvider(properties, projectionEntities)) {
-  // semantic and architecture projections are registered
+  // Core plus selected rebuildable projections share one persistence context.
 }
 ```
 
-## Modules
+## Verification and compatibility
 
-| Module | Purpose |
-|---|---|
-| `jgit-storage-hibernate-core` | Database-backed JGit packs, refs, reftables and reflogs. |
-| `jgit-storage-hibernate-search` | Generic commit/history and full-text projections. |
-| `jgit-storage-hibernate-java-analysis` | Binding-aware analysis, semantic diff, timelines, graph and impact analysis. |
-| `jgit-storage-hibernate-architecture` | Versioned DSL SPI, evidence, architecture constraints and drift analysis. |
-| `jgit-storage-hibernate-benchmarks` | JMH benchmarks; not a runtime dependency. |
+`mvn verify` always exercises H2. When Docker is available, Testcontainers starts PostgreSQL 17.10 and runs the same fresh-install and 0.1.4-upgrade scenarios against a real database. The upgrade tests use immutable legacy DDL fixtures rather than regenerating the old schema from current entity mappings.
 
-## Consuming
+CI also checks JGit compatibility, dependency changes, JMH benchmarks and release/documentation consistency. The release workflow refuses to publish when Maven versions, citation metadata, Java requirements or public dependency snippets disagree.
 
-```xml
-<dependency>
-  <groupId>io.github.carstenartur</groupId>
-  <artifactId>jgit-storage-hibernate-architecture</artifactId>
-  <version>0.1.4</version>
-</dependency>
-```
+## Documentation
 
-See [docs/consuming.md](docs/consuming.md), the [architecture module guide](jgit-storage-hibernate-architecture/README.md) and the [semantic software history roadmap](docs/semantic-history-roadmap.md).
+- [Consumer and migration operations guide](docs/consuming.md)
+- [Core module guide](jgit-storage-hibernate-core/README.md)
+- [Search module guide](jgit-storage-hibernate-search/README.md)
+- [Java-analysis module guide](jgit-storage-hibernate-java-analysis/README.md)
+- [Architecture module guide](jgit-storage-hibernate-architecture/README.md)
+- [Release process](docs/release-process.md)
+- [Semantic software history roadmap](docs/semantic-history-roadmap.md)
 
-## Design stance
+## Design boundaries
 
-- Git data is authoritative; all semantic indexes are rebuildable projections.
-- DSL adapters produce neutral models; Taxonomy-specific domain classes remain in Taxonomy.
-- Binding quality, mapping ambiguity and incomplete evidence are explicit.
-- JGit, JDT and Hibernate Search implementation types do not leak into public APIs.
-- Java 21 is the project baseline.
-- License: BSD-3-Clause.
+- This project extends JGit; it is not a fork and is not affiliated with the Eclipse Foundation.
+- Public consumers use module-owned facades and DTOs, not JGit, JDT or Hibernate Search implementation internals.
+- Git data is authoritative; semantic and search indexes are rebuildable.
+- Domain-specific workflows and application tables remain owned by consuming applications.
+- Java 21 is the baseline.
 
 ## License
 
