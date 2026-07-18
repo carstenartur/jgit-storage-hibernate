@@ -19,18 +19,19 @@ if [[ "$SOURCE_BRANCH" != "main" && "$DRY_RUN" != "true" ]]; then
   exit 1
 fi
 
+if [[ "$SKIP_TESTS" == "true" && "$DRY_RUN" != "true" ]]; then
+  echo "::error::Real releases must run the complete test suite"
+  exit 1
+fi
+
 CURRENT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
 if [[ "$CURRENT_VERSION" != *-SNAPSHOT ]]; then
   echo "::error::Current Maven version must be a SNAPSHOT, but was $CURRENT_VERSION"
   exit 1
 fi
 if [[ "${CURRENT_VERSION%-SNAPSHOT}" != "$RELEASE_VERSION" ]]; then
-  if [[ "$DRY_RUN" == "true" ]]; then
-    echo "::warning::Release $RELEASE_VERSION does not match current version $CURRENT_VERSION"
-  else
-    echo "::error::Release $RELEASE_VERSION does not match current version $CURRENT_VERSION"
-    exit 1
-  fi
+  echo "::error::Release $RELEASE_VERSION does not match current version $CURRENT_VERSION"
+  exit 1
 fi
 
 if [[ -n "$NEXT_VERSION_INPUT" ]]; then
@@ -53,6 +54,8 @@ echo "Next development version: $NEXT_VERSION"
 echo "Dry run: $DRY_RUN"
 echo "Skip tests: $SKIP_TESTS"
 
+python3 .github/scripts/verify-release-consistency.py --release-version "$RELEASE_VERSION"
+
 git fetch origin --tags --force
 if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then
   echo "::error::Tag $TAG_NAME already exists"
@@ -61,6 +64,7 @@ fi
 
 mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release
+python3 .github/scripts/verify-release-consistency.py --release-version "$RELEASE_VERSION"
 
 if [[ "$SKIP_TESTS" == "true" ]]; then
   mvn -B -DskipTests verify
@@ -97,10 +101,13 @@ git push origin "$TAG_NAME"
 
 gh release create "$TAG_NAME" target/release-artifacts/* \
   --title "jgit-storage-hibernate $RELEASE_VERSION" \
-  --notes "Release $RELEASE_VERSION of jgit-storage-hibernate. Packages are published to GitHub Packages."
+  --verify-tag \
+  --fail-on-no-commits \
+  --generate-notes
 
 mvn -B versions:set -DnewVersion="$NEXT_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"
+python3 .github/scripts/verify-release-consistency.py
 git add pom.xml '*/pom.xml' CITATION.cff CITATION.md .zenodo.json codemeta.json
 git commit -m "Prepare next development version $NEXT_VERSION"
 git push origin HEAD:main
