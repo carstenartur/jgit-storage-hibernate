@@ -49,9 +49,9 @@ class JavaTypeUsageHistoryQueryTest {
     assertFalse(documentedTypeReferences.isEmpty());
     assertTrue(
         documentedTypeReferences.stream()
-            .allMatch(site -> site.bindingStatus() == BindingStatus.FULL),
+            .allMatch(site -> site.bindingStatus() == BindingStatus.RECOVERED),
         () ->
-            "documented type references must use non-recovered bindings, but were "
+            "documented materialized-project type references must expose recovered bindings, but were "
                 + documentedTypeReferences.stream()
                     .map(JavaTypeUsageHistory.UsageSite::bindingStatus)
                     .toList());
