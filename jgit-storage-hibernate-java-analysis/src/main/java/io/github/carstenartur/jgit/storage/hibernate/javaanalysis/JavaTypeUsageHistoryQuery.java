@@ -3,11 +3,13 @@ package io.github.carstenartur.jgit.storage.hibernate.javaanalysis;
 
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.JavaTypeUsageHistory.UsageSite;
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.JavaTypeUsageHistory.Version;
+import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaReferenceIndex;
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaSymbolIndex;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,10 +31,8 @@ public final class JavaTypeUsageHistoryQuery {
           JavaSymbolKind.RECORD,
           JavaSymbolKind.ANNOTATION_TYPE);
 
-  private static final Set<JavaGraphEdgeKind> TYPE_USAGE_RELATIONS =
+  private static final Set<JavaGraphEdgeKind> HIERARCHY_USAGE_RELATIONS =
       EnumSet.of(
-          JavaGraphEdgeKind.CONSTRUCTS,
-          JavaGraphEdgeKind.REFERENCES_TYPE,
           JavaGraphEdgeKind.EXTENDS,
           JavaGraphEdgeKind.IMPLEMENTS,
           JavaGraphEdgeKind.ANNOTATED_WITH);
@@ -71,42 +71,66 @@ public final class JavaTypeUsageHistoryQuery {
     for (SymbolTimelineEntry entry : timeline.entries()) {
       JavaProjectAnalysisResult analysis =
           analysisFor(orderedCommits, entry.commitIndex(), entry.commitId());
-      JavaSoftwareGraph graph = JavaSoftwareGraph.from(analysis);
       versions.add(
           new Version(
               entry.commitIndex(),
               entry.commitId(),
               entry.symbol(),
-              usageSites(graph, entry.symbol())));
+              usageSites(analysis, entry.symbol())));
     }
     return Optional.of(new JavaTypeUsageHistory(timeline.logicalId(), versions));
   }
 
   private static List<UsageSite> usageSites(
-      JavaSoftwareGraph graph, JavaSymbolIndex targetType) {
-    String targetKey = targetType.getStableSemanticKey();
-    if (targetKey == null || targetKey.isBlank()) {
-      return List.of();
-    }
-
+      JavaProjectAnalysisResult analysis, JavaSymbolIndex targetType) {
+    Map<String, JavaSymbolIndex> symbolsByKey = symbolsByKey(analysis.symbols());
     Map<UsageKey, UsageSite> unique = new LinkedHashMap<>();
-    for (JavaGraphEdge edge : graph.incoming(targetKey)) {
-      if (!TYPE_USAGE_RELATIONS.contains(edge.kind())) {
+
+    for (JavaReferenceIndex reference : analysis.references()) {
+      JavaGraphEdgeKind relation = directTypeUsageKind(reference.getReferenceKind());
+      if (relation == null || !referenceTargetsType(reference, targetType)) {
         continue;
       }
-      JavaSymbolIndex source = graph.symbols().get(edge.sourceSemanticKey());
-      UsageSite site =
+
+      JavaSymbolIndex source = enclosingSymbol(analysis.symbols(), reference);
+      if (source == null && reference.getSourceSymbolKey() != null) {
+        source = symbolsByKey.get(reference.getSourceSymbolKey());
+      }
+      if (source == null || source.getStableSemanticKey() == null) {
+        continue;
+      }
+
+      add(
+          unique,
           new UsageSite(
-              edge.kind(),
-              edge.sourceSemanticKey(),
-              source == null ? null : source.getQualifiedName(),
-              source == null ? null : source.getSymbolKind(),
-              edge.sourcePath(),
-              edge.sourceLine(),
-              edge.bindingStatus());
-      unique.putIfAbsent(
-          new UsageKey(edge.kind(), edge.sourceSemanticKey(), edge.sourcePath(), edge.sourceLine()),
-          site);
+              relation,
+              source.getStableSemanticKey(),
+              source.getQualifiedName(),
+              source.getSymbolKind(),
+              reference.getPath(),
+              reference.getStartLine(),
+              reference.getBindingStatus()));
+    }
+
+    String targetKey = targetType.getStableSemanticKey();
+    if (targetKey != null && !targetKey.isBlank()) {
+      JavaSoftwareGraph graph = JavaSoftwareGraph.from(analysis);
+      for (JavaGraphEdge edge : graph.incoming(targetKey)) {
+        if (!HIERARCHY_USAGE_RELATIONS.contains(edge.kind())) {
+          continue;
+        }
+        JavaSymbolIndex source = graph.symbols().get(edge.sourceSemanticKey());
+        add(
+            unique,
+            new UsageSite(
+                edge.kind(),
+                edge.sourceSemanticKey(),
+                source == null ? null : source.getQualifiedName(),
+                source == null ? null : source.getSymbolKind(),
+                edge.sourcePath(),
+                edge.sourceLine(),
+                edge.bindingStatus()));
+      }
     }
 
     return unique.values().stream()
@@ -117,6 +141,87 @@ public final class JavaTypeUsageHistoryQuery {
                 .thenComparing(site -> site.relation().name())
                 .thenComparing(UsageSite::sourceSemanticKey))
         .toList();
+  }
+
+  private static void add(Map<UsageKey, UsageSite> unique, UsageSite site) {
+    unique.putIfAbsent(
+        new UsageKey(site.relation(), site.sourceSemanticKey(), site.path(), site.line()), site);
+  }
+
+  private static Map<String, JavaSymbolIndex> symbolsByKey(List<JavaSymbolIndex> symbols) {
+    Map<String, JavaSymbolIndex> result = new LinkedHashMap<>();
+    for (JavaSymbolIndex symbol : symbols) {
+      addKey(result, symbol.getStableSemanticKey(), symbol);
+      addKey(result, symbol.getDeclarationBindingKey(), symbol);
+      addKey(result, symbol.getRawBindingKey(), symbol);
+    }
+    return result;
+  }
+
+  private static void addKey(
+      Map<String, JavaSymbolIndex> symbols, String key, JavaSymbolIndex symbol) {
+    if (key != null && !key.isBlank()) {
+      symbols.putIfAbsent(key, symbol);
+    }
+  }
+
+  private static JavaSymbolIndex enclosingSymbol(
+      List<JavaSymbolIndex> symbols, JavaReferenceIndex reference) {
+    JavaSymbolIndex best = null;
+    for (JavaSymbolIndex symbol : symbols) {
+      if (!Objects.equals(symbol.getPath(), reference.getPath())) {
+        continue;
+      }
+      int position = reference.getStartPosition();
+      int start = symbol.getStartPosition();
+      int end = start + symbol.getSourceLength();
+      if (position < start || position >= end) {
+        continue;
+      }
+      if (best == null || symbol.getSourceLength() < best.getSourceLength()) {
+        best = symbol;
+      }
+    }
+    return best;
+  }
+
+  private static boolean referenceTargetsType(
+      JavaReferenceIndex reference, JavaSymbolIndex targetType) {
+    if (same(reference.getTargetStableSemanticKey(), targetType.getStableSemanticKey())) {
+      return true;
+    }
+
+    Set<String> targetBindingKeys = new LinkedHashSet<>();
+    add(targetBindingKeys, targetType.getRawBindingKey());
+    add(targetBindingKeys, targetType.getDeclarationBindingKey());
+    add(targetBindingKeys, targetType.getTypeBindingKey());
+
+    if (targetBindingKeys.contains(reference.getRawBindingKey())
+        || targetBindingKeys.contains(reference.getDeclarationBindingKey())
+        || targetBindingKeys.contains(reference.getTargetTypeBindingKey())) {
+      return true;
+    }
+
+    if (reference.getBindingStatus() == BindingStatus.FULL) {
+      return false;
+    }
+    return same(reference.getReferenceName(), targetType.getSimpleName())
+        || same(reference.getReferenceName(), targetType.getQualifiedName());
+  }
+
+  private static void add(Set<String> values, String value) {
+    if (value != null && !value.isBlank()) {
+      values.add(value);
+    }
+  }
+
+  private static JavaGraphEdgeKind directTypeUsageKind(JavaReferenceKind kind) {
+    return switch (kind) {
+      case TYPE_REFERENCE -> JavaGraphEdgeKind.REFERENCES_TYPE;
+      case CONSTRUCTOR_INVOCATION -> JavaGraphEdgeKind.CONSTRUCTS;
+      case ANNOTATION_USE -> JavaGraphEdgeKind.ANNOTATED_WITH;
+      case IMPORT, METHOD_INVOCATION, FIELD_ACCESS -> null;
+    };
   }
 
   private static JavaProjectAnalysisResult analysisFor(
@@ -138,11 +243,15 @@ public final class JavaTypeUsageHistoryQuery {
   }
 
   private static boolean matches(JavaSymbolIndex symbol, String identity) {
-    return identity.equals(symbol.getStableSemanticKey())
-        || identity.equals(symbol.getDeclarationBindingKey())
-        || identity.equals(symbol.getRawBindingKey())
-        || identity.equals(symbol.getQualifiedName())
-        || identity.equals(symbol.getSymbolKind() + ":" + symbol.getQualifiedName());
+    return same(identity, symbol.getStableSemanticKey())
+        || same(identity, symbol.getDeclarationBindingKey())
+        || same(identity, symbol.getRawBindingKey())
+        || same(identity, symbol.getQualifiedName())
+        || same(identity, symbol.getSymbolKind() + ":" + symbol.getQualifiedName());
+  }
+
+  private static boolean same(String left, String right) {
+    return left != null && left.equals(right);
   }
 
   private static String requireIdentity(String identity) {
