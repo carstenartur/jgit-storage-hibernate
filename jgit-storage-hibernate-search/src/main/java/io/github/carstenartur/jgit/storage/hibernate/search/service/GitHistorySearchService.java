@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.search.service;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -32,7 +33,7 @@ public class GitHistorySearchService {
   }
 
   /**
-   * Full-text search over commit messages, paths and indexed text content.
+   * Full-text search over commit messages, changed paths and indexed changed-file content.
    *
    * @param repositoryName logical repository name
    * @param query search query
@@ -60,7 +61,59 @@ public class GitHistorySearchService {
   }
 
   /**
-   * Find commits whose indexed path list contains the given path fragment.
+   * Find commits matching all supplied author, changed-path and time predicates.
+   *
+   * <p>This is the reusable projection equivalent of manually walking commits with JGit, diffing
+   * every commit against its first parent and applying the predicates in application code.
+   *
+   * @param query compound query
+   * @return matching commits ordered by author time descending
+   */
+  public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
+    Objects.requireNonNull(query, "query");
+
+    StringBuilder hql =
+        new StringBuilder("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+    if (query.authorEmail() != null) {
+      hql.append(" AND c.authorEmail = :email");
+    }
+    if (query.pathFragment() != null) {
+      hql.append(" AND LOWER(c.changedPaths) LIKE :path ESCAPE '!'");
+    }
+    if (query.from() != null) {
+      hql.append(" AND c.commitTime >= :from");
+    }
+    if (query.to() != null) {
+      hql.append(" AND c.commitTime <= :to");
+    }
+    hql.append(" ORDER BY c.commitTime DESC");
+
+    try (Session session = sessionFactory.openSession()) {
+      var selection =
+          session
+              .createQuery(hql.toString(), GitCommitIndex.class)
+              .setParameter("repo", query.repositoryName())
+              .setMaxResults(query.limit());
+      if (query.authorEmail() != null) {
+        selection.setParameter("email", query.authorEmail());
+      }
+      if (query.pathFragment() != null) {
+        selection.setParameter(
+            "path",
+            "%" + escapeLikePattern(query.pathFragment().toLowerCase(Locale.ROOT)) + "%");
+      }
+      if (query.from() != null) {
+        selection.setParameter("from", query.from());
+      }
+      if (query.to() != null) {
+        selection.setParameter("to", query.to());
+      }
+      return selection.getResultList();
+    }
+  }
+
+  /**
+   * Find commits whose changed-path list contains the given path fragment.
    *
    * @param repositoryName logical repository name
    * @param pathFragment path fragment
@@ -68,17 +121,11 @@ public class GitHistorySearchService {
    * @return matching commits
    */
   public List<GitCommitIndex> findByPath(String repositoryName, String pathFragment, int limit) {
-    try (Session session = sessionFactory.openSession()) {
-      return session
-          .createQuery(
-              "FROM GitCommitIndex c WHERE c.repositoryName = :repo AND c.changedPaths LIKE :path "
-                  + "ORDER BY c.commitTime DESC",
-              GitCommitIndex.class)
-          .setParameter("repo", repositoryName)
-          .setParameter("path", "%" + pathFragment + "%")
-          .setMaxResults(limit)
-          .getResultList();
-    }
+    return findChanges(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .touchingPath(pathFragment)
+            .limit(limit)
+            .build());
   }
 
   /**
@@ -89,22 +136,17 @@ public class GitHistorySearchService {
    * @param limit maximum hits
    * @return matching commits
    */
-  public List<GitCommitIndex> findByAuthorEmail(String repositoryName, String authorEmail, int limit) {
-    try (Session session = sessionFactory.openSession()) {
-      return session
-          .createQuery(
-              "FROM GitCommitIndex c WHERE c.repositoryName = :repo AND c.authorEmail = :email "
-                  + "ORDER BY c.commitTime DESC",
-              GitCommitIndex.class)
-          .setParameter("repo", repositoryName)
-          .setParameter("email", authorEmail)
-          .setMaxResults(limit)
-          .getResultList();
-    }
+  public List<GitCommitIndex> findByAuthorEmail(
+      String repositoryName, String authorEmail, int limit) {
+    return findChanges(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .authoredBy(authorEmail)
+            .limit(limit)
+            .build());
   }
 
   /**
-   * Return commits in a timestamp range.
+   * Return commits in an inclusive timestamp range.
    *
    * @param repositoryName logical repository name
    * @param from inclusive lower bound
@@ -114,18 +156,11 @@ public class GitHistorySearchService {
    */
   public List<GitCommitIndex> findBetween(
       String repositoryName, Instant from, Instant to, int limit) {
-    try (Session session = sessionFactory.openSession()) {
-      return session
-          .createQuery(
-              "FROM GitCommitIndex c WHERE c.repositoryName = :repo "
-                  + "AND c.commitTime >= :from AND c.commitTime <= :to ORDER BY c.commitTime DESC",
-              GitCommitIndex.class)
-          .setParameter("repo", repositoryName)
-          .setParameter("from", from)
-          .setParameter("to", to)
-          .setMaxResults(limit)
-          .getResultList();
-    }
+    return findChanges(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .between(from, to)
+            .limit(limit)
+            .build());
   }
 
   /**
@@ -146,15 +181,12 @@ public class GitHistorySearchService {
     }
   }
 
+  private static String escapeLikePattern(String value) {
+    return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+  }
+
   private List<GitCommitIndex> latestCommits(String repositoryName, int limit) {
-    try (Session session = sessionFactory.openSession()) {
-      return session
-          .createQuery(
-              "FROM GitCommitIndex c WHERE c.repositoryName = :repo ORDER BY c.commitTime DESC",
-              GitCommitIndex.class)
-          .setParameter("repo", repositoryName)
-          .setMaxResults(limit)
-          .getResultList();
-    }
+    return findChanges(
+        CommitHistoryQuery.forRepository(repositoryName).limit(limit).build());
   }
 }

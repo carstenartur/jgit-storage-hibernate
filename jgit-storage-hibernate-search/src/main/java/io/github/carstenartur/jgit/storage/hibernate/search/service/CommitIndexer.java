@@ -15,22 +15,32 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 
-/** Indexes Git commits into a generic Hibernate Search projection. */
+/**
+ * Indexes Git commits into a generic Hibernate Search projection.
+ *
+ * <p>Changed paths and changed text use first-parent diff semantics. Every path in a root commit is
+ * considered changed. For merge commits, the projection describes the result relative to the first
+ * parent.
+ */
 public class CommitIndexer {
 
   private static final int MAX_INDEXED_BLOB_BYTES = 256 * 1024;
   private static final int MAX_CHANGED_TEXT_CHARS = 250_000;
+  private static final int CURRENT_TREE = 1;
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
@@ -57,7 +67,7 @@ public class CommitIndexer {
   public GitCommitIndex indexCommit(Repository repository, ObjectId commitId) throws IOException {
     try (RevWalk revWalk = new RevWalk(repository)) {
       RevCommit commit = revWalk.parseCommit(commitId);
-      GitCommitIndex projection = toProjection(repository, commit);
+      GitCommitIndex projection = toProjection(repository, revWalk, commit);
       upsert(projection);
       return projection;
     }
@@ -82,7 +92,7 @@ public class CommitIndexer {
           break;
         }
         if (findExisting(commit.name()) == null) {
-          upsert(toProjection(repository, commit));
+          upsert(toProjection(repository, revWalk, commit));
           indexed++;
         }
       }
@@ -90,7 +100,8 @@ public class CommitIndexer {
     return indexed;
   }
 
-  private GitCommitIndex toProjection(Repository repository, RevCommit commit) throws IOException {
+  private GitCommitIndex toProjection(
+      Repository repository, RevWalk revWalk, RevCommit commit) throws IOException {
     GitCommitIndex projection = new GitCommitIndex();
     projection.setRepositoryName(repositoryName);
     projection.setObjectId(commit.name());
@@ -102,34 +113,49 @@ public class CommitIndexer {
       projection.setCommitTime(commit.getAuthorIdent().getWhenAsInstant());
     }
 
-    TreeText treeText = readTreeText(repository, commit);
+    TreeText treeText = readChangedTreeText(repository, revWalk, commit);
     projection.setChangedPaths(String.join("\n", treeText.paths()));
     projection.setChangedText(treeText.text());
     return projection;
   }
 
-  private TreeText readTreeText(Repository repository, RevCommit commit) throws IOException {
+  private TreeText readChangedTreeText(
+      Repository repository, RevWalk revWalk, RevCommit commit) throws IOException {
     List<String> paths = new ArrayList<>();
     StringBuilder text = new StringBuilder();
-    try (ObjectReader reader = repository.newObjectReader(); TreeWalk treeWalk = new TreeWalk(reader)) {
+
+    try (ObjectReader reader = repository.newObjectReader();
+        TreeWalk treeWalk = new TreeWalk(reader)) {
+      if (commit.getParentCount() == 0) {
+        treeWalk.addTree(new EmptyTreeIterator());
+      } else {
+        treeWalk.addTree(revWalk.parseCommit(commit.getParent(0)).getTree());
+      }
       treeWalk.addTree(commit.getTree());
       treeWalk.setRecursive(true);
+      treeWalk.setFilter(TreeFilter.ANY_DIFF);
+
       while (treeWalk.next()) {
         String path = treeWalk.getPathString();
         paths.add(path);
-        if (text.length() >= MAX_CHANGED_TEXT_CHARS) {
+
+        if (text.length() >= MAX_CHANGED_TEXT_CHARS
+            || FileMode.MISSING.equals(treeWalk.getFileMode(CURRENT_TREE))) {
           continue;
         }
-        ObjectId objectId = treeWalk.getObjectId(0);
+
+        ObjectId objectId = treeWalk.getObjectId(CURRENT_TREE);
         ObjectLoader loader = reader.open(objectId);
         if (loader.getType() != Constants.OBJ_BLOB || loader.getSize() > MAX_INDEXED_BLOB_BYTES) {
           continue;
         }
+
         byte[] bytes = loader.getBytes();
         text.append('\n').append("--- ").append(path).append(" ---\n");
         text.append(new String(bytes, StandardCharsets.UTF_8));
       }
     }
+
     return new TreeText(paths, truncate(text.toString(), MAX_CHANGED_TEXT_CHARS));
   }
 
