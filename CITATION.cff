@@ -1,7 +1,8 @@
 cff-version: 1.2.0
 message: "If you use jgit-storage-hibernate, please cite it using these metadata."
 title: "jgit-storage-hibernate"
-version: "0.1.5-SNAPSHOT"
+version: "0.1.5"
+date-released: "2026-07-18"
 abstract: "Hibernate-backed database storage backend for JGit repositories."
 authors:
   - family-names: "Hammer"

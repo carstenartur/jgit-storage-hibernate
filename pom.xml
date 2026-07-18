@@ -6,7 +6,7 @@
 
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-parent</artifactId>
-  <version>0.1.5-SNAPSHOT</version>
+  <version>0.1.5</version>
   <packaging>pom</packaging>
 
   <name>jgit-storage-hibernate Parent</name>
