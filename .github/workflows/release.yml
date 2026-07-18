@@ -13,7 +13,7 @@ on:
         type: string
         default: ''
       skip_tests:
-        description: 'Skip tests during release build'
+        description: 'Skip tests during a dry run; real releases reject this option'
         required: false
         type: boolean
         default: false
@@ -54,6 +54,7 @@ jobs:
           server-password: GITHUB_TOKEN
 
       - name: Verify Docker for PostgreSQL integration tests
+        if: ${{ ! inputs.skip_tests }}
         run: docker info
 
       - name: Run release script
