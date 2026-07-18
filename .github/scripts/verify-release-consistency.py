@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Verify Maven, release metadata, Java baseline and public release contracts."""
+"""Verify Maven, metadata, documentation, and the static release contract."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import re
 import sys
@@ -32,9 +31,16 @@ ALIGNED_TEST_COORDINATES = {
 }
 PUBLIC_MARKDOWN_GLOBS = (
     "README.md",
-    "docs/*.md",
+    "docs/**/*.md",
     "jgit-storage-hibernate-*/README.md",
 )
+DOCUMENTATION_VERSION_PLACEHOLDERS = {
+    "...",
+    "X.Y.Z",
+    "X.Y.Z-SNAPSHOT",
+    "${project.version}",
+    "${revision}",
+}
 REQUIRED_RELEASE_OPTIONS = (
     "--generate-notes",
     "--verify-tag",
@@ -50,7 +56,11 @@ def required_text(path: Path, errors: list[str]) -> str:
     if not path.is_file():
         fail(errors, f"missing required file: {path}")
         return ""
-    return path.read_text(encoding="utf-8")
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as exception:
+        fail(errors, f"cannot read {path}: {exception}")
+        return ""
 
 
 def pom_root(path: Path, errors: list[str]) -> ET.Element | None:
@@ -119,6 +129,12 @@ def verify_module_poms(project_version: str, errors: list[str]) -> None:
 
 
 def verify_project_dependencies(project_version: str, errors: list[str]) -> None:
+    allowed_expressions = {
+        "${project.version}",
+        "${project.parent.version}",
+        "${pom.version}",
+        "${revision}",
+    }
     for path in [Path("pom.xml"), *module_pom_paths()]:
         root = pom_root(path, errors)
         if root is None:
@@ -139,11 +155,11 @@ def verify_project_dependencies(project_version: str, errors: list[str]) -> None
                 PROJECT_ARTIFACT_PREFIX
             ):
                 continue
-            if version and version not in {"${project.version}", project_version}:
+            if version and version not in allowed_expressions and version != project_version:
                 fail(
                     errors,
                     f"{path} uses project dependency {artifact_id}:{version}; "
-                    f"expected dependencyManagement or {project_version}",
+                    f"expected dependencyManagement, a project version expression, or {project_version}",
                 )
 
 
@@ -183,7 +199,7 @@ def verify_aligned_test_dependencies(errors: list[str]) -> None:
 
 def verify_metadata(project_version: str, java_version: str, errors: list[str]) -> None:
     cff = required_text(Path("CITATION.cff"), errors)
-    match = re.search(r'^version:\s*"([^"]+)"\s*$', cff, flags=re.MULTILINE)
+    match = re.search(r'^version:\s*["\']?([^"\'\s]+)["\']?\s*$', cff, flags=re.MULTILINE)
     if not match or match.group(1) != project_version:
         fail(errors, f"CITATION.cff version does not match {project_version}")
 
@@ -238,25 +254,26 @@ def markdown_files() -> list[Path]:
     paths: set[Path] = set()
     for pattern in PUBLIC_MARKDOWN_GLOBS:
         paths.update(path for path in Path(".").glob(pattern) if path.is_file())
-    return sorted(paths)
+    return sorted(path for path in paths if "docs/releases" not in path.as_posix())
+
+
+def project_dependency_version(block: str) -> tuple[str, str] | None:
+    group_match = re.search(r"<groupId>\s*([^<]+)\s*</groupId>", block)
+    artifact_match = re.search(r"<artifactId>\s*([^<]+)\s*</artifactId>", block)
+    if group_match is None or artifact_match is None:
+        return None
+    group_id = group_match.group(1).strip()
+    artifact_id = artifact_match.group(1).strip()
+    if group_id != PROJECT_GROUP_ID or not artifact_id.startswith(PROJECT_ARTIFACT_PREFIX):
+        return None
+    version_match = re.search(r"<version>\s*([^<]+)\s*</version>", block)
+    return artifact_id, version_match.group(1).strip() if version_match else ""
 
 
 def verify_documentation_snippets(
     documented_version: str, java_version: str, errors: list[str]
 ) -> None:
-    dependency_pattern = re.compile(
-        r"<dependency>\s*"
-        r"(?:(?!</dependency>).)*?"
-        r"<groupId>\s*" + re.escape(PROJECT_GROUP_ID) + r"\s*</groupId>\s*"
-        r"(?:(?!</dependency>).)*?"
-        r"<artifactId>\s*("
-        + re.escape(PROJECT_ARTIFACT_PREFIX)
-        + r"[^<]+)\s*</artifactId>\s*"
-        r"(?:(?!</dependency>).)*?"
-        r"<version>\s*([^<]+)\s*</version>\s*"
-        r"(?:(?!</dependency>).)*?</dependency>",
-        flags=re.DOTALL,
-    )
+    dependency_block_pattern = re.compile(r"<dependency>.*?</dependency>", re.DOTALL)
     coordinate_pattern = re.compile(
         re.escape(PROJECT_GROUP_ID)
         + r":"
@@ -266,11 +283,27 @@ def verify_documentation_snippets(
 
     found_dependency = False
     for path in markdown_files():
-        text = path.read_text(encoding="utf-8")
-        for artifact_id, version in dependency_pattern.findall(text):
+        text = required_text(path, errors)
+        if not text:
+            continue
+
+        for block in dependency_block_pattern.findall(text):
+            project_dependency = project_dependency_version(block)
+            if project_dependency is None:
+                continue
             found_dependency = True
-            version = version.strip()
-            if version != documented_version:
+            artifact_id, version = project_dependency
+            if not version:
+                fail(errors, f"{path} project dependency {artifact_id} has no version")
+                continue
+            if version in DOCUMENTATION_VERSION_PLACEHOLDERS:
+                continue
+            if not SEMVER.fullmatch(version):
+                fail(
+                    errors,
+                    f"{path} documents {artifact_id} with unsupported version value {version!r}",
+                )
+            elif version != documented_version:
                 fail(
                     errors,
                     f"{path} documents {artifact_id}:{version}; expected {documented_version}",
@@ -322,6 +355,11 @@ def verify_release_workflow(errors: list[str]) -> None:
         fail(
             errors,
             f"{RELEASE_WORKFLOW_FILE} duplicates release creation instead of delegating to release.sh",
+        )
+    if "docker info" in text:
+        fail(
+            errors,
+            f"{RELEASE_WORKFLOW_FILE} duplicates Docker release policy instead of delegating to release.sh",
         )
 
 
@@ -389,7 +427,7 @@ def verify_release_notes_configuration(errors: list[str]) -> None:
     if not catch_all:
         fail(
             errors,
-            f"{RELEASE_NOTES_FILE} must include a catch-all category with label \"*\"",
+            f'{RELEASE_NOTES_FILE} must include a catch-all category with label "*"',
         )
 
 
@@ -419,42 +457,29 @@ def verify_release_script(errors: list[str]) -> None:
         fail(errors, f"{RELEASE_SCRIPT_FILE} does not create a GitHub release")
         return
 
+    command_parts = command.split()
     for option in REQUIRED_RELEASE_OPTIONS:
-        if option not in command.split():
+        if option not in command_parts:
             fail(
                 errors,
                 f"{RELEASE_SCRIPT_FILE} gh release create command is missing {option}",
             )
 
+    required_fragments = (
+        "DOCUMENTED_RELEASE_VERSION_FILE",
+        "docker info",
+        "SKIP_TESTS",
+        "DRY_RUN",
+    )
+    for fragment in required_fragments:
+        if fragment not in text:
+            fail(errors, f"{RELEASE_SCRIPT_FILE} is missing release safeguard {fragment!r}")
+
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--release-version",
-        help="Require the current snapshot/release base and documented version to equal X.Y.Z",
-    )
-    args = parser.parse_args()
-
     errors: list[str] = []
     project_version, java_version = root_project_version(errors)
     documented_version = documentation_version(errors)
-
-    if args.release_version:
-        if not RELEASE_SEMVER.fullmatch(args.release_version):
-            fail(errors, "--release-version must use X.Y.Z")
-        project_base = project_version.removesuffix("-SNAPSHOT")
-        if project_base != args.release_version:
-            fail(
-                errors,
-                f"project version base {project_base!r} does not match release "
-                f"{args.release_version!r}",
-            )
-        if documented_version != args.release_version:
-            fail(
-                errors,
-                f"documented release {documented_version!r} does not match requested release "
-                f"{args.release_version!r}",
-            )
 
     verify_module_poms(project_version, errors)
     verify_project_dependencies(project_version, errors)
@@ -471,7 +496,7 @@ def main() -> None:
         raise SystemExit(1)
 
     print(
-        "Release consistency verified: "
+        "Repository consistency verified: "
         f"project={project_version}, docs={documented_version}, java={java_version}"
     )
 
