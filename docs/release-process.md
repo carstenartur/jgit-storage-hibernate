@@ -17,11 +17,11 @@ The benchmark artifact is for CI and release review, not normal runtime use.
 
 User-visible features, schema changes, compatibility changes and release-process hardening must have an issue before implementation. Pull requests should close or reference those issues. GitHub-generated release notes then provide a traceable list of merged work instead of a generic one-line release description.
 
-Use clear PR titles because they become release-note entries. Apply release-note category labels when the repository configuration defines them.
+Use clear PR titles because they become release-note entries. Apply release-note category labels when the repository configuration defines them. `.github/release.yml` must retain multiple meaningful categories and a final catch-all category so an unlabeled merged PR cannot disappear from the generated notes.
 
 ## Documentation version contract
 
-`docs/current-release-version.txt` contains the version used by public Maven dependency snippets. It represents the release being documed, not necessarily the current development `-SNAPSHOT` version.
+`docs/current-release-version.txt` contains the version used by public Maven dependency snippets. It represents the release being documented, not necessarily the current development `-SNAPSHOT` version.
 
 Before releasing `X.Y.Z`:
 
@@ -36,9 +36,12 @@ Before releasing `X.Y.Z`:
 - `CITATION.cff`, `CITATION.md`, `.zenodo.json` and `codemeta.json`;
 - the Java baseline in Maven metadata, CodeMeta and README;
 - every public Maven snippet for a project artifact;
-- the requested release version against the documented release version.
+- the requested release version against the documented release version;
+- version-neutral `X.Y.Z` and `X.Y.Z-SNAPSHOT` help text in the existing release workflow;
+- categorized generated-release-note configuration with a catch-all category;
+- the `--generate-notes`, `--verify-tag` and `--fail-on-no-commits` safeguards on the existing `gh release create` command.
 
-This distinguishes legitimate historical version references from stale copy-and-paste dependency snippets.
+This distinguishes legitimate historical version references from stale copy-and-paste dependency snippets. It also protects the existing release path from being split or silently weakened: `.github/workflows/release.yml` remains the orchestration entry point and delegates publication to `.github/scripts/release.sh`.
 
 ## Snapshot publishing
 
@@ -51,9 +54,9 @@ Run `.github/workflows/release.yml` from `main`.
 Inputs:
 
 ```text
-release_version = 0.1.5
-next_development_version = 0.1.6-SNAPSHOT   # optional; patch is incremented by default
-skip_tests = false                # real releases reject true
+release_version = X.Y.Z
+next_development_version = X.Y.Z-SNAPSHOT   # optional; patch is incremented by default
+skip_tests = false                          # real releases reject true
 dry_run = false
 ```
 
@@ -86,7 +89,7 @@ A dry run performs all validation and build steps but does not deploy, tag, crea
 
 ## Failure behavior
 
-The release script stops before publication on any version, metadata, documentation, test or tag inconsistency. Do not bypass a failed consistency check by weakening the search or editing generated release history. Correct the source documentation or metadata in a reviewed commit and re-run the workflow.
+The release script stops before publication on any version, metadata, documentation, generated-note, workflow, test or tag inconsistency. Do not bypass a failed consistency check by weakening the search or editing generated release history. Correct the source documentation, configuration or metadata in a reviewed commit and re-run the workflow.
 
 If deployment succeeds but a later GitHub operation fails, inspect GitHub Packages, tags and releases before retrying so the same version is not published twice.
 
