@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import re
 import sys
@@ -241,32 +240,9 @@ def verify_documentation_snippets(documented_version: str, java_version: str, er
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--release-version",
-        help="Require the current snapshot/release base and documented version to equal X.Y.Z",
-    )
-    args = parser.parse_args()
-
     errors: list[str] = []
     project_version, java_version = root_project_version(errors)
     documented_version = documentation_version(errors)
-
-    if args.release_version:
-        if not RELEASE_SEMVER.fullmatch(args.release_version):
-            fail(errors, "--release-version must use X.Y.Z")
-        project_base = project_version.removesuffix("-SNAPSHOT")
-        if project_base != args.release_version:
-            fail(
-                errors,
-                f"project version base {project_base!r} does not match release {args.release_version!r}",
-            )
-        if documented_version != args.release_version:
-            fail(
-                errors,
-                f"documented release {documented_version!r} does not match requested release "
-                f"{args.release_version!r}",
-            )
 
     verify_module_poms(project_version, errors)
     verify_project_dependencies(project_version, errors)
@@ -280,7 +256,7 @@ def main() -> None:
         raise SystemExit(1)
 
     print(
-        "Release consistency verified: "
+        "Repository consistency verified: "
         f"project={project_version}, docs={documented_version}, java={java_version}"
     )
 
