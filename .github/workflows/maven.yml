@@ -27,8 +27,13 @@ jobs:
       - name: Verify Docker for PostgreSQL integration tests
         run: docker info
 
-      - name: Verify release and documentation consistency
-        run: python3 .github/scripts/verify-release-consistency.py
+      - name: Verify release tooling and repository consistency
+        run: |
+          bash -n .github/scripts/release.sh
+          python3 -m py_compile \
+            .github/scripts/update-release-metadata.py \
+            .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/verify-release-consistency.py
 
       - name: Build
         run: |
