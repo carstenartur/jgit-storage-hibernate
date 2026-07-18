@@ -9,17 +9,32 @@
 
 https://doi.org/10.5281/zenodo.21210132
 
-## Git semantics, operated and queried like application data
+## Git history as indexed application knowledge
 
-JGit provides the authoritative Git object and repository model. `jgit-storage-hibernate` adds database-native persistence, transaction-safe pack/ref publication, reusable commit-history queries, binding-aware Java history and explainable architecture governance without replacing the standard JGit `Repository` API.
+JGit is the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. `jgit-storage-hibernate` adds a relational storage backend plus persistent query models over that history: transaction-safe pack/ref publication, structured history queries, Lucene full-text search, binding-aware Java histories and explainable architecture analysis.
 
-Use it when Git is part of an application's domain model and repository state must live inside the same relational database, backup, deployment, access-control and lifecycle model as the rest of the application—without exposing `org.eclipse.jgit.internal.*` to consumers.
+The important distinction is not merely that the library saves application code. It changes **when and how often** expensive work is performed:
+
+```text
+Without a projection
+query -> walk commits -> diff trees -> parse/filter content -> return result
+query -> walk commits -> diff trees -> parse/filter content -> return result
+query -> walk commits -> diff trees -> parse/filter content -> return result
+
+With jgit-storage-hibernate
+commit/reindex -> walk/diff/parse once -> persist relational + Lucene indexes
+query          -> execute indexed predicates/full-text search
+query          -> execute indexed predicates/full-text search
+query          -> execute indexed predicates/full-text search
+```
+
+Indexing moves revision traversal, first-parent diffing, text extraction and index construction from query time to ingestion or explicit reindex time. Queries then use relational indexes and Hibernate Search/Lucene rather than recomputing repository history for every request.
+
+Git and JGit do not normally provide a general full-text search engine over commit messages, actual changed paths and changed-file contents. The Search module adds that capability as a rebuildable read model while Git remains authoritative.
 
 ## Two questions that show the difference
 
 ### Which changes did one person make in one subsystem during one interval?
-
-With JGit, an application can build this by walking commits, checking author metadata, diffing every candidate tree against its parent, filtering paths and sorting the result. The Search module turns that repeated algorithm into a projection and one compound database query:
 
 ```java
 CommitHistoryQuery query =
@@ -36,11 +51,9 @@ List<GitCommitIndex> changes =
     new GitHistorySearchService(sessionFactory).findChanges(query);
 ```
 
-`CommitIndexer` stores paths actually changed relative to the first parent, not every path present in the snapshot. Root commits treat every path as changed; merge commits use first-parent semantics. Added and modified changed-file content is available for full-text search, and deleted files remain represented by path.
+JGit can compute such an answer by walking commits and diffing each candidate tree. This module instead materializes actual first-parent changed paths when a commit is indexed, so repeated audit, support and reporting queries become database operations. Root commits treat every path as changed; merge commits use first-parent semantics. Added and modified changed-file content is also available to Lucene full-text search, while deleted files remain represented by path.
 
 ### Which code locations used this Java class in each version?
-
-A token search can find `ApprovalPolicy` in one checkout. It cannot reliably prove which same-named type each occurrence binds to, follow the declaration after a package move, identify the enclosing declaration or expose binding quality.
 
 ```java
 JavaTypeUsageHistory usageHistory =
@@ -62,30 +75,29 @@ for (JavaTypeUsageHistory.Version version : usageHistory.versions()) {
 }
 ```
 
-The query combines `SymbolTimeMachine` with one binding-aware software graph per commit. An old qualified name can still lead to usages after the type moved or was renamed.
-
-These questions are not theoretically impossible with custom JGit/JDT code. The library value is that the storage protocol, first-parent change projection, compound query API, semantic identity model and cross-version graph query are supplied and regression-tested together.
+Git does not contain Java declaration identities, JDT binding keys, type-usage relations or symbol continuity across package moves. Java Analysis derives that semantic index from each version and combines it with symbol timelines, allowing an old qualified name to lead to usages after a move or rename.
 
 See the complete [change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md), the executable [compound history test](jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java) and the executable [Java usage test](jgit-storage-hibernate-java-analysis/src/test/java/io/github/carstenartur/jgit/storage/hibernate/javaanalysis/JavaTypeUsageHistoryQueryTest.java).
 
 ## What it adds on top of JGit
 
-| Need | What the project adds | Practical outcome |
+| Need | What the project adds | Operational effect |
 |---|---|---|
-| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with transactional pack publication | Readers do not observe partially published pack rows, and repository data follows database backup and access-control practices. |
-| Ask combined history questions repeatedly | First-parent changed-path projection plus author/path/time and full-text queries | Support and audit screens query indexed history instead of traversing and diffing every commit for every request. |
+| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with transactional pack publication | Repository state follows database backup, access-control and lifecycle practices; readers do not observe partially published pack rows. |
+| Run repeated structured history queries | Materialized first-parent changed paths plus indexed author and timestamp fields | Ingestion performs traversal/diff work once; queries combine predicates without re-walking history. |
+| Search history content | Hibernate Search/Lucene indexes for messages, changed paths and selected changed-file text | Full-text queries use an inverted index, a capability standard Git/JGit does not normally expose. |
 | Understand Java evolution beyond tokens and lines | Binding-aware symbols, references, semantic diff, timelines and software graphs | Follow declarations through moves and ask which code locations used a logical type in each version. |
 | Keep architecture intent connected to implementation | Versioned rules, evidence, code mapping and drift evaluation | Produce deterministic findings that explain which rule was violated, where and why. |
 
-Git objects remain authoritative. Search, Java-analysis and architecture tables are derived projections and must be rebuildable.
+Git objects and refs remain authoritative. Search, Java Analysis and Architecture are derived projections: they may be updated asynchronously, can be rebuilt and must not be treated as the source of truth.
 
 ## Module elevator pitches
 
 | Module | Elevator pitch | Choose it when... |
 |---|---|---|
-| `jgit-storage-hibernate-core` | Use the familiar JGit repository API while storing packs, refs, reftables and reflogs in the relational database your application already operates. | You need database-backed Git semantics and no search or code-analysis layer. |
-| `jgit-storage-hibernate-search` | Ask compound author/path/time and full-text questions over actual changed paths without re-walking and re-diffing history for every request. | Users or services need repeated audit, support or reporting queries. |
-| `jgit-storage-hibernate-java-analysis` | Follow binding-aware Java declarations and usage sites across commits, moves and semantic changes. | You need to know which declaration changed, who uses a type and which versions are affected. |
+| `jgit-storage-hibernate-core` | Use the public JGit repository API while storing packs, refs, reftables and reflogs in the relational database your application already operates. | You need database-backed Git semantics and transaction-safe repository publication. |
+| `jgit-storage-hibernate-search` | Move history traversal, first-parent diffing and text indexing to ingestion/reindex time, then run compound relational and Lucene full-text queries at request time. | Users or services need repeated audit, support, reporting or content-search queries. |
+| `jgit-storage-hibernate-java-analysis` | Derive a versioned semantic index of Java declarations, bindings and usages rather than searching source text alone. | You need to know which logical declaration changed, who uses it and which versions are affected. |
 | `jgit-storage-hibernate-architecture` | Version architecture intent beside the code and compare rules and evidence with the observed software graph. | You need explainable architecture drift, constraints and decision provenance. |
 | `jgit-storage-hibernate-benchmarks` | Measure storage operations through repeatable JMH workloads. | You maintain or review performance; it is not a runtime dependency. |
 
@@ -103,7 +115,7 @@ The documented release line is **0.1.5**. Java 21 is required. PostgreSQL 17 is 
 </dependency>
 ```
 
-Add `jgit-storage-hibernate-search` and `jgit-storage-hibernate-java-analysis` at the same version only when their derived query layers are needed.
+Add `jgit-storage-hibernate-search` and `jgit-storage-hibernate-java-analysis` at the same version when their derived query layers are needed.
 
 ### 2. Apply the packaged migration before Hibernate starts
 
@@ -152,7 +164,16 @@ Core uses explicit Hibernate transactions rather than presenting partially writt
 
 This is the ACID benefit described in the original [JGit discussion #251](https://github.com/eclipse-jgit/jgit/discussions/251).
 
-The guarantee is deliberately **per storage operation**. The current implementation does not provide one ambient transaction spanning an arbitrary application entity, Git object insertion, ref publication, reflog append, Search indexing and Java analysis. Those are separate retryable steps. See the [precise transaction contract and failure behavior](docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
+The guarantee is deliberately **per storage operation**. The implementation does not provide one ambient transaction spanning an arbitrary application entity, Git object insertion, ref publication, reflog append, Search indexing and Java analysis. Those are separate retryable steps. See the [precise transaction contract and failure behavior](docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
+
+## Indexing and consistency model
+
+- Core Git objects and refs are authoritative.
+- Search indexing is performed when commits are added to the projection or during an explicit rebuild.
+- The additional ingestion cost buys cheaper repeated queries and full-text search through Lucene indexes.
+- If indexing fails after a ref was published, the Git history remains valid and the projection can be retried or rebuilt.
+- Consumers may run indexing synchronously, asynchronously or through an outbox, depending on their consistency requirements.
+- Existing projections should be rebuilt after analyzer or changed-path-semantics changes.
 
 ## Versioned database contract
 
@@ -163,68 +184,11 @@ Core and Search package Flyway-compatible SQL resources for H2 and PostgreSQL in
 | Core | `classpath:db/migration/jgit-storage-hibernate/core/h2` | `classpath:db/migration/jgit-storage-hibernate/core/postgresql` | `jgit_storage_hibernate_core_schema_history` |
 | Search | `classpath:db/migration/jgit-storage-hibernate/search/h2` | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` | `jgit_storage_hibernate_search_schema_history` |
 
-The migration contract starts with the 0.1.4 schema and is published from 0.1.5 onward. Application-specific workflow, session, audit and outbox tables are intentionally outside these locations.
-
 See [docs/consuming.md](docs/consuming.md) for fresh installation, shared-schema installation, 0.1.4 adoption, backup, failure handling, checksum policy, rollback strategy and multi-version upgrades.
-
-## Semantic history and impact
-
-```java
-JavaProjectAnalysisResult before =
-    new JavaProjectAnalyzer().analyze(beforeSnapshot, configuration);
-JavaProjectAnalysisResult after =
-    new JavaProjectAnalyzer().analyze(afterSnapshot, configuration);
-
-List<SemanticChange> changes = new JavaSemanticDiff().compare(before, after);
-List<SymbolTimeline> timelines =
-    new SymbolTimeMachine().build(List.of(before, after));
-JavaGraphDelta graphDelta =
-    JavaGraphDelta.between(JavaSoftwareGraph.from(before), JavaSoftwareGraph.from(after));
-```
-
-Binding quality and unresolved dependencies are explicit diagnostics rather than hidden guesses. See the [history query cookbook](docs/query-cookbook.md) for rename, move, impact and type-usage recipes.
-
-## Architecture intent and drift
-
-```text
-element ui layer "UI" packagePrefix=com.example.ui
-element database layer "Database" packagePrefix=com.example.persistence
-
-rule no-ui-db forbid REFERENCES_TYPE from ui to database \
-  evidence=adr-7 reason="UI must not access persistence directly"
-
-evidence adr-7 for no-ui-db kind=ADR path=docs/adr/0007.md \
-  rationale="Layering decision" confidence=1.0
-```
-
-```java
-ArchitectureSnapshot intent = parser.parse(dslSource).snapshot();
-JavaSoftwareGraph observed = JavaSoftwareGraph.from(javaAnalysis);
-ArchitectureDriftReport report =
-    new ArchitectureDriftEngine().evaluate(intent, observed);
-```
-
-Findings cover forbidden observed relations, missing required relations, unmapped or ambiguous symbols, missing evidence and stale evidence.
-
-## Entity registration
-
-```java
-List<Class<?>> projectionEntities = new ArrayList<>();
-projectionEntities.addAll(SearchEntities.annotatedClasses());
-projectionEntities.addAll(JavaAnalysisEntities.annotatedClasses());
-projectionEntities.addAll(ArchitectureEntities.annotatedClasses());
-
-try (HibernateSessionFactoryProvider provider =
-    new HibernateSessionFactoryProvider(properties, projectionEntities)) {
-  // Core plus selected rebuildable projections share one persistence context.
-}
-```
 
 ## Verification and compatibility
 
-`mvn verify` always exercises H2. When Docker is available, Testcontainers starts PostgreSQL 17.10 and runs fresh-install and 0.1.4-upgrade scenarios against a real database. The upgrade tests use immutable legacy DDL fixtures rather than regenerating the old schema from current entity mappings.
-
-CI also checks JGit compatibility, dependency changes, JMH benchmarks and release/documentation consistency. The release workflow refuses to publish when Maven versions, citation metadata, Java requirements or public dependency snippets disagree.
+`mvn verify` exercises H2 and, with Docker, PostgreSQL through Testcontainers. CI also checks JGit 7.5/7.6/7.7 compatibility, dependency changes, JMH benchmarks and release/documentation consistency.
 
 ## Documentation
 
@@ -237,7 +201,6 @@ CI also checks JGit compatibility, dependency changes, JMH benchmarks and releas
 - [Java-analysis module guide](jgit-storage-hibernate-java-analysis/README.md)
 - [Architecture module guide](jgit-storage-hibernate-architecture/README.md)
 - [Release process](docs/release-process.md)
-- [Semantic software history roadmap](docs/semantic-history-roadmap.md)
 
 ## Design boundaries
 
