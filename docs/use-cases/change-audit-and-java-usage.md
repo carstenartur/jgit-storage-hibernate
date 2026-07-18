@@ -5,21 +5,43 @@ A payment platform has hundreds of Git-backed rules and Java services. After a p
 1. **Which changes did Alice make below `services/payments/fraud/` during Q1?**
 2. **Which code locations used `ApprovalPolicy` in each released version, including after the class moved packages?**
 
-Both questions can be implemented by an application using lower-level JGit and JDT APIs. The differentiator is that `jgit-storage-hibernate` supplies the repeatable projection, compound database query, binding-aware identity tracking and executable compatibility tests instead of requiring every consuming application to build them.
+These are not merely shorter spellings for simple JGit calls. They require query models optimized for repeated application use.
+
+The Search module shifts revision traversal, first-parent diffing, text extraction and index construction to the point where commits enter the projection or an explicit reindex runs. Request-time work is then performed by relational indexes and Hibernate Search/Lucene. Java Analysis performs a comparable transformation for source code: it derives declarations, binding identities and semantic relations that are not present in Git itself.
+
+## Index once, query repeatedly
+
+Without a projection, every request must repeat work proportional to the relevant history:
+
+```text
+request
+  -> walk commits
+  -> inspect author and time
+  -> diff each candidate against its parent
+  -> inspect paths and contents
+  -> collect, sort and paginate
+```
+
+With the Search projection:
+
+```text
+commit or reindex
+  -> walk/diff/normalize once
+  -> persist changed paths and structured fields
+  -> update Lucene full-text indexes
+
+request
+  -> execute indexed author/path/time predicates
+  -> optionally execute a Lucene full-text query
+```
+
+This changes the operational cost model. Ingestion becomes more expensive, but repeated queries no longer recalculate the same history. The projection can be rebuilt because authoritative Git objects and refs remain in Core.
+
+Standard Git/JGit does not normally expose a general full-text search engine over commit messages, actual changed paths and changed-file contents. Hibernate Search/Lucene therefore adds a capability, not only convenience: an inverted index, analyzers and composable full-text predicates are maintained alongside the relational projection.
 
 ## Question 1: author + changed area + time range
 
-Plain JGit gives an application everything needed to write the algorithm:
-
-1. walk reachable commits;
-2. inspect each author and timestamp;
-3. diff each commit tree against its parent;
-4. test every changed path;
-5. collect and sort the matching commits.
-
-That is standard Git machinery, but it is not a ready database query. Repeating the traversal for every support, audit or reporting request becomes application-owned indexing and caching code.
-
-The Search module stores the **actual first-parent changed paths** for each commit. A root commit treats all paths as changed. A merge commit is described relative to its first parent. The predicates can then be combined:
+The Search module stores the **actual first-parent changed paths** for each indexed commit. A root commit treats all paths as changed. A merge commit is described relative to its first parent. Structured predicates can then be combined:
 
 ```java
 CommitHistoryQuery query =
@@ -36,33 +58,48 @@ List<GitCommitIndex> changes =
     new GitHistorySearchService(sessionFactory).findChanges(query);
 ```
 
-Each result contains the commit ID, message, author, commit time, changed paths and indexed content of added or modified changed files. Deleted files remain queryable by their path.
+Each result contains the commit ID, message, author, commit time and actual changed paths. Added or modified changed-file content is indexed for full-text search; deleted files remain queryable by path.
 
-This supports application endpoints such as:
+A separate full-text question can use the Lucene-backed projection:
+
+```java
+List<GitCommitIndex> securityChanges =
+    new GitHistorySearchService(sessionFactory)
+        .searchCommitText(
+            "payment-platform",
+            "\"dual control\" OR fraud OR CVE-2026-*",
+            100);
+```
+
+This is not equivalent to Git's normal path, log or grep operations. The query can search analyzed terms across commit messages, changed paths and selected changed-file contents using a maintained inverted index.
+
+Application endpoints may expose both dimensions:
 
 ```text
 GET /audit/changes?author=alice@example.com
                    &path=services/payments/fraud/
                    &from=2026-01-01T00:00:00Z
                    &to=2026-03-31T23:59:59Z
+
+GET /audit/search?q="dual control" OR fraud
 ```
 
 The executable
 [`CompoundCommitHistoryQueryH2Test`](../../jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java)
-creates commits by different authors in different subsystems and proves that only the commit satisfying all three predicates is returned. It also proves that an unchanged file is not mislabeled as changed.
+creates commits by different authors in different subsystems and proves that only the commit satisfying all structured predicates is returned. It also proves that unchanged files are not mislabeled as changed.
 
 ## Question 2: who used this Java type in each version?
 
-Text search can find the token `ApprovalPolicy`, but it cannot reliably answer the semantic question:
+A Git or full-text index can find the token `ApprovalPolicy`, but it cannot by itself answer the semantic question:
 
 - was this occurrence bound to the intended type or merely a same-named class?
 - did the type move from `demo.policy` to `demo.risk`?
 - which declaration contains the use?
 - is the relation a type reference, construction, inheritance or annotation?
 - in which commit did each usage exist?
-- was the binding resolved, recovered or partial?
+- was the binding full, recovered or partial?
 
-The Java Analysis module analyzes an ordered series of repository snapshots, follows the logical declaration through `SymbolTimeMachine`, builds a software graph for each commit and returns incoming type-usage relations:
+The Java Analysis module performs source parsing and binding analysis when a version is analyzed. It stores or exposes the resulting symbols and references as a versioned semantic projection. Query time then combines the previously derived symbol timeline with per-version usage relations:
 
 ```java
 List<JavaProjectAnalysisResult> orderedAnalyses =
@@ -98,30 +135,38 @@ release-2026-02 -> demo.risk.ApprovalPolicy
   src/main/java/demo/checkout/CheckoutService.java:4  REFERENCES_TYPE  demo.checkout.CheckoutService  binding=RECOVERED
 ```
 
-`RECOVERED` means JDT supplied a recovered binding for the materialized project snapshot. The result remains useful for following the logical type, but it is deliberately not presented as equally strong as `FULL`, which represents a non-recovered binding. `PARTIAL`, `NONE` and `FAILED` remain visible as still weaker evidence.
+`RECOVERED` means JDT supplied a recovered binding for the materialized project snapshot. The evidence remains useful but is weaker than `FULL`; `PARTIAL`, `NONE` and `FAILED` remain visible as distinct states.
 
 The query accepted the **old qualified name** but still found usages after the package move because the type is followed as one logical symbol timeline.
 
 The executable
 [`JavaTypeUsageHistoryQueryTest`](../../jgit-storage-hibernate-java-analysis/src/test/java/io/github/carstenartur/jgit/storage/hibernate/javaanalysis/JavaTypeUsageHistoryQueryTest.java)
-analyzes two versions, moves the class, adds a new user and verifies both versions' code locations and the documented recovered binding status.
+analyzes two versions, moves the class, adds a new user and verifies both versions' code locations and binding quality.
 
-## Why these are stronger library use cases
+## Architectural difference
 
-| Question | With plain Git/JGit/JDT | With this project |
+| Capability | Plain Git/JGit/JDT primitives | Indexed project model |
 |---|---|---|
-| What did one author change? | Rev-walk and filter author metadata | Query the reusable commit projection |
-| What changed in one subsystem? | Diff every candidate commit and inspect paths | Query first-parent `changedPaths` |
-| What did one author change in one subsystem during one interval? | Compose traversal, diffing, filtering, ordering and caching in the application | One `CommitHistoryQuery` combines all predicates |
-| Where is a Java class used now? | Parse sources and resolve bindings for one checkout | Query incoming semantic graph edges |
-| Where was that class used across releases after moves or renames? | Recreate each version, analyze it, match logical identities and aggregate results | `JavaTypeUsageHistoryQuery` combines symbol timelines and per-version graphs |
-| How trustworthy is each Java result? | Design and expose a binding-quality model | Every usage carries `BindingStatus` |
+| One historical answer | Traverse commits and calculate it on demand | Available, but not the optimization target |
+| Repeated author/path/time queries | Repeat traversal, diffs, filtering and ordering or build an application-owned index | Query materialized first-parent changes through relational indexes |
+| Full-text history search | Not normally provided as a general indexed query engine | Hibernate Search/Lucene maintains an inverted index over messages, changed paths and selected changed-file contents |
+| Request-time cost | Includes repository traversal and tree comparison | Primarily indexed query execution |
+| Ingestion cost | Low until a query is executed | Higher because history and text are normalized and indexed when added or rebuilt |
+| Java type identity | Not represented in Git; JDT can derive it for one analyzed source state | Versioned binding-aware symbols and references |
+| Java use across moves | Reanalyze versions, match declarations and aggregate relations | `JavaTypeUsageHistoryQuery` follows the logical type timeline |
+| Evidence quality | Must be designed by the application | Every semantic result carries `BindingStatus` |
 
-The claim is not that these questions are mathematically impossible with JGit or JDT. The claim is that the library provides the storage protocol, projections, composable query API, semantic identity model and regression tests as one maintained integration.
+The value is therefore not captured by saying that an application could write equivalent loops. A database index, an inverted full-text index and a semantic source-code index are deliberately different data structures with different update and query behavior. Building those structures around JGit/JDT is precisely the functionality this project provides.
 
-## Data and transaction model
+## Data, consistency and transaction model
 
-Git objects and refs remain authoritative. Generic commit and Java-analysis tables are derived projections and can be rebuilt.
+Git objects and refs remain authoritative. Generic commit and Java-analysis projections are derived and rebuildable.
+
+- Indexing may run synchronously after publication, asynchronously or from an outbox.
+- Until indexing completes, a projection may lag behind authoritative Git history.
+- A failed projection update does not invalidate a successfully published Git commit or ref.
+- Reindexing moves the expensive derivation work back to an explicit maintenance operation.
+- Core's pack publication and ref transaction guarantees remain separate from Search and Java-analysis projection updates.
 
 The Core transaction contract remains per storage operation:
 
