@@ -34,6 +34,12 @@ if [[ "${CURRENT_VERSION%-SNAPSHOT}" != "$RELEASE_VERSION" ]]; then
   exit 1
 fi
 
+DOCUMENTED_RELEASE_VERSION=$(tr -d '[:space:]' < docs/current-release-version.txt)
+if [[ "$DOCUMENTED_RELEASE_VERSION" != "$RELEASE_VERSION" ]]; then
+  echo "::error::Documented release $DOCUMENTED_RELEASE_VERSION does not match requested release $RELEASE_VERSION"
+  exit 1
+fi
+
 if [[ -n "$NEXT_VERSION_INPUT" ]]; then
   NEXT_VERSION=$NEXT_VERSION_INPUT
 else
@@ -50,11 +56,12 @@ git config user.email 'github-actions[bot]@users.noreply.github.com'
 
 echo "Release version: $RELEASE_VERSION"
 echo "Current version: $CURRENT_VERSION"
+echo "Documented release version: $DOCUMENTED_RELEASE_VERSION"
 echo "Next development version: $NEXT_VERSION"
 echo "Dry run: $DRY_RUN"
 echo "Skip tests: $SKIP_TESTS"
 
-python3 .github/scripts/verify-release-consistency.py --release-version "$RELEASE_VERSION"
+python3 .github/scripts/verify-release-consistency.py
 
 git fetch origin --tags --force
 if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then
@@ -64,11 +71,12 @@ fi
 
 mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release
-python3 .github/scripts/verify-release-consistency.py --release-version "$RELEASE_VERSION"
+python3 .github/scripts/verify-release-consistency.py
 
 if [[ "$SKIP_TESTS" == "true" ]]; then
   mvn -B -DskipTests verify
 else
+  docker info >/dev/null
   mvn -B verify
 fi
 
