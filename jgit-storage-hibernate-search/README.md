@@ -6,11 +6,30 @@ Add rebuildable structured and full-text commit-history search instead of walkin
 
 - index repository, object ID, messages, author, commit time, changed paths and selected text;
 - query generic history through Hibernate Search/Lucene;
-- share the Core persistence context while keeping Search optional;
+- share the Core database configuration and Hibernate lifecycle while keeping Search optional;
 - delete and rebuild projections because Git objects remain authoritative;
 - provision the projection table through its own versioned Flyway history.
 
 Choose this module when users or services need fast, repeated history queries. Core alone is sufficient when repository storage is needed without generic search.
+
+## Application example
+
+In the [approval-workflow use case](../docs/use-cases/versioned-approval-workflows.md), Core stores immutable workflow commits and the active ref in PostgreSQL. Search then answers application questions that plain JGit would otherwise require custom revision walking and content parsing for every request:
+
+```java
+CommitIndexer indexer = new CommitIndexer(sessionFactory, "approval-workflows");
+indexer.indexCommit(repository, publishedCommitId);
+
+GitHistorySearchService history = new GitHistorySearchService(sessionFactory);
+
+List<GitCommitIndex> policyChanges =
+    history.searchCommitText("approval-workflows", "dualcontrol", 20);
+
+List<GitCommitIndex> workflowVersions =
+    history.findByPath("approval-workflows", "purchase-approval.yaml", 50);
+```
+
+The projection records commit messages, authors, timestamps, paths and selected blob text. It is an application read model, not a replacement for the Git object graph.
 
 ## Dependency
 
@@ -40,6 +59,14 @@ try (HibernateSessionFactoryProvider provider =
 }
 ```
 
+## Transaction model
+
+`CommitIndexer` upserts each `GitCommitIndex` row in an explicit Hibernate transaction and rolls that transaction back on failure. This protects the relational/Lucene projection update itself.
+
+Search indexing is deliberately **not** the same transaction as Core pack publication or a JGit ref update. A commit can be valid and reachable even when projection indexing fails. The correct recovery is to retry or rebuild the projection from authoritative Git history, not to treat the Search table as the source of truth.
+
+The current implementation also does not automatically join an arbitrary application transaction. See the [precise Core/Search transaction boundaries](../docs/use-cases/versioned-approval-workflows.md#important-transaction-boundary).
+
 ## Database ownership
 
 Search owns `git_commit_index` and `jgit_storage_hibernate_search_schema_history`. Domain-specific projections stay in the consuming application even when they share one `SessionFactory`.
@@ -50,4 +77,4 @@ The projection is derived data. Back up Git/Core data as authoritative state; pl
 
 ## Verification
 
-H2 tests run on every build. With Docker available, Testcontainers starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart.
+H2 tests run on every build. With Docker available, Testcontainers starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart. `VersionedApprovalWorkflowUseCaseTest` compiles and executes the documented end-to-end application flow.
