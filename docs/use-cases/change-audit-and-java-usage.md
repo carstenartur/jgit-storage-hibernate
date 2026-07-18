@@ -69,9 +69,11 @@ List<GitCommitIndex> securityChanges =
     new GitHistorySearchService(sessionFactory)
         .searchCommitText(
             "payment-platform",
-            "\"dual control\" OR fraud OR CVE-2026-*",
+            "\"dual control\" OR fraud OR cve",
             100);
 ```
+
+The example uses analyzed terms and a phrase compatible with the default analyzer. Punctuated identifiers such as `CVE-2026-1234` are normally split into terms; applications requiring exact identifier matches should add a dedicated keyword field or analyzer.
 
 This is not equivalent to Git's normal path, log or grep operations. The query searches analyzed terms across commit messages, changed paths and selected changed-file contents using a maintained inverted index.
 
@@ -83,8 +85,10 @@ GET /audit/changes?author=alice@example.com
                    &from=2026-01-01T00:00:00Z
                    &to=2026-03-31T23:59:59Z
 
-GET /audit/search?q="dual control" OR fraud
+GET /audit/search?q=%22dual%20control%22%20OR%20fraud
 ```
+
+The second request is URL-encoded and decodes to the simple query string `"dual control" OR fraud`.
 
 ### Integration-test contract
 
