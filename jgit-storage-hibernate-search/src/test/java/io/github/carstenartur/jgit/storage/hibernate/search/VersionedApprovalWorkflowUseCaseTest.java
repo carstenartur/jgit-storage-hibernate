@@ -41,6 +41,7 @@ class VersionedApprovalWorkflowUseCaseTest {
 
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
   private static final String REPOSITORY_NAME = "approval-workflows";
+  private static final String MAIN_REF = "refs/heads/main";
   private static final String WORKFLOW_PATH = "workflows/purchase-approval.yaml";
 
   @Test
@@ -95,7 +96,7 @@ class VersionedApprovalWorkflowUseCaseTest {
       assertEquals(fourEyes.name(), policyHits.getFirst().getObjectId());
       assertEquals(2, pathHits.size());
 
-      Ref main = repository.exactRef(Constants.R_HEADS + Constants.MASTER);
+      Ref main = repository.exactRef(MAIN_REF);
       assertEquals(fourEyes, main.getObjectId());
       assertTrue(repository.getRefDatabase().performsAtomicTransactions());
     }
@@ -131,7 +132,7 @@ class VersionedApprovalWorkflowUseCaseTest {
       ObjectId newId,
       RefUpdate.Result expectedResult)
       throws Exception {
-    RefUpdate update = repository.updateRef(Constants.R_HEADS + Constants.MASTER);
+    RefUpdate update = repository.updateRef(MAIN_REF);
     update.setExpectedOldObjectId(expectedOldId);
     update.setNewObjectId(newId);
     update.setRefLogMessage("publish approval workflow", false);
