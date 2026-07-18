@@ -53,10 +53,6 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Verify Docker for PostgreSQL integration tests
-        if: ${{ ! inputs.skip_tests }}
-        run: docker info
-
       - name: Run release script
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
