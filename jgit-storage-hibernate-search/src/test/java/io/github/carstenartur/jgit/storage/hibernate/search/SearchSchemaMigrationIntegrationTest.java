@@ -196,9 +196,9 @@ class SearchSchemaMigrationIntegrationTest {
       throws SQLException {
     List<String> versions = new ArrayList<>();
     String sql =
-        "select version from "
+        "select \"version\" from \""
             + historyTable
-            + " where success = true and type = 'SQL' order by installed_rank";
+            + "\" where \"success\" = true and \"version\" <> '0' order by \"installed_rank\"";
     try (Connection connection = database.openConnection();
         Statement statement = connection.createStatement();
         ResultSet resultSet = statement.executeQuery(sql)) {
