@@ -46,7 +46,9 @@ List<GitCommitIndex> hits =
 
 `CommitIndexer` stores paths changed relative to the first parent. Root commits treat every path as changed; merge commits use first-parent semantics. The relational projection makes author, changed-path and time predicates jointly queryable without traversing and diffing history at request time.
 
-The executable [`CompoundCommitHistoryQueryH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java) proves that unchanged files are not reported and that all predicates are combined with logical `AND`.
+This documented use case is executable in
+[`CompoundCommitHistoryQueryH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java).
+The test creates commits by different authors, paths and times, then proves that only the commit satisfying all predicates is returned. It also verifies first-parent changed-path semantics and literal handling of SQL wildcard characters.
 
 ## Full-text query
 
@@ -67,6 +69,10 @@ Full-text search covers:
 Deleted files remain represented by path. Large or non-blob content is intentionally not loaded into the text projection.
 
 The full-text index is not a wrapper around `git log` or `git grep`. It is a maintained Lucene inverted index over historical metadata and selected changed content, optimized for repeated search queries.
+
+The executable
+[`GitHistorySearchH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/GitHistorySearchH2Test.java)
+indexes one commit, closes the JGit repository and then successfully searches the indexed commit message, path and changed-file content through Hibernate Search. Closing the repository before querying ensures the documented request path uses the projection rather than repository traversal.
 
 ## What it adds
 
@@ -126,6 +132,6 @@ Search owns `git_commit_index` and `jgit_storage_hibernate_search_schema_history
 
 ## Verification
 
-H2 tests run on every build. With Docker available, Testcontainers starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart.
+H2 integration tests exercise both documented query use cases on every build. With Docker available, Testcontainers additionally starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart.
 
 See the [change-audit and Java-usage use case](../docs/use-cases/change-audit-and-java-usage.md) for the complete architectural comparison.
