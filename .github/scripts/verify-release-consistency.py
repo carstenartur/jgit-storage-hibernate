@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import re
 import sys
@@ -19,6 +18,7 @@ CONCRETE_SEMVER = re.compile(
 PROJECT_GROUP_ID = "io.github.carstenartur"
 PROJECT_ARTIFACT_PREFIX = "jgit-storage-hibernate-"
 DOCUMENTATION_VERSION_FILE = Path("docs/current-release-version.txt")
+DOCUMENTATION_VERSION_PLACEHOLDERS = {"...", "X.Y.Z", "${project.version}", "${revision}"}
 RELEASE_WORKFLOW_FILE = Path(".github/workflows/release.yml")
 RELEASE_NOTES_FILE = Path(".github/release.yml")
 RELEASE_SCRIPT_FILE = Path(".github/scripts/release.sh")
@@ -32,7 +32,7 @@ ALIGNED_TEST_COORDINATES = {
 }
 PUBLIC_MARKDOWN_GLOBS = (
     "README.md",
-    "docs/*.md",
+    "docs/**/*.md",
     "jgit-storage-hibernate-*/README.md",
 )
 REQUIRED_RELEASE_OPTIONS = (
@@ -270,7 +270,14 @@ def verify_documentation_snippets(
         for artifact_id, version in dependency_pattern.findall(text):
             found_dependency = True
             version = version.strip()
-            if version != documented_version:
+            if version in DOCUMENTATION_VERSION_PLACEHOLDERS:
+                continue
+            if not SEMVER.fullmatch(version):
+                fail(
+                    errors,
+                    f"{path} documents {artifact_id} with unsupported version value {version!r}",
+                )
+            elif version != documented_version:
                 fail(
                     errors,
                     f"{path} documents {artifact_id}:{version}; expected {documented_version}",
@@ -389,7 +396,7 @@ def verify_release_notes_configuration(errors: list[str]) -> None:
     if not catch_all:
         fail(
             errors,
-            f"{RELEASE_NOTES_FILE} must include a catch-all category with label \"*\"",
+            f'{RELEASE_NOTES_FILE} must include a catch-all category with label "*"',
         )
 
 
@@ -428,33 +435,9 @@ def verify_release_script(errors: list[str]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--release-version",
-        help="Require the current snapshot/release base and documented version to equal X.Y.Z",
-    )
-    args = parser.parse_args()
-
     errors: list[str] = []
     project_version, java_version = root_project_version(errors)
     documented_version = documentation_version(errors)
-
-    if args.release_version:
-        if not RELEASE_SEMVER.fullmatch(args.release_version):
-            fail(errors, "--release-version must use X.Y.Z")
-        project_base = project_version.removesuffix("-SNAPSHOT")
-        if project_base != args.release_version:
-            fail(
-                errors,
-                f"project version base {project_base!r} does not match release "
-                f"{args.release_version!r}",
-            )
-        if documented_version != args.release_version:
-            fail(
-                errors,
-                f"documented release {documented_version!r} does not match requested release "
-                f"{args.release_version!r}",
-            )
 
     verify_module_poms(project_version, errors)
     verify_project_dependencies(project_version, errors)
@@ -471,7 +454,7 @@ def main() -> None:
         raise SystemExit(1)
 
     print(
-        "Release consistency verified: "
+        "Repository consistency verified: "
         f"project={project_version}, docs={documented_version}, java={java_version}"
     )
 
