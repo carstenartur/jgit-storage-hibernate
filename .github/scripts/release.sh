@@ -8,6 +8,7 @@ SKIP_TESTS=${SKIP_TESTS:-false}
 DRY_RUN=${DRY_RUN:-false}
 SOURCE_BRANCH=${SOURCE_BRANCH:-main}
 TAG_NAME="v${RELEASE_VERSION}"
+DOCUMENTED_RELEASE_VERSION_FILE=docs/current-release-version.txt
 
 if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "::error::release_version must use X.Y.Z without a leading v"
@@ -34,6 +35,16 @@ if [[ "${CURRENT_VERSION%-SNAPSHOT}" != "$RELEASE_VERSION" ]]; then
   exit 1
 fi
 
+if [[ ! -r "$DOCUMENTED_RELEASE_VERSION_FILE" ]]; then
+  echo "::error::Missing or unreadable documented release version file: $DOCUMENTED_RELEASE_VERSION_FILE"
+  exit 1
+fi
+DOCUMENTED_RELEASE_VERSION=$(tr -d '[:space:]' < "$DOCUMENTED_RELEASE_VERSION_FILE")
+if [[ "$DOCUMENTED_RELEASE_VERSION" != "$RELEASE_VERSION" ]]; then
+  echo "::error::Documented release $DOCUMENTED_RELEASE_VERSION does not match requested release $RELEASE_VERSION"
+  exit 1
+fi
+
 if [[ -n "$NEXT_VERSION_INPUT" ]]; then
   NEXT_VERSION=$NEXT_VERSION_INPUT
 else
@@ -50,11 +61,12 @@ git config user.email 'github-actions[bot]@users.noreply.github.com'
 
 echo "Release version: $RELEASE_VERSION"
 echo "Current version: $CURRENT_VERSION"
+echo "Documented release version: $DOCUMENTED_RELEASE_VERSION"
 echo "Next development version: $NEXT_VERSION"
 echo "Dry run: $DRY_RUN"
 echo "Skip tests: $SKIP_TESTS"
 
-python3 .github/scripts/verify-release-consistency.py --release-version "$RELEASE_VERSION"
+python3 .github/scripts/verify-release-consistency.py
 
 git fetch origin --tags --force
 if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then
@@ -64,11 +76,15 @@ fi
 
 mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release
-python3 .github/scripts/verify-release-consistency.py --release-version "$RELEASE_VERSION"
+python3 .github/scripts/verify-release-consistency.py
 
 if [[ "$SKIP_TESTS" == "true" ]]; then
   mvn -B -DskipTests verify
 else
+  if ! docker info >/dev/null 2>&1; then
+    echo "::error::Docker is required for the Testcontainers-backed PostgreSQL release tests"
+    exit 1
+  fi
   mvn -B verify
 fi
 
