@@ -2,6 +2,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.javaanalysis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.LinkedHashMap;
@@ -39,9 +40,21 @@ class JavaTypeUsageHistoryQueryTest {
     assertTrue(firstVersionPaths.contains("src/main/java/demo/checkout/CheckoutService.java"));
     assertTrue(secondVersionPaths.contains("src/main/java/demo/checkout/CheckoutService.java"));
     assertTrue(secondVersionPaths.contains("src/main/java/demo/batch/BatchApprovalJob.java"));
+
+    List<JavaTypeUsageHistory.UsageSite> documentedTypeReferences =
+        history.versions().stream()
+            .flatMap(version -> version.usageSites().stream())
+            .filter(site -> site.relation() == JavaGraphEdgeKind.REFERENCES_TYPE)
+            .toList();
+    assertFalse(documentedTypeReferences.isEmpty());
     assertTrue(
-        history.latest().usageSites().stream()
-            .anyMatch(site -> site.relation() == JavaGraphEdgeKind.REFERENCES_TYPE));
+        documentedTypeReferences.stream()
+            .allMatch(site -> site.bindingStatus() == BindingStatus.RECOVERED),
+        () ->
+            "documented materialized-project type references must expose recovered bindings, but were "
+                + documentedTypeReferences.stream()
+                    .map(JavaTypeUsageHistory.UsageSite::bindingStatus)
+                    .toList());
   }
 
   private static Set<String> paths(JavaTypeUsageHistory.Version version) {

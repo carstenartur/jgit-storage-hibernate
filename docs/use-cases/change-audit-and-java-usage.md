@@ -87,22 +87,24 @@ for (JavaTypeUsageHistory.Version version : usageHistory.versions()) {
 }
 ```
 
-A possible result is:
+The executable example produces the following binding-quality shape:
 
 ```text
 release-2026-01 -> demo.policy.ApprovalPolicy
-  src/main/java/demo/checkout/CheckoutService.java:4  REFERENCES_TYPE  demo.checkout.CheckoutService.policy  binding=RESOLVED
+  src/main/java/demo/checkout/CheckoutService.java:4  REFERENCES_TYPE  demo.checkout.CheckoutService  binding=RECOVERED
 
 release-2026-02 -> demo.risk.ApprovalPolicy
-  src/main/java/demo/batch/BatchApprovalJob.java:4    REFERENCES_TYPE  demo.batch.BatchApprovalJob.policy      binding=RESOLVED
-  src/main/java/demo/checkout/CheckoutService.java:4  REFERENCES_TYPE  demo.checkout.CheckoutService.policy   binding=RESOLVED
+  src/main/java/demo/batch/BatchApprovalJob.java:4    REFERENCES_TYPE  demo.batch.BatchApprovalJob     binding=RECOVERED
+  src/main/java/demo/checkout/CheckoutService.java:4  REFERENCES_TYPE  demo.checkout.CheckoutService  binding=RECOVERED
 ```
+
+`RECOVERED` means JDT supplied a recovered binding for the materialized project snapshot. The result remains useful for following the logical type, but it is deliberately not presented as equally strong as `FULL`, which represents a non-recovered binding. `PARTIAL`, `NONE` and `FAILED` remain visible as still weaker evidence.
 
 The query accepted the **old qualified name** but still found usages after the package move because the type is followed as one logical symbol timeline.
 
 The executable
 [`JavaTypeUsageHistoryQueryTest`](../../jgit-storage-hibernate-java-analysis/src/test/java/io/github/carstenartur/jgit/storage/hibernate/javaanalysis/JavaTypeUsageHistoryQueryTest.java)
-analyzes two versions, moves the class, adds a new user and verifies both versions' code locations.
+analyzes two versions, moves the class, adds a new user and verifies both versions' code locations and the documented recovered binding status.
 
 ## Why these are stronger library use cases
 
