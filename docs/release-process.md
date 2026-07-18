@@ -13,6 +13,20 @@ This project publishes Maven artifacts to GitHub Packages and creates a GitHub R
 
 The benchmark artifact is for CI and release review, not normal runtime use.
 
+## Implementation boundary
+
+There is one release workflow and one release state machine:
+
+| Component | Responsibility |
+|---|---|
+| `.github/workflows/release.yml` | GitHub Actions entry point: collect inputs, check out the complete history, configure Java/package credentials and invoke the existing release script. |
+| `.github/scripts/release.sh` | Single authority for release-only policy and sequencing: branch, requested/current/documented version agreement, Docker/test requirements, tag checks, version changes, publication, release creation and next-snapshot preparation. |
+| `.github/scripts/update-release-metadata.py` | Deterministically update Citation, Zenodo and CodeMeta versions/dates. |
+| `.github/scripts/verify-release-consistency.py` | Read-only static checks reusable from pull-request CI, snapshot publishing and the release script. It does not publish, tag or mutate release state. |
+| `.github/release.yml` | Category configuration consumed by GitHub-generated release notes. It is not an Actions workflow. |
+
+Keeping release policy in `release.sh` also makes the same state machine available for a local or CI dry run; the workflow does not reimplement it.
+
 ## Release-note traceability
 
 User-visible features, schema changes, compatibility changes and release-process hardening must have an issue before implementation. Pull requests should close or reference those issues. GitHub-generated release notes then provide a traceable list of merged work instead of a generic one-line release description.
@@ -21,7 +35,7 @@ Use clear PR titles because they become release-note entries. Apply release-note
 
 ## Documentation version contract
 
-`docs/current-release-version.txt` contains the version used by public Maven dependency snippets. It represents the release being documed, not necessarily the current development `-SNAPSHOT` version.
+`docs/current-release-version.txt` contains the version used by public Maven dependency snippets. It represents the release being documented, not necessarily the current development `-SNAPSHOT` version.
 
 Before releasing `X.Y.Z`:
 
@@ -33,16 +47,16 @@ Before releasing `X.Y.Z`:
 
 - the root and module Maven versions;
 - project-owned dependency versions;
+- aligned Flyway, PostgreSQL JDBC and Testcontainers test dependencies;
 - `CITATION.cff`, `CITATION.md`, `.zenodo.json` and `codemeta.json`;
 - the Java baseline in Maven metadata, CodeMeta and README;
-- every public Maven snippet for a project artifact;
-- the requested release version against the documented release version.
+- public project dependency snippets in the root README, nested `docs/**/*.md` and module READMEs.
 
-This distinguishes legitimate historical version references from stale copy-and-paste dependency snippets.
+The release script separately requires the requested release version, current Maven snapshot base and documented release version to agree. This distinguishes legitimate historical version references from stale copy-and-paste dependency snippets without duplicating release policy in the static checker.
 
 ## Snapshot publishing
 
-Snapshots are published by `.github/workflows/publish-snapshot.yml`. Normal CI runs the consistency verifier so metadata and public documentation cannot silently diverge.
+Snapshots are published by `.github/workflows/publish-snapshot.yml`. Normal CI runs the static consistency verifier so metadata and public documentation cannot silently diverge.
 
 ## Manual release workflow
 
@@ -53,26 +67,27 @@ Inputs:
 ```text
 release_version = 0.1.5
 next_development_version = 0.1.6-SNAPSHOT   # optional; patch is incremented by default
-skip_tests = false                # real releases reject true
+skip_tests = false                           # real releases reject true
 dry_run = false
 ```
 
-The workflow:
+The existing `release.sh` invoked by the workflow:
 
 1. verifies that the current Maven version is the matching snapshot;
-2. verifies release documentation and metadata consistency;
-3. checks that the tag does not already exist;
-4. sets the release Maven version;
-5. updates citation and software metadata;
-6. requires Docker and runs the full Maven build, including Testcontainers-backed PostgreSQL migration tests;
-7. rejects remaining snapshot POM references;
-8. deploys Maven artifacts to GitHub Packages;
-9. commits and tags the release;
-10. creates a GitHub Release with generated notes and attached JAR/metadata files;
-11. advances Maven and citation metadata to the next development snapshot;
-12. re-runs consistency verification and pushes the development commit.
+2. verifies that the documented release version matches the request;
+3. verifies static repository, documentation and metadata consistency;
+4. checks that the tag does not already exist;
+5. sets the release Maven version;
+6. updates citation and software metadata;
+7. requires Docker and runs the full Maven build, including Testcontainers-backed PostgreSQL migration tests;
+8. rejects remaining snapshot POM references;
+9. deploys Maven artifacts to GitHub Packages;
+10. commits and tags the release;
+11. creates a GitHub Release with generated notes and attached JAR/metadata files;
+12. advances Maven and citation metadata to the next development snapshot;
+13. re-runs static consistency verification and pushes the development commit.
 
-A dry run performs all validation and build steps but does not deploy, tag, create a release or push commits.
+A normal dry run performs the same validation and full build but does not deploy, tag, create a release or push commits. A deliberately test-free dry run may set `skip_tests=true`; the script rejects that setting for a real release.
 
 ## Pre-release checklist
 
@@ -82,7 +97,7 @@ A dry run performs all validation and build steps but does not deploy, tag, crea
 - README and module guides describe the release version;
 - database changes have immutable migrations and upgrade fixtures;
 - release notes for destructive or compatibility-sensitive migrations include operational instructions;
-- a dry run has completed successfully from the intended source branch.
+- a full dry run has completed successfully from the intended source branch.
 
 ## Failure behavior
 
