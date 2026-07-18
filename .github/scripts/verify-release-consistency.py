@@ -26,7 +26,7 @@ ALIGNED_TEST_COORDINATES = {
 }
 PUBLIC_MARKDOWN_GLOBS = (
     "README.md",
-    "docs/*.md",
+    "docs/**/*.md",
     "jgit-storage-hibernate-*/README.md",
 )
 
