@@ -15,6 +15,7 @@ RELEASE_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 PROJECT_GROUP_ID = "io.github.carstenartur"
 PROJECT_ARTIFACT_PREFIX = "jgit-storage-hibernate-"
 DOCUMENTATION_VERSION_FILE = Path("docs/current-release-version.txt")
+DOCUMENTATION_VERSION_PLACEHOLDERS = {"...", "X.Y.Z", "${project.version}", "${revision}"}
 METADATA_JSON_FILES = (Path(".zenodo.json"), Path("codemeta.json"))
 ALIGNED_TEST_COORDINATES = {
     ("org.flywaydb", "flyway-core"),
@@ -217,7 +218,14 @@ def verify_documentation_snippets(documented_version: str, java_version: str, er
         for artifact_id, version in dependency_pattern.findall(text):
             found_dependency = True
             version = version.strip()
-            if version != documented_version:
+            if version in DOCUMENTATION_VERSION_PLACEHOLDERS:
+                continue
+            if not SEMVER.fullmatch(version):
+                fail(
+                    errors,
+                    f"{path} documents {artifact_id} with unsupported version value {version!r}",
+                )
+            elif version != documented_version:
                 fail(
                     errors,
                     f"{path} documents {artifact_id}:{version}; expected {documented_version}",
