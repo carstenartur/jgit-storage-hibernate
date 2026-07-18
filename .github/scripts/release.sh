@@ -8,6 +8,7 @@ SKIP_TESTS=${SKIP_TESTS:-false}
 DRY_RUN=${DRY_RUN:-false}
 SOURCE_BRANCH=${SOURCE_BRANCH:-main}
 TAG_NAME="v${RELEASE_VERSION}"
+DOCUMENTED_RELEASE_VERSION_FILE=docs/current-release-version.txt
 
 if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "::error::release_version must use X.Y.Z without a leading v"
@@ -34,7 +35,11 @@ if [[ "${CURRENT_VERSION%-SNAPSHOT}" != "$RELEASE_VERSION" ]]; then
   exit 1
 fi
 
-DOCUMENTED_RELEASE_VERSION=$(tr -d '[:space:]' < docs/current-release-version.txt)
+if [[ ! -r "$DOCUMENTED_RELEASE_VERSION_FILE" ]]; then
+  echo "::error::Missing or unreadable documented release version file: $DOCUMENTED_RELEASE_VERSION_FILE"
+  exit 1
+fi
+DOCUMENTED_RELEASE_VERSION=$(tr -d '[:space:]' < "$DOCUMENTED_RELEASE_VERSION_FILE")
 if [[ "$DOCUMENTED_RELEASE_VERSION" != "$RELEASE_VERSION" ]]; then
   echo "::error::Documented release $DOCUMENTED_RELEASE_VERSION does not match requested release $RELEASE_VERSION"
   exit 1
@@ -76,7 +81,10 @@ python3 .github/scripts/verify-release-consistency.py
 if [[ "$SKIP_TESTS" == "true" ]]; then
   mvn -B -DskipTests verify
 else
-  docker info >/dev/null
+  if ! docker info >/dev/null 2>&1; then
+    echo "::error::Docker is required for the Testcontainers-backed PostgreSQL release tests"
+    exit 1
+  fi
   mvn -B verify
 fi
 
