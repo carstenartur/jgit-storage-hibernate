@@ -137,6 +137,27 @@ class CompoundCommitHistoryQueryH2Test {
           aliceFraudChangesInQuarter.stream().map(GitCommitIndex::getObjectId).toList());
       assertEquals(3, history.findByAuthorEmail(REPOSITORY_NAME, "alice@example.com", 20).size());
       assertEquals(3, history.findByPath(REPOSITORY_NAME, "payments/fraud", 20).size());
+
+      assertEquals(
+          0,
+          history
+              .findChanges(
+                  CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+                      .touchingPath("%")
+                      .limit(20)
+                      .build())
+              .size(),
+          "a percent sign in a path fragment must be treated literally");
+      assertEquals(
+          0,
+          history
+              .findChanges(
+                  CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+                      .touchingPath("_")
+                      .limit(20)
+                      .build())
+              .size(),
+          "an underscore in a path fragment must be treated literally");
     }
   }
 
