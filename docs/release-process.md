@@ -17,11 +17,11 @@ The benchmark artifact is for CI and release review, not normal runtime use.
 
 User-visible features, schema changes, compatibility changes and release-process hardening must have an issue before implementation. Pull requests should close or reference those issues. GitHub-generated release notes then provide a traceable list of merged work instead of a generic one-line release description.
 
-Use clear PR titles because they become release-note entries. Apply release-note category labels when the repository configuration defines them.
+Use clear PR titles because they become release-note entries. `.github/release.yml` categorizes them and includes a catch-all category so unlabeled work is not silently omitted. Apply `ignore-for-release` only when a merged change is genuinely irrelevant to consumers.
 
 ## Documentation version contract
 
-`docs/current-release-version.txt` contains the version used by public Maven dependency snippets. It represents the release being documed, not necessarily the current development `-SNAPSHOT` version.
+`docs/current-release-version.txt` contains the version used by public Maven dependency snippets. It represents the release being documented, not necessarily the current development `-SNAPSHOT` version.
 
 Before releasing `X.Y.Z`:
 
@@ -33,12 +33,15 @@ Before releasing `X.Y.Z`:
 
 - the root and module Maven versions;
 - project-owned dependency versions;
+- aligned Flyway, PostgreSQL and Testcontainers test dependency versions;
 - `CITATION.cff`, `CITATION.md`, `.zenodo.json` and `codemeta.json`;
 - the Java baseline in Maven metadata, CodeMeta and README;
 - every public Maven snippet for a project artifact;
-- the requested release version against the documented release version.
+- the requested release version against the documented release version;
+- generated-release-note configuration and its catch-all category;
+- the release workflow for concrete semantic-version examples that could become stale.
 
-This distinguishes legitimate historical version references from stale copy-and-paste dependency snippets.
+This distinguishes legitimate historical version references from stale copy-and-paste dependency snippets. Workflow input help uses `X.Y.Z` placeholders instead of embedding the current release number.
 
 ## Snapshot publishing
 
@@ -51,9 +54,9 @@ Run `.github/workflows/release.yml` from `main`.
 Inputs:
 
 ```text
-release_version = 0.1.5
-next_development_version = 0.1.6-SNAPSHOT   # optional; patch is incremented by default
-skip_tests = false                # real releases reject true
+release_version = X.Y.Z
+next_development_version = X.Y.Z-SNAPSHOT   # optional; patch is incremented by default
+skip_tests = false                           # real releases reject true
 dry_run = false
 ```
 
@@ -68,7 +71,7 @@ The workflow:
 7. rejects remaining snapshot POM references;
 8. deploys Maven artifacts to GitHub Packages;
 9. commits and tags the release;
-10. creates a GitHub Release with generated notes and attached JAR/metadata files;
+10. creates a GitHub Release with categorized generated notes and attached JAR/metadata files;
 11. advances Maven and citation metadata to the next development snapshot;
 12. re-runs consistency verification and pushes the development commit.
 

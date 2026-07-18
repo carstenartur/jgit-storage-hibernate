@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Maven, release metadata, Java baseline and public dependency snippets."""
+"""Verify Maven, metadata, Java, documentation and release configuration consistency."""
 
 from __future__ import annotations
 
@@ -13,10 +13,14 @@ from pathlib import Path
 MAVEN_NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?$")
 RELEASE_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+LITERAL_SEMVER = re.compile(r"(?<![0-9.])[0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?(?![0-9.])")
 PROJECT_GROUP_ID = "io.github.carstenartur"
 PROJECT_ARTIFACT_PREFIX = "jgit-storage-hibernate-"
 DOCUMENTATION_VERSION_FILE = Path("docs/current-release-version.txt")
 METADATA_JSON_FILES = (Path(".zenodo.json"), Path("codemeta.json"))
+RELEASE_NOTES_CONFIG = Path(".github/release.yml")
+RELEASE_WORKFLOW = Path(".github/workflows/release.yml")
+RELEASE_SCRIPT = Path(".github/scripts/release.sh")
 ALIGNED_TEST_COORDINATES = {
     ("org.flywaydb", "flyway-core"),
     ("org.flywaydb", "flyway-database-postgresql"),
@@ -39,7 +43,11 @@ def required_text(path: Path, errors: list[str]) -> str:
     if not path.is_file():
         fail(errors, f"missing required file: {path}")
         return ""
-    return path.read_text(encoding="utf-8")
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as exception:
+        fail(errors, f"cannot read {path}: {exception}")
+        return ""
 
 
 def pom_root(path: Path, errors: list[str]) -> ET.Element | None:
@@ -119,7 +127,7 @@ def verify_project_dependencies(project_version: str, errors: list[str]) -> None
 
 def verify_aligned_test_dependencies(errors: list[str]) -> None:
     versions: dict[tuple[str, str], dict[str, list[Path]]] = {}
-    for path in sorted(Path(".").glob("jgit-storage-hibernate-*/pom.xml")):
+    for path in module_pom_paths():
         root = pom_root(path, errors)
         if root is None:
             continue
@@ -150,7 +158,10 @@ def verify_metadata(project_version: str, java_version: str, errors: list[str]) 
 
     citation_md = required_text(Path("CITATION.md"), errors)
     cited_versions = set(
-        re.findall(r"(?:Version\s+|version\s*=\s*\{)([0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?)", citation_md)
+        re.findall(
+            r"(?:Version\s+|version\s*=\s*\{)([0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?)",
+            citation_md,
+        )
     )
     if cited_versions != {project_version}:
         fail(
@@ -219,10 +230,7 @@ def verify_documentation_snippets(documented_version: str, java_version: str, er
             found_dependency = True
             version = version.strip()
             if version != documented_version:
-                fail(
-                    errors,
-                    f"{path} documents {artifact_id}:{version}; expected {documented_version}",
-                )
+                fail(errors, f"{path} documents {artifact_id}:{version}; expected {documented_version}")
         for version in coordinate_pattern.findall(text):
             found_dependency = True
             if version != documented_version:
@@ -238,6 +246,30 @@ def verify_documentation_snippets(documented_version: str, java_version: str, er
     readme = required_text(Path("README.md"), errors)
     if f"Java-{java_version}" not in readme and f"Java {java_version}" not in readme:
         fail(errors, f"README.md does not advertise the Java {java_version} baseline")
+
+
+def verify_release_configuration(errors: list[str]) -> None:
+    notes_config = required_text(RELEASE_NOTES_CONFIG, errors)
+    if notes_config:
+        if "changelog:" not in notes_config or "categories:" not in notes_config:
+            fail(errors, f"{RELEASE_NOTES_CONFIG} does not define changelog categories")
+        if not re.search(r"labels:\s*\n\s*-\s*[\"']?\*[\"']?\s*(?:\n|$)", notes_config):
+            fail(errors, f"{RELEASE_NOTES_CONFIG} has no catch-all '*' category")
+
+    workflow = required_text(RELEASE_WORKFLOW, errors)
+    if workflow:
+        literal_versions = sorted(set(LITERAL_SEMVER.findall(workflow)))
+        if literal_versions:
+            fail(
+                errors,
+                f"{RELEASE_WORKFLOW} contains concrete release examples {literal_versions}; "
+                "use X.Y.Z placeholders so workflow help text cannot become stale",
+            )
+
+    release_script = required_text(RELEASE_SCRIPT, errors)
+    for required_option in ("--generate-notes", "--verify-tag", "--fail-on-no-commits"):
+        if required_option not in release_script:
+            fail(errors, f"{RELEASE_SCRIPT} does not use {required_option}")
 
 
 def main() -> None:
@@ -273,10 +305,11 @@ def main() -> None:
     verify_aligned_test_dependencies(errors)
     verify_metadata(project_version, java_version, errors)
     verify_documentation_snippets(documented_version, java_version, errors)
+    verify_release_configuration(errors)
 
     if errors:
-        for error in errors:
-            print(f"ERROR: {error}", file=sys.stderr)
+        for message in errors:
+            print(f"ERROR: {message}", file=sys.stderr)
         raise SystemExit(1)
 
     print(
