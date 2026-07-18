@@ -42,6 +42,11 @@ class JavaTypeUsageHistoryQueryTest {
     assertTrue(
         history.latest().usageSites().stream()
             .anyMatch(site -> site.relation() == JavaGraphEdgeKind.REFERENCES_TYPE));
+    assertTrue(
+        history.versions().stream()
+            .flatMap(version -> version.usageSites().stream())
+            .allMatch(site -> site.bindingStatus() == BindingStatus.FULL),
+        "the documented example expects non-recovered JDT bindings");
   }
 
   private static Set<String> paths(JavaTypeUsageHistory.Version version) {
