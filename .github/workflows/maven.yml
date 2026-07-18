@@ -24,6 +24,12 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Verify Docker for PostgreSQL integration tests
+        run: docker info
+
+      - name: Verify release and documentation consistency
+        run: python3 .github/scripts/verify-release-consistency.py
+
       - name: Build
         run: |
           set +e

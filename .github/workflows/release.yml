@@ -53,6 +53,9 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
+      - name: Verify Docker for PostgreSQL integration tests
+        run: docker info
+
       - name: Run release script
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,5 +66,8 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run }}
           SOURCE_BRANCH: ${{ github.ref_name }}
         run: |
-          chmod +x .github/scripts/release.sh .github/scripts/update-release-metadata.py
+          chmod +x \
+            .github/scripts/release.sh \
+            .github/scripts/update-release-metadata.py \
+            .github/scripts/verify-release-consistency.py
           .github/scripts/release.sh
