@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Release version without leading v, for example 0.1.0. Must match the current SNAPSHOT base.'
+        description: 'Release version without leading v in X.Y.Z format. Must match the current SNAPSHOT base.'
         required: true
         type: string
       next_development_version:
-        description: 'Next development version, for example 0.1.1-SNAPSHOT. Leave empty to increment patch.'
+        description: 'Next development version in X.Y.Z-SNAPSHOT format. Leave empty to increment patch.'
         required: false
         type: string
         default: ''
