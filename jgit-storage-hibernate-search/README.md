@@ -56,9 +56,11 @@ The test creates commits by different authors, paths and times, then proves that
 List<GitCommitIndex> hits =
     search.searchCommitText(
         "payment-platform",
-        "\"dual control\" OR fraud OR CVE-2026-*",
+        "\"dual control\" OR fraud OR cve",
         50);
 ```
+
+The query uses terms and a phrase compatible with the default full-text analyzer. Identifiers containing punctuation, such as `CVE-2026-1234`, are normally tokenized into analyzed terms; callers needing exact identifier matching should add a dedicated keyword field/analyzer rather than relying on a hyphenated wildcard expression.
 
 Full-text search covers:
 
