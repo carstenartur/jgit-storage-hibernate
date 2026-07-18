@@ -45,7 +45,9 @@ class GitHistorySearchH2Test {
   void setUp() throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     repositoryName = "history-h2-" + TEST_COUNTER.incrementAndGet();
-    provider = new HibernateSessionFactoryProvider(h2Properties(repositoryName), SearchEntities.annotatedClasses());
+    provider =
+        new HibernateSessionFactoryProvider(
+            h2Properties(repositoryName), SearchEntities.annotatedClasses());
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     repository.create(true);
   }
@@ -61,23 +63,45 @@ class GitHistorySearchH2Test {
   }
 
   @Test
-  void indexesCommitMessagesPathsAndText() throws Exception {
-    ObjectId commitId = createCommitWithFile("Add workflow DSL", "workflows/demo.apflow", "node gain");
+  void queriesIndexedMessagePathAndChangedContentAfterRepositoryIsClosed() throws Exception {
+    ObjectId commitId =
+        createCommitWithFile(
+            "Add workflow DSL",
+            "workflows/demo.apflow",
+            "node gain\npolicy dualcontrol\n");
     CommitIndexer indexer = new CommitIndexer(provider.getSessionFactory(), repositoryName);
     GitCommitIndex projection = indexer.indexCommit(repository, commitId);
 
     assertEquals(commitId.name(), projection.getObjectId());
     assertTrue(projection.getChangedPaths().contains("workflows/demo.apflow"));
-    assertTrue(projection.getChangedText().contains("node gain"));
+    assertTrue(projection.getChangedText().contains("policy dualcontrol"));
 
-    GitHistorySearchService searchService = new GitHistorySearchService(provider.getSessionFactory());
-    List<GitCommitIndex> hits = searchService.searchCommitText(repositoryName, "workflow", 10);
-    assertEquals(1, hits.size());
+    repository.close();
+    repository = null;
+
+    GitHistorySearchService searchService =
+        new GitHistorySearchService(provider.getSessionFactory());
+    List<GitCommitIndex> messageHits =
+        searchService.searchCommitText(repositoryName, "workflow", 10);
+    List<GitCommitIndex> pathHits =
+        searchService.searchCommitText(repositoryName, "demo.apflow", 10);
+    List<GitCommitIndex> contentHits =
+        searchService.searchCommitText(repositoryName, "dualcontrol", 10);
+
+    assertEquals(List.of(commitId.name()), objectIds(messageHits));
+    assertEquals(List.of(commitId.name()), objectIds(pathHits));
+    assertEquals(List.of(commitId.name()), objectIds(contentHits));
   }
 
-  private ObjectId createCommitWithFile(String message, String path, String content) throws Exception {
+  private static List<String> objectIds(List<GitCommitIndex> hits) {
+    return hits.stream().map(GitCommitIndex::getObjectId).toList();
+  }
+
+  private ObjectId createCommitWithFile(String message, String path, String content)
+      throws Exception {
     try (ObjectInserter inserter = repository.newObjectInserter()) {
-      ObjectId blobId = inserter.insert(Constants.OBJ_BLOB, content.getBytes(StandardCharsets.UTF_8));
+      ObjectId blobId =
+          inserter.insert(Constants.OBJ_BLOB, content.getBytes(StandardCharsets.UTF_8));
       TreeFormatter tree = new TreeFormatter();
       tree.append(path, FileMode.REGULAR_FILE, blobId);
       ObjectId treeId = inserter.insert(tree);

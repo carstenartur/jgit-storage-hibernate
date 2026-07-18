@@ -1,10 +1,31 @@
 # jgit-storage-hibernate-search
 
-Add rebuildable structured and full-text commit-history queries instead of walking and diffing the Git object graph for every request.
+Add a rebuildable relational and Lucene query model over Git history.
 
-## The useful question
+The module moves revision traversal, first-parent diffing, changed-text extraction and index construction from every request to commit-ingestion or explicit reindex time. Request-time work is then handled by relational indexes and Hibernate Search/Lucene.
 
-The individual questions “what did Alice commit?”, “what changed below `services/payments/fraud/`?” and “what changed in Q1?” can all be implemented with JGit. The application-grade question combines them:
+## Why indexing matters
+
+Without a projection, repeated history requests repeatedly traverse commits and compare trees:
+
+```text
+query -> RevWalk -> parent diff -> path/content filtering -> result
+query -> RevWalk -> parent diff -> path/content filtering -> result
+```
+
+With this module:
+
+```text
+commit/reindex -> RevWalk + first-parent diff + text extraction + index update
+query          -> relational predicates and/or Lucene full-text search
+query          -> relational predicates and/or Lucene full-text search
+```
+
+This is a deliberate read-optimized architecture. Indexing adds work when a commit enters the projection, but avoids recalculating the same history for each audit, support, reporting or search request.
+
+Git/JGit does not normally provide a general full-text query engine over commit messages, actual changed paths and changed-file contents. Hibernate Search/Lucene adds analyzers, an inverted index and composable full-text queries over those fields.
+
+## Compound structured query
 
 > Which changes did Alice make in the fraud subsystem during Q1?
 
@@ -23,23 +44,50 @@ List<GitCommitIndex> hits =
     new GitHistorySearchService(sessionFactory).findChanges(query);
 ```
 
-JGit supplies revision walking and tree-diff primitives. This module supplies the reusable projection and compound database query so each request does not have to traverse and diff history again.
+`CommitIndexer` stores paths changed relative to the first parent. Root commits treat every path as changed; merge commits use first-parent semantics. The relational projection makes author, changed-path and time predicates jointly queryable without traversing and diffing history at request time.
 
-`CommitIndexer` stores paths changed relative to the first parent. Root commits treat every path as changed; merge commits use first-parent semantics. Added and modified changed-file content is indexed for full-text search, while deleted files remain represented by their path.
+This documented use case is executable in
+[`CompoundCommitHistoryQueryH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java).
+The test creates commits by different authors, paths and times, then proves that only the commit satisfying all predicates is returned. It also verifies first-parent changed-path semantics and literal handling of SQL wildcard characters.
 
-The executable [`CompoundCommitHistoryQueryH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java) proves that unchanged files are not reported and that author, path and time predicates are combined with logical `AND`.
+## Full-text query
+
+```java
+List<GitCommitIndex> hits =
+    search.searchCommitText(
+        "payment-platform",
+        "\"dual control\" OR fraud OR cve",
+        50);
+```
+
+The query uses terms and a phrase compatible with the default full-text analyzer. Identifiers containing punctuation, such as `CVE-2026-1234`, are normally tokenized into analyzed terms; callers needing exact identifier matching should add a dedicated keyword field/analyzer rather than relying on a hyphenated wildcard expression.
+
+Full-text search covers:
+
+- short and full commit messages;
+- actual first-parent changed paths;
+- indexed content of added or modified changed files.
+
+Deleted files remain represented by path. Large or non-blob content is intentionally not loaded into the text projection.
+
+The full-text index is not a wrapper around `git log` or `git grep`. It is a maintained Lucene inverted index over historical metadata and selected changed content, optimized for repeated search queries.
+
+The executable
+[`GitHistorySearchH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/GitHistorySearchH2Test.java)
+indexes one commit, closes the JGit repository and then successfully searches the indexed commit message, path and changed-file content through Hibernate Search. Closing the repository before querying ensures the documented request path uses the projection rather than repository traversal.
 
 ## What it adds
 
-- index repository, object ID, messages, author, commit time, actual changed paths and selected changed-file text;
-- combine author email, path fragment and inclusive time bounds through `CommitHistoryQuery`;
-- query generic history through Hibernate ORM and Hibernate Search/Lucene;
+- materialize repository, object ID, messages, author, commit time and actual changed paths;
+- extract selected changed-file text during indexing rather than during every query;
+- combine author email, literal path fragment and inclusive time bounds through `CommitHistoryQuery`;
+- run full-text queries through Hibernate Search/Lucene;
 - retain `findByAuthorEmail`, `findByPath`, `findBetween` and full-text convenience methods;
-- share the Core persistence context while keeping Search optional;
-- delete and rebuild projections because Git objects remain authoritative;
+- share the Core database configuration while keeping Search optional;
+- delete and rebuild projections because Git objects and refs remain authoritative;
 - provision the projection table through its own versioned Flyway history.
 
-Choose this module when users or services need repeated history queries. Core alone is sufficient when repository storage is needed without generic search.
+Choose this module when history is an application query workload, not only something inspected occasionally with repository traversal.
 
 ## Dependency
 
@@ -69,29 +117,23 @@ try (HibernateSessionFactoryProvider provider =
 }
 ```
 
-## Full-text query
+## Update and consistency model
 
-```java
-List<GitCommitIndex> hits =
-    search.searchCommitText("payment-platform", "dualcontrol OR fraud", 50);
-```
+The index can be maintained synchronously after ref publication, asynchronously, or from an application outbox.
 
-Full-text search covers commit messages, changed paths and the indexed content of added or modified changed files.
-
-## Transaction model
-
-`CommitIndexer` upserts each `GitCommitIndex` row in an explicit Hibernate transaction and rolls that transaction back on failure. This protects the projection update itself.
-
-Search indexing is deliberately **not** the same transaction as Core pack publication or a JGit ref update. A commit can be valid and reachable even when projection indexing fails. Retry or rebuild the projection from authoritative Git history rather than treating `git_commit_index` as the source of truth.
+- Git/Core remains authoritative.
+- The Search projection may temporarily lag behind Git when indexing is asynchronous.
+- `CommitIndexer` upserts each `GitCommitIndex` row in an explicit Hibernate transaction.
+- Search indexing is not the same transaction as Core pack publication or a JGit ref update.
+- A failed index update is retried or rebuilt; it does not invalidate a successfully published commit.
+- Reindexing is the explicit operation that pays the derivation cost again after loss, analyzer changes or projection-semantics changes.
 
 ## Database ownership
 
-Search owns `git_commit_index` and `jgit_storage_hibernate_search_schema_history`. Domain-specific projections stay in the consuming application even when they share one `SessionFactory`.
-
-## Operational model
-
-The projection is derived data. Back up Git/Core data as authoritative state; plan a repeatable reindex operation after loss, corruption, analyzer changes or adoption of corrected changed-path semantics. See the [consumer and migration operations guide](../docs/consuming.md) for provisioning and upgrade procedures and the [change-audit use case](../docs/use-cases/change-audit-and-java-usage.md) for the complete comparison with plain JGit.
+Search owns `git_commit_index` and `jgit_storage_hibernate_search_schema_history`. Domain-specific projections remain in the consuming application even when they share one `SessionFactory`.
 
 ## Verification
 
-H2 tests run on every build. With Docker available, Testcontainers starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart.
+H2 integration tests exercise both documented query use cases on every build. With Docker available, Testcontainers additionally starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart.
+
+See the [change-audit and Java-usage use case](../docs/use-cases/change-audit-and-java-usage.md) for the complete architectural comparison.
