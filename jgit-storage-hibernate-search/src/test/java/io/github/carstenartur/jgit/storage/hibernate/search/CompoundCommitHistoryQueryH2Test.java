@@ -42,14 +42,14 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.junit.jupiter.api.Test;
 
-/** Executable audit use case for compound author, changed-path and time queries. */
+/** Executable audit use case for compound full-text, author, path and time queries. */
 class CompoundCommitHistoryQueryH2Test {
 
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
   private static final String REPOSITORY_NAME = "payment-platform";
 
   @Test
-  void findsOnlyChangesByOneAuthorInOneSubsystemDuringOneTimeRange() throws Exception {
+  void findsOnlyMatchingTextByOneAuthorInOneSubsystemAtInclusiveTimeBounds() throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     String databaseName = "compound-history-" + TEST_COUNTER.incrementAndGet();
 
@@ -99,6 +99,7 @@ class CompoundCommitHistoryQueryH2Test {
               snapshot);
       indexer.indexCommit(repository, profile);
 
+      Instant tunedAt = Instant.parse("2026-03-10T10:00:00Z");
       snapshot.put("services/payments/fraud/rules.yaml", "threshold: 500\n");
       ObjectId tunedRules =
           commitSnapshot(
@@ -107,7 +108,7 @@ class CompoundCommitHistoryQueryH2Test {
               "Tighten fraud threshold",
               "Alice",
               "alice@example.com",
-              Instant.parse("2026-03-10T10:00:00Z"),
+              tunedAt,
               snapshot);
       indexer.indexCommit(repository, tunedRules);
 
@@ -121,22 +122,33 @@ class CompoundCommitHistoryQueryH2Test {
 
       GitHistorySearchService history =
           new GitHistorySearchService(provider.getSessionFactory());
-      List<GitCommitIndex> aliceFraudChangesInQuarter =
+      List<GitCommitIndex> exactCompoundMatch =
           history.findChanges(
               CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+                  .matchingText("threshold")
                   .authoredBy("alice@example.com")
-                  .touchingPath("services/payments/fraud/")
-                  .between(
-                      Instant.parse("2026-02-01T00:00:00Z"),
-                      Instant.parse("2026-03-31T23:59:59Z"))
+                  .touchingPath("services payments fraud")
+                  .between(tunedAt, tunedAt)
                   .limit(20)
                   .build());
 
       assertEquals(
           List.of(tunedRules.name()),
-          aliceFraudChangesInQuarter.stream().map(GitCommitIndex::getObjectId).toList());
+          exactCompoundMatch.stream().map(GitCommitIndex::getObjectId).toList());
       assertEquals(3, history.findByAuthorEmail(REPOSITORY_NAME, "alice@example.com", 20).size());
       assertEquals(3, history.findByPath(REPOSITORY_NAME, "payments/fraud", 20).size());
+      assertEquals(
+          List.of(tunedRules.name()),
+          history
+              .findChanges(
+                  CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+                      .matchingText("threshold")
+                      .from(tunedAt)
+                      .limit(20)
+                      .build())
+              .stream()
+              .map(GitCommitIndex::getObjectId)
+              .toList());
 
       assertEquals(
           0,

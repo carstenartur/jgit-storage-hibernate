@@ -16,13 +16,15 @@ import java.util.Objects;
  *
  * <p>The optional predicates are combined with logical {@code AND}. Path matching applies to paths
  * changed by the commit relative to its first parent; every path in a root commit is considered
- * changed.
+ * changed. When {@link #text()} is present, path text is interpreted by the full-text analyzer;
+ * otherwise path matching retains its literal, case-insensitive fragment semantics.
  */
 public final class CommitHistoryQuery {
 
   private static final int DEFAULT_LIMIT = 100;
 
   private final String repositoryName;
+  private final String text;
   private final String authorEmail;
   private final String pathFragment;
   private final Instant from;
@@ -31,6 +33,7 @@ public final class CommitHistoryQuery {
 
   private CommitHistoryQuery(Builder builder) {
     repositoryName = requireText(builder.repositoryName, "repositoryName");
+    text = normalize(builder.text);
     authorEmail = normalize(builder.authorEmail);
     pathFragment = normalize(builder.pathFragment);
     from = builder.from;
@@ -59,6 +62,10 @@ public final class CommitHistoryQuery {
     return repositoryName;
   }
 
+  public String text() {
+    return text;
+  }
+
   public String authorEmail() {
     return authorEmail;
   }
@@ -83,6 +90,7 @@ public final class CommitHistoryQuery {
   public static final class Builder {
 
     private final String repositoryName;
+    private String text;
     private String authorEmail;
     private String pathFragment;
     private Instant from;
@@ -91,6 +99,17 @@ public final class CommitHistoryQuery {
 
     private Builder(String repositoryName) {
       this.repositoryName = requireText(repositoryName, "repositoryName");
+    }
+
+    /**
+     * Restrict results using a simple-query-string expression over messages, paths and changed text.
+     *
+     * @param text full-text expression, or {@code null} to omit the predicate
+     * @return this builder
+     */
+    public Builder matchingText(String text) {
+      this.text = text;
+      return this;
     }
 
     /**
