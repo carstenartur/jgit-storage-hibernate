@@ -70,7 +70,7 @@
     <hibernate.version>7.4.5.Final</hibernate.version>
     <hibernate-search.version>8.4.0.Final</hibernate-search.version>
     <jakarta.xml.bind.version>4.0.5</jakarta.xml.bind.version>
-    <junit.version>6.1.1</junit.version>
+    <junit.version>6.1.2</junit.version>
     <h2.version>2.4.240</h2.version>
     <jmh.version>1.37</jmh.version>
     <jdt.core.version>3.46.0</jdt.core.version>
