@@ -96,8 +96,7 @@ public class GitHistorySearchService {
                           .defaultOperator(BooleanOperator.AND));
                 }
                 if (query.from() != null) {
-                  predicate.filter(
-                      f.range().field("commitTime").atLeast(query.from()));
+                  predicate.filter(f.range().field("commitTime").atLeast(query.from()));
                 }
                 if (query.to() != null) {
                   predicate.filter(f.range().field("commitTime").atMost(query.to()));
@@ -220,10 +219,5 @@ public class GitHistorySearchService {
 
   private static String escapeLikePattern(String value) {
     return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
-  }
-
-  private List<GitCommitIndex> latestCommits(String repositoryName, int limit) {
-    return findChanges(
-        CommitHistoryQuery.forRepository(repositoryName).limit(limit).build());
   }
 }
