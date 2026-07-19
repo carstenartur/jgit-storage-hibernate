@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Objects;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.search.engine.search.common.BooleanOperator;
 import org.hibernate.search.mapper.orm.Search;
 import org.hibernate.search.mapper.orm.session.SearchSession;
 
@@ -41,37 +42,73 @@ public class GitHistorySearchService {
    * @return matching commit projections
    */
   public List<GitCommitIndex> searchCommitText(String repositoryName, String query, int limit) {
-    if (query == null || query.isBlank()) {
-      return latestCommits(repositoryName, limit);
-    }
-    try (Session session = sessionFactory.openSession()) {
-      SearchSession searchSession = Search.session(session);
-      return searchSession
-          .search(GitCommitIndex.class)
-          .where(
-              f ->
-                  f.bool()
-                      .must(f.match().field("repositoryName").matching(repositoryName))
-                      .must(
-                          f.simpleQueryString()
-                              .fields("shortMessage", "fullMessage", "changedPaths", "changedText")
-                              .matching(query)))
-          .fetchHits(limit);
-    }
+    return findChanges(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .matchingText(query)
+            .limit(limit)
+            .build());
   }
 
   /**
-   * Find commits matching all supplied author, changed-path and time predicates.
+   * Find commits matching all supplied full-text, author, changed-path and time predicates.
    *
    * <p>This is the reusable projection equivalent of manually walking commits with JGit, diffing
    * every commit against its first parent and applying the predicates in application code.
    *
    * @param query compound query
-   * @return matching commits ordered by author time descending
+   * @return matching commits, relevance-ranked when full text is present and newest-first otherwise
    */
   public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
     Objects.requireNonNull(query, "query");
+    return query.text() == null ? findStructuredChanges(query) : findFullTextChanges(query);
+  }
 
+  private List<GitCommitIndex> findFullTextChanges(CommitHistoryQuery query) {
+    try (Session session = sessionFactory.openSession()) {
+      SearchSession searchSession = Search.session(session);
+      return searchSession
+          .search(GitCommitIndex.class)
+          .where(
+              f -> {
+                var predicate =
+                    f.bool()
+                        .filter(
+                            f.match()
+                                .field("repositoryName")
+                                .matching(query.repositoryName()))
+                        .must(
+                            f.simpleQueryString()
+                                .fields(
+                                    "shortMessage",
+                                    "fullMessage",
+                                    "changedPaths",
+                                    "changedText")
+                                .matching(query.text()));
+                if (query.authorEmail() != null) {
+                  predicate.filter(
+                      f.match().field("authorEmail").matching(query.authorEmail()));
+                }
+                if (query.pathFragment() != null) {
+                  predicate.filter(
+                      f.simpleQueryString()
+                          .field("changedPaths")
+                          .matching(query.pathFragment())
+                          .defaultOperator(BooleanOperator.AND));
+                }
+                if (query.from() != null) {
+                  predicate.filter(
+                      f.range().field("commitTime").atLeast(query.from()));
+                }
+                if (query.to() != null) {
+                  predicate.filter(f.range().field("commitTime").atMost(query.to()));
+                }
+                return predicate;
+              })
+          .fetchHits(query.limit());
+    }
+  }
+
+  private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
     StringBuilder hql =
         new StringBuilder("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
     if (query.authorEmail() != null) {
