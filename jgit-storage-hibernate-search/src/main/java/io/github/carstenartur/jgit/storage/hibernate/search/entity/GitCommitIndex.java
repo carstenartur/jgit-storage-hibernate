@@ -18,6 +18,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.search.engine.backend.types.Sortable;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.GenericField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
@@ -73,7 +74,7 @@ public class GitCommitIndex {
   @Column(name = "author_email")
   private String authorEmail;
 
-  @GenericField
+  @GenericField(sortable = Sortable.YES)
   @Column(name = "commit_time")
   private Instant commitTime;
 
