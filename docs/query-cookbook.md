@@ -2,15 +2,16 @@
 
 This cookbook shows how to answer repeatable history questions with the generic Search projection and binding-aware Java analysis.
 
-## Recipe 1: changes by author, subsystem and time range
+## Recipe 1: text, author, subsystem and time range in one query
 
-The separate questions can be answered with ordinary Git/JGit primitives. The useful application query combines them without walking and diffing the repository again for every request.
+The separate questions can be answered with ordinary Git/JGit primitives. The useful application query combines them without walking and diffing the repository again for every request or intersecting independently truncated result lists.
 
 ```java
 CommitHistoryQuery query =
     CommitHistoryQuery.forRepository("payment-platform")
+        .matchingText("threshold")
         .authoredBy("alice@example.com")
-        .touchingPath("services/payments/fraud/")
+        .touchingPath("services payments fraud")
         .between(
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-03-31T23:59:59Z"))
@@ -21,9 +22,11 @@ List<GitCommitIndex> changes =
     new GitHistorySearchService(sessionFactory).findChanges(query);
 ```
 
-Expected output: commits authored by Alice that actually changed a path below the fraud subsystem during the inclusive interval.
+Expected output: relevance-ranked commits matching the full-text expression that were authored by Alice, actually changed an analyzed fraud-subsystem path and fall inside the inclusive interval.
 
-`changedPaths` uses first-parent diff semantics. A root commit treats every path as changed; a merge commit is compared with its first parent.
+All supplied predicates execute in one bounded Hibernate Search query. Omitting `matchingText(...)` retains the relational newest-first query and literal, case-insensitive path-fragment behavior.
+
+`changedPaths` uses first-parent diff semantics. A root commit treats every path as changed; a merge commit is compared with its first parent. Branch reachability is not duplicated into the generic projection and remains a JGit or application-level access/lifecycle decision.
 
 ## Recipe 2: full-text search over changed material
 
@@ -32,7 +35,7 @@ List<GitCommitIndex> changes =
     search.searchCommitText("payment-platform", "dualcontrol OR threshold", 50);
 ```
 
-Expected output: commits whose messages, changed paths or indexed added/modified changed-file content match the query.
+Expected output: commits whose messages, changed paths or indexed added/modified changed-file content match the query. This convenience method delegates to the same compound query implementation used by Recipe 1.
 
 ## Recipe 3: find all renamed methods between two commits
 
