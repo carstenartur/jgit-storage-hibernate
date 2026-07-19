@@ -25,17 +25,18 @@ This is a deliberate read-optimized architecture. Indexing adds work when a comm
 
 Git/JGit does not normally provide a general full-text query engine over commit messages, actual changed paths and changed-file contents. Hibernate Search/Lucene adds analyzers, an inverted index and composable full-text queries over those fields.
 
-## Compound structured query
+## Compound history query
 
-> Which changes did Alice make in the fraud subsystem during Q1?
+> Which changes mentioning a threshold did Alice make in the fraud subsystem at the end of Q1?
 
 ```java
 CommitHistoryQuery query =
     CommitHistoryQuery.forRepository("payment-platform")
+        .matchingText("threshold")
         .authoredBy("alice@example.com")
-        .touchingPath("services/payments/fraud/")
+        .touchingPath("services payments fraud")
         .between(
-            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-03-01T00:00:00Z"),
             Instant.parse("2026-03-31T23:59:59Z"))
         .limit(100)
         .build();
@@ -44,11 +45,15 @@ List<GitCommitIndex> hits =
     new GitHistorySearchService(sessionFactory).findChanges(query);
 ```
 
-`CommitIndexer` stores paths changed relative to the first parent. Root commits treat every path as changed; merge commits use first-parent semantics. The relational projection makes author, changed-path and time predicates jointly queryable without traversing and diffing history at request time.
+All supplied predicates are applied in one bounded server-side query. Full-text results retain relevance ordering; repository, author, path and time restrictions are filters. When no full-text expression is present, the existing relational query path remains newest-first and keeps literal, case-insensitive path-fragment matching.
+
+`CommitIndexer` stores paths changed relative to the first parent. Root commits treat every path as changed; merge commits use first-parent semantics. The projection makes text, author, changed-path and time predicates jointly queryable without traversing and diffing history at request time.
 
 This documented use case is executable in
 [`CompoundCommitHistoryQueryH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java).
-The test creates commits by different authors, paths and times, then proves that only the commit satisfying all predicates is returned. It also verifies first-parent changed-path semantics and literal handling of SQL wildcard characters.
+The test creates commits by different authors, paths and times, then proves that only the commit satisfying all predicates is returned. It also verifies inclusive time bounds, first-parent changed-path semantics and literal handling of SQL wildcard characters in structured path-only queries.
+
+Branch or ref reachability is intentionally not copied into this generic projection. A consumer that restricts results to one branch must enforce that repository/ref boundary through JGit or an application-owned projection.
 
 ## Full-text query
 
@@ -80,7 +85,7 @@ indexes one commit, closes the JGit repository and then successfully searches th
 
 - materialize repository, object ID, messages, author, commit time and actual changed paths;
 - extract selected changed-file text during indexing rather than during every query;
-- combine author email, literal path fragment and inclusive time bounds through `CommitHistoryQuery`;
+- combine full text, author email, changed path and inclusive time bounds through `CommitHistoryQuery`;
 - run full-text queries through Hibernate Search/Lucene;
 - retain `findByAuthorEmail`, `findByPath`, `findBetween` and full-text convenience methods;
 - share the Core database configuration while keeping Search optional;
