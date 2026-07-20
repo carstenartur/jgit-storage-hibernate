@@ -24,7 +24,10 @@ import org.hibernate.search.engine.backend.analysis.AnalyzerNames;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.GenericField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.IndexingDependency;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.KeywordField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.ObjectPath;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.PropertyValue;
 
 /** Generic searchable projection of a Git commit. */
 @Entity
@@ -176,6 +179,8 @@ public class GitCommitIndex {
   @Transient
   @FullTextField(name = CHANGED_PATH_TERMS_FIELD, analyzer = AnalyzerNames.SIMPLE)
   @KeywordField(name = CHANGED_PATH_EXACT_FIELD)
+  @IndexingDependency(
+      derivedFrom = @ObjectPath(@PropertyValue(propertyName = "changedPaths")))
   public List<String> getChangedPathValues() {
     if (changedPaths == null || changedPaths.isBlank()) {
       return List.of();
