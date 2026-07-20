@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.entity;
 
+import io.github.carstenartur.jgit.storage.hibernate.search.analysis.GitTextAnalysis;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -65,12 +66,16 @@ public class GitCommitIndex {
   @Column(name = "object_id", nullable = false, length = 40)
   private String objectId;
 
-  @FullTextField
+  @FullTextField(
+      analyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER,
+      searchAnalyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER)
   @Nationalized
   @Column(name = "short_message", length = 2048)
   private String shortMessage;
 
-  @FullTextField
+  @FullTextField(
+      analyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER,
+      searchAnalyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER)
   @Nationalized
   @Column(name = "full_message", length = 8192)
   private String fullMessage;
@@ -89,12 +94,12 @@ public class GitCommitIndex {
   @Column(name = "commit_time")
   private Instant commitTime;
 
-  @FullTextField
+  @FullTextField(analyzer = GitTextAnalysis.STRUCTURED_TEXT_ANALYZER)
   @Nationalized
   @Column(name = "changed_paths", length = 16384)
   private String changedPaths;
 
-  @FullTextField
+  @FullTextField(analyzer = GitTextAnalysis.STRUCTURED_TEXT_ANALYZER)
   @Nationalized
   @Column(name = "changed_text", length = 262144)
   private String changedText;
