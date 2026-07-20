@@ -31,7 +31,7 @@ if [[ "$CURRENT_VERSION" != *-SNAPSHOT ]]; then
   exit 1
 fi
 if [[ "${CURRENT_VERSION%-SNAPSHOT}" != "$RELEASE_VERSION" ]]; then
-  echo "::error::Release $RELEASE_VERSION does not match current version $CURRENT_VERSION"
+  echo "::error title=Release version mismatch::Requested release $RELEASE_VERSION cannot be built from current Maven version $CURRENT_VERSION. Dispatch release ${CURRENT_VERSION%-SNAPSHOT}, or first move main to $RELEASE_VERSION-SNAPSHOT."
   exit 1
 fi
 
@@ -40,8 +40,8 @@ if [[ ! -r "$DOCUMENTED_RELEASE_VERSION_FILE" ]]; then
   exit 1
 fi
 DOCUMENTED_RELEASE_VERSION=$(tr -d '[:space:]' < "$DOCUMENTED_RELEASE_VERSION_FILE")
-if [[ "$DOCUMENTED_RELEASE_VERSION" != "$RELEASE_VERSION" ]]; then
-  echo "::error::Documented release $DOCUMENTED_RELEASE_VERSION does not match requested release $RELEASE_VERSION"
+if ! [[ "$DOCUMENTED_RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "::error title=Invalid documented release version::$DOCUMENTED_RELEASE_VERSION_FILE must contain the last published X.Y.Z version, but contained '$DOCUMENTED_RELEASE_VERSION'."
   exit 1
 fi
 
@@ -61,11 +61,19 @@ git config user.email 'github-actions[bot]@users.noreply.github.com'
 
 echo "Release version: $RELEASE_VERSION"
 echo "Current version: $CURRENT_VERSION"
-echo "Documented release version: $DOCUMENTED_RELEASE_VERSION"
+echo "Currently documented published release: $DOCUMENTED_RELEASE_VERSION"
 echo "Next development version: $NEXT_VERSION"
 echo "Dry run: $DRY_RUN"
 echo "Skip tests: $SKIP_TESTS"
 
+if [[ "$DOCUMENTED_RELEASE_VERSION" == "$RELEASE_VERSION" ]]; then
+  echo "Public documentation already targets release $RELEASE_VERSION."
+else
+  echo "::notice title=Automatic release preparation::Public documentation currently targets published release $DOCUMENTED_RELEASE_VERSION and will be advanced automatically to $RELEASE_VERSION in the release commit."
+fi
+
+# Verify that the development checkout is internally consistent before any release mutation.
+# At this point public documentation may intentionally still describe the previous release.
 python3 .github/scripts/verify-release-consistency.py
 
 git fetch origin --tags --force
@@ -74,9 +82,13 @@ if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Prepare all release state in one operation: Maven versions, software metadata, the
+# documented release line, and active public dependency examples.
 mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release
 python3 .github/scripts/verify-release-consistency.py
+
+git diff --check
 
 if [[ "$SKIP_TESTS" == "true" ]]; then
   mvn -B -DskipTests verify
@@ -100,7 +112,11 @@ fi
 
 mvn -B -DskipTests deploy
 
-git add pom.xml '*/pom.xml' CITATION.cff CITATION.md .zenodo.json codemeta.json
+git add \
+  pom.xml \
+  '*/pom.xml' \
+  CITATION.cff CITATION.md .zenodo.json codemeta.json \
+  README.md docs jgit-storage-hibernate-*/README.md
 git commit -m "Release version $RELEASE_VERSION"
 git tag -a "$TAG_NAME" -m "Release version $RELEASE_VERSION"
 
@@ -121,6 +137,8 @@ gh release create "$TAG_NAME" target/release-artifacts/* \
   --fail-on-no-commits \
   --generate-notes
 
+# Advance development metadata only. Public dependency examples continue to point to the
+# immutable release that was just published until the next release run advances them.
 mvn -B versions:set -DnewVersion="$NEXT_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"
 python3 .github/scripts/verify-release-consistency.py
