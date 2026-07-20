@@ -78,6 +78,8 @@ A consumer can scope a custom configurer to the generic commit index without cha
 public final class EnglishCommitMessageConfigurer
     implements LuceneAnalysisConfigurer {
 
+  public EnglishCommitMessageConfigurer() {}
+
   @Override
   public void configure(LuceneAnalysisConfigurationContext context) {
     context
@@ -93,11 +95,11 @@ public final class EnglishCommitMessageConfigurer
 Properties properties = new Properties();
 GitTextAnalysis.configure(
     properties,
-    new EnglishCommitMessageConfigurer(),
+    EnglishCommitMessageConfigurer.class,
     "english-snowball-v1");
 ```
 
-`GitTextAnalysis.configure(...)` writes the index-specific Hibernate Search configurer property and a separate operator-visible profile identity. `GitTextAnalysis.profileId(properties)` reports that identity, or `neutral-standard-v1` when the built-in neutral profile is active. The configurer argument may also be a Hibernate Search `BeanReference` or a `class:`/`bean:` reference string.
+`GitTextAnalysis.configure(...)` writes a resolvable `class:` reference to the index-specific Hibernate Search configurer property and stores a separate operator-visible profile identity. `GitTextAnalysis.profileId(properties)` reports that identity, or `neutral-standard-v1` when the built-in neutral profile is active. Consumers with a Hibernate Search bean resolver can instead pass a `bean:beanName` reference string.
 
 Only commit-message fields use the overridable analyzer slot. Changed source material, paths, repository names, object IDs and author emails remain isolated from language stemming. This prevents an English or German profile from rewriting source identifiers and allows a shared Hibernate backend to contain unrelated application indexes safely.
 
