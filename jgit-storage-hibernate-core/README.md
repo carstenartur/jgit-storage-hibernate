@@ -21,7 +21,7 @@ A concrete example is the [auditable approval-workflow service](../docs/use-case
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.1.6</version>
+  <version>0.1.7</version>
 </dependency>
 ```
 
