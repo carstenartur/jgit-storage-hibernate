@@ -15,9 +15,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.List;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.search.engine.backend.analysis.AnalyzerNames;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.GenericField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
@@ -39,6 +42,12 @@ import org.hibernate.search.mapper.pojo.mapping.definition.annotation.KeywordFie
           columnNames = {"repository_name", "object_id"})
     })
 public class GitCommitIndex {
+
+  /** Full-text field containing lowercase path components split at punctuation. */
+  public static final String CHANGED_PATH_TERMS_FIELD = "changedPathTerms";
+
+  /** Keyword field containing one exact value per changed path. */
+  public static final String CHANGED_PATH_EXACT_FIELD = "changedPathExact";
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -157,6 +166,21 @@ public class GitCommitIndex {
 
   public void setChangedPaths(String changedPaths) {
     this.changedPaths = changedPaths;
+  }
+
+  /**
+   * Return individual changed paths for field-specific full-text and exact indexing.
+   *
+   * @return immutable path values, excluding blank lines
+   */
+  @Transient
+  @FullTextField(name = CHANGED_PATH_TERMS_FIELD, analyzer = AnalyzerNames.SIMPLE)
+  @KeywordField(name = CHANGED_PATH_EXACT_FIELD)
+  public List<String> getChangedPathValues() {
+    if (changedPaths == null || changedPaths.isBlank()) {
+      return List.of();
+    }
+    return changedPaths.lines().filter(path -> !path.isBlank()).toList();
   }
 
   public String getChangedText() {
