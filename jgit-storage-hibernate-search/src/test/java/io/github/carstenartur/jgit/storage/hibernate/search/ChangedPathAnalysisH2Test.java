@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import org.hibernate.Session;
+import org.hibernate.search.mapper.orm.Search;
 import org.junit.jupiter.api.Test;
 
 /** Verifies field-specific analysis for changed Git paths. */
@@ -28,7 +29,7 @@ class ChangedPathAnalysisH2Test {
   private static final String OBJECT_ID = "0123456789012345678901234567890123456789";
 
   @Test
-  void matchesPathComponentsAcrossPunctuationAndCase() {
+  void matchesPathComponentsAndRetainsExactPathIdentity() {
     try (HibernateSessionFactoryProvider provider =
         new HibernateSessionFactoryProvider(h2Properties(), SearchEntities.annotatedClasses())) {
       persistProjection(provider, projection());
@@ -38,6 +39,10 @@ class ChangedPathAnalysisH2Test {
       assertEquals(List.of(OBJECT_ID), objectIds(search(history, "workflow")));
       assertEquals(List.of(OBJECT_ID), objectIds(search(history, "SRC main")));
       assertEquals(List.of(), objectIds(search(history, "missing")));
+      assertEquals(
+          List.of(OBJECT_ID),
+          objectIds(exactPathSearch(provider, "models/v2/Signal42.json")));
+      assertEquals(List.of(), objectIds(exactPathSearch(provider, "models/v2/signal42.json")));
     }
   }
 
@@ -48,6 +53,23 @@ class ChangedPathAnalysisH2Test {
             .touchingPath(pathTerms)
             .limit(10)
             .build());
+  }
+
+  private static List<GitCommitIndex> exactPathSearch(
+      HibernateSessionFactoryProvider provider, String exactPath) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      return Search.session(session)
+          .search(GitCommitIndex.class)
+          .where(
+              f ->
+                  f.bool()
+                      .filter(f.match().field("repositoryName").matching(REPOSITORY_NAME))
+                      .must(
+                          f.match()
+                              .field(GitCommitIndex.CHANGED_PATH_EXACT_FIELD)
+                              .matching(exactPath)))
+          .fetchHits(10);
+    }
   }
 
   private static List<String> objectIds(List<GitCommitIndex> hits) {
