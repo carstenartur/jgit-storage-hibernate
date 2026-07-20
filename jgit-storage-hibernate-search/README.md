@@ -57,22 +57,55 @@ Branch or ref reachability is intentionally not copied into this generic project
 
 ## Analysis model
 
-The generic projection deliberately uses different analysis for different kinds of text:
+The generic projection deliberately assigns analyzers by field semantics:
 
-- commit messages and changed-file content retain Hibernate Search's language-neutral default analyzer;
-- the original `changedPaths` field remains available for backward-compatible general full-text queries;
-- compound path filters target a derived `changedPathTerms` field using the built-in `simple` analyzer;
-- each path is also indexed separately as the exact keyword field `changedPathExact` for future exact-path predicates.
+- short and full commit messages use the configurable natural-language slot `GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER`;
+- changed-file content and the backward-compatible aggregate `changedPaths` field use the fixed language-neutral `standard` analyzer;
+- compound path filters target the derived `changedPathTerms` field using the built-in `simple` analyzer;
+- each path is also indexed separately as the exact keyword field `changedPathExact`.
+
+The default natural-language slot is Hibernate Search's built-in `default` analyzer, whose Lucene implementation is `StandardAnalyzer`. This preserves the behavior of release 0.1.6: tokenization follows Unicode word boundaries and tokens are lowercased, but words are not stemmed.
 
 The path analyzer splits at non-letter punctuation and lowercases terms. Thus `workflow` matches `workflow.dsl`, and `SERVICES payments` matches path components in `services/payments/...`. Numeric-only path components are not independent terms with this analyzer; use the exact path field or an application-specific projection when numeric identity is significant.
 
-Language stemming is intentionally not hard-coded. Stemming algorithms are language-specific—Stempel, for example, is a Polish stemmer—and applying one generic stemmer to source code, paths and multilingual commit data would create false matches. A consuming application can add language-specific fields and analyzers for its own natural-language content without changing the generic Git projection.
+### Selecting a language profile
 
-Analyzer changes alter derived Lucene data, not the relational schema or Git authority. Existing indexes must be recreated or rebuilt after upgrading to a version that changes analyzer mappings.
+Stemming is index configuration, not a per-request option. Index-time and query-time analysis must remain compatible, and changing the profile requires recreating or rebuilding the derived Lucene index.
+
+A consumer can scope a custom configurer to the generic commit index without changing the entity mapping or affecting other application indexes:
+
+```java
+public final class EnglishCommitMessageConfigurer
+    implements LuceneAnalysisConfigurer {
+
+  @Override
+  public void configure(LuceneAnalysisConfigurationContext context) {
+    context
+        .analyzer(AnalyzerNames.DEFAULT)
+        .custom()
+        .tokenizer("standard")
+        .tokenFilter("lowercase")
+        .tokenFilter("snowballPorter")
+        .param("language", "English");
+  }
+}
+
+Properties properties = new Properties();
+GitTextAnalysis.configure(
+    properties,
+    new EnglishCommitMessageConfigurer(),
+    "english-snowball-v1");
+```
+
+`GitTextAnalysis.configure(...)` writes the index-specific Hibernate Search configurer property and a separate operator-visible profile identity. `GitTextAnalysis.profileId(properties)` reports that identity, or `neutral-standard-v1` when the built-in neutral profile is active. The configurer argument may also be a Hibernate Search `BeanReference` or a `class:`/`bean:` reference string.
+
+Only commit-message fields use the overridable analyzer slot. Changed source material, paths, repository names, object IDs and author emails remain isolated from language stemming. This prevents an English or German profile from rewriting source identifiers and allows a shared Hibernate backend to contain unrelated application indexes safely.
+
+Stempel is specifically a Polish stemmer. A Polish application may provide an explicit profile using Lucene's optional Stempel analysis module, but the Search artifact does not make Stempel a mandatory dependency or a generic default. Mixed-language repositories should use separate application-owned language fields or a semantic projection rather than one global stemmer.
 
 The executable
 [`ChangedPathAnalysisH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/ChangedPathAnalysisH2Test.java)
-verifies component matching across punctuation and case.
+verifies component matching across punctuation and case. [`ConfigurableGitTextAnalysisH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/ConfigurableGitTextAnalysisH2Test.java) verifies neutral backward behavior, English message stemming, field isolation and profile diagnostics.
 
 ## Full-text query
 
@@ -84,7 +117,7 @@ List<GitCommitIndex> hits =
         50);
 ```
 
-The query uses terms and a phrase compatible with the default full-text analyzer. Identifiers containing punctuation, such as `CVE-2026-1234`, are normally tokenized into analyzed terms; callers needing exact identifier matching should add a dedicated keyword field/analyzer rather than relying on a hyphenated wildcard expression.
+The query uses terms and a phrase compatible with the configured field analyzers. Identifiers containing punctuation, such as `CVE-2026-1234`, are normally tokenized into analyzed terms; callers needing exact identifier matching should add a dedicated keyword field/analyzer rather than relying on a hyphenated wildcard expression.
 
 Full-text search covers:
 
@@ -105,7 +138,7 @@ indexes one commit, closes the JGit repository and then successfully searches th
 - materialize repository, object ID, messages, author, commit time and actual changed paths;
 - extract selected changed-file text during indexing rather than during every query;
 - combine full text, author email, changed path and inclusive time bounds through `CommitHistoryQuery`;
-- apply field-specific analysis to path terms without imposing language stemming on generic content;
+- apply field-specific analysis to path terms and configurable analysis to natural-language messages;
 - run full-text queries through Hibernate Search/Lucene;
 - retain `findByAuthorEmail`, `findByPath`, `findBetween` and full-text convenience methods;
 - share the Core database configuration while keeping Search optional;
@@ -151,7 +184,7 @@ The index can be maintained synchronously after ref publication, asynchronously,
 - `CommitIndexer` upserts each `GitCommitIndex` row in an explicit Hibernate transaction.
 - Search indexing is not the same transaction as Core pack publication or a JGit ref update.
 - A failed index update is retried or rebuilt; it does not invalidate a successfully published commit.
-- Reindexing is the explicit operation that pays the derivation cost again after loss, analyzer changes or projection-semantics changes.
+- Reindexing is the explicit operation that pays the derivation cost again after loss, analyzer-profile changes or projection-semantics changes.
 
 ## Database ownership
 
@@ -159,6 +192,6 @@ Search owns `git_commit_index` and `jgit_storage_hibernate_search_schema_history
 
 ## Verification
 
-H2 integration tests exercise both documented query use cases on every build. With Docker available, Testcontainers additionally starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart.
+H2 integration tests exercise the documented query and analysis use cases on every build. With Docker available, Testcontainers additionally starts PostgreSQL 17.10 and verifies Core-plus-Search installation, immutable 0.1.4 fixture adoption, projection persistence and Hibernate validation across a `SessionFactory` restart.
 
 See the [change-audit and Java-usage use case](../docs/use-cases/change-audit-and-java-usage.md) for the complete architectural comparison.
