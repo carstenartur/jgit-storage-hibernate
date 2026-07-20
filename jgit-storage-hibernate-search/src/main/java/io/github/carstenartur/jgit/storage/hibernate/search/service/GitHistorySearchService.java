@@ -91,7 +91,7 @@ public class GitHistorySearchService {
                 if (query.pathFragment() != null) {
                   predicate.filter(
                       f.simpleQueryString()
-                          .field("changedPaths")
+                          .field(GitCommitIndex.CHANGED_PATH_TERMS_FIELD)
                           .matching(query.pathFragment())
                           .defaultOperator(BooleanOperator.AND));
                 }
