@@ -31,7 +31,7 @@ if [[ "$CURRENT_VERSION" != *-SNAPSHOT ]]; then
   exit 1
 fi
 if [[ "${CURRENT_VERSION%-SNAPSHOT}" != "$RELEASE_VERSION" ]]; then
-  echo "::error title=Release version mismatch::Requested release $RELEASE_VERSION cannot be built from current Maven version $CURRENT_VERSION. Dispatch release ${CURRENT_VERSION%-SNAPSHOT}, or first move main to $RELEASE_VERSION-SNAPSHOT."
+  echo "::error title=Release version mismatch::Requested release $RELEASE_VERSION cannot be built from current Maven version $CURRENT_VERSION on source branch $SOURCE_BRANCH. Dispatch release ${CURRENT_VERSION%-SNAPSHOT}, or first move the source branch to $RELEASE_VERSION-SNAPSHOT."
   exit 1
 fi
 
