@@ -32,7 +32,9 @@ jobs:
           bash -n .github/scripts/release.sh
           python3 -m py_compile \
             .github/scripts/update-release-metadata.py \
+            .github/scripts/test_update_release_metadata.py \
             .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/verify-release-consistency.py
 
       - name: Build
