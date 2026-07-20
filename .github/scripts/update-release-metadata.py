@@ -130,7 +130,7 @@ def update_public_documentation(version: str) -> list[Path]:
 
     Historical release notes are excluded. Other historical version references, such as the
     0.1.4 migration baseline, are preserved because only project dependency declarations,
-    project coordinates, and the explicit documented-release sentence are rewritten.
+    project coordinates, and explicit documented-release sentences are rewritten.
     """
     if not RELEASE_SEMVER.fullmatch(version):
         raise SystemExit(
@@ -165,12 +165,10 @@ def update_public_documentation(version: str) -> list[Path]:
             lambda match: match.group(1) + version,
             updated,
         )
-        release_line_changes = 0
-        if path == Path("README.md"):
-            updated, release_line_changes = DOCUMENTED_RELEASE_LINE.subn(
-                lambda match: match.group(1) + version + match.group(3),
-                updated,
-            )
+        updated, release_line_changes = DOCUMENTED_RELEASE_LINE.subn(
+            lambda match: match.group(1) + version + match.group(3),
+            updated,
+        )
 
         if updated != text:
             path.write_text(updated, encoding="utf-8")
