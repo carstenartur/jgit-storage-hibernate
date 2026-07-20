@@ -89,9 +89,7 @@ public class GitHistorySearchService {
                                 .matching(query.text()));
                 if (query.hasObjectIdRestriction()) {
                   predicate.filter(
-                      f.terms()
-                          .field("objectId")
-                          .matchingAny(query.objectIds().toArray(String[]::new)));
+                      f.terms().field("objectId").matchingAny(query.objectIds()));
                 }
                 if (query.authorEmail() != null) {
                   predicate.filter(
