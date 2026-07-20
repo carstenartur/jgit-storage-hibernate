@@ -16,18 +16,15 @@ import org.hibernate.search.engine.backend.analysis.AnalyzerNames;
 /** Stable configuration contract for natural-language analysis in the Git commit index. */
 public final class GitTextAnalysis {
 
-  /** Default Hibernate Search index name of the generic commit projection. */
-  public static final String INDEX_NAME = "GitCommitIndex";
-
-  /** Configurable analyzer slot used only for natural-language commit-message fields. */
+  /** Configurable analyzer slot used only by natural-language fields in this module. */
   public static final String NATURAL_LANGUAGE_ANALYZER = AnalyzerNames.DEFAULT;
 
   /** Fixed language-neutral analyzer used for changed paths and changed-file text. */
   public static final String STRUCTURED_TEXT_ANALYZER = AnalyzerNames.STANDARD;
 
-  /** Hibernate Search property for an analysis configurer scoped to the commit index. */
-  public static final String INDEX_CONFIGURER_PROPERTY =
-      "hibernate.search.backend.indexes." + INDEX_NAME + ".analysis.configurer";
+  /** Hibernate Search property for the default Lucene backend analysis configurer. */
+  public static final String BACKEND_CONFIGURER_PROPERTY =
+      "hibernate.search.backend.analysis.configurer";
 
   /** Application-visible property identifying the configured analysis profile. */
   public static final String PROFILE_ID_PROPERTY =
@@ -42,8 +39,12 @@ public final class GitTextAnalysis {
    * Configure a custom natural-language profile through an instantiable configurer class.
    *
    * <p>The class must expose an accessible no-argument constructor and override the analyzer named
-   * {@link #NATURAL_LANGUAGE_ANALYZER}. Path, identifier and changed-file fields remain mapped to
-   * their explicit language-neutral analyzers.
+   * {@link #NATURAL_LANGUAGE_ANALYZER}. Path, identifier and changed-file fields in this module
+   * remain mapped to their explicit language-neutral analyzers.
+   *
+   * <p>The Lucene analysis configurer is backend-wide in Hibernate Search 8.4. Applications sharing
+   * the default backend must therefore give unrelated full-text fields explicit analyzers when
+   * those fields must not inherit the configured {@code default} analyzer.
    *
    * @param properties Hibernate configuration properties
    * @param configurerClass configurer class resolved through Hibernate Search's {@code class:}
@@ -72,7 +73,7 @@ public final class GitTextAnalysis {
       Properties properties, String configurerReference, String profileId) {
     Objects.requireNonNull(properties, "properties");
     properties.setProperty(
-        INDEX_CONFIGURER_PROPERTY, requireNotBlank(configurerReference, "configurerReference"));
+        BACKEND_CONFIGURER_PROPERTY, requireNotBlank(configurerReference, "configurerReference"));
     properties.setProperty(PROFILE_ID_PROPERTY, requireNotBlank(profileId, "profileId"));
   }
 
