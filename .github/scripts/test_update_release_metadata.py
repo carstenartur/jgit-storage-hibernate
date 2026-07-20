@@ -58,7 +58,9 @@ class UpdateReleaseDocumentationTest(unittest.TestCase):
             )
             self.write(
                 root / "docs/guide.md",
-                """<dependency>
+                """The documented release line is **0.1.5**.
+
+<dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
   <version>0.1.5</version>
@@ -69,6 +71,7 @@ The legacy migration baseline remains 0.1.4.
             )
             self.write(
                 root / "docs/releases/0.1.5.md",
+                "The documented release line is **0.1.5**.\n"
                 "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n",
             )
             self.write(
@@ -108,10 +111,12 @@ The legacy migration baseline remains 0.1.4.
             self.assertIn("<groupId>com.example</groupId>", readme)
             self.assertIn("<version>X.Y.Z</version>", readme)
             self.assertIn("Historical migration baseline: 0.1.4", readme)
+            self.assertIn("The documented release line is **0.1.6**.", guide)
             self.assertIn("<version>0.1.6</version>", guide)
             self.assertIn("legacy migration baseline remains 0.1.4", guide)
             self.assertIn("<version>0.1.6</version>", module_readme)
             self.assertEqual(
+                "The documented release line is **0.1.5**.\n"
                 "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n",
                 release_note,
             )
