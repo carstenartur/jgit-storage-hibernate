@@ -56,8 +56,7 @@ class ConfigurableGitTextAnalysisH2Test {
   @Test
   void customEnglishProfileStemsMessagesButNotPathsOrChangedText() {
     Properties properties = h2Properties();
-    GitTextAnalysis.configure(
-        properties, new EnglishMessageAnalysisConfigurer(), "english-snowball-v1");
+    GitTextAnalysis.configure(properties, EnglishMessageAnalysisConfigurer.class, "english-snowball-v1");
     assertEquals("english-snowball-v1", GitTextAnalysis.profileId(properties));
 
     try (HibernateSessionFactoryProvider provider =
@@ -133,8 +132,12 @@ class ConfigurableGitTextAnalysisH2Test {
     return properties;
   }
 
-  private static final class EnglishMessageAnalysisConfigurer
+  /** Public class reference used by Hibernate Search's reflective bean resolver. */
+  public static final class EnglishMessageAnalysisConfigurer
       implements LuceneAnalysisConfigurer {
+
+    /** Required for reflective construction from a {@code class:} reference. */
+    public EnglishMessageAnalysisConfigurer() {}
 
     @Override
     public void configure(LuceneAnalysisConfigurationContext context) {
