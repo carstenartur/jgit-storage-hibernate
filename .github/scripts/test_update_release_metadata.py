@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).with_name("update-release-metadata.py")
+RELEASE_SCRIPT = Path(__file__).with_name("release.sh")
 SPEC = importlib.util.spec_from_file_location("update_release_metadata", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"Could not load {SCRIPT}")
@@ -125,6 +127,44 @@ The legacy migration baseline remains 0.1.4.
                     UPDATE_RELEASE_METADATA.update_public_documentation("0.1.6-SNAPSHOT")
             finally:
                 os.chdir(previous_directory)
+
+    def test_release_script_generates_documentation_instead_of_requiring_pre_alignment(self) -> None:
+        text = RELEASE_SCRIPT.read_text(encoding="utf-8")
+        normalized = re.sub(r"\\\s*\n\s*", " ", text)
+
+        self.assertNotIn(
+            "Documented release $DOCUMENTED_RELEASE_VERSION does not match requested release",
+            text,
+        )
+        self.assertIn("Automatic release preparation", text)
+
+        preflight = text.index("python3 .github/scripts/verify-release-consistency.py")
+        set_release = text.index(
+            'mvn -B versions:set -DnewVersion="$RELEASE_VERSION"'
+        )
+        generate_release = text.index(
+            'python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release'
+        )
+        generated_state_check = text.index(
+            "python3 .github/scripts/verify-release-consistency.py",
+            generate_release,
+        )
+
+        self.assertLess(preflight, set_release)
+        self.assertLess(set_release, generate_release)
+        self.assertLess(generate_release, generated_state_check)
+        self.assertIn(
+            "README.md docs jgit-storage-hibernate-*/README.md",
+            normalized,
+        )
+        self.assertIn(
+            'python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"',
+            text,
+        )
+        self.assertNotIn(
+            'python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION" --release',
+            text,
+        )
 
     @staticmethod
     def write(path: Path, content: str) -> None:
