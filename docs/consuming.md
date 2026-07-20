@@ -9,7 +9,7 @@ io.github.carstenartur:jgit-storage-hibernate-search
 
 Core provides database-backed JGit repositories. Search is optional and adds generic Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation and have their own module guides.
 
-The documented release line is **0.1.5**. It uses Java 21, Hibernate ORM 7.4.5.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published artifacts instead of overriding only one side of the stack.
+The documented release line is **0.1.6**. It uses Java 21, Hibernate ORM 7.4.5.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published artifacts instead of overriding only one side of the stack.
 
 ## Supported databases and operating model
 
@@ -71,7 +71,7 @@ Core only:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.1.5</version>
+  <version>0.1.6</version>
 </dependency>
 ```
 
@@ -81,7 +81,7 @@ Optional generic history search:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.1.5</version>
+  <version>0.1.6</version>
 </dependency>
 ```
 

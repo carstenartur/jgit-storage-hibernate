@@ -103,7 +103,7 @@ Git objects and refs remain authoritative. Search, Java Analysis and Architectur
 
 ## Five-minute production setup
 
-The documented release line is **0.1.5**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; H2 2.4.x is supported for tests, demos and lightweight development.
+The documented release line is **0.1.6**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; H2 2.4.x is supported for tests, demos and lightweight development.
 
 ### 1. Add the Core dependency
 
@@ -111,7 +111,7 @@ The documented release line is **0.1.5**. Java 21 is required. PostgreSQL 17 is 
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.1.5</version>
+  <version>0.1.6</version>
 </dependency>
 ```
 
