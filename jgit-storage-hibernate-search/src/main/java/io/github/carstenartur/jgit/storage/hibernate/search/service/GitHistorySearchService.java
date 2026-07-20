@@ -50,7 +50,7 @@ public class GitHistorySearchService {
   }
 
   /**
-   * Find commits matching all supplied full-text, author, changed-path and time predicates.
+   * Find commits matching all supplied full-text, author, changed-path, time and candidate predicates.
    *
    * <p>This is the reusable projection equivalent of manually walking commits with JGit, diffing
    * every commit against its first parent and applying the predicates in application code.
@@ -60,6 +60,9 @@ public class GitHistorySearchService {
    */
   public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
     Objects.requireNonNull(query, "query");
+    if (query.hasObjectIdRestriction() && query.objectIds().isEmpty()) {
+      return List.of();
+    }
     return query.text() == null ? findStructuredChanges(query) : findFullTextChanges(query);
   }
 
@@ -84,6 +87,10 @@ public class GitHistorySearchService {
                                     "changedPaths",
                                     "changedText")
                                 .matching(query.text()));
+                if (query.hasObjectIdRestriction()) {
+                  predicate.filter(
+                      f.terms().field("objectId").matchingAny(query.objectIds()));
+                }
                 if (query.authorEmail() != null) {
                   predicate.filter(
                       f.match().field("authorEmail").matching(query.authorEmail()));
@@ -110,6 +117,9 @@ public class GitHistorySearchService {
   private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
     StringBuilder hql =
         new StringBuilder("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+    if (query.hasObjectIdRestriction()) {
+      hql.append(" AND c.objectId IN :objectIds");
+    }
     if (query.authorEmail() != null) {
       hql.append(" AND c.authorEmail = :email");
     }
@@ -130,13 +140,15 @@ public class GitHistorySearchService {
               .createQuery(hql.toString(), GitCommitIndex.class)
               .setParameter("repo", query.repositoryName())
               .setMaxResults(query.limit());
+      if (query.hasObjectIdRestriction()) {
+        selection.setParameter("objectIds", query.objectIds());
+      }
       if (query.authorEmail() != null) {
         selection.setParameter("email", query.authorEmail());
       }
       if (query.pathFragment() != null) {
         selection.setParameter(
-            "path",
-            "%" + escapeLikePattern(query.pathFragment().toLowerCase(Locale.ROOT)) + "%");
+            "path", "%" + escapeLikePattern(query.pathFragment().toLowerCase(Locale.ROOT)) + "%");
       }
       if (query.from() != null) {
         selection.setParameter("from", query.from());
