@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.search.analysis;
 
 import java.util.Objects;
 import java.util.Properties;
+import org.hibernate.search.backend.lucene.analysis.LuceneAnalysisConfigurer;
 import org.hibernate.search.engine.backend.analysis.AnalyzerNames;
 
 /** Stable configuration contract for natural-language analysis in the Git commit index. */
@@ -38,21 +39,40 @@ public final class GitTextAnalysis {
   private GitTextAnalysis() {}
 
   /**
-   * Configure a custom natural-language profile for the generic commit index.
+   * Configure a custom natural-language profile through an instantiable configurer class.
    *
-   * <p>The configurer may be a {@code LuceneAnalysisConfigurer} instance, a Hibernate Search bean
-   * reference, a class reference string or any other value accepted by Hibernate Search for the
-   * analysis-configurer property. It must override the analyzer named {@link
-   * #NATURAL_LANGUAGE_ANALYZER}. Path, identifier and changed-file fields remain mapped to their
-   * explicit language-neutral analyzers.
+   * <p>The class must expose an accessible no-argument constructor and override the analyzer named
+   * {@link #NATURAL_LANGUAGE_ANALYZER}. Path, identifier and changed-file fields remain mapped to
+   * their explicit language-neutral analyzers.
    *
    * @param properties Hibernate configuration properties
-   * @param configurer Hibernate Search analysis configurer reference
+   * @param configurerClass configurer class resolved through Hibernate Search's {@code class:}
+   *     reference
    * @param profileId stable operator-visible profile identity
    */
-  public static void configure(Properties properties, Object configurer, String profileId) {
+  public static void configure(
+      Properties properties,
+      Class<? extends LuceneAnalysisConfigurer> configurerClass,
+      String profileId) {
+    Objects.requireNonNull(configurerClass, "configurerClass");
+    configure(properties, "class:" + configurerClass.getName(), profileId);
+  }
+
+  /**
+   * Configure a custom natural-language profile through a Hibernate Search reference string.
+   *
+   * <p>Use a {@code class:fully.qualified.Configurer} reference for reflective construction or a
+   * {@code bean:beanName} reference when the consuming integration supplies a bean resolver.
+   *
+   * @param properties Hibernate configuration properties
+   * @param configurerReference Hibernate Search {@code class:} or {@code bean:} reference
+   * @param profileId stable operator-visible profile identity
+   */
+  public static void configure(
+      Properties properties, String configurerReference, String profileId) {
     Objects.requireNonNull(properties, "properties");
-    properties.put(INDEX_CONFIGURER_PROPERTY, Objects.requireNonNull(configurer, "configurer"));
+    properties.setProperty(
+        INDEX_CONFIGURER_PROPERTY, requireNotBlank(configurerReference, "configurerReference"));
     properties.setProperty(PROFILE_ID_PROPERTY, requireNotBlank(profileId, "profileId"));
   }
 
