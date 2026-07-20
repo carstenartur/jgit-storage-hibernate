@@ -56,7 +56,8 @@ class ConfigurableGitTextAnalysisH2Test {
   @Test
   void customEnglishProfileStemsMessagesButNotPathsOrChangedText() {
     Properties properties = h2Properties();
-    GitTextAnalysis.configure(properties, EnglishMessageAnalysisConfigurer.class, "english-snowball-v1");
+    GitTextAnalysis.configure(
+        properties, EnglishMessageAnalysisConfigurer.class, "english-snowball-v1");
     assertEquals("english-snowball-v1", GitTextAnalysis.profileId(properties));
 
     try (HibernateSessionFactoryProvider provider =
