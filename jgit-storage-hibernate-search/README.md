@@ -55,6 +55,25 @@ The test creates commits by different authors, paths and times, then proves that
 
 Branch or ref reachability is intentionally not copied into this generic projection. A consumer that restricts results to one branch must enforce that repository/ref boundary through JGit or an application-owned projection.
 
+## Analysis model
+
+The generic projection deliberately uses different analysis for different kinds of text:
+
+- commit messages and changed-file content retain Hibernate Search's language-neutral default analyzer;
+- the original `changedPaths` field remains available for backward-compatible general full-text queries;
+- compound path filters target a derived `changedPathTerms` field using the built-in `simple` analyzer;
+- each path is also indexed separately as the exact keyword field `changedPathExact` for future exact-path predicates.
+
+The path analyzer splits at non-letter punctuation and lowercases terms. Thus `workflow` matches `workflow.dsl`, and `SERVICES payments` matches path components in `services/payments/...`. Numeric-only path components are not independent terms with this analyzer; use the exact path field or an application-specific projection when numeric identity is significant.
+
+Language stemming is intentionally not hard-coded. Stemming algorithms are language-specific—Stempel, for example, is a Polish stemmer—and applying one generic stemmer to source code, paths and multilingual commit data would create false matches. A consuming application can add language-specific fields and analyzers for its own natural-language content without changing the generic Git projection.
+
+Analyzer changes alter derived Lucene data, not the relational schema or Git authority. Existing indexes must be recreated or rebuilt after upgrading to a version that changes analyzer mappings.
+
+The executable
+[`ChangedPathAnalysisH2Test`](src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/ChangedPathAnalysisH2Test.java)
+verifies component matching across punctuation and case.
+
 ## Full-text query
 
 ```java
@@ -86,6 +105,7 @@ indexes one commit, closes the JGit repository and then successfully searches th
 - materialize repository, object ID, messages, author, commit time and actual changed paths;
 - extract selected changed-file text during indexing rather than during every query;
 - combine full text, author email, changed path and inclusive time bounds through `CommitHistoryQuery`;
+- apply field-specific analysis to path terms without imposing language stemming on generic content;
 - run full-text queries through Hibernate Search/Lucene;
 - retain `findByAuthorEmail`, `findByPath`, `findBetween` and full-text convenience methods;
 - share the Core database configuration while keeping Search optional;
