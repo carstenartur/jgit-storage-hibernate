@@ -72,7 +72,7 @@ The path analyzer splits at non-letter punctuation and lowercases terms. Thus `w
 
 Stemming is index configuration, not a per-request option. Index-time and query-time analysis must remain compatible, and changing the profile requires recreating or rebuilding the derived Lucene index.
 
-A consumer can scope a custom configurer to the generic commit index without changing the entity mapping or affecting other application indexes:
+Hibernate Search 8.4 applies a Lucene analysis configurer to the backend. A consumer can replace the built-in `default` analyzer with a language profile while this module protects paths and changed source material through explicit analyzer mappings:
 
 ```java
 public final class EnglishCommitMessageConfigurer
@@ -99,9 +99,9 @@ GitTextAnalysis.configure(
     "english-snowball-v1");
 ```
 
-`GitTextAnalysis.configure(...)` writes a resolvable `class:` reference to the index-specific Hibernate Search configurer property and stores a separate operator-visible profile identity. `GitTextAnalysis.profileId(properties)` reports that identity, or `neutral-standard-v1` when the built-in neutral profile is active. Consumers with a Hibernate Search bean resolver can instead pass a `bean:beanName` reference string.
+`GitTextAnalysis.configure(...)` writes a resolvable `class:` reference to `hibernate.search.backend.analysis.configurer` and stores a separate operator-visible profile identity. `GitTextAnalysis.profileId(properties)` reports that identity, or `neutral-standard-v1` when the built-in neutral profile is active. Consumers with a Hibernate Search bean resolver can instead pass a `bean:beanName` reference string.
 
-Only commit-message fields use the overridable analyzer slot. Changed source material, paths, repository names, object IDs and author emails remain isolated from language stemming. This prevents an English or German profile from rewriting source identifiers and allows a shared Hibernate backend to contain unrelated application indexes safely.
+The configurer is backend-wide. Applications sharing the default backend must therefore assign explicit analyzers to unrelated full-text fields when those fields must not inherit the overridden `default` analyzer. This module already does so for changed source material and paths; repository names, object IDs, exact paths and author emails use keyword semantics.
 
 Stempel is specifically a Polish stemmer. A Polish application may provide an explicit profile using Lucene's optional Stempel analysis module, but the Search artifact does not make Stempel a mandatory dependency or a generic default. Mixed-language repositories should use separate application-owned language fields or a semantic projection rather than one global stemmer.
 
