@@ -9,6 +9,9 @@
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -18,6 +21,10 @@ import java.util.Objects;
  * changed by the commit relative to its first parent; every path in a root commit is considered
  * changed. When {@link #text()} is present, path text is interpreted by the full-text analyzer;
  * otherwise path matching retains its literal, case-insensitive fragment semantics.
+ *
+ * <p>An object-id restriction is distinct from no restriction. An explicitly empty candidate set
+ * matches no commits, while omitting the restriction searches every indexed commit in the logical
+ * repository.
  */
 public final class CommitHistoryQuery {
 
@@ -29,6 +36,8 @@ public final class CommitHistoryQuery {
   private final String pathFragment;
   private final Instant from;
   private final Instant to;
+  private final boolean objectIdRestriction;
+  private final List<String> objectIds;
   private final int limit;
 
   private CommitHistoryQuery(Builder builder) {
@@ -38,6 +47,8 @@ public final class CommitHistoryQuery {
     pathFragment = normalize(builder.pathFragment);
     from = builder.from;
     to = builder.to;
+    objectIdRestriction = builder.objectIds != null;
+    objectIds = builder.objectIds == null ? List.of() : builder.objectIds;
     limit = builder.limit;
 
     if (limit < 0) {
@@ -82,6 +93,14 @@ public final class CommitHistoryQuery {
     return to;
   }
 
+  public boolean hasObjectIdRestriction() {
+    return objectIdRestriction;
+  }
+
+  public List<String> objectIds() {
+    return objectIds;
+  }
+
   public int limit() {
     return limit;
   }
@@ -95,6 +114,7 @@ public final class CommitHistoryQuery {
     private String pathFragment;
     private Instant from;
     private Instant to;
+    private List<String> objectIds;
     private int limit = DEFAULT_LIMIT;
 
     private Builder(String repositoryName) {
@@ -131,6 +151,25 @@ public final class CommitHistoryQuery {
      */
     public Builder touchingPath(String pathFragment) {
       this.pathFragment = pathFragment;
+      return this;
+    }
+
+    /**
+     * Restrict results to an exact set of commit object IDs.
+     *
+     * <p>The supplied IDs are trimmed, deduplicated and defensively copied. An empty collection is a
+     * deliberate match-none restriction; omit this method to search every commit in the repository.
+     *
+     * @param objectIds exact candidate commit IDs
+     * @return this builder
+     */
+    public Builder restrictedToObjectIds(Collection<String> objectIds) {
+      Objects.requireNonNull(objectIds, "objectIds");
+      LinkedHashSet<String> normalized = new LinkedHashSet<>();
+      for (String objectId : objectIds) {
+        normalized.add(requireText(objectId, "objectId"));
+      }
+      this.objectIds = List.copyOf(normalized);
       return this;
     }
 
