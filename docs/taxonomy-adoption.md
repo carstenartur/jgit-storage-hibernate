@@ -32,7 +32,9 @@ hibernate.dialect=org.hibernate.dialect.HSQLDialect
 hibernate.hbm2ddl.auto=validate
 ```
 
-Flyway must finish before the Spring persistence context starts schema validation.
+Flyway must finish before the Spring persistence context starts schema validation. With Flyway 12 or
+newer, include `flyway-database-hsqldb` at the same version as `flyway-core`; database-specific
+support is no longer provided by `flyway-core` alone.
 
 ## Application-managed persistence context
 
@@ -83,7 +85,8 @@ HibernateRepositoryFactory hibernateRepositoryFactory(EntityManagerFactory entit
 ```
 
 Do not close the application-managed `SessionFactory` from repository code. Close every
-`HibernateGitStorage` handle after use.
+`HibernateGitStorage` handle after use. `ApplicationManagedSessionFactoryIntegrationTest` verifies
+that Core can share application entities and leaves shutdown ownership with the application.
 
 ## Fresh installation
 
@@ -206,7 +209,8 @@ created history.
 
 ## Deleting a logical repository
 
-Close all handles opened by the factory, then call:
+Close all handles for the repository name that share the same application-managed `SessionFactory`,
+then call:
 
 ```java
 RepositoryDeletionResult result =
@@ -215,7 +219,9 @@ RepositoryDeletionResult result =
 
 The operation:
 
-- rejects deletion while the same factory still owns an open handle for that name;
+- coordinates all `DefaultHibernateRepositoryFactory` instances sharing that `SessionFactory`;
+- rejects deletion while any coordinated handle for the repository name remains open;
+- prevents a new coordinated handle from opening while deletion is active;
 - removes optional participant projections, reflogs and pack/reftable rows in one transaction;
 - rolls the complete deletion back when a participant fails;
 - is idempotent;
