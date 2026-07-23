@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -31,7 +32,6 @@ import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.ObjectId;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.Transaction;
 
 /**
  * {@link DfsObjDatabase} backed by Hibernate-managed relational database rows.
@@ -44,6 +44,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
+  private final HibernateTransactionContext transactionContext;
   private Set<ObjectId> shallowCommits = Collections.emptySet();
 
   /**
@@ -53,15 +54,18 @@ public class HibernateObjDatabase extends DfsObjDatabase {
    * @param options DFS reader options
    * @param sessionFactory Hibernate session factory
    * @param repositoryName logical repository name
+   * @param transactionContext repository-scoped transaction context
    */
   public HibernateObjDatabase(
       DfsRepository repository,
       DfsReaderOptions options,
       SessionFactory sessionFactory,
-      String repositoryName) {
+      String repositoryName,
+      HibernateTransactionContext transactionContext) {
     super(repository, options);
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
+    this.transactionContext = transactionContext;
   }
 
   private static String baseName(DfsPackDescription description) {
@@ -109,59 +113,56 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   }
 
   @Override
-  protected void commitPackImpl(Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
+  protected void commitPackImpl(
+      Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
-    try (Session session = sessionFactory.openSession()) {
-      Transaction transaction = session.beginTransaction();
-      try {
-        if (replaces != null) {
-          for (DfsPackDescription replace : replaces) {
+    transactionContext.execute(
+        session -> {
+          if (replaces != null) {
+            for (DfsPackDescription replace : replaces) {
+              session
+                  .createMutationQuery(
+                      "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                          + "AND p.packName = :name")
+                  .setParameter("repo", repositoryName)
+                  .setParameter("name", baseName(replace))
+                  .executeUpdate();
+            }
+          }
+          Instant committedAt = Instant.now();
+          for (DfsPackDescription description : descriptions) {
             session
                 .createMutationQuery(
-                    "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name")
+                    "UPDATE GitPackEntity p SET p.committed = true, "
+                        + "p.committedAt = :committedAt WHERE p.repositoryName = :repo "
+                        + "AND p.packName = :name")
+                .setParameter("committedAt", committedAt)
                 .setParameter("repo", repositoryName)
-                .setParameter("name", baseName(replace))
+                .setParameter("name", baseName(description))
                 .executeUpdate();
           }
-        }
-        Instant committedAt = Instant.now();
-        for (DfsPackDescription description : descriptions) {
-          session
-              .createMutationQuery(
-                  "UPDATE GitPackEntity p SET p.committed = true, p.committedAt = :committedAt "
-                      + "WHERE p.repositoryName = :repo AND p.packName = :name")
-              .setParameter("committedAt", committedAt)
-              .setParameter("repo", repositoryName)
-              .setParameter("name", baseName(description))
-              .executeUpdate();
-        }
-        transaction.commit();
-      } catch (RuntimeException e) {
-        transaction.rollback();
-        throw e;
-      }
-    }
+          return null;
+        });
     clearCache();
   }
 
   @Override
   protected void rollbackPack(Collection<DfsPackDescription> descriptions) {
-    try (Session session = sessionFactory.openSession()) {
-      Transaction transaction = session.beginTransaction();
-      try {
-        for (DfsPackDescription description : descriptions) {
-          session
-              .createMutationQuery(
-                  "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name")
-              .setParameter("repo", repositoryName)
-              .setParameter("name", baseName(description))
-              .executeUpdate();
-        }
-        transaction.commit();
-      } catch (RuntimeException e) {
-        transaction.rollback();
-      }
-    } catch (RuntimeException ignored) {
+    try {
+      transactionContext.execute(
+          session -> {
+            for (DfsPackDescription description : descriptions) {
+              session
+                  .createMutationQuery(
+                      "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                          + "AND p.packName = :name")
+                  .setParameter("repo", repositoryName)
+                  .setParameter("name", baseName(description))
+                  .executeUpdate();
+            }
+            return null;
+          });
+    } catch (IOException | RuntimeException ignored) {
       // Rollback is best-effort and must not mask the original JGit exception.
     }
   }
@@ -191,7 +192,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   protected DfsOutputStream writeFile(DfsPackDescription description, PackExt extension)
       throws IOException {
     return new HibernatePackOutputStream(
-        sessionFactory, repositoryName, baseName(description), extension.getExtension());
+        transactionContext, repositoryName, baseName(description), extension.getExtension());
   }
 
   @Override
@@ -212,7 +213,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   private static final class HibernatePackOutputStream extends DfsOutputStream {
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    private final SessionFactory sessionFactory;
+    private final HibernateTransactionContext transactionContext;
     private final String repositoryName;
     private final String packName;
     private final String packExtension;
@@ -220,8 +221,11 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     private boolean flushed;
 
     private HibernatePackOutputStream(
-        SessionFactory sessionFactory, String repositoryName, String packName, String packExtension) {
-      this.sessionFactory = sessionFactory;
+        HibernateTransactionContext transactionContext,
+        String repositoryName,
+        String packName,
+        String packExtension) {
+      this.transactionContext = transactionContext;
       this.repositoryName = repositoryName;
       this.packName = packName;
       this.packExtension = packExtension;
@@ -245,49 +249,44 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     }
 
     @Override
-    public void flush() {
+    public void flush() throws IOException {
       if (flushed) {
         return;
       }
       flushed = true;
       byte[] bytes = bytes();
-      try (Session session = sessionFactory.openSession()) {
-        Transaction transaction = session.beginTransaction();
-        try {
-          GitPackEntity entity =
-              session
-                  .createQuery(
-                      "FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name "
-                          + "AND p.packExtension = :ext",
-                      GitPackEntity.class)
-                  .setParameter("repo", repositoryName)
-                  .setParameter("name", packName)
-                  .setParameter("ext", packExtension)
-                  .uniqueResult();
-          if (entity == null) {
-            entity = new GitPackEntity();
-            entity.setRepositoryName(repositoryName);
-            entity.setPackName(packName);
-            entity.setPackExtension(packExtension);
-            entity.setCreatedAt(Instant.now());
-          }
-          entity.setData(bytes);
-          entity.setFileSize(bytes.length);
-          entity.setCommitted(false);
-          entity.setCommittedAt(null);
-          if (entity.getId() == null) {
-            session.persist(entity);
-          }
-          transaction.commit();
-        } catch (RuntimeException e) {
-          transaction.rollback();
-          throw e;
-        }
-      }
+      transactionContext.execute(
+          session -> {
+            GitPackEntity entity =
+                session
+                    .createQuery(
+                        "FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                            + "AND p.packName = :name AND p.packExtension = :ext",
+                        GitPackEntity.class)
+                    .setParameter("repo", repositoryName)
+                    .setParameter("name", packName)
+                    .setParameter("ext", packExtension)
+                    .uniqueResult();
+            if (entity == null) {
+              entity = new GitPackEntity();
+              entity.setRepositoryName(repositoryName);
+              entity.setPackName(packName);
+              entity.setPackExtension(packExtension);
+              entity.setCreatedAt(Instant.now());
+            }
+            entity.setData(bytes);
+            entity.setFileSize(bytes.length);
+            entity.setCommitted(false);
+            entity.setCommittedAt(null);
+            if (entity.getId() == null) {
+              session.persist(entity);
+            }
+            return null;
+          });
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
       flush();
     }
 
