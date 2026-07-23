@@ -9,13 +9,15 @@
 package io.github.carstenartur.jgit.storage.hibernate;
 
 import java.util.Objects;
-
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.jgit.lib.Repository;
 
 /** Default {@link HibernateGitStorage} implementation wrapping a JGit repository. */
 public final class DefaultHibernateGitStorage implements HibernateGitStorage {
 
   private final Repository repository;
+  private final Runnable afterClose;
+  private final AtomicBoolean open = new AtomicBoolean(true);
 
   /**
    * Create a storage facade.
@@ -23,7 +25,18 @@ public final class DefaultHibernateGitStorage implements HibernateGitStorage {
    * @param repository repository to expose and close
    */
   public DefaultHibernateGitStorage(Repository repository) {
+    this(repository, () -> {});
+  }
+
+  /**
+   * Create a storage facade with a lifecycle callback.
+   *
+   * @param repository repository to expose and close
+   * @param afterClose callback invoked exactly once after the repository closes
+   */
+  public DefaultHibernateGitStorage(Repository repository, Runnable afterClose) {
     this.repository = Objects.requireNonNull(repository, "repository");
+    this.afterClose = Objects.requireNonNull(afterClose, "afterClose");
   }
 
   @Override
@@ -33,6 +46,12 @@ public final class DefaultHibernateGitStorage implements HibernateGitStorage {
 
   @Override
   public void close() {
-    repository.close();
+    if (open.compareAndSet(true, false)) {
+      try {
+        repository.close();
+      } finally {
+        afterClose.run();
+      }
+    }
   }
 }
