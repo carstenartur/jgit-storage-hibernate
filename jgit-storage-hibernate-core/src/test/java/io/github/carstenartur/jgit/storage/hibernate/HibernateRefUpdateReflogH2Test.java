@@ -46,6 +46,7 @@ class HibernateRefUpdateReflogH2Test {
     PersonIdent actor = new PersonIdent("Ref User", "ref-user@example.invalid");
     ObjectId first;
     ObjectId second;
+    ObjectId merged;
     ObjectId forced;
 
     try (HibernateSessionFactoryProvider provider =
@@ -53,20 +54,26 @@ class HibernateRefUpdateReflogH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      first = createCommit(repository, null, "first");
+      first = createCommit(repository, "first");
       assertEquals(
           RefUpdate.Result.NEW,
           update(repository, ObjectId.zeroId(), first, actor, "commit: first", false));
 
-      second = createCommit(repository, first, "second");
+      second = createCommit(repository, "second", first);
       assertEquals(
           RefUpdate.Result.FAST_FORWARD,
           update(repository, first, second, actor, "commit: second", false));
 
-      forced = createCommit(repository, first, "forced branch");
+      ObjectId side = createCommit(repository, "side branch", first);
+      merged = createCommit(repository, "merge feature", second, side);
+      assertEquals(
+          RefUpdate.Result.FAST_FORWARD,
+          update(repository, second, merged, actor, "merge: feature", false));
+
+      forced = createCommit(repository, "forced branch", first);
       assertEquals(
           RefUpdate.Result.FORCED,
-          update(repository, second, forced, actor, "reset: workflow", true));
+          update(repository, merged, forced, actor, "reset: workflow", true));
 
       assertEquals(
           RefUpdate.Result.LOCK_FAILURE,
@@ -87,19 +94,22 @@ class HibernateRefUpdateReflogH2Test {
       assertNull(repository.exactRef("refs/heads/main"));
       List<ReflogEntry> entries =
           repository.getReflogReader("refs/heads/main").getReverseEntries();
-      assertEquals(4, entries.size());
+      assertEquals(5, entries.size());
       assertEquals(ObjectId.zeroId(), entries.get(0).getNewId());
       assertEquals(forced, entries.get(0).getOldId());
       assertTrue(entries.get(0).getComment().startsWith("branch: deleted"));
       assertEquals(forced, entries.get(1).getNewId());
-      assertEquals(second, entries.get(1).getOldId());
+      assertEquals(merged, entries.get(1).getOldId());
       assertEquals("reset: workflow: forced-update", entries.get(1).getComment());
-      assertEquals(second, entries.get(2).getNewId());
-      assertEquals(first, entries.get(2).getOldId());
-      assertEquals("commit: second: fast-forward", entries.get(2).getComment());
-      assertEquals(first, entries.get(3).getNewId());
-      assertEquals(ObjectId.zeroId(), entries.get(3).getOldId());
-      assertEquals("commit: first: created", entries.get(3).getComment());
+      assertEquals(merged, entries.get(2).getNewId());
+      assertEquals(second, entries.get(2).getOldId());
+      assertEquals("merge: feature: fast-forward", entries.get(2).getComment());
+      assertEquals(second, entries.get(3).getNewId());
+      assertEquals(first, entries.get(3).getOldId());
+      assertEquals("commit: second: fast-forward", entries.get(3).getComment());
+      assertEquals(first, entries.get(4).getNewId());
+      assertEquals(ObjectId.zeroId(), entries.get(4).getOldId());
+      assertEquals("commit: first: created", entries.get(4).getComment());
       assertTrue(
           entries.stream().noneMatch(entry -> entry.getComment().contains("must not be logged")));
     }
@@ -117,7 +127,7 @@ class HibernateRefUpdateReflogH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      ObjectId commitId = createCommit(repository, null, "must not become reachable");
+      ObjectId commitId = createCommit(repository, "must not become reachable");
       PersonIdent actor = new PersonIdent("Rollback User", "rollback@example.invalid");
 
       RefUpdate update = repository.updateRef("refs/heads/main");
@@ -158,7 +168,7 @@ class HibernateRefUpdateReflogH2Test {
   }
 
   private static ObjectId createCommit(
-      HibernateRepository repository, ObjectId parent, String message) throws Exception {
+      HibernateRepository repository, String message, ObjectId... parents) throws Exception {
     try (ObjectInserter inserter = repository.newObjectInserter()) {
       ObjectId blob =
           inserter.insert(Constants.OBJ_BLOB, message.getBytes(StandardCharsets.UTF_8));
@@ -166,9 +176,7 @@ class HibernateRefUpdateReflogH2Test {
       tree.append("workflow.txt", FileMode.REGULAR_FILE, blob);
       CommitBuilder commit = new CommitBuilder();
       commit.setTreeId(inserter.insert(tree));
-      if (parent != null) {
-        commit.setParentId(parent);
-      }
+      commit.setParentIds(parents);
       PersonIdent author = new PersonIdent("Ref User", "ref-user@example.invalid");
       commit.setAuthor(author);
       commit.setCommitter(author);
