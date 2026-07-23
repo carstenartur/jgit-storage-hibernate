@@ -47,6 +47,7 @@ class HibernateRefUpdateReflogH2Test {
     ObjectId first;
     ObjectId second;
     ObjectId merged;
+    ObjectId cherryPicked;
     ObjectId forced;
 
     try (HibernateSessionFactoryProvider provider =
@@ -70,10 +71,21 @@ class HibernateRefUpdateReflogH2Test {
           RefUpdate.Result.FAST_FORWARD,
           update(repository, second, merged, actor, "merge: feature", false));
 
+      cherryPicked = createCommit(repository, "cherry-picked patch", merged);
+      assertEquals(
+          RefUpdate.Result.FAST_FORWARD,
+          update(
+              repository,
+              merged,
+              cherryPicked,
+              actor,
+              "cherry-pick: apply workflow patch",
+              false));
+
       forced = createCommit(repository, "forced branch", first);
       assertEquals(
           RefUpdate.Result.FORCED,
-          update(repository, merged, forced, actor, "reset: workflow", true));
+          update(repository, cherryPicked, forced, actor, "reset: workflow", true));
 
       assertEquals(
           RefUpdate.Result.LOCK_FAILURE,
@@ -94,22 +106,26 @@ class HibernateRefUpdateReflogH2Test {
       assertNull(repository.exactRef("refs/heads/main"));
       List<ReflogEntry> entries =
           repository.getReflogReader("refs/heads/main").getReverseEntries();
-      assertEquals(5, entries.size());
+      assertEquals(6, entries.size());
       assertEquals(ObjectId.zeroId(), entries.get(0).getNewId());
       assertEquals(forced, entries.get(0).getOldId());
       assertTrue(entries.get(0).getComment().startsWith("branch: deleted"));
       assertEquals(forced, entries.get(1).getNewId());
-      assertEquals(merged, entries.get(1).getOldId());
+      assertEquals(cherryPicked, entries.get(1).getOldId());
       assertEquals("reset: workflow: forced-update", entries.get(1).getComment());
-      assertEquals(merged, entries.get(2).getNewId());
-      assertEquals(second, entries.get(2).getOldId());
-      assertEquals("merge: feature: fast-forward", entries.get(2).getComment());
-      assertEquals(second, entries.get(3).getNewId());
-      assertEquals(first, entries.get(3).getOldId());
-      assertEquals("commit: second: fast-forward", entries.get(3).getComment());
-      assertEquals(first, entries.get(4).getNewId());
-      assertEquals(ObjectId.zeroId(), entries.get(4).getOldId());
-      assertEquals("commit: first: created", entries.get(4).getComment());
+      assertEquals(cherryPicked, entries.get(2).getNewId());
+      assertEquals(merged, entries.get(2).getOldId());
+      assertEquals(
+          "cherry-pick: apply workflow patch: fast-forward", entries.get(2).getComment());
+      assertEquals(merged, entries.get(3).getNewId());
+      assertEquals(second, entries.get(3).getOldId());
+      assertEquals("merge: feature: fast-forward", entries.get(3).getComment());
+      assertEquals(second, entries.get(4).getNewId());
+      assertEquals(first, entries.get(4).getOldId());
+      assertEquals("commit: second: fast-forward", entries.get(4).getComment());
+      assertEquals(first, entries.get(5).getNewId());
+      assertEquals(ObjectId.zeroId(), entries.get(5).getOldId());
+      assertEquals("commit: first: created", entries.get(5).getComment());
       assertTrue(
           entries.stream().noneMatch(entry -> entry.getComment().contains("must not be logged")));
     }
