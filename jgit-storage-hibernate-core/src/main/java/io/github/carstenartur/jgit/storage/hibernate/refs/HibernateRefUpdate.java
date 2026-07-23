@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.refs;
 
+import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.io.IOException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -19,6 +20,7 @@ import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.hibernate.Session;
 
 /** Ref update that commits the DFS reftable and queryable reflog entry in one transaction. */
 final class HibernateRefUpdate extends RefUpdate {
@@ -38,8 +40,8 @@ final class HibernateRefUpdate extends RefUpdate {
   }
 
   @Override
-  protected HibernateRepositoryAdapter getRepository() {
-    return new HibernateRepositoryAdapter(refDatabase.repository());
+  protected HibernateRepository getRepository() {
+    return refDatabase.repository();
   }
 
   @Override
@@ -152,11 +154,7 @@ final class HibernateRefUpdate extends RefUpdate {
   }
 
   private void writeReflog(
-      org.hibernate.Session session,
-      String refName,
-      ObjectId oldId,
-      ObjectId newId,
-      Result result) {
+      Session session, String refName, ObjectId oldId, ObjectId newId, Result result) {
     String message = reflogMessage(result);
     if (message == null) {
       return;
@@ -190,56 +188,5 @@ final class HibernateRefUpdate extends RefUpdate {
       case NEW -> ReflogEntry.PREFIX_CREATED;
       default -> null;
     };
-  }
-
-  /**
-   * Narrows the repository return type without exposing implementation packages from the public
-   * facade. RefUpdate only relies on the Repository API, so the adapter is transparent.
-   */
-  private static final class HibernateRepositoryAdapter
-      extends org.eclipse.jgit.lib.Repository {
-
-    private final io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository delegate;
-
-    private HibernateRepositoryAdapter(
-        io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository delegate) {
-      super(new org.eclipse.jgit.lib.BaseRepositoryBuilder<>() {});
-      this.delegate = delegate;
-    }
-
-    @Override
-    public void create(boolean bare) throws IOException {
-      delegate.create(bare);
-    }
-
-    @Override
-    public org.eclipse.jgit.lib.ObjectDatabase getObjectDatabase() {
-      return delegate.getObjectDatabase();
-    }
-
-    @Override
-    public org.eclipse.jgit.lib.RefDatabase getRefDatabase() {
-      return delegate.getRefDatabase();
-    }
-
-    @Override
-    public org.eclipse.jgit.lib.StoredConfig getConfig() {
-      return delegate.getConfig();
-    }
-
-    @Override
-    public org.eclipse.jgit.attributes.AttributesNodeProvider getAttributesNodeProvider() {
-      return delegate.getAttributesNodeProvider();
-    }
-
-    @Override
-    public void scanForRepoChanges() throws IOException {
-      delegate.scanForRepoChanges();
-    }
-
-    @Override
-    public void notifyIndexChanged(boolean internal) {
-      delegate.notifyIndexChanged(internal);
-    }
   }
 }
