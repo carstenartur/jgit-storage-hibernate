@@ -10,10 +10,12 @@ package io.github.carstenartur.jgit.storage.hibernate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
@@ -100,6 +102,41 @@ class HibernateRefUpdateReflogH2Test {
       assertEquals("commit: first: created", entries.get(3).getComment());
       assertTrue(
           entries.stream().noneMatch(entry -> entry.getComment().contains("must not be logged")));
+    }
+  }
+
+  @Test
+  void reflogPersistenceFailureRollsBackRefAndInvalidatesRepositoryCaches() throws Exception {
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    String databaseName = "ref-update-rollback-" + TEST_COUNTER.incrementAndGet();
+    String repositoryName = "rollback-history";
+    Properties properties = h2Properties(databaseName);
+
+    try (HibernateSessionFactoryProvider provider =
+            new HibernateSessionFactoryProvider(properties);
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      ObjectId commitId = createCommit(repository, null, "must not become reachable");
+      PersonIdent actor = new PersonIdent("Rollback User", "rollback@example.invalid");
+
+      RefUpdate update = repository.updateRef("refs/heads/main");
+      update.setExpectedOldObjectId(ObjectId.zeroId());
+      update.setNewObjectId(commitId);
+      update.setRefLogIdent(actor);
+      update.setRefLogMessage("x".repeat(4096), true);
+
+      assertThrows(IOException.class, update::update);
+      assertNull(repository.exactRef("refs/heads/main"));
+      assertTrue(repository.getReflogReader("refs/heads/main").getReverseEntries().isEmpty());
+    }
+
+    try (HibernateSessionFactoryProvider provider =
+            new HibernateSessionFactoryProvider(properties);
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      assertNull(repository.exactRef("refs/heads/main"));
+      assertTrue(repository.getReflogReader("refs/heads/main").getReverseEntries().isEmpty());
     }
   }
 
