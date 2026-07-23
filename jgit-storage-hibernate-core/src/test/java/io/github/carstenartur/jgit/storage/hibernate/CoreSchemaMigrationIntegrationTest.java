@@ -10,7 +10,9 @@ package io.github.carstenartur.jgit.storage.hibernate;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
@@ -73,13 +75,18 @@ class CoreSchemaMigrationIntegrationTest {
     migrate(database, false);
     assertEquals(List.of("0.1.4", "0.1.5"), migrationVersions(database));
 
+    String incompleteRepositoryName = "incomplete-only";
+    insertUncommittedPack(database, incompleteRepositoryName);
+
     String repositoryName = "migrated-empty";
     StoredHistory storedHistory;
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
+      verifyUncommittedPackInvisible(provider.getSessionFactory(), incompleteRepositoryName);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
     }
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
+      verifyUncommittedPackInvisible(provider.getSessionFactory(), incompleteRepositoryName);
       verifyHistory(provider.getSessionFactory(), repositoryName, storedHistory);
     }
   }
@@ -158,6 +165,15 @@ class CoreSchemaMigrationIntegrationTest {
     }
   }
 
+  private static void verifyUncommittedPackInvisible(
+      SessionFactory sessionFactory, String repositoryName) throws Exception {
+    try (HibernateRepository repository =
+        HibernateRepository.create(sessionFactory, repositoryName)) {
+      assertFalse(repository.exists());
+      assertNull(repository.exactRef("refs/heads/main"));
+    }
+  }
+
   private static ObjectId createCommit(
       HibernateRepository repository, ObjectId parent, String message, String content)
       throws Exception {
@@ -191,6 +207,25 @@ class CoreSchemaMigrationIntegrationTest {
     assertTrue(
         result == RefUpdate.Result.NEW || result == RefUpdate.Result.FAST_FORWARD,
         () -> "unexpected ref update result " + result);
+  }
+
+  private static void insertUncommittedPack(TestDatabase database, String repositoryName)
+      throws SQLException {
+    String sql =
+        "insert into git_packs "
+            + "(repository_name, pack_name, pack_extension, data, file_size, committed, "
+            + "created_at, committed_at) values (?, ?, ?, ?, ?, false, ?, null)";
+    try (Connection connection = database.openConnection();
+        var statement = connection.prepareStatement(sql)) {
+      byte[] unfinishedData = {1, 2, 3, 4};
+      statement.setString(1, repositoryName);
+      statement.setString(2, "pack-unfinished");
+      statement.setString(3, "pack");
+      statement.setBytes(4, unfinishedData);
+      statement.setLong(5, unfinishedData.length);
+      statement.setTimestamp(6, new java.sql.Timestamp(System.currentTimeMillis()));
+      statement.executeUpdate();
+    }
   }
 
   private static void installLegacySchema(TestDatabase database) throws IOException, SQLException {
