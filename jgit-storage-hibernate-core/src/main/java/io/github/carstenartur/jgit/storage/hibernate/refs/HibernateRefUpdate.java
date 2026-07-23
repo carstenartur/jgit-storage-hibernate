@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.refs;
 
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.io.IOException;
+import java.time.Instant;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -165,7 +166,7 @@ final class HibernateRefUpdate extends RefUpdate {
   private PersonIdent reflogIdentity() {
     PersonIdent configured = getRefLogIdent();
     return configured != null
-        ? new PersonIdent(configured)
+        ? new PersonIdent(configured, Instant.now())
         : new PersonIdent(refDatabase.repository());
   }
 
