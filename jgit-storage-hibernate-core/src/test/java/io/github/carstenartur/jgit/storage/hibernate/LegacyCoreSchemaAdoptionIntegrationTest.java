@@ -60,8 +60,11 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
             "org.hibernate.dialect.HSQLDialect",
             CoreSchemaMigrations.HSQLDB_LOCATION,
             CoreSchemaMigrations.HSQLDB_LEGACY_ADOPTION_LOCATION);
-    verifyAdoption(database);
-    shutdown(database);
+    try {
+      verifyAdoption(database);
+    } finally {
+      shutdown(database);
+    }
   }
 
   @Test
@@ -76,24 +79,27 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
             "org.hibernate.dialect.HSQLDialect",
             CoreSchemaMigrations.HSQLDB_LOCATION,
             CoreSchemaMigrations.HSQLDB_LEGACY_ADOPTION_LOCATION);
-    migrateCurrent(database);
-    StoredRepository stored = writeRepository(database, "duplicate-repository");
-    downgradeToPreLibrarySchema(database);
-    duplicateFirstPack(database);
+    try {
+      migrateCurrent(database);
+      StoredRepository stored = writeRepository(database, "duplicate-repository");
+      downgradeToPreLibrarySchema(database);
+      duplicateFirstPack(database);
 
-    try (Connection connection = database.openConnection()) {
-      LegacyCoreSchemaAdoptionException exception =
-          assertThrows(
-              LegacyCoreSchemaAdoptionException.class,
-              () -> LegacyCoreSchemaAdoption.requireSafeToAdopt(connection));
-      assertTrue(exception.getMessage().contains("duplicate"));
-      LegacyCoreSchemaAdoption.LegacySchemaReport report =
-          LegacyCoreSchemaAdoption.inspect(connection);
-      assertTrue(report.requiresAdoption());
-      assertEquals(1, report.duplicatePackIdentities().size());
-      assertTrue(report.packRows() > stored.packRows());
+      try (Connection connection = database.openConnection()) {
+        LegacyCoreSchemaAdoptionException exception =
+            assertThrows(
+                LegacyCoreSchemaAdoptionException.class,
+                () -> LegacyCoreSchemaAdoption.requireSafeToAdopt(connection));
+        assertTrue(exception.getMessage().contains("duplicate"));
+        LegacyCoreSchemaAdoption.LegacySchemaReport report =
+            LegacyCoreSchemaAdoption.inspect(connection);
+        assertTrue(report.requiresAdoption());
+        assertEquals(1, report.duplicatePackIdentities().size());
+        assertTrue(report.packRows() > stored.packRows());
+      }
+    } finally {
+      shutdown(database);
     }
-    shutdown(database);
   }
 
   static void verifyAdoption(AdoptionDatabase database) throws Exception {
