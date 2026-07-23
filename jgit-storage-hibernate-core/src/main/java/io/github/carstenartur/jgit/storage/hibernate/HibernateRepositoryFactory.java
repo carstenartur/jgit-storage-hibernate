@@ -22,7 +22,8 @@ public interface HibernateRepositoryFactory {
   /**
    * Transactionally delete all persisted state for one logical repository.
    *
-   * <p>All storage handles opened by this factory for the requested name must be closed first. The
+   * <p>All storage handles for the requested name that share this factory's Hibernate {@code
+   * SessionFactory} must be closed first, including handles opened by another factory instance. The
    * operation is idempotent and never deletes rows belonging to another logical repository.
    *
    * @param repositoryName logical repository to delete
