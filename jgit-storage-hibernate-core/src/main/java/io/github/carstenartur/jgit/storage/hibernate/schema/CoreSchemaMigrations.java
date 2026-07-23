@@ -21,13 +21,29 @@ public final class CoreSchemaMigrations {
   public static final String H2_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/core/h2";
 
+  /** Flyway location for HSQLDB migrations. */
+  public static final String HSQLDB_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/core/hsqldb";
+
   /** Flyway location for PostgreSQL migrations. */
   public static final String POSTGRESQL_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/core/postgresql";
 
+  /** Flyway location for adopting the pre-library schema on HSQLDB. */
+  public static final String HSQLDB_LEGACY_ADOPTION_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/core/adoption/hsqldb";
+
+  /** Flyway location for adopting the pre-library schema on PostgreSQL. */
+  public static final String POSTGRESQL_LEGACY_ADOPTION_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/core/adoption/postgresql";
+
   /** Dedicated Flyway schema history table for core storage. */
   public static final String SCHEMA_HISTORY_TABLE =
       "jgit_storage_hibernate_core_schema_history";
+
+  /** Dedicated Flyway history table for one-time pre-library schema adoption. */
+  public static final String LEGACY_ADOPTION_SCHEMA_HISTORY_TABLE =
+      "jgit_storage_hibernate_core_adoption_history";
 
   /** Baseline used when installing into a schema that contains only unrelated tables. */
   public static final String PRE_MIGRATION_BASELINE_VERSION = "0";
@@ -42,6 +58,12 @@ public final class CoreSchemaMigrations {
   /** Description used when baselining a verified 0.1.4 schema. */
   public static final String LEGACY_BASELINE_DESCRIPTION =
       "jgit-storage-hibernate-core 0.1.4";
+
+  /** Current physical core schema version after the 0.1.5 schema-history migration. */
+  public static final String CURRENT_SCHEMA_VERSION = "0.1.5";
+
+  /** Version of the one-time pre-library/Sandbox/Taxonomy adoption migration. */
+  public static final String LEGACY_ADOPTION_VERSION = "1";
 
   private CoreSchemaMigrations() {}
 }
