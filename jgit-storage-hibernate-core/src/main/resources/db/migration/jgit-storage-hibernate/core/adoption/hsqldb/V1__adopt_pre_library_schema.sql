@@ -3,7 +3,7 @@
 -- duplicate pack identities and partial schemas before this migration changes data.
 
 alter table git_packs add column committed boolean default true not null;
-alter table git_packs add column committed_at timestamp(6) with time zone;
+alter table git_packs add column committed_at timestamp(6);
 
 update git_packs
 set committed = true,
