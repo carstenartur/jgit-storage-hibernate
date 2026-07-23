@@ -123,11 +123,15 @@ public class HibernateRepository extends DfsRepository {
   }
 
   private void invalidateStorageCaches(Exception originalFailure) {
-    objectDatabase.close();
+    try {
+      objectDatabase.close();
+    } catch (RuntimeException cacheFailure) {
+      originalFailure.addSuppressed(cacheFailure);
+    }
     try {
       refDatabase.refresh();
-    } catch (IOException refreshFailure) {
-      originalFailure.addSuppressed(refreshFailure);
+    } catch (RuntimeException cacheFailure) {
+      originalFailure.addSuppressed(cacheFailure);
     }
   }
 
