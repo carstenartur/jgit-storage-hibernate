@@ -104,13 +104,31 @@ public class HibernateRepository extends DfsRepository {
   /**
    * Execute repository storage work in one shared transaction.
    *
+   * <p>If a transaction is rolled back after JGit has constructed an in-memory pack or Reftable
+   * view, the repository caches are invalidated before the failure is returned. The next read then
+   * rebuilds its view from committed database rows instead of retaining rolled-back state.
+   *
    * @param work work that may persist packs, refs and reflog rows
    * @param <T> work result type
    * @return work result
    * @throws IOException if storage work fails
    */
   public <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
-    return transactionContext.execute(work);
+    try {
+      return transactionContext.execute(work);
+    } catch (IOException | RuntimeException exception) {
+      invalidateStorageCaches(exception);
+      throw exception;
+    }
+  }
+
+  private void invalidateStorageCaches(Exception originalFailure) {
+    objectDatabase.close();
+    try {
+      refDatabase.refresh();
+    } catch (IOException refreshFailure) {
+      originalFailure.addSuppressed(refreshFailure);
+    }
   }
 
   /**
