@@ -152,6 +152,9 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
         .dataSource(database.url(), database.username(), database.password())
         .locations(database.adoptionMigrationLocation())
         .table(CoreSchemaMigrations.LEGACY_ADOPTION_SCHEMA_HISTORY_TABLE)
+        .baselineOnMigrate(true)
+        .baselineVersion(CoreSchemaMigrations.PRE_MIGRATION_BASELINE_VERSION)
+        .baselineDescription("before pre-library core adoption")
         .load()
         .migrate();
   }
