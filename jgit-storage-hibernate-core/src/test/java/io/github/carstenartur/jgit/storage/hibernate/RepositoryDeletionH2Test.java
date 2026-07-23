@@ -39,17 +39,20 @@ class RepositoryDeletionH2Test {
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
 
   @Test
-  void deletionIsIsolatedIdempotentAndRequiresClosedHandles() throws Exception {
+  void deletionIsIsolatedIdempotentAndRequiresClosedHandlesAcrossFactories() throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     try (HibernateSessionFactoryProvider provider = provider("delete")) {
+      SessionFactory sessionFactory = provider.getSessionFactory();
       DefaultHibernateRepositoryFactory factory =
-          new DefaultHibernateRepositoryFactory(provider.getSessionFactory());
+          new DefaultHibernateRepositoryFactory(sessionFactory);
+      DefaultHibernateRepositoryFactory secondFactory =
+          new DefaultHibernateRepositoryFactory(sessionFactory);
       RepositoryName firstName = new RepositoryName("first-repository");
       RepositoryName secondName = new RepositoryName("second-repository");
       ObjectId firstCommit;
       ObjectId secondCommit;
 
-      HibernateGitStorage firstStorage = factory.open(firstName);
+      HibernateGitStorage firstStorage = secondFactory.open(firstName);
       firstCommit = commit(firstStorage.repository(), "first");
       try (HibernateGitStorage secondStorage = factory.open(secondName)) {
         secondCommit = commit(secondStorage.repository(), "second");
