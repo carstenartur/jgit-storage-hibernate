@@ -18,6 +18,7 @@ jobs:
   jmh:
     name: Hibernate storage JMH benchmarks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
