@@ -8,8 +8,6 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.config;
 
-import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
-import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +31,9 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
 
     Configuration configuration = new Configuration();
     configuration.addProperties(properties);
-    addCoreEntities(configuration);
+    for (Class<?> annotatedClass : CoreEntities.annotatedClasses()) {
+      configuration.addAnnotatedClass(annotatedClass);
+    }
     for (Class<?> annotatedClass : additionalAnnotatedClasses) {
       configuration.addAnnotatedClass(annotatedClass);
     }
@@ -42,11 +42,6 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
 
   public HibernateSessionFactoryProvider(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
-  }
-
-  private static void addCoreEntities(Configuration configuration) {
-    configuration.addAnnotatedClass(GitPackEntity.class);
-    configuration.addAnnotatedClass(GitReflogEntity.class);
   }
 
   public SessionFactory getSessionFactory() {
