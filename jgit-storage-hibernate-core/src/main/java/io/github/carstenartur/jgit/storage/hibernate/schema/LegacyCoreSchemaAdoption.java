@@ -54,6 +54,17 @@ public final class LegacyCoreSchemaAdoption {
       boolean hasCommitted = columns.contains("COMMITTED");
       boolean hasCommittedAt = columns.contains("COMMITTED_AT");
       long packRows = count(connection, "select count(*) from git_packs");
+      if (!missingColumns.isEmpty()) {
+        return new LegacySchemaReport(
+            Set.copyOf(columns),
+            Set.copyOf(missingColumns),
+            packRows,
+            0,
+            List.of(),
+            hasCommitted,
+            hasCommittedAt);
+      }
+
       long incompletePackRows =
           count(
               connection,
