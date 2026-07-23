@@ -137,11 +137,18 @@ application knowledge or restore a known-good backup.
 
 ### Run the one-time adoption migration
 
+The schema is intentionally non-empty before the dedicated adoption history table exists. Baseline
+that history stream at version `0` so Flyway can record the pre-existing state and then execute the
+version `1` adoption migration:
+
 ```java
 Flyway.configure()
     .dataSource(dataSource)
     .locations(CoreSchemaMigrations.HSQLDB_LEGACY_ADOPTION_LOCATION)
     .table(CoreSchemaMigrations.LEGACY_ADOPTION_SCHEMA_HISTORY_TABLE)
+    .baselineOnMigrate(true)
+    .baselineVersion(CoreSchemaMigrations.PRE_MIGRATION_BASELINE_VERSION)
+    .baselineDescription("before pre-library core adoption")
     .load()
     .migrate();
 ```
@@ -154,6 +161,9 @@ Use `POSTGRESQL_LEGACY_ADOPTION_LOCATION` for PostgreSQL. The migration:
 - adds the unique logical pack identity;
 - adds the committed-pack lookup index;
 - leaves every stored BLOB byte unchanged.
+
+The adoption history configuration is used only for this one-time operation. Do not leave
+`baselineOnMigrate(true)` enabled as an unrestricted application-startup repair mechanism.
 
 ### Establish normal Core history
 
