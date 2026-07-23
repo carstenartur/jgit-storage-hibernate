@@ -19,6 +19,7 @@ permissions:
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Cancel superseded runs created before concurrency was enabled
