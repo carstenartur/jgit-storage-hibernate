@@ -186,6 +186,7 @@ class CoreSchemaMigrationIntegrationTest {
     RefUpdate update = repository.updateRef("refs/heads/main");
     update.setExpectedOldObjectId(expectedOldId);
     update.setNewObjectId(newId);
+    update.disableRefLog();
     RefUpdate.Result result = update.update();
     assertTrue(
         result == RefUpdate.Result.NEW || result == RefUpdate.Result.FAST_FORWARD,
