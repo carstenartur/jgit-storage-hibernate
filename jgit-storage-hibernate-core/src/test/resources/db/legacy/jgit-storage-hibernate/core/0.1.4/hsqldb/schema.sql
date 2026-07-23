@@ -8,8 +8,8 @@ create table git_packs (
     data blob not null,
     file_size bigint not null,
     committed boolean not null,
-    created_at timestamp(6) with time zone not null,
-    committed_at timestamp(6) with time zone,
+    created_at timestamp(6) not null,
+    committed_at timestamp(6),
     primary key (id),
     constraint uk_pack_repo_name_ext unique (repository_name, pack_name, pack_extension)
 );
@@ -27,7 +27,7 @@ create table git_reflog (
     new_id varchar(40),
     who_name varchar(255),
     who_email varchar(255),
-    who_when timestamp(6) with time zone not null,
+    who_when timestamp(6) not null,
     message varchar(2048),
     primary key (id)
 );
