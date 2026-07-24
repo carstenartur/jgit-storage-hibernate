@@ -62,8 +62,8 @@ public final class CoreSchemaMigrations {
   /** Current physical core schema version after the 0.1.5 schema-history migration. */
   public static final String CURRENT_SCHEMA_VERSION = "0.1.5";
 
-  /** Version of the one-time pre-library/Sandbox/Taxonomy adoption migration. */
-  public static final String LEGACY_ADOPTION_VERSION = "1";
+  /** Latest version of the pre-library/Sandbox/Taxonomy adoption migration stream. */
+  public static final String LEGACY_ADOPTION_VERSION = "2";
 
   private CoreSchemaMigrations() {}
 }
