@@ -12,7 +12,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  actions: write
   contents: read
   pull-requests: read
 
@@ -22,26 +21,6 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Cancel superseded runs created before concurrency was enabled
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          for status in queued in_progress pending waiting requested; do
-            gh api "repos/${REPOSITORY}/actions/runs?event=pull_request&status=${status}&per_page=100" \
-              | jq -r --argjson pr "${PR_NUMBER}" --arg head "${HEAD_SHA}" '
-                  .workflow_runs[]
-                  | select(.head_sha != $head)
-                  | select(any(.pull_requests[]?; .number == $pr))
-                  | .id' \
-              | while read -r run_id; do
-                  [ -z "${run_id}" ] || gh api -X POST \
-                    "repos/${REPOSITORY}/actions/runs/${run_id}/cancel" || true
-                done
-          done
-
       - name: Checkout
         uses: actions/checkout@v5
 
