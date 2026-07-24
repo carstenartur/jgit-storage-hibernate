@@ -117,7 +117,7 @@ SOURCE_BRANCH=$(git branch --show-current) \
   .github/scripts/release.sh
 ```
 
-A full dry run omits `SKIP_TESTS=true` and therefore also requires Docker for the PostgreSQL Testcontainers suite.
+A full dry run omits `SKIP_TESTS=true` and therefore also requires Docker for the PostgreSQL Testcontainers suite. The script intentionally prepares the release version and documentation in the current checkout before it validates the bundle. A local dry run therefore leaves uncommitted release-preparation changes; run it in a disposable worktree or reset those changes after inspection.
 
 ## Performing a real release
 
@@ -127,7 +127,7 @@ Run the existing **Release** workflow from `main` with:
 release_version = X.Y.Z
 next_development_version = X.Y.Z-SNAPSHOT  # optional
 skip_tests = false
- dry_run = false
+dry_run = false
 publish_github_packages = true             # optional secondary copy
 ```
 
