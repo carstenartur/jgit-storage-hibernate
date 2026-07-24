@@ -38,6 +38,7 @@ jobs:
             .github/scripts/release.sh \
             .github/scripts/verify-central-consumption.sh
           python3 -m py_compile \
+            .github/scripts/build-central-bundle.py \
             .github/scripts/update-release-metadata.py \
             .github/scripts/test_update_release_metadata.py \
             .github/scripts/verify-central-bundle.py \
@@ -125,6 +126,9 @@ jobs:
           SKIP_TESTS=true \
           PUBLISH_GITHUB_PACKAGES=false \
             .github/scripts/release.sh 2>&1 | tee central-release-contract.log
+
+      - name: Require Central bundle evidence
+        run: test -s target/central-publishing/central-bundle.zip
 
       - name: Upload Central release evidence
         if: always()
