@@ -13,6 +13,7 @@ DOCUMENTED_RELEASE_VERSION_FILE=docs/current-release-version.txt
 CENTRAL_CONSUMER_ATTEMPTS=${CENTRAL_CONSUMER_ATTEMPTS:-12}
 CENTRAL_CONSUMER_RETRY_SECONDS=${CENTRAL_CONSUMER_RETRY_SECONDS:-15}
 CENTRAL_DRY_RUN_SETTINGS=
+CENTRAL_DRY_RUN_REPOSITORY=
 TEMP_DIRS=()
 
 cleanup() {
@@ -85,11 +86,12 @@ prepare_ephemeral_signing_key() {
   echo "Generated an ephemeral signing key for Central bundle validation only."
 }
 
-prepare_central_dry_run_settings() {
-  local settings_dir
-  settings_dir=$(mktemp -d)
-  TEMP_DIRS+=("$settings_dir")
-  CENTRAL_DRY_RUN_SETTINGS="$settings_dir/settings.xml"
+prepare_central_dry_run_environment() {
+  local working_dir
+  working_dir=$(mktemp -d)
+  TEMP_DIRS+=("$working_dir")
+  CENTRAL_DRY_RUN_SETTINGS="$working_dir/settings.xml"
+  CENTRAL_DRY_RUN_REPOSITORY="$working_dir/repository"
 
   # The Central plugin resolves its configured server before it evaluates
   # skipPublishing. Bundle-only verification therefore needs a server entry, but
@@ -252,13 +254,19 @@ fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
   prepare_ephemeral_signing_key
-  prepare_central_dry_run_settings
+  prepare_central_dry_run_environment
   mvn -B \
     -s "$CENTRAL_DRY_RUN_SETTINGS" \
+    -Dmaven.repo.local="$CENTRAL_DRY_RUN_REPOSITORY" \
     -Pcentral-release \
     -DskipTests \
     -Dcentral.skipPublishing=true \
     deploy
+  rm -rf target/central-publishing
+  python3 .github/scripts/build-central-bundle.py \
+    "$RELEASE_VERSION" \
+    "$CENTRAL_DRY_RUN_REPOSITORY" \
+    target/central-publishing/central-bundle.zip
   python3 .github/scripts/verify-central-bundle.py "$RELEASE_VERSION"
   echo "Dry run completed after signed Central bundle validation and before upload/tag/release."
   exit 0
