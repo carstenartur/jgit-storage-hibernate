@@ -9,6 +9,7 @@ from pathlib import Path
 
 NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 ROOT_POM = Path("pom.xml")
+MAVEN_WORKFLOW = Path(".github/workflows/maven.yml")
 RELEASE_WORKFLOW = Path(".github/workflows/release.yml")
 SNAPSHOT_WORKFLOW = Path(".github/workflows/publish-snapshot.yml")
 RELEASE_SCRIPT = Path(".github/scripts/release.sh")
@@ -79,8 +80,11 @@ def execution_has(plugin_element: ET.Element | None, phase: str, goal: str) -> b
     for execution in plugin_element.findall("m:executions/m:execution", NS):
         if text(execution, "m:phase") != phase:
             continue
-        goals = {goal_element.text.strip() for goal_element in execution.findall("m:goals/m:goal", NS)
-                 if goal_element.text}
+        goals = {
+            goal_element.text.strip()
+            for goal_element in execution.findall("m:goals/m:goal", NS)
+            if goal_element.text
+        }
         if goal in goals:
             return True
     return False
@@ -208,6 +212,18 @@ def verify_workflows_and_scripts(errors: list[str]) -> None:
         if fragment not in release_workflow:
             fail(errors, f"{RELEASE_WORKFLOW} is missing {fragment!r}")
 
+    maven_workflow = read(MAVEN_WORKFLOW, errors)
+    for fragment in (
+        "Maven Central release contract",
+        "set -o pipefail",
+        "DRY_RUN=true",
+        "PUBLISH_GITHUB_PACKAGES=false",
+        "if-no-files-found: error",
+        "target/central-publishing/*.zip",
+    ):
+        if fragment not in maven_workflow:
+            fail(errors, f"{MAVEN_WORKFLOW} is missing {fragment!r}")
+
     snapshot_workflow = read(SNAPSHOT_WORKFLOW, errors)
     if "-Pgithub-packages" not in snapshot_workflow:
         fail(errors, f"{SNAPSHOT_WORKFLOW} must activate github-packages explicitly")
@@ -218,11 +234,14 @@ def verify_workflows_and_scripts(errors: list[str]) -> None:
         "-Pgithub-packages",
         "verify-central-bundle.py",
         "verify-central-consumption.sh",
+        "verify-central-publishing.py",
         "CENTRAL_USERNAME",
         "CENTRAL_PASSWORD",
         "MAVEN_GPG_KEY",
         "MAVEN_GPG_PASSPHRASE",
         "PUBLISH_GITHUB_PACKAGES",
+        "CENTRAL_DRY_RUN_SETTINGS",
+        "bundle-only-dry-run",
         "-Dcentral.skipPublishing=true",
     ):
         if fragment not in release_script:
