@@ -57,7 +57,7 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
   private static TestDatabase fileDatabase(Path directory, String purpose) {
     String databaseName = "core_hsqldb_" + purpose + "_" + TEST_COUNTER.incrementAndGet();
     String path = directory.resolve(databaseName).toAbsolutePath().toString().replace('\\', '/');
-    return database("jdbc:hsqldb:file:" + path);
+    return database("jdbc:hsqldb:file:" + path + ";hsqldb.tx=mvcc");
   }
 
   private static TestDatabase database(String url) {
