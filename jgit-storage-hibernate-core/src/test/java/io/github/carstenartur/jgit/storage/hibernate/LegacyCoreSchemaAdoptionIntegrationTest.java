@@ -427,9 +427,9 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
         Statement statement = connection.createStatement();
         ResultSet resultSet =
             statement.executeQuery(
-                "select version from \""
+                "select \"version\" from \""
                     + CoreSchemaMigrations.LEGACY_ADOPTION_SCHEMA_HISTORY_TABLE
-                    + "\" where success = true order by installed_rank")) {
+                    + "\" where \"success\" = true order by \"installed_rank\"")) {
       while (resultSet.next()) {
         versions.add(resultSet.getString(1));
       }
