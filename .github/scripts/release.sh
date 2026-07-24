@@ -12,6 +12,7 @@ TAG_NAME="v${RELEASE_VERSION}"
 DOCUMENTED_RELEASE_VERSION_FILE=docs/current-release-version.txt
 CENTRAL_CONSUMER_ATTEMPTS=${CENTRAL_CONSUMER_ATTEMPTS:-12}
 CENTRAL_CONSUMER_RETRY_SECONDS=${CENTRAL_CONSUMER_RETRY_SECONDS:-15}
+CENTRAL_DRY_RUN_SETTINGS=
 TEMP_DIRS=()
 
 cleanup() {
@@ -82,6 +83,32 @@ prepare_ephemeral_signing_key() {
   MAVEN_GPG_PASSPHRASE=''
   export MAVEN_GPG_KEY MAVEN_GPG_PASSPHRASE
   echo "Generated an ephemeral signing key for Central bundle validation only."
+}
+
+prepare_central_dry_run_settings() {
+  local settings_dir
+  settings_dir=$(mktemp -d)
+  TEMP_DIRS+=("$settings_dir")
+  CENTRAL_DRY_RUN_SETTINGS="$settings_dir/settings.xml"
+
+  # The Central plugin resolves its configured server before it evaluates
+  # skipPublishing. Bundle-only verification therefore needs a server entry, but
+  # these fixed placeholders are never sent because upload is explicitly skipped.
+  cat > "$CENTRAL_DRY_RUN_SETTINGS" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <interactiveMode>false</interactiveMode>
+  <servers>
+    <server>
+      <id>central</id>
+      <username>bundle-only-dry-run</username>
+      <password>bundle-only-dry-run</password>
+    </server>
+  </servers>
+</settings>
+XML
 }
 
 publish_github_packages() {
@@ -225,7 +252,9 @@ fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
   prepare_ephemeral_signing_key
+  prepare_central_dry_run_settings
   mvn -B \
+    -s "$CENTRAL_DRY_RUN_SETTINGS" \
     -Pcentral-release \
     -DskipTests \
     -Dcentral.skipPublishing=true \
