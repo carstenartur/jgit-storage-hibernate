@@ -14,14 +14,9 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
-import java.util.Comparator;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 class CoreHsqlDbSchemaMigrationIntegrationTest {
@@ -45,39 +40,11 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
   }
 
   @Test
+  @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
   void persistsRepositoryAcrossFileBackedDatabaseRestart(@TempDir Path directory)
       throws Exception {
-    ScheduledExecutorService watchdog =
-        Executors.newSingleThreadScheduledExecutor(
-            runnable -> {
-              Thread thread = new Thread(runnable, "hsqldb-restart-watchdog");
-              thread.setDaemon(true);
-              return thread;
-            });
-    ScheduledFuture<?> timeout =
-        watchdog.schedule(CoreHsqlDbSchemaMigrationIntegrationTest::dumpThreadsAndHalt, 45, TimeUnit.SECONDS);
     try (TestDatabase database = fileDatabase(directory, "restart")) {
       CoreSchemaMigrationIntegrationTest.verifyEmptyMigrationAndRestart(database);
-    } finally {
-      timeout.cancel(false);
-      watchdog.shutdownNow();
-    }
-  }
-
-  private static void dumpThreadsAndHalt() {
-    System.err.println("=== HSQLDB restart watchdog thread dump ===");
-    Thread.getAllStackTraces().entrySet().stream()
-        .sorted(Comparator.comparing(entry -> entry.getKey().getName()))
-        .forEach(CoreHsqlDbSchemaMigrationIntegrationTest::printThread);
-    System.err.flush();
-    Runtime.getRuntime().halt(124);
-  }
-
-  private static void printThread(Map.Entry<Thread, StackTraceElement[]> entry) {
-    Thread thread = entry.getKey();
-    System.err.printf("\n\"%s\" id=%d state=%s%n", thread.getName(), thread.threadId(), thread.getState());
-    for (StackTraceElement frame : entry.getValue()) {
-      System.err.println("    at " + frame);
     }
   }
 
@@ -90,7 +57,7 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
   private static TestDatabase fileDatabase(Path directory, String purpose) {
     String databaseName = "core_hsqldb_" + purpose + "_" + TEST_COUNTER.incrementAndGet();
     String path = directory.resolve(databaseName).toAbsolutePath().toString().replace('\\', '/');
-    return database("jdbc:hsqldb:file:" + path + ";hsqldb.tx=mvcc");
+    return database("jdbc:hsqldb:file:" + path);
   }
 
   private static TestDatabase database(String url) {
