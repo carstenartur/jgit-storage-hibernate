@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.carstenartur.verification</groupId>
+  <artifactId>jgit-storage-hibernate-central-consumer</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <name>jgit-storage-hibernate Maven Central clean-room consumer</name>
+  <description>
+    Resolves every public release artifact without GitHub repositories or credentials.
+  </description>
+
+  <properties>
+    <central.version>0.0.0</central.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-core</artifactId>
+      <version>${central.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-search</artifactId>
+      <version>${central.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
+      <version>${central.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-architecture</artifactId>
+      <version>${central.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-benchmarks</artifactId>
+      <version>${central.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.11.0</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>
