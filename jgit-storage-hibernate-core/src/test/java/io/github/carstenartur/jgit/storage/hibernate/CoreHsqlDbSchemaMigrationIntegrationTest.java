@@ -40,7 +40,7 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
   }
 
   @Test
-  @Timeout(60)
+  @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
   void persistsRepositoryAcrossFileBackedDatabaseRestart(@TempDir Path directory)
       throws Exception {
     try (TestDatabase database = fileDatabase(directory, "restart")) {
