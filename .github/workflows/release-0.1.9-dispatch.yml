@@ -1,0 +1,87 @@
+name: Dispatch release 0.1.9
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/release-0.1.9-dispatch.yml'
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: release-dispatch-0.1.9
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: github.event.head_commit.message == 'Dispatch release 0.1.9'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Validate and publish through the canonical release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          DISPATCHER_PATH: .github/workflows/release-0.1.9-dispatch.yml
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dispatch_and_wait() {
+            local dry_run="$1"
+            local label="$2"
+            local before_file
+            before_file=$(mktemp)
+
+            gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?event=workflow_dispatch&per_page=100" \
+              --jq '.workflow_runs[].id' > "${before_file}"
+
+            gh workflow run release.yml \
+              --repo "${REPOSITORY}" \
+              --ref main \
+              -f release_version=0.1.9 \
+              -f next_development_version=0.1.10-SNAPSHOT \
+              -f skip_tests=false \
+              -f dry_run="${dry_run}"
+
+            local run_id=""
+            for attempt in $(seq 1 60); do
+              while IFS= read -r candidate; do
+                if ! grep -qx "${candidate}" "${before_file}"; then
+                  run_id="${candidate}"
+                  break
+                fi
+              done < <(
+                gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?event=workflow_dispatch&per_page=100" \
+                  --jq '.workflow_runs | sort_by(.created_at) | reverse | .[].id'
+              )
+              if [[ -n "${run_id}" ]]; then
+                break
+              fi
+              sleep 2
+            done
+            rm -f "${before_file}"
+
+            if [[ -z "${run_id}" ]]; then
+              echo "::error::Could not identify the ${label} workflow run"
+              exit 1
+            fi
+
+            echo "${label} workflow run: ${run_id}"
+            gh run watch "${run_id}" --repo "${REPOSITORY}" --exit-status
+          }
+
+          dispatch_and_wait true "Release dry run"
+
+          dispatcher_sha=$(
+            gh api "repos/${REPOSITORY}/contents/${DISPATCHER_PATH}?ref=main" --jq '.sha'
+          )
+          gh api -X DELETE "repos/${REPOSITORY}/contents/${DISPATCHER_PATH}" \
+            -f message='Remove temporary release 0.1.9 dispatcher' \
+            -f sha="${dispatcher_sha}" \
+            -f branch=main >/dev/null
+
+          dispatch_and_wait false "Release 0.1.9"
