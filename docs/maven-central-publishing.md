@@ -32,6 +32,27 @@ The official registration, namespace and token documentation is maintained at:
 - <https://central.sonatype.org/register/namespace/>
 - <https://central.sonatype.org/publish/generate-portal-token/>
 
+### Portal login troubleshooting
+
+Use the current Publisher Portal at `central.sonatype.com`; do not use the retired OSSRH, Jira, `oss.sonatype.org`, or `s01.oss.sonatype.org` login pages for this publishing path.
+
+When **Continue with GitHub** does not complete or returns to the sign-in page:
+
+1. open a private/incognito browser window;
+2. allow cookies and pop-ups for both `central.sonatype.com` and `github.com`;
+3. temporarily disable strict tracking protection or content blockers for those two sites;
+4. confirm that the GitHub account has an accessible, verified email address;
+5. retry the GitHub login using the `carstenartur` account rather than a different personal or organization identity.
+
+The Portal also supports a dedicated username/password account. GitHub social login is preferred here because it normally provisions the verified `io.github.carstenartur` namespace automatically. If login succeeds but that namespace is absent, or if the redirect loop remains after the browser checks above, contact `central-support@sonatype.com` and include:
+
+- the account email address;
+- GitHub username `carstenartur`;
+- expected namespace `io.github.carstenartur`;
+- the exact error, timestamp, browser and a screenshot.
+
+Never send support a password, Portal token, PGP private key, private-key backup, or GitHub secret value.
+
 ## One-time signing-key setup
 
 Central requires detached PGP signatures for the POM, primary JAR, source JAR and Javadoc JAR of every published component.
@@ -68,6 +89,72 @@ Central's signing requirements and GPG guidance are maintained at:
 
 - <https://central.sonatype.org/publish/requirements/>
 - <https://central.sonatype.org/publish/requirements/gpg/>
+
+### Browser-only setup with GitHub Codespaces
+
+Do not use an arbitrary web-based OpenPGP key generator: the page can observe or retain the private key. A safer browser-only option is a private GitHub Codespace, where the commands execute in an isolated terminal and the private key can be transferred directly into repository Actions secrets without placing it in the repository or workflow logs.
+
+1. Open this repository on GitHub, choose **Code → Codespaces**, and create a Codespace for the Central publishing branch.
+2. Open its browser terminal and check that GnuPG and GitHub CLI are available:
+
+   ```bash
+   gpg --version || (sudo apt-get update && sudo apt-get install -y gnupg)
+   gh auth status
+   ```
+
+3. Generate a dedicated two-year signing key without placing the passphrase in shell history:
+
+   ```bash
+   read -r -p "Signing name: " KEY_NAME
+   read -r -p "Signing email: " KEY_EMAIL
+   read -r -s -p "Signing passphrase: " KEY_PASSPHRASE
+   echo
+
+   gpg --batch --pinentry-mode loopback \
+     --passphrase "$KEY_PASSPHRASE" \
+     --quick-generate-key \
+     "$KEY_NAME <$KEY_EMAIL>" rsa3072 sign 2y
+
+   FINGERPRINT=$(gpg --batch --with-colons --list-secret-keys "$KEY_EMAIL" \
+     | awk -F: '$1 == "fpr" { print $10; exit }')
+   test -n "$FINGERPRINT"
+   printf 'Signing-key fingerprint: %s\n' "$FINGERPRINT"
+   ```
+
+4. Publish only the public key to a Central-supported keyserver:
+
+   ```bash
+   gpg --keyserver keyserver.ubuntu.com --send-keys "$FINGERPRINT"
+   ```
+
+5. Export the private key to a temporary file and write both values directly to repository Actions secrets:
+
+   ```bash
+   gpg --batch --pinentry-mode loopback \
+     --passphrase "$KEY_PASSPHRASE" \
+     --armor --export-secret-keys "$FINGERPRINT" \
+     > /tmp/central-private-key.asc
+
+   gh secret set MAVEN_CENTRAL_GPG_PRIVATE_KEY \
+     --repo carstenartur/jgit-storage-hibernate \
+     < /tmp/central-private-key.asc
+
+   printf '%s' "$KEY_PASSPHRASE" \
+     | gh secret set MAVEN_CENTRAL_GPG_PASSPHRASE \
+         --repo carstenartur/jgit-storage-hibernate
+   ```
+
+6. Keep an encrypted offline backup of the key and its revocation certificate in administrator-controlled secure storage. Then remove the temporary export and shell variables:
+
+   ```bash
+   shred -u /tmp/central-private-key.asc 2>/dev/null \
+     || rm -f /tmp/central-private-key.asc
+   unset KEY_PASSPHRASE KEY_NAME KEY_EMAIL FINGERPRINT
+   ```
+
+7. Delete the Codespace after confirming the two GitHub secrets exist. Never expose the private key through a workflow artifact, issue comment, pull-request comment, terminal screenshot or Actions log.
+
+The browser/Codespaces path only handles the signing key. The Portal login and Portal user token are still required for `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`.
 
 ## Repository implementation
 
