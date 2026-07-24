@@ -8,7 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate;
 
-/** Factory for opening Hibernate-backed JGit repositories. */
+/** Factory for opening and deleting Hibernate-backed JGit repositories. */
 public interface HibernateRepositoryFactory {
 
   /**
@@ -18,4 +18,19 @@ public interface HibernateRepositoryFactory {
    * @return opened storage facade
    */
   HibernateGitStorage open(RepositoryName repositoryName);
+
+  /**
+   * Transactionally delete all persisted state for one logical repository.
+   *
+   * <p>All storage handles opened through {@link DefaultHibernateRepositoryFactory} for the
+   * requested name and the same Hibernate {@code SessionFactory} must be closed first, including
+   * handles opened by another factory instance. The operation is idempotent and never deletes rows
+   * belonging to another logical repository. Code that bypasses the public factory and constructs
+   * internal repository implementations directly is responsible for closing those handles before
+   * invoking this lifecycle operation.
+   *
+   * @param repositoryName logical repository to delete
+   * @return deleted row counts
+   */
+  RepositoryDeletionResult deleteRepository(RepositoryName repositoryName);
 }

@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.refs;
 
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.IOException;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -19,13 +20,12 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.ReflogReader;
-import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
 /** Reads queryable reflog entries from the {@code git_reflog} table. */
 public class HibernateReflogReader implements ReflogReader {
 
-  private final SessionFactory sessionFactory;
+  private final HibernateTransactionContext transactionContext;
   private final String repositoryName;
   private final String refName;
 
@@ -37,7 +37,19 @@ public class HibernateReflogReader implements ReflogReader {
    * @param refName reference name
    */
   public HibernateReflogReader(SessionFactory sessionFactory, String repositoryName, String refName) {
-    this.sessionFactory = sessionFactory;
+    this(new HibernateTransactionContext(sessionFactory), repositoryName, refName);
+  }
+
+  /**
+   * Create a reader that can join the repository transaction active on the calling thread.
+   *
+   * @param transactionContext repository transaction context
+   * @param repositoryName logical repository name
+   * @param refName reference name
+   */
+  public HibernateReflogReader(
+      HibernateTransactionContext transactionContext, String repositoryName, String refName) {
+    this.transactionContext = transactionContext;
     this.repositoryName = repositoryName;
     this.refName = refName;
   }
@@ -61,23 +73,24 @@ public class HibernateReflogReader implements ReflogReader {
 
   @Override
   public List<ReflogEntry> getReverseEntries(int max) throws IOException {
-    try (Session session = sessionFactory.openSession()) {
-      List<GitReflogEntity> entities =
-          session
-              .createQuery(
-                  "FROM GitReflogEntity r WHERE r.repositoryName = :repo AND r.refName = :ref "
-                      + "ORDER BY r.id DESC",
-                  GitReflogEntity.class)
-              .setParameter("repo", repositoryName)
-              .setParameter("ref", refName)
-              .setMaxResults(max)
-              .getResultList();
-      List<ReflogEntry> result = new ArrayList<>(entities.size());
-      for (GitReflogEntity entity : entities) {
-        result.add(new DbReflogEntry(entity));
-      }
-      return Collections.unmodifiableList(result);
-    }
+    return transactionContext.execute(
+        session -> {
+          List<GitReflogEntity> entities =
+              session
+                  .createQuery(
+                      "FROM GitReflogEntity r WHERE r.repositoryName = :repo AND r.refName = :ref "
+                          + "ORDER BY r.id DESC",
+                      GitReflogEntity.class)
+                  .setParameter("repo", repositoryName)
+                  .setParameter("ref", refName)
+                  .setMaxResults(max)
+                  .getResultList();
+          List<ReflogEntry> result = new ArrayList<>(entities.size());
+          for (GitReflogEntity entity : entities) {
+            result.add(new DbReflogEntry(entity));
+          }
+          return Collections.unmodifiableList(result);
+        });
   }
 
   private static final class DbReflogEntry implements ReflogEntry {
@@ -87,8 +100,10 @@ public class HibernateReflogReader implements ReflogReader {
     private final String comment;
 
     private DbReflogEntry(GitReflogEntity entity) {
-      this.oldId = entity.getOldId() != null ? ObjectId.fromString(entity.getOldId()) : ObjectId.zeroId();
-      this.newId = entity.getNewId() != null ? ObjectId.fromString(entity.getNewId()) : ObjectId.zeroId();
+      this.oldId =
+          entity.getOldId() != null ? ObjectId.fromString(entity.getOldId()) : ObjectId.zeroId();
+      this.newId =
+          entity.getNewId() != null ? ObjectId.fromString(entity.getNewId()) : ObjectId.zeroId();
       this.who =
           new PersonIdent(
               entity.getWhoName() != null ? entity.getWhoName() : "",

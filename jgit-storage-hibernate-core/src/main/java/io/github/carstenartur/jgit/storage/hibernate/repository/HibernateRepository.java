@@ -12,6 +12,7 @@ import io.github.carstenartur.jgit.storage.hibernate.objects.HibernateObjDatabas
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.IOException;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -30,6 +31,7 @@ public class HibernateRepository extends DfsRepository {
   private final HibernateObjDatabase objectDatabase;
   private final HibernateRefDatabase refDatabase;
   private final HibernateReflogWriter reflogWriter;
+  private final HibernateTransactionContext transactionContext;
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private String gitwebDescription;
@@ -43,10 +45,16 @@ public class HibernateRepository extends DfsRepository {
     super(builder);
     this.sessionFactory = builder.getSessionFactory();
     this.repositoryName = builder.getRepositoryName();
+    this.transactionContext = new HibernateTransactionContext(sessionFactory);
     this.objectDatabase =
-        new HibernateObjDatabase(this, builder.getReaderOptions(), sessionFactory, repositoryName);
+        new HibernateObjDatabase(
+            this,
+            builder.getReaderOptions(),
+            sessionFactory,
+            repositoryName,
+            transactionContext);
+    this.reflogWriter = new HibernateReflogWriter(transactionContext, repositoryName);
     this.refDatabase = new HibernateRefDatabase(this);
-    this.reflogWriter = new HibernateReflogWriter(sessionFactory, repositoryName);
   }
 
   /**
@@ -94,7 +102,44 @@ public class HibernateRepository extends DfsRepository {
   }
 
   /**
+   * Execute repository storage work in one shared transaction.
+   *
+   * <p>If a transaction is rolled back after JGit has constructed an in-memory pack or Reftable
+   * view, the repository caches are invalidated before the failure is returned. The next read then
+   * rebuilds its view from committed database rows instead of retaining rolled-back state.
+   *
+   * @param work work that may persist packs, refs and reflog rows
+   * @param <T> work result type
+   * @return work result
+   * @throws IOException if storage work fails
+   */
+  public <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
+    try {
+      return transactionContext.execute(work);
+    } catch (IOException | RuntimeException exception) {
+      invalidateStorageCaches(exception);
+      throw exception;
+    }
+  }
+
+  private void invalidateStorageCaches(Exception originalFailure) {
+    try {
+      objectDatabase.close();
+    } catch (RuntimeException cacheFailure) {
+      originalFailure.addSuppressed(cacheFailure);
+    }
+    try {
+      refDatabase.refresh();
+    } catch (RuntimeException cacheFailure) {
+      originalFailure.addSuppressed(cacheFailure);
+    }
+  }
+
+  /**
    * Return the queryable reflog writer.
+   *
+   * <p>Normal {@code RefUpdate} operations already write queryable reflogs. This writer remains
+   * available for importing externally produced history.
    *
    * @return reflog writer
    */
@@ -104,7 +149,7 @@ public class HibernateRepository extends DfsRepository {
 
   @Override
   public ReflogReader getReflogReader(String refName) throws IOException {
-    return new HibernateReflogReader(sessionFactory, repositoryName, refName);
+    return new HibernateReflogReader(transactionContext, repositoryName, refName);
   }
 
   @Override

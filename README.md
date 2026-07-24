@@ -103,7 +103,7 @@ Git objects and refs remain authoritative. Search, Java Analysis and Architectur
 
 ## Five-minute production setup
 
-The documented release line is **0.1.7**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; H2 2.4.x is supported for tests, demos and lightweight development.
+The documented release line is **0.1.7**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; HSQLDB 2.7 is supported for embedded persistent deployments; H2 2.4.x remains supported for tests, demos and lightweight development.
 
 ### 1. Add the Core dependency
 
@@ -128,7 +128,7 @@ Flyway.configure()
     .migrate();
 ```
 
-A shared schema or an existing 0.1.4 installation requires a deliberate one-time baseline. Do not enable `baselineOnMigrate` blindly; follow the provisioning runbooks in [docs/consuming.md](docs/consuming.md).
+Use `CoreSchemaMigrations.HSQLDB_LOCATION` for HSQLDB. A shared schema, an existing 0.1.4 installation or a copied pre-library Taxonomy schema requires a deliberate one-time procedure. Do not enable `baselineOnMigrate` blindly; follow the provisioning runbooks in [docs/consuming.md](docs/consuming.md) and the [Taxonomy adoption runbook](docs/taxonomy-adoption.md).
 
 ### 3. Make Hibernate validate, not mutate, the production schema
 
@@ -151,7 +151,7 @@ try (HibernateSessionFactoryProvider provider =
 }
 ```
 
-Framework-managed applications can supply their own Hibernate `SessionFactory` and share a `DataSource`, mappings and lifecycle with application entities.
+Framework-managed applications can supply their own Hibernate `SessionFactory` and share a `DataSource`, mappings and lifecycle with application entities. `CoreEntities.annotatedClasses()` provides the stable entity-registration contract.
 
 ## Transaction-safe database publication
 
@@ -159,12 +159,13 @@ Core uses explicit Hibernate transactions rather than presenting partially writt
 
 - pack extensions are first persisted with `committed=false` and are invisible to `listPacks()` and `openFile(...)`;
 - publishing all extensions of a pack and deleting replaced packs happens in one transaction and rolls back on failure;
-- the Reftable ref database advertises atomic ref transactions, with Reftable files published through the same pack mechanism;
-- queryable reflog appends and Search projection upserts each run in their own transaction.
+- normal JGit `RefUpdate` operations publish the Reftable and append the queryable `git_reflog` row in the same repository-scoped transaction;
+- failed optimistic ref updates do not append a queryable reflog entry;
+- Search projection upserts remain separate, retryable derived-state operations.
 
 This is the ACID benefit described in the original [JGit discussion #251](https://github.com/eclipse-jgit/jgit/discussions/251).
 
-The guarantee is deliberately **per storage operation**. The implementation does not provide one ambient transaction spanning an arbitrary application entity, Git object insertion, ref publication, reflog append, Search indexing and Java analysis. Those are separate retryable steps. See the [precise transaction contract and failure behavior](docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
+The guarantee is deliberately **per storage operation**. The implementation does not provide one ambient transaction spanning an arbitrary application entity, Git object insertion, Search indexing and Java analysis. Those are separate retryable steps. See the [precise transaction contract and failure behavior](docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
 
 ## Indexing and consistency model
 
@@ -177,18 +178,18 @@ The guarantee is deliberately **per storage operation**. The implementation does
 
 ## Versioned database contract
 
-Core and Search package Flyway-compatible SQL resources for H2 and PostgreSQL in their own artifacts. They use separate history tables so both modules can evolve independently inside one application schema.
+Core packages Flyway-compatible SQL resources for H2, HSQLDB and PostgreSQL. Search currently packages H2 and PostgreSQL resources. Modules use separate history tables so they can evolve independently inside one application schema.
 
-| Artifact | H2 location | PostgreSQL location | History table |
-|---|---|---|---|
-| Core | `classpath:db/migration/jgit-storage-hibernate/core/h2` | `classpath:db/migration/jgit-storage-hibernate/core/postgresql` | `jgit_storage_hibernate_core_schema_history` |
-| Search | `classpath:db/migration/jgit-storage-hibernate/search/h2` | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` | `jgit_storage_hibernate_search_schema_history` |
+| Artifact | H2 location | HSQLDB location | PostgreSQL location | History table |
+|---|---|---|---|---|
+| Core | `classpath:db/migration/jgit-storage-hibernate/core/h2` | `classpath:db/migration/jgit-storage-hibernate/core/hsqldb` | `classpath:db/migration/jgit-storage-hibernate/core/postgresql` | `jgit_storage_hibernate_core_schema_history` |
+| Search | `classpath:db/migration/jgit-storage-hibernate/search/h2` | — | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` | `jgit_storage_hibernate_search_schema_history` |
 
-See [docs/consuming.md](docs/consuming.md) for fresh installation, shared-schema installation, 0.1.4 adoption, backup, failure handling, checksum policy, rollback strategy and multi-version upgrades.
+The copied pre-library schema has dedicated HSQLDB and PostgreSQL adoption locations plus a separate adoption history table. See [docs/taxonomy-adoption.md](docs/taxonomy-adoption.md) for duplicate detection, BLOB-preserving migration, Spring-managed integration, reflogs and repository deletion.
 
 ## Verification and compatibility
 
-`mvn verify` exercises H2 and, with Docker, PostgreSQL through Testcontainers. CI also checks JGit 7.5/7.6/7.7 compatibility, dependency changes, JMH benchmarks and release/documentation consistency.
+`mvn verify` exercises H2, HSQLDB in-memory/file-backed restart paths and, with Docker, PostgreSQL through Testcontainers. CI also checks JGit 7.5/7.6/7.7 compatibility, dependency changes, JMH benchmarks and release/documentation consistency.
 
 ## Documentation
 
@@ -196,6 +197,7 @@ See [docs/consuming.md](docs/consuming.md) for fresh installation, shared-schema
 - [Approval-workflow use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
 - [History query cookbook](docs/query-cookbook.md)
 - [Consumer and migration operations guide](docs/consuming.md)
+- [Taxonomy/Spring adoption runbook](docs/taxonomy-adoption.md)
 - [Core module guide](jgit-storage-hibernate-core/README.md)
 - [Search module guide](jgit-storage-hibernate-search/README.md)
 - [Java-analysis module guide](jgit-storage-hibernate-java-analysis/README.md)

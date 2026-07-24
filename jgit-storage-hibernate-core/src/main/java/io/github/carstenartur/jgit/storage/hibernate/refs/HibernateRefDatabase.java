@@ -8,20 +8,31 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.refs;
 
-import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
+import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import java.io.IOException;
 import org.eclipse.jgit.internal.storage.dfs.DfsReftableDatabase;
 import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdRef;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefUpdate;
+import org.hibernate.Session;
 
 /** Reference database using JGit DFS reftables persisted through the Hibernate object database. */
 public class HibernateRefDatabase extends DfsReftableDatabase {
 
+  private final HibernateRepository repository;
+
   /**
    * Create a reference database.
    *
-   * @param repository owning DFS repository
+   * @param repository owning Hibernate repository
    */
-  public HibernateRefDatabase(DfsRepository repository) {
+  public HibernateRefDatabase(HibernateRepository repository) {
     super(repository);
+    this.repository = repository;
   }
 
   @Override
@@ -36,5 +47,48 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
   @Override
   public boolean performsAtomicTransactions() {
     return true;
+  }
+
+  @Override
+  public RefUpdate newUpdate(String refName, boolean detach) throws IOException {
+    boolean detachingSymbolicRef = false;
+    Ref ref = exactRef(refName);
+    if (ref == null) {
+      ref = new ObjectIdRef.Unpeeled(Ref.Storage.NEW, refName, null);
+    } else {
+      detachingSymbolicRef = detach && ref.isSymbolic();
+    }
+
+    HibernateRefUpdate update = new HibernateRefUpdate(this, ref);
+    if (detachingSymbolicRef) {
+      update.setDetachingSymbolicRef();
+    }
+    return update;
+  }
+
+  HibernateRepository repository() {
+    return repository;
+  }
+
+  boolean compareAndPutRef(Ref oldRef, Ref newRef) throws IOException {
+    return super.compareAndPut(oldRef, newRef);
+  }
+
+  boolean compareAndRemoveRef(Ref oldRef) throws IOException {
+    return super.compareAndRemove(oldRef);
+  }
+
+  <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
+    return repository.inTransaction(work);
+  }
+
+  void writeReflog(
+      Session session,
+      String refName,
+      ObjectId oldId,
+      ObjectId newId,
+      PersonIdent who,
+      String message) {
+    repository.getReflogWriter().log(session, refName, oldId, newId, who, message);
   }
 }
