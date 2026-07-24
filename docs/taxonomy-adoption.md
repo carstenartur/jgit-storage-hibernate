@@ -107,15 +107,18 @@ pre-migration baseline version `0` once, as documented in [consuming.md](consumi
 ## Adopting the pre-library Taxonomy schema
 
 The copied pre-library schema contains `git_packs` rows without `committed` and `committed_at`, and
-without the logical pack-identity constraint. Adoption is intentionally a separate migration stream;
-it is not hidden inside a normal fresh-install migration.
+without the logical pack-identity constraint. It also uses the JPA-default length 255 for
+`git_packs.pack_extension` and `git_reflog.ref_name`; the released Core contract requires lengths 32
+and 1024 respectively. Adoption is intentionally a separate migration stream; it is not hidden
+inside a normal fresh-install migration.
 
 ### Preconditions
 
 1. Stop every writer and take a restorable database backup.
-2. Verify that `git_packs` and `git_reflog` are the copied Sandbox/Taxonomy tables.
+2. Verify that `git_packs` and `git_reflog` are the copied Sandbox/Taxonomy tables, including the
+   legacy `VARCHAR(255)` lengths for `pack_extension` and `ref_name`.
 3. Verify that no Core Flyway history table claims the schema is already managed.
-4. Record repository counts and BLOB checksums.
+4. Record repository counts, ordered BLOB checksums and the existing reflog rows.
 5. Run the read-only preflight before any Flyway DDL.
 
 ```java
@@ -123,7 +126,7 @@ try (Connection connection = dataSource.getConnection()) {
   LegacyCoreSchemaAdoption.LegacySchemaReport report =
       LegacyCoreSchemaAdoption.requireSafeToAdopt(connection);
   if (!report.requiresAdoption()) {
-    throw new IllegalStateException("Schema is already adopted; do not run the legacy migration");
+    throw new IllegalStateException("Schema is already adopted; do not run adoption V1 again");
   }
 }
 ```
@@ -133,16 +136,17 @@ The preflight rejects:
 - missing legacy columns;
 - a partial state containing only one of `committed` or `committed_at`;
 - null/incomplete pack rows or negative file sizes;
+- `pack_extension` values longer than 32 characters;
 - duplicate `(repository_name, pack_name, pack_extension)` identities.
 
-It never chooses a duplicate row automatically. Operators must resolve duplicates explicitly from
-application knowledge or restore a known-good backup.
+It never chooses a duplicate row or truncates an oversized extension automatically. Operators must
+resolve such rows explicitly from application knowledge or restore a known-good backup.
 
-### Run the one-time adoption migration
+### Run the adoption migration stream
 
 The schema is intentionally non-empty before the dedicated adoption history table exists. Baseline
-that history stream at version `0` so Flyway can record the pre-existing state and then execute the
-version `1` adoption migration:
+that history stream at version `0` so Flyway can record the pre-existing state and then execute all
+pending adoption migrations:
 
 ```java
 Flyway.configure()
@@ -156,17 +160,34 @@ Flyway.configure()
     .migrate();
 ```
 
-Use `POSTGRESQL_LEGACY_ADOPTION_LOCATION` for PostgreSQL. The migration:
+Use `POSTGRESQL_LEGACY_ADOPTION_LOCATION` for PostgreSQL. The migration stream:
 
 - adds `committed` and `committed_at`;
 - marks every pre-existing pack extension committed;
 - initializes `committed_at` from `created_at`;
 - adds the unique logical pack identity;
 - adds the committed-pack lookup index;
-- leaves every stored BLOB byte unchanged.
+- narrows `git_packs.pack_extension` from the exact legacy length 255 to 32 after preflight;
+- widens `git_reflog.ref_name` from the exact legacy length 255 to 1024;
+- leaves every stored BLOB byte and existing reflog row unchanged.
 
 The adoption history configuration is used only for this one-time operation. Do not leave
 `baselineOnMigrate(true)` enabled as an unrestricted application-startup repair mechanism.
+
+### Follow-up for databases already adopted with 0.1.8
+
+Version 0.1.8 published adoption migration V1 without the two column-length changes. V1 remains
+immutable so existing Flyway checksums stay valid. The correction is adoption migration V2.
+
+For a database whose adoption history already contains successful version `1`, stop writers and take
+a new backup, run `LegacyCoreSchemaAdoption.requireSafeToAdopt(connection)` again, and then run the
+same HSQLDB or PostgreSQL adoption location. In this state `report.requiresAdoption()` is
+expected to be `false` because V1 already added the committed-state columns; the remaining preflight
+checks must still pass before V2 is allowed to execute. Do not delete or re-baseline either Flyway
+history table.
+After migration, the adoption history must contain successful version `2`,
+`git_packs.pack_extension` must report length 32 and `git_reflog.ref_name` length 1024. Compare the
+recorded BLOB checksums and reflog rows before starting Hibernate validation or enabling writers.
 
 ### Establish normal Core history
 
@@ -238,6 +259,8 @@ Before switching Taxonomy to the library artifact:
 
 - run the adoption procedure against a restored production-like database;
 - compare ordered SHA-256 checksums of all `git_packs.data` values before and after migration;
+- compare all existing `git_reflog` rows before and after migration;
+- verify `pack_extension` length 32 and `ref_name` length 1024 through JDBC metadata;
 - start Hibernate with `validate`;
 - reopen at least two logical repositories and traverse their main histories;
 - confirm normal `RefUpdate` operations create queryable reflog entries;
