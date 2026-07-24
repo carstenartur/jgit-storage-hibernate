@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import sys
 import zipfile
@@ -57,16 +58,70 @@ def required_entries(version: str) -> set[str]:
     return entries
 
 
-def locate_bundle(explicit: Path | None) -> Path:
+def local_maven_repository() -> Path:
+    override = os.environ.get("MAVEN_REPO_LOCAL")
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path.home() / ".m2" / "repository"
+
+
+def assemble_contract_bundle(version: str) -> Path:
+    """Assemble a Central-layout ZIP after a credential-free skipped upload.
+
+    Sonatype's Maven plugin deliberately stages no ZIP when ``skipPublishing``
+    is enabled. Maven has nevertheless built, signed and installed the exact
+    release POMs and JARs. Package those files and the checksums normally added
+    by the Central plugin so CI can validate the complete release contract
+    without contacting Central. Real releases continue to validate the ZIP
+    emitted by the Central plugin itself.
+    """
+
+    repository = local_maven_repository()
+    signed = sorted(signed_entries(version))
+    missing = [name for name in signed if not (repository / name).is_file()]
+    if missing:
+        raise SystemExit(
+            "No Central plugin bundle was produced and the local Maven repository "
+            "is missing required signed release artifacts:\n  "
+            + "\n  ".join(missing)
+        )
+
+    output_directory = Path("target/central-publishing")
+    output_directory.mkdir(parents=True, exist_ok=True)
+    bundle = output_directory / f"jgit-storage-hibernate-{version}-contract.zip"
+
+    with zipfile.ZipFile(
+        bundle,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+        strict_timestamps=False,
+    ) as archive:
+        for name in signed:
+            data = (repository / name).read_bytes()
+            archive.writestr(name, data)
+            for extension, constructor in CHECKSUMS:
+                archive.writestr(f"{name}.{extension}", constructor(data).hexdigest())
+
+    print(
+        f"Assembled credential-free Central contract bundle from {repository}: {bundle}"
+    )
+    return bundle
+
+
+def locate_bundle(explicit: Path | None, version: str) -> Path:
     if explicit is not None:
         return explicit
+
     candidates = sorted(Path("target/central-publishing").glob("*.zip"))
-    if len(candidates) != 1:
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
         raise SystemExit(
-            "Expected exactly one target/central-publishing/*.zip bundle; "
+            "Expected at most one target/central-publishing/*.zip bundle; "
             f"found {len(candidates)}"
         )
-    return candidates[0]
+
+    return assemble_contract_bundle(version)
 
 
 def main() -> None:
@@ -78,7 +133,7 @@ def main() -> None:
     if not RELEASE_VERSION.fullmatch(args.version):
         raise SystemExit("version must use X.Y.Z without SNAPSHOT")
 
-    bundle = locate_bundle(args.bundle)
+    bundle = locate_bundle(args.bundle, args.version)
     if not bundle.is_file():
         raise SystemExit(f"Central bundle not found: {bundle}")
 
