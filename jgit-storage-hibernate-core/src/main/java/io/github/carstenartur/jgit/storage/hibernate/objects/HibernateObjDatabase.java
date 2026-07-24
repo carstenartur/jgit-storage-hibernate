@@ -30,7 +30,6 @@ import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.ObjectId;
-import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
 /**
@@ -76,34 +75,35 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
-    try (Session session = sessionFactory.openSession()) {
-      List<Object[]> rows =
-          session
-              .createQuery(
-                  "SELECT p.packName, p.packExtension FROM GitPackEntity p "
-                      + "WHERE p.repositoryName = :repo AND p.committed = true",
-                  Object[].class)
-              .setParameter("repo", repositoryName)
-              .getResultList();
-      LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
-      for (Object[] row : rows) {
-        String packName = (String) row[0];
-        String extension = (String) row[1];
-        DfsPackDescription description =
-            descriptions.computeIfAbsent(
-                packName,
-                name ->
-                    new DfsPackDescription(
-                        getRepository().getDescription(), name, PackSource.INSERT));
-        for (PackExt packExtension : PackExt.values()) {
-          if (packExtension.getExtension().equals(extension)) {
-            description.addFileExt(packExtension);
-            break;
+    return transactionContext.execute(
+        session -> {
+          List<Object[]> rows =
+              session
+                  .createQuery(
+                      "SELECT p.packName, p.packExtension FROM GitPackEntity p "
+                          + "WHERE p.repositoryName = :repo AND p.committed = true",
+                      Object[].class)
+                  .setParameter("repo", repositoryName)
+                  .getResultList();
+          LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
+          for (Object[] row : rows) {
+            String packName = (String) row[0];
+            String extension = (String) row[1];
+            DfsPackDescription description =
+                descriptions.computeIfAbsent(
+                    packName,
+                    name ->
+                        new DfsPackDescription(
+                            getRepository().getDescription(), name, PackSource.INSERT));
+            for (PackExt packExtension : PackExt.values()) {
+              if (packExtension.getExtension().equals(extension)) {
+                description.addFileExt(packExtension);
+                break;
+              }
+            }
           }
-        }
-      }
-      return new ArrayList<>(descriptions.values());
-    }
+          return new ArrayList<>(descriptions.values());
+        });
   }
 
   @Override
@@ -170,22 +170,23 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   @Override
   protected ReadableChannel openFile(DfsPackDescription description, PackExt extension)
       throws FileNotFoundException, IOException {
-    try (Session session = sessionFactory.openSession()) {
-      GitPackEntity entity =
-          session
-              .createQuery(
-                  "FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name "
-                      + "AND p.packExtension = :ext AND p.committed = true",
-                  GitPackEntity.class)
-              .setParameter("repo", repositoryName)
-              .setParameter("name", baseName(description))
-              .setParameter("ext", extension.getExtension())
-              .uniqueResult();
-      if (entity == null) {
-        throw new FileNotFoundException(description.getFileName(extension));
-      }
-      return new ByteArrayReadableChannel(entity.getData());
-    }
+    return transactionContext.execute(
+        session -> {
+          GitPackEntity entity =
+              session
+                  .createQuery(
+                      "FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name "
+                          + "AND p.packExtension = :ext AND p.committed = true",
+                      GitPackEntity.class)
+                  .setParameter("repo", repositoryName)
+                  .setParameter("name", baseName(description))
+                  .setParameter("ext", extension.getExtension())
+                  .uniqueResult();
+          if (entity == null) {
+            throw new FileNotFoundException(description.getFileName(extension));
+          }
+          return new ByteArrayReadableChannel(entity.getData());
+        });
   }
 
   @Override
