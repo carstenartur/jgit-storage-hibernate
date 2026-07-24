@@ -23,10 +23,12 @@ import java.util.TreeSet;
  * Validates the pre-library Sandbox/Taxonomy schema before the adoption migration is run.
  *
  * <p>The validator is intentionally separate from Flyway SQL. It performs read-only checks before
- * any DDL is executed, so duplicate pack identities, incomplete rows and partially migrated schemas
- * fail without silently deleting or overwriting stored Git data.
+ * any DDL is executed, so duplicate pack identities, incomplete rows, overlong pack extensions and
+ * partially migrated schemas fail without silently deleting or overwriting stored Git data.
  */
 public final class LegacyCoreSchemaAdoption {
+
+  private static final int CORE_PACK_EXTENSION_LENGTH = 32;
 
   private static final Set<String> REQUIRED_LEGACY_COLUMNS =
       Set.of(
@@ -90,8 +92,9 @@ public final class LegacyCoreSchemaAdoption {
   /**
    * Require that the existing table is either the exact pre-library shape or already adopted.
    *
-   * <p>For the pre-library shape, every row must be complete and every logical pack identity must be
-   * unique. Call this method before running the migration at the matching legacy-adoption location.
+   * <p>For the pre-library shape, every row must be complete, every pack extension must fit the
+   * released Core column contract and every logical pack identity must be unique. Call this method
+   * before running the migration at the matching legacy-adoption location.
    *
    * @param connection connection using the schema to validate
    * @return validated schema report
@@ -115,6 +118,15 @@ public final class LegacyCoreSchemaAdoption {
               + report.incompletePackRows()
               + " incomplete rows; adoption did not modify the schema");
     }
+    long overlongPackExtensionRows = countOverlongPackExtensionRows(connection);
+    if (overlongPackExtensionRows > 0) {
+      throw new LegacyCoreSchemaAdoptionException(
+          "git_packs contains "
+              + overlongPackExtensionRows
+              + " pack_extension values longer than "
+              + CORE_PACK_EXTENSION_LENGTH
+              + " characters; adoption did not modify the schema");
+    }
     if (!report.duplicatePackIdentities().isEmpty()) {
       throw new LegacyCoreSchemaAdoptionException(
           "git_packs contains duplicate (repository_name, pack_name, pack_extension) identities: "
@@ -134,6 +146,18 @@ public final class LegacyCoreSchemaAdoption {
       }
     }
     return columns;
+  }
+
+  private static long countOverlongPackExtensionRows(Connection connection) {
+    try {
+      return count(
+          connection,
+          "select count(*) from git_packs where character_length(pack_extension) > "
+              + CORE_PACK_EXTENSION_LENGTH);
+    } catch (SQLException exception) {
+      throw new LegacyCoreSchemaAdoptionException(
+          "Could not validate existing git_packs pack_extension values", exception);
+    }
   }
 
   private static long count(Connection connection, String sql) throws SQLException {
