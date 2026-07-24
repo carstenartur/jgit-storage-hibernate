@@ -191,6 +191,7 @@ fi
 # Verify that the development checkout is internally consistent before any release mutation.
 # At this point public documentation may intentionally still describe the previous release.
 python3 .github/scripts/verify-release-consistency.py
+python3 .github/scripts/verify-central-publishing.py
 
 git fetch origin --tags --force
 if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then
@@ -203,6 +204,7 @@ fi
 mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release
 python3 .github/scripts/verify-release-consistency.py
+python3 .github/scripts/verify-central-publishing.py
 
 git diff --check
 
@@ -279,6 +281,7 @@ gh release create "$TAG_NAME" target/release-artifacts/* \
 mvn -B versions:set -DnewVersion="$NEXT_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"
 python3 .github/scripts/verify-release-consistency.py
+python3 .github/scripts/verify-central-publishing.py
 git add pom.xml '*/pom.xml' CITATION.cff CITATION.md .zenodo.json codemeta.json
 git commit -m "Prepare next development version $NEXT_VERSION"
 git push origin HEAD:main
