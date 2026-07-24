@@ -155,7 +155,7 @@ Choose this module when history is an application query workload, not only somet
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.1.7</version>
+  <version>0.1.8</version>
 </dependency>
 ```
 

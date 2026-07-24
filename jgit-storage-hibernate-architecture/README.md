@@ -10,7 +10,7 @@ Choose this module when architecture decisions must be reviewable, versioned and
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-architecture</artifactId>
-  <version>0.1.7</version>
+  <version>0.1.8</version>
 </dependency>
 ```
 
