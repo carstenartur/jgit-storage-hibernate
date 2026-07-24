@@ -2,7 +2,7 @@
 
 If you use **jgit-storage-hibernate**, please cite it as:
 
-> Hammer, C. **jgit-storage-hibernate**. Version 0.1.8. https://github.com/carstenartur/jgit-storage-hibernate
+> Hammer, C. **jgit-storage-hibernate**. Version 0.1.9-SNAPSHOT. https://github.com/carstenartur/jgit-storage-hibernate
 
 ## BibTeX
 
@@ -10,8 +10,7 @@ If you use **jgit-storage-hibernate**, please cite it as:
 @software{hammer_jgit_storage_hibernate,
   author  = {Hammer, Carsten},
   title   = {jgit-storage-hibernate},
-  version = {0.1.8},
-  date    = {2026-07-24},
+  version = {0.1.9-SNAPSHOT},
   url     = {https://github.com/carstenartur/jgit-storage-hibernate},
   license = {BSD-3-Clause}
 }
