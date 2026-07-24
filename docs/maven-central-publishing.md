@@ -168,7 +168,7 @@ The Central plugin is configured to:
 - use server ID `central`;
 - automatically publish after validation;
 - wait until the deployment reaches `published`;
-- support `-Dcentral.skipPublishing=true` for a signed local bundle dry run.
+- support `-Dcentral.skipPublishing=true` when CI must exercise the release profile without uploading.
 
 Signing uses the Maven GPG plugin's Bouncy Castle signer. It reads only these environment variables:
 
@@ -177,20 +177,33 @@ MAVEN_GPG_KEY
 MAVEN_GPG_PASSPHRASE
 ```
 
-No secret is stored in `pom.xml` or `settings.xml`.
+No real secret is stored in `pom.xml` or a committed `settings.xml`.
 
 ## Credential-free release-contract test
 
-The normal Maven workflow contains a `Maven Central release contract` job. It derives the release version from the current `-SNAPSHOT`, runs the same release script in dry-run mode, generates a short-lived local signing key, and creates a Central bundle without uploading it.
+The normal Maven workflow contains a `Maven Central release contract` job. It derives the release version from the current `-SNAPSHOT` and invokes the same release script in dry-run mode.
 
-The bundle verifier requires:
+The dry run:
+
+1. creates a short-lived signing key;
+2. creates an empty temporary Maven repository and a temporary `central` server entry containing fixed non-secret placeholders;
+3. runs the normal `central-release` Maven profile with `central.skipPublishing=true`;
+4. lets Maven build, attach, sign and install the exact release coordinates into that empty repository;
+5. assembles those installed files into a deterministic Central-layout inspection ZIP;
+6. generates MD5, SHA-1, SHA-256 and SHA-512 files for every POM, JAR and detached signature;
+7. verifies the complete ZIP before the job can succeed.
+
+The current Central plugin resolves the configured server even when publication is skipped. In the tested multi-module path it also skips its own aggregate staging when `skipPublishing=true`. Therefore the credential-free CI contract does not pretend that the plugin uploaded or staged a deployment. The repository helper assembles the inspection ZIP from the Maven-installed, signed artifacts. A real release still delegates bundle construction, validation, upload and publication exclusively to the official Central plugin.
+
+The verifier requires:
 
 - the parent POM and its signature;
 - the primary, source and Javadoc JARs for every public JAR module;
 - a signature for every POM and JAR;
+- four valid checksums for every release file;
 - release coordinates without `SNAPSHOT`.
 
-This job requires no Central or GitHub Packages credentials. It validates the release mechanics, not ownership of the Central namespace.
+For the current six-component reactor this means 42 signed release files and 168 checksum files. This job requires no Central or GitHub Packages credentials. It validates release packaging, signatures, checksums and coordinate completeness, but not ownership of the Central namespace or network upload authorization.
 
 A local equivalent is:
 
@@ -223,8 +236,8 @@ The release script:
 1. validates versions, branch, metadata and all required secret presence before mutation;
 2. prepares the release version and public documentation;
 3. runs the complete Maven test suite;
-4. creates and validates the signed Central bundle;
-5. uploads it to the Central Publisher Portal and waits for publication;
+4. lets the official Central plugin create, validate, upload and publish the signed deployment and waits for the published state;
+5. validates the plugin-produced bundle retained under `target/central-publishing`;
 6. verifies every public module from a new empty Maven repository with all GitHub and Central credentials removed from the process environment;
 7. optionally publishes the same release version to GitHub Packages;
 8. creates and pushes the release commit, tag and GitHub Release;
