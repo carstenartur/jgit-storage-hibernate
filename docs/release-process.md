@@ -33,8 +33,9 @@ There is one GitHub Actions entry point and one release state machine:
 | Component | Responsibility |
 |---|---|
 | `.github/workflows/release.yml` | Collect workflow inputs, check out complete history, configure Java and Central credentials, expose repository secrets as process environment variables, then invoke the release script. |
-| `.github/scripts/release.sh` | Single authority for release-only policy and sequencing: branch/version agreement, credential preflight, automatic public-documentation preparation, Docker/test policy, signed Central bundle generation, Central publication, anonymous consumer verification, optional GitHub Packages publication, tag checks, release creation and next-snapshot preparation. |
-| `.github/scripts/verify-central-bundle.py` | Validate that the generated Central bundle contains the parent POM and signed primary/source/Javadoc artifacts for every public module. |
+| `.github/scripts/release.sh` | Single authority for release-only policy and sequencing: branch/version agreement, credential preflight, automatic public-documentation preparation, Docker/test policy, signed release packaging, Central publication, anonymous consumer verification, optional GitHub Packages publication, tag checks, release creation and next-snapshot preparation. |
+| `.github/scripts/build-central-bundle.py` | Build a deterministic Central-layout inspection ZIP from release artifacts Maven installed into an isolated local repository during the credential-free contract test. It is never used for real Central upload. |
+| `.github/scripts/verify-central-bundle.py` | Validate that an inspection or plugin-produced Central bundle contains the parent POM and signed primary/source/Javadoc artifacts for every public module, with valid MD5, SHA-1, SHA-256 and SHA-512 checksums. |
 | `.github/scripts/verify-central-consumption.sh` | Resolve the published parent and every public JAR module from an empty Maven repository with GitHub and Central credentials removed. |
 | `.github/scripts/verify-central-publishing.py` | Read-only static enforcement of profiles, plugin versions, signing configuration, workflow secret names and clean-room consumer coverage. |
 | `.github/scripts/update-release-metadata.py` | Deterministically update Citation, Zenodo and CodeMeta versions. During a release it also advances the documented release version and active public project dependency examples. |
@@ -116,9 +117,21 @@ skip_tests = true
 publish_github_packages = false
 ```
 
-The release script generates a short-lived signing key, attaches source/Javadoc JARs, signs the full reactor, asks the Central plugin to build but not upload the bundle, and validates the resulting ZIP. No Publisher Portal or GitHub Packages credential is used.
+The release script generates a short-lived signing key and an empty temporary Maven repository. It activates the same `central-release` profile used by real releases, but sets `central.skipPublishing=true`; Maven therefore builds, attaches, signs and installs the exact release coordinates without sending credentials or uploading data.
 
-This is a release-packaging check, not a second functional test suite. The ordinary Maven `verify` job remains the authority for project tests.
+The current Central plugin resolves its configured server even when publishing is skipped, so the dry run provides a temporary server entry containing fixed non-secret placeholders. In the tested multi-module path, `skipPublishing=true` also omits the plugin's own aggregate staging. The contract job therefore assembles a deterministic Central-layout **inspection bundle** from the exact signed files Maven installed into the isolated repository. It adds and verifies four checksum formats for every release file.
+
+For the current reactor the inspection bundle contains:
+
+```text
+42 signed release files
+168 checksum files
+210 total entries
+```
+
+The official Central plugin remains the sole implementation for real bundle construction, Portal validation, upload and publication. The inspection helper never uploads and is not called by a real release.
+
+This is a release-packaging check, not a second functional test suite. The ordinary Maven `verify` job remains the authority for project tests. The workflow also uses shell `pipefail` and an explicit non-empty bundle assertion, so an error in `release.sh` cannot be hidden by log piping or artifact upload.
 
 ## Snapshot publishing
 
@@ -153,16 +166,17 @@ The release script invoked by the workflow:
 9. re-runs static consistency verification over the generated release state;
 10. requires Docker and runs the complete Maven build, including Testcontainers-backed PostgreSQL migration tests;
 11. rejects remaining snapshot POM references;
-12. creates and validates the signed Central bundle;
-13. uploads through the Central Publisher Portal plugin, automatically publishes and waits for the `published` state;
-14. resolves every public artifact anonymously from a new empty Maven repository without GitHub/Central credentials;
-15. optionally deploys a secondary copy to GitHub Packages;
-16. commits Maven, metadata and generated documentation changes and tags the release;
-17. creates a GitHub Release with generated notes and attached JAR/metadata files;
-18. advances Maven and citation metadata to the next development snapshot while keeping public dependency examples on the released version;
-19. re-runs static consistency verification and pushes the development commit.
+12. invokes the official Central Publisher Portal Maven plugin to create, validate and upload the signed deployment;
+13. automatically publishes and waits for the Portal deployment to reach `published`;
+14. validates the Central plugin's retained bundle evidence;
+15. resolves every public artifact anonymously from a new empty Maven repository without GitHub/Central credentials;
+16. optionally deploys a secondary copy to GitHub Packages;
+17. commits Maven, metadata and generated documentation changes and tags the release;
+18. creates a GitHub Release with generated notes and attached JAR/metadata files;
+19. advances Maven and citation metadata to the next development snapshot while keeping public dependency examples on the released version;
+20. re-runs static consistency verification and pushes the development commit.
 
-A normal dry run performs the same automatic preparation and build, then creates and validates a signed local Central bundle without uploading, tagging, creating a release or pushing commits. A deliberately test-free dry run may set `skip_tests=true`; the script rejects that setting for a real release and does not require Docker when tests are intentionally skipped.
+A normal dry run performs the same automatic preparation and Maven build, then creates and validates the signed local inspection bundle without uploading, tagging, creating a release or pushing commits. A deliberately test-free dry run may set `skip_tests=true`; the script rejects that setting for a real release and does not require Docker when tests are intentionally skipped. Because release preparation updates files in the checkout, run a local dry run in a disposable worktree or reset the generated changes after inspection.
 
 ## Anonymous consumption gate
 
