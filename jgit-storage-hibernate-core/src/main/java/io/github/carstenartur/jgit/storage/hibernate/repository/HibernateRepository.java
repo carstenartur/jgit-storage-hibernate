@@ -149,7 +149,7 @@ public class HibernateRepository extends DfsRepository {
 
   @Override
   public ReflogReader getReflogReader(String refName) throws IOException {
-    return new HibernateReflogReader(sessionFactory, repositoryName, refName);
+    return new HibernateReflogReader(transactionContext, repositoryName, refName);
   }
 
   @Override
