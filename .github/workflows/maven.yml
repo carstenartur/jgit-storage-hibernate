@@ -34,10 +34,13 @@ jobs:
 
       - name: Verify release tooling and repository consistency
         run: |
-          bash -n .github/scripts/release.sh
+          bash -n \
+            .github/scripts/release.sh \
+            .github/scripts/verify-central-consumption.sh
           python3 -m py_compile \
             .github/scripts/update-release-metadata.py \
             .github/scripts/test_update_release_metadata.py \
+            .github/scripts/verify-central-bundle.py \
             .github/scripts/verify-release-consistency.py
           python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/verify-release-consistency.py
@@ -80,3 +83,52 @@ jobs:
           git add docs/badges/*.json
           git commit -m "Update build metric badges [skip ci]"
           git push
+
+  central-release-contract:
+    name: Maven Central release contract
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build signed Central bundle without publishing
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          chmod +x \
+            .github/scripts/release.sh \
+            .github/scripts/verify-central-consumption.sh
+          CURRENT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          case "$CURRENT_VERSION" in
+            *-SNAPSHOT) RELEASE_VERSION=${CURRENT_VERSION%-SNAPSHOT} ;;
+            *) echo "::error::Expected a SNAPSHOT development version, found $CURRENT_VERSION"; exit 1 ;;
+          esac
+          RELEASE_VERSION="$RELEASE_VERSION" \
+          DRY_RUN=true \
+          SKIP_TESTS=true \
+          PUBLISH_GITHUB_PACKAGES=false \
+            .github/scripts/release.sh 2>&1 | tee central-release-contract.log
+
+      - name: Upload Central release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: central-release-contract
+          path: |
+            central-release-contract.log
+            target/central-publishing/*.zip
+          if-no-files-found: warn
