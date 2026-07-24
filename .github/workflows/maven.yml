@@ -111,6 +111,7 @@ jobs:
         env:
           SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
+          set -o pipefail
           chmod +x \
             .github/scripts/release.sh \
             .github/scripts/verify-central-consumption.sh
@@ -133,4 +134,4 @@ jobs:
           path: |
             central-release-contract.log
             target/central-publishing/*.zip
-          if-no-files-found: warn
+          if-no-files-found: error
