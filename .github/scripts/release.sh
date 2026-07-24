@@ -7,8 +7,111 @@ NEXT_VERSION_INPUT=${NEXT_VERSION_INPUT:-}
 SKIP_TESTS=${SKIP_TESTS:-false}
 DRY_RUN=${DRY_RUN:-false}
 SOURCE_BRANCH=${SOURCE_BRANCH:-main}
+PUBLISH_GITHUB_PACKAGES=${PUBLISH_GITHUB_PACKAGES:-true}
 TAG_NAME="v${RELEASE_VERSION}"
 DOCUMENTED_RELEASE_VERSION_FILE=docs/current-release-version.txt
+CENTRAL_CONSUMER_ATTEMPTS=${CENTRAL_CONSUMER_ATTEMPTS:-12}
+CENTRAL_CONSUMER_RETRY_SECONDS=${CENTRAL_CONSUMER_RETRY_SECONDS:-15}
+TEMP_DIRS=()
+
+cleanup() {
+  local directory
+  for directory in "${TEMP_DIRS[@]:-}"; do
+    [[ -n "$directory" ]] && rm -rf "$directory"
+  done
+}
+trap cleanup EXIT
+
+require_boolean() {
+  local name=$1
+  local value=${!name}
+  if [[ "$value" != "true" && "$value" != "false" ]]; then
+    echo "::error::$name must be true or false, but was '$value'"
+    exit 1
+  fi
+}
+
+require_env() {
+  local name=$1
+  if [[ -z "${!name:-}" ]]; then
+    echo "::error::Required release credential $name is not configured"
+    exit 1
+  fi
+}
+
+prepare_ephemeral_signing_key() {
+  if [[ -n "${MAVEN_GPG_KEY:-}" ]]; then
+    return
+  fi
+  if ! command -v gpg >/dev/null 2>&1; then
+    echo "::error::gpg is required to generate the ephemeral Central dry-run signing key"
+    exit 1
+  fi
+
+  local key_home fingerprint
+  key_home=$(mktemp -d)
+  TEMP_DIRS+=("$key_home")
+  chmod 700 "$key_home"
+
+  gpg \
+    --batch \
+    --homedir "$key_home" \
+    --pinentry-mode loopback \
+    --passphrase '' \
+    --quick-generate-key \
+    'jgit-storage-hibernate Central dry run <central-dry-run@example.invalid>' \
+    rsa2048 \
+    sign \
+    1d
+
+  fingerprint=$(gpg \
+    --batch \
+    --homedir "$key_home" \
+    --with-colons \
+    --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')
+  if [[ -z "$fingerprint" ]]; then
+    echo "::error::Could not identify the ephemeral Central dry-run signing key"
+    exit 1
+  fi
+
+  MAVEN_GPG_KEY=$(gpg \
+    --batch \
+    --homedir "$key_home" \
+    --armor \
+    --export-secret-keys "$fingerprint")
+  MAVEN_GPG_PASSPHRASE=''
+  export MAVEN_GPG_KEY MAVEN_GPG_PASSPHRASE
+  echo "Generated an ephemeral signing key for Central bundle validation only."
+}
+
+publish_github_packages() {
+  local settings_dir settings_file
+  settings_dir=$(mktemp -d)
+  TEMP_DIRS+=("$settings_dir")
+  settings_file="$settings_dir/settings.xml"
+
+  cat > "$settings_file" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <interactiveMode>false</interactiveMode>
+  <servers>
+    <server>
+      <id>github</id>
+      <username>${env.GITHUB_ACTOR}</username>
+      <password>${env.GITHUB_TOKEN}</password>
+    </server>
+  </servers>
+</settings>
+XML
+
+  mvn -B -s "$settings_file" -Pgithub-packages -DskipTests deploy
+}
+
+require_boolean SKIP_TESTS
+require_boolean DRY_RUN
+require_boolean PUBLISH_GITHUB_PACKAGES
 
 if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "::error::release_version must use X.Y.Z without a leading v"
@@ -56,6 +159,18 @@ if ! [[ "$NEXT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
   exit 1
 fi
 
+if [[ "$DRY_RUN" != "true" ]]; then
+  require_env CENTRAL_USERNAME
+  require_env CENTRAL_PASSWORD
+  require_env MAVEN_GPG_KEY
+  require_env MAVEN_GPG_PASSPHRASE
+  require_env GH_TOKEN
+  if [[ "$PUBLISH_GITHUB_PACKAGES" == "true" ]]; then
+    require_env GITHUB_ACTOR
+    require_env GITHUB_TOKEN
+  fi
+fi
+
 git config user.name 'github-actions[bot]'
 git config user.email 'github-actions[bot]@users.noreply.github.com'
 
@@ -65,6 +180,7 @@ echo "Currently documented published release: $DOCUMENTED_RELEASE_VERSION"
 echo "Next development version: $NEXT_VERSION"
 echo "Dry run: $DRY_RUN"
 echo "Skip tests: $SKIP_TESTS"
+echo "Publish secondary GitHub Packages copy: $PUBLISH_GITHUB_PACKAGES"
 
 if [[ "$DOCUMENTED_RELEASE_VERSION" == "$RELEASE_VERSION" ]]; then
   echo "Public documentation already targets release $RELEASE_VERSION."
@@ -106,11 +222,32 @@ if grep -R "SNAPSHOT" --include="pom.xml" --exclude-dir=target --exclude-dir=.gi
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "Dry run completed before deploy/tag/release."
+  prepare_ephemeral_signing_key
+  mvn -B \
+    -Pcentral-release \
+    -DskipTests \
+    -Dcentral.skipPublishing=true \
+    deploy
+  python3 .github/scripts/verify-central-bundle.py "$RELEASE_VERSION"
+  echo "Dry run completed after signed Central bundle validation and before upload/tag/release."
   exit 0
 fi
 
-mvn -B -DskipTests deploy
+# Maven Central is the primary immutable public distribution channel. The Central
+# plugin validates, publishes and waits for the published state before this script
+# performs any secondary package publication or creates the GitHub release.
+mvn -B -Pcentral-release -DskipTests deploy
+python3 .github/scripts/verify-central-bundle.py "$RELEASE_VERSION"
+
+CENTRAL_CONSUMER_ATTEMPTS="$CENTRAL_CONSUMER_ATTEMPTS" \
+CENTRAL_CONSUMER_RETRY_SECONDS="$CENTRAL_CONSUMER_RETRY_SECONDS" \
+  .github/scripts/verify-central-consumption.sh "$RELEASE_VERSION"
+
+if [[ "$PUBLISH_GITHUB_PACKAGES" == "true" ]]; then
+  publish_github_packages
+else
+  echo "Skipping optional GitHub Packages publication."
+fi
 
 git add \
   pom.xml \
