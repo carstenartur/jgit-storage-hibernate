@@ -16,6 +16,7 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 class CoreHsqlDbSchemaMigrationIntegrationTest {
@@ -39,6 +40,7 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
   }
 
   @Test
+  @Timeout(60)
   void persistsRepositoryAcrossFileBackedDatabaseRestart(@TempDir Path directory)
       throws Exception {
     try (TestDatabase database = fileDatabase(directory, "restart")) {
