@@ -68,11 +68,10 @@
     <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
     <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
-    <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
+    <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
     <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-    <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
     <linkage-checker-enforcer-rules.version>1.5.15</linkage-checker-enforcer-rules.version>
   </properties>
 
@@ -223,13 +222,13 @@
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-gpg-plugin</artifactId>
-          <version>${maven-gpg-plugin.version}</version>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${maven-shade-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-shade-plugin</artifactId>
-          <version>${maven-shade-plugin.version}</version>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>${maven-deploy-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -310,46 +309,17 @@
     </profile>
 
     <profile>
-      <id>central-release</id>
+      <id>public-repository-release</id>
       <properties>
-        <central.skipPublishing>false</central.skipPublishing>
+        <public.repository.directory>${maven.multiModuleProjectDirectory}/target/public-maven-repository</public.repository.directory>
       </properties>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>sign-release-artifacts</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <signer>bc</signer>
-              <bestPractices>true</bestPractices>
-              <keyEnvName>MAVEN_GPG_KEY</keyEnvName>
-              <passphraseEnvName>MAVEN_GPG_PASSPHRASE</passphraseEnvName>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.sonatype.central</groupId>
-            <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>${central-publishing-maven-plugin.version}</version>
-            <extensions>true</extensions>
-            <configuration>
-              <publishingServerId>central</publishingServerId>
-              <autoPublish>true</autoPublish>
-              <waitUntil>published</waitUntil>
-              <skipPublishing>${central.skipPublishing}</skipPublishing>
-              <deploymentName>jgit-storage-hibernate ${project.version}</deploymentName>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
+      <distributionManagement>
+        <repository>
+          <id>public-repository</id>
+          <name>Static public Maven repository staging directory</name>
+          <url>file://${public.repository.directory}</url>
+        </repository>
+      </distributionManagement>
     </profile>
 
     <profile>

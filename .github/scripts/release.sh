@@ -1,324 +1,113 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 : "${RELEASE_VERSION:?RELEASE_VERSION is required}"
-
 NEXT_VERSION_INPUT=${NEXT_VERSION_INPUT:-}
 SKIP_TESTS=${SKIP_TESTS:-false}
 DRY_RUN=${DRY_RUN:-false}
 SOURCE_BRANCH=${SOURCE_BRANCH:-main}
-PUBLISH_GITHUB_PACKAGES=${PUBLISH_GITHUB_PACKAGES:-true}
+REQUEST_BRANCH=${REQUEST_BRANCH:-}
 TAG_NAME="v${RELEASE_VERSION}"
 DOCUMENTED_RELEASE_VERSION_FILE=docs/current-release-version.txt
-CENTRAL_CONSUMER_ATTEMPTS=${CENTRAL_CONSUMER_ATTEMPTS:-12}
-CENTRAL_CONSUMER_RETRY_SECONDS=${CENTRAL_CONSUMER_RETRY_SECONDS:-15}
-CENTRAL_DRY_RUN_SETTINGS=
-CENTRAL_DRY_RUN_REPOSITORY=
-TEMP_DIRS=()
-
-cleanup() {
-  local directory
-  for directory in "${TEMP_DIRS[@]:-}"; do
-    [[ -n "$directory" ]] && rm -rf "$directory"
-  done
-}
+PUBLIC_REPOSITORY_BRANCH=${PUBLIC_REPOSITORY_BRANCH:-maven-repository}
+PUBLIC_REPOSITORY_URL=${PUBLIC_REPOSITORY_URL:-https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/${PUBLIC_REPOSITORY_BRANCH}/}
+PUBLIC_REPOSITORY_ATTEMPTS=${PUBLIC_REPOSITORY_ATTEMPTS:-12}
+PUBLIC_REPOSITORY_RETRY_SECONDS=${PUBLIC_REPOSITORY_RETRY_SECONDS:-10}
+PUBLIC_REPOSITORY_STAGE=${PUBLIC_REPOSITORY_STAGE:-$PWD/target/public-maven-repository}
+PUBLIC_REPOSITORY_EVIDENCE=${PUBLIC_REPOSITORY_EVIDENCE:-$PWD/target/public-repository-evidence/manifest.json}
+WORKTREE=
+cleanup(){ if [[ -n "$WORKTREE" ]]; then git worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true; fi; }
 trap cleanup EXIT
-
-require_boolean() {
-  local name=$1
-  local value=${!name}
-  if [[ "$value" != "true" && "$value" != "false" ]]; then
-    echo "::error::$name must be true or false, but was '$value'"
-    exit 1
-  fi
-}
-
-require_env() {
-  local name=$1
-  if [[ -z "${!name:-}" ]]; then
-    echo "::error::Required release credential $name is not configured"
-    exit 1
-  fi
-}
-
-prepare_ephemeral_signing_key() {
-  if [[ -n "${MAVEN_GPG_KEY:-}" ]]; then
-    return
-  fi
-  if ! command -v gpg >/dev/null 2>&1; then
-    echo "::error::gpg is required to generate the ephemeral Central dry-run signing key"
-    exit 1
-  fi
-
-  local key_home fingerprint
-  key_home=$(mktemp -d)
-  TEMP_DIRS+=("$key_home")
-  chmod 700 "$key_home"
-
-  gpg \
-    --batch \
-    --homedir "$key_home" \
-    --pinentry-mode loopback \
-    --passphrase '' \
-    --quick-generate-key \
-    'jgit-storage-hibernate Central dry run <central-dry-run@example.invalid>' \
-    rsa2048 \
-    sign \
-    1d
-
-  fingerprint=$(gpg \
-    --batch \
-    --homedir "$key_home" \
-    --with-colons \
-    --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')
-  if [[ -z "$fingerprint" ]]; then
-    echo "::error::Could not identify the ephemeral Central dry-run signing key"
-    exit 1
-  fi
-
-  MAVEN_GPG_KEY=$(gpg \
-    --batch \
-    --homedir "$key_home" \
-    --armor \
-    --export-secret-keys "$fingerprint")
-  MAVEN_GPG_PASSPHRASE=''
-  export MAVEN_GPG_KEY MAVEN_GPG_PASSPHRASE
-  echo "Generated an ephemeral signing key for Central bundle validation only."
-}
-
-prepare_central_dry_run_environment() {
-  local working_dir
-  working_dir=$(mktemp -d)
-  TEMP_DIRS+=("$working_dir")
-  CENTRAL_DRY_RUN_SETTINGS="$working_dir/settings.xml"
-  CENTRAL_DRY_RUN_REPOSITORY="$working_dir/repository"
-
-  # The Central plugin resolves its configured server before it evaluates
-  # skipPublishing. Bundle-only verification therefore needs a server entry, but
-  # these fixed placeholders are never sent because upload is explicitly skipped.
-  cat > "$CENTRAL_DRY_RUN_SETTINGS" <<'XML'
-<?xml version="1.0" encoding="UTF-8"?>
-<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
-  <interactiveMode>false</interactiveMode>
-  <servers>
-    <server>
-      <id>central</id>
-      <username>bundle-only-dry-run</username>
-      <password>bundle-only-dry-run</password>
-    </server>
-  </servers>
-</settings>
-XML
-}
-
-publish_github_packages() {
-  local settings_dir settings_file
-  settings_dir=$(mktemp -d)
-  TEMP_DIRS+=("$settings_dir")
-  settings_file="$settings_dir/settings.xml"
-
-  cat > "$settings_file" <<'XML'
-<?xml version="1.0" encoding="UTF-8"?>
-<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
-  <interactiveMode>false</interactiveMode>
-  <servers>
-    <server>
-      <id>github</id>
-      <username>${env.GITHUB_ACTOR}</username>
-      <password>${env.GITHUB_TOKEN}</password>
-    </server>
-  </servers>
-</settings>
-XML
-
-  mvn -B -s "$settings_file" -Pgithub-packages -DskipTests deploy
-}
-
-require_boolean SKIP_TESTS
-require_boolean DRY_RUN
-require_boolean PUBLISH_GITHUB_PACKAGES
-
-if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "::error::release_version must use X.Y.Z without a leading v"
-  exit 1
-fi
-
-if [[ "$SOURCE_BRANCH" != "main" && "$DRY_RUN" != "true" ]]; then
-  echo "::error::Real releases must be dispatched from main, not $SOURCE_BRANCH"
-  exit 1
-fi
-
-if [[ "$SKIP_TESTS" == "true" && "$DRY_RUN" != "true" ]]; then
-  echo "::error::Real releases must run the complete test suite"
-  exit 1
-fi
-
+boolean(){ [[ "${!1}" == true || "${!1}" == false ]] || { echo "::error::$1 must be true or false"; exit 1; }; }
+boolean SKIP_TESTS; boolean DRY_RUN
+[[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::release_version must use X.Y.Z"; exit 1; }
+[[ "$SOURCE_BRANCH" == main || "$DRY_RUN" == true ]] || { echo "::error::Real releases must build main, not $SOURCE_BRANCH"; exit 1; }
+[[ "$SKIP_TESTS" != true || "$DRY_RUN" == true ]] || { echo "::error::Real releases must run the complete test suite"; exit 1; }
 CURRENT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
-if [[ "$CURRENT_VERSION" != *-SNAPSHOT ]]; then
-  echo "::error::Current Maven version must be a SNAPSHOT, but was $CURRENT_VERSION"
-  exit 1
-fi
-if [[ "${CURRENT_VERSION%-SNAPSHOT}" != "$RELEASE_VERSION" ]]; then
-  echo "::error title=Release version mismatch::Requested release $RELEASE_VERSION cannot be built from current Maven version $CURRENT_VERSION on source branch $SOURCE_BRANCH. Dispatch release ${CURRENT_VERSION%-SNAPSHOT}, or first move the source branch to $RELEASE_VERSION-SNAPSHOT."
-  exit 1
-fi
-
-if [[ ! -r "$DOCUMENTED_RELEASE_VERSION_FILE" ]]; then
-  echo "::error::Missing or unreadable documented release version file: $DOCUMENTED_RELEASE_VERSION_FILE"
-  exit 1
-fi
+[[ "$CURRENT_VERSION" == *-SNAPSHOT ]] || { echo "::error::Current Maven version must be SNAPSHOT, was $CURRENT_VERSION"; exit 1; }
+[[ "${CURRENT_VERSION%-SNAPSHOT}" == "$RELEASE_VERSION" ]] || { echo "::error title=Release version mismatch::Requested $RELEASE_VERSION from $CURRENT_VERSION"; exit 1; }
 DOCUMENTED_RELEASE_VERSION=$(tr -d '[:space:]' < "$DOCUMENTED_RELEASE_VERSION_FILE")
-if ! [[ "$DOCUMENTED_RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "::error title=Invalid documented release version::$DOCUMENTED_RELEASE_VERSION_FILE must contain the last published X.Y.Z version, but contained '$DOCUMENTED_RELEASE_VERSION'."
-  exit 1
-fi
+[[ "$DOCUMENTED_RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid documented release version"; exit 1; }
+if [[ -n "$NEXT_VERSION_INPUT" ]]; then NEXT_VERSION=$NEXT_VERSION_INPUT; else IFS=. read -r a b c <<< "$RELEASE_VERSION"; NEXT_VERSION="$a.$b.$((c+1))-SNAPSHOT"; fi
+[[ "$NEXT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]] || { echo "::error::next_development_version must use X.Y.Z-SNAPSHOT"; exit 1; }
 
-if [[ -n "$NEXT_VERSION_INPUT" ]]; then
-  NEXT_VERSION=$NEXT_VERSION_INPUT
-else
-  IFS='.' read -r MAJOR MINOR PATCH <<< "$RELEASE_VERSION"
-  NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
-fi
-if ! [[ "$NEXT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
-  echo "::error::next_development_version must use X.Y.Z-SNAPSHOT"
-  exit 1
-fi
-
-if [[ "$DRY_RUN" != "true" ]]; then
-  require_env CENTRAL_USERNAME
-  require_env CENTRAL_PASSWORD
-  require_env MAVEN_GPG_KEY
-  require_env MAVEN_GPG_PASSPHRASE
-  require_env GH_TOKEN
-  if [[ "$PUBLISH_GITHUB_PACKAGES" == "true" ]]; then
-    require_env GITHUB_ACTOR
-    require_env GITHUB_TOKEN
-  fi
-fi
-
-git config user.name 'github-actions[bot]'
-git config user.email 'github-actions[bot]@users.noreply.github.com'
-
-echo "Release version: $RELEASE_VERSION"
-echo "Current version: $CURRENT_VERSION"
-echo "Currently documented published release: $DOCUMENTED_RELEASE_VERSION"
-echo "Next development version: $NEXT_VERSION"
-echo "Dry run: $DRY_RUN"
-echo "Skip tests: $SKIP_TESTS"
-echo "Publish secondary GitHub Packages copy: $PUBLISH_GITHUB_PACKAGES"
-
-if [[ "$DOCUMENTED_RELEASE_VERSION" == "$RELEASE_VERSION" ]]; then
-  echo "Public documentation already targets release $RELEASE_VERSION."
-else
-  echo "::notice title=Automatic release preparation::Public documentation currently targets published release $DOCUMENTED_RELEASE_VERSION and will be advanced automatically to $RELEASE_VERSION in the release commit."
-fi
-
-# Verify that the development checkout is internally consistent before any release mutation.
-# At this point public documentation may intentionally still describe the previous release.
+git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+echo "Release $RELEASE_VERSION; next $NEXT_VERSION; repository $PUBLIC_REPOSITORY_URL; dry run $DRY_RUN"
 python3 .github/scripts/verify-release-consistency.py
-python3 .github/scripts/verify-central-publishing.py
-
+python3 .github/scripts/verify-public-repository-publishing.py
 git fetch origin --tags --force
-if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then
-  echo "::error::Tag $TAG_NAME already exists"
-  exit 1
-fi
-
-# Prepare all release state in one operation: Maven versions, software metadata, the
-# documented release line, and active public dependency examples.
+if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then echo "::error::Tag $TAG_NAME already exists"; exit 1; fi
 mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release
 python3 .github/scripts/verify-release-consistency.py
-python3 .github/scripts/verify-central-publishing.py
-
+python3 .github/scripts/verify-public-repository-publishing.py
 git diff --check
+if [[ "$SKIP_TESTS" == true ]]; then mvn -B -DskipTests verify; else docker info >/dev/null; mvn -B verify; fi
+if grep -R "SNAPSHOT" --include='pom.xml' --exclude-dir=target --exclude-dir=.git .; then echo "::error::SNAPSHOT POM reference remains"; exit 1; fi
 
-if [[ "$SKIP_TESTS" == "true" ]]; then
-  mvn -B -DskipTests verify
-else
-  if ! docker info >/dev/null 2>&1; then
-    echo "::error::Docker is required for the Testcontainers-backed PostgreSQL release tests"
-    exit 1
+rm -rf "$PUBLIC_REPOSITORY_STAGE" "$(dirname "$PUBLIC_REPOSITORY_EVIDENCE")"
+mkdir -p "$PUBLIC_REPOSITORY_STAGE"
+mvn -B -Ppublic-repository-release -DskipTests -Dpublic.repository.directory="$PUBLIC_REPOSITORY_STAGE" deploy
+python3 .github/scripts/prepare-public-repository.py "$RELEASE_VERSION" "$PUBLIC_REPOSITORY_STAGE" "$PUBLIC_REPOSITORY_EVIDENCE"
+MAVEN_COMMAND=mvn PUBLIC_REPOSITORY_ATTEMPTS=1 .github/scripts/verify-public-repository-consumption.sh "$RELEASE_VERSION" "file://$PUBLIC_REPOSITORY_STAGE"
+if [[ "$DRY_RUN" == true ]]; then echo "Dry run completed after local anonymous repository verification."; exit 0; fi
+
+publish_repository(){
+  local exists=false file rel dest changed=false
+  git ls-remote --exit-code --heads origin "refs/heads/$PUBLIC_REPOSITORY_BRANCH" >/dev/null 2>&1 && exists=true
+  WORKTREE=$(mktemp -d); rmdir "$WORKTREE"
+  if [[ "$exists" == true ]]; then
+    git fetch origin "$PUBLIC_REPOSITORY_BRANCH"
+    git worktree add --detach "$WORKTREE" "origin/$PUBLIC_REPOSITORY_BRANCH"
+  else
+    git worktree add --detach "$WORKTREE" HEAD
+    git -C "$WORKTREE" switch --orphan "$PUBLIC_REPOSITORY_BRANCH"
+    git -C "$WORKTREE" rm -rf . >/dev/null 2>&1 || true
   fi
-  mvn -B verify
-fi
+  git -C "$WORKTREE" config user.name 'github-actions[bot]'
+  git -C "$WORKTREE" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+  while IFS= read -r -d '' file; do
+    rel=${file#"$PUBLIC_REPOSITORY_STAGE/"}
+    case "$rel" in */"$RELEASE_VERSION"/*)
+      dest="$WORKTREE/$rel"
+      if [[ -e "$dest" ]] && ! cmp -s "$file" "$dest"; then echo "::error::Immutable release file differs: $rel"; exit 1; fi
+    esac
+  done < <(find "$PUBLIC_REPOSITORY_STAGE" -type f -print0)
+  rsync -a "$PUBLIC_REPOSITORY_STAGE/" "$WORKTREE/"
+  mkdir -p "$WORKTREE/releases"
+  cp "$PUBLIC_REPOSITORY_EVIDENCE" "$WORKTREE/releases/$RELEASE_VERSION.json"
+  cat > "$WORKTREE/README.md" <<EOF
+# jgit-storage-hibernate Maven repository
 
-if grep -R "SNAPSHOT" --include="pom.xml" --exclude-dir=target --exclude-dir=.git .; then
-  echo "::error::SNAPSHOT references still found in pom.xml files after release version update"
-  exit 1
-fi
+Anonymous release repository for \\`io.github.carstenartur\\` artifacts.
 
-if [[ "$DRY_RUN" == "true" ]]; then
-  prepare_ephemeral_signing_key
-  prepare_central_dry_run_environment
-  mvn -B \
-    -s "$CENTRAL_DRY_RUN_SETTINGS" \
-    -Dmaven.repo.local="$CENTRAL_DRY_RUN_REPOSITORY" \
-    -Pcentral-release \
-    -DskipTests \
-    -Dcentral.skipPublishing=true \
-    deploy
-  rm -rf target/central-publishing
-  python3 .github/scripts/build-central-bundle.py \
-    "$RELEASE_VERSION" \
-    "$CENTRAL_DRY_RUN_REPOSITORY" \
-    target/central-publishing/central-bundle.zip
-  python3 .github/scripts/verify-central-bundle.py "$RELEASE_VERSION"
-  echo "Dry run completed after signed Central bundle validation and before upload/tag/release."
-  exit 0
-fi
+Maven URL: \\`$PUBLIC_REPOSITORY_URL\\`
 
-# Maven Central is the primary immutable public distribution channel. The Central
-# plugin validates, publishes and waits for the published state before this script
-# performs any secondary package publication or creates the GitHub release.
-mvn -B -Pcentral-release -DskipTests deploy
-python3 .github/scripts/verify-central-bundle.py "$RELEASE_VERSION"
+Published release: \\`$RELEASE_VERSION\\`
+EOF
+  cat > "$WORKTREE/index.html" <<EOF
+<!doctype html><meta charset="utf-8"><title>jgit-storage-hibernate Maven repository</title><h1>jgit-storage-hibernate Maven repository</h1><p>Anonymous Maven URL: <code>$PUBLIC_REPOSITORY_URL</code></p><p>Latest published release: <strong>$RELEASE_VERSION</strong></p>
+EOF
+  touch "$WORKTREE/.nojekyll"
+  git -C "$WORKTREE" add -A
+  if ! git -C "$WORKTREE" diff --cached --quiet; then git -C "$WORKTREE" commit -m "Publish Maven repository version $RELEASE_VERSION"; git -C "$WORKTREE" push origin "HEAD:refs/heads/$PUBLIC_REPOSITORY_BRANCH"; fi
+}
+publish_repository
+PUBLIC_REPOSITORY_ATTEMPTS="$PUBLIC_REPOSITORY_ATTEMPTS" PUBLIC_REPOSITORY_RETRY_SECONDS="$PUBLIC_REPOSITORY_RETRY_SECONDS" \
+  .github/scripts/verify-public-repository-consumption.sh "$RELEASE_VERSION" "$PUBLIC_REPOSITORY_URL"
 
-CENTRAL_CONSUMER_ATTEMPTS="$CENTRAL_CONSUMER_ATTEMPTS" \
-CENTRAL_CONSUMER_RETRY_SECONDS="$CENTRAL_CONSUMER_RETRY_SECONDS" \
-  .github/scripts/verify-central-consumption.sh "$RELEASE_VERSION"
-
-if [[ "$PUBLISH_GITHUB_PACKAGES" == "true" ]]; then
-  publish_github_packages
-else
-  echo "Skipping optional GitHub Packages publication."
-fi
-
-git add \
-  pom.xml \
-  '*/pom.xml' \
-  CITATION.cff CITATION.md .zenodo.json codemeta.json \
-  README.md docs jgit-storage-hibernate-*/README.md
+git add pom.xml '*/pom.xml' CITATION.cff CITATION.md .zenodo.json codemeta.json README.md docs jgit-storage-hibernate-*/README.md
 git commit -m "Release version $RELEASE_VERSION"
 git tag -a "$TAG_NAME" -m "Release version $RELEASE_VERSION"
-
-rm -rf target/release-artifacts
-mkdir -p target/release-artifacts
-find . -path './target/release-artifacts' -prune -o \
-  -path '*/target/*.jar' -type f \
-  ! -name 'original-*' \
-  -exec cp {} target/release-artifacts/ \;
-cp CITATION.cff CITATION.md .zenodo.json codemeta.json target/release-artifacts/
-
-git push origin HEAD:main
-git push origin "$TAG_NAME"
-
-gh release create "$TAG_NAME" target/release-artifacts/* \
-  --title "jgit-storage-hibernate $RELEASE_VERSION" \
-  --verify-tag \
-  --fail-on-no-commits \
-  --generate-notes
-
-# Advance development metadata only. Public dependency examples continue to point to the
-# immutable release that was just published until the next release run advances them.
+rm -rf target/release-artifacts; mkdir -p target/release-artifacts
+find . -path './target/release-artifacts' -prune -o -path '*/target/*.jar' -type f ! -name 'original-*' -exec cp {} target/release-artifacts/ \;
+cp CITATION.cff CITATION.md .zenodo.json codemeta.json "$PUBLIC_REPOSITORY_EVIDENCE" target/release-artifacts/
+git push origin HEAD:main; git push origin "$TAG_NAME"
+gh release create "$TAG_NAME" target/release-artifacts/* --title "jgit-storage-hibernate $RELEASE_VERSION" --verify-tag --fail-on-no-commits --generate-notes
 mvn -B versions:set -DnewVersion="$NEXT_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"
 python3 .github/scripts/verify-release-consistency.py
-python3 .github/scripts/verify-central-publishing.py
+python3 .github/scripts/verify-public-repository-publishing.py
 git add pom.xml '*/pom.xml' CITATION.cff CITATION.md .zenodo.json codemeta.json
 git commit -m "Prepare next development version $NEXT_VERSION"
 git push origin HEAD:main
+if [[ -n "$REQUEST_BRANCH" ]]; then git push origin --delete "$REQUEST_BRANCH" || true; fi
