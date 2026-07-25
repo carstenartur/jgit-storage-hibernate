@@ -20,12 +20,23 @@ jobs:
         run: |
           set -euo pipefail
           gh api "repos/${REPOSITORY}/actions/runs?per_page=100" \
-            --jq '.workflow_runs[] | select(.name == "Release" or .name == "Retry release 0.1.10") | [.id,.name,.event,.status,(.conclusion // ""),.head_branch,.head_sha,.created_at,.updated_at,.html_url] | @tsv' \
+            --jq '.workflow_runs[] | select(.name == "Release" or .name == "Run release 0.1.10" or .name == "Retry release 0.1.10") | [.id,.name,.event,.status,(.conclusion // ""),.head_branch,.head_sha,.created_at,.updated_at,.html_url] | @tsv' \
             | tee release-retry-status.txt
-      - name: Upload status
+      - name: Capture latest failed release log
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh run view 30150208111 --repo "$REPOSITORY" --log-failed > release-failure.log 2>&1 || true
+          tail -n 800 release-failure.log > release-failure-tail.log
+          cat release-failure-tail.log
+      - name: Upload diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: release-retry-status
-          path: release-retry-status.txt
+          name: release-retry-diagnostics
+          path: |
+            release-retry-status.txt
+            release-failure-tail.log
           if-no-files-found: error
           retention-days: 1
