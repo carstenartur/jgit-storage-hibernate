@@ -38,7 +38,7 @@ jobs:
           cp .github/scripts/prepare-public-repository.py target/refactor-diagnostics/
           python3 --version > target/refactor-diagnostics/python-version.txt 2>&1
       - name: Compile repository preparation script
-        run: python3 -m py_compile .github/scripts/prepare-public-repository.py 2>target/refactor-diagnostics/prepare-error.txt
+        run: python3 -m py_compile .github/scripts/prepare-public-repository.py
       - name: Compile publishing contract script
         run: python3 -m py_compile .github/scripts/verify-public-repository-publishing.py
       - name: Parse release script
@@ -46,7 +46,9 @@ jobs:
       - name: Parse anonymous consumer script
         run: bash -n .github/scripts/verify-public-repository-consumption.sh
       - name: Verify public repository contract
-        run: python3 .github/scripts/verify-public-repository-publishing.py
+        run: |
+          set -o pipefail
+          python3 .github/scripts/verify-public-repository-publishing.py 2>&1 | tee target/refactor-diagnostics/publishing-contract.txt
       - name: Verify release consistency
         run: python3 .github/scripts/verify-release-consistency.py
       - name: Parse Maven POMs
@@ -65,6 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           git checkout HEAD -- .github/workflows/maven.yml .github/workflows/release.yml .github/workflows/publish-snapshot.yml .github/workflows/temp-public-repo-source-export.yml .github/workflows/temp-apply-public-repository-refactor.yml
+          rm -f .github/public-repository-refactor-trigger .github/public-repository-contract-ready .github/public-repository-contract-check-*
       - name: Commit and push verified non-workflow changes
         run: |
           set -euo pipefail
