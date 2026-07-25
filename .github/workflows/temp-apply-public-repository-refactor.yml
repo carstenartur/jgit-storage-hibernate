@@ -29,12 +29,16 @@ jobs:
       - name: Apply refactor patch
         run: |
           set -euo pipefail
+          mkdir -p target/refactor-diagnostics
           cat .github/public-repo-patch/part-* | base64 --decode | gzip --decompress > /tmp/public-repository.patch
+          sha256sum /tmp/public-repository.patch | tee target/refactor-diagnostics/patch-sha256.txt
           test "$(sha256sum /tmp/public-repository.patch | cut -d' ' -f1)" = "03f9cd6c5b3d0d425e39a62801fdb4eb4f0da5d0fa3d3f29dde29ca07501f3e6"
           git apply --index /tmp/public-repository.patch
           rm -rf .github/public-repo-patch
+          cp .github/scripts/prepare-public-repository.py target/refactor-diagnostics/
+          python3 --version > target/refactor-diagnostics/python-version.txt 2>&1
       - name: Compile repository preparation script
-        run: python3 -m py_compile .github/scripts/prepare-public-repository.py
+        run: python3 -m py_compile .github/scripts/prepare-public-repository.py 2>target/refactor-diagnostics/prepare-error.txt
       - name: Compile publishing contract script
         run: python3 -m py_compile .github/scripts/verify-public-repository-publishing.py
       - name: Parse release script
@@ -69,3 +73,11 @@ jobs:
           git add -A
           git commit -m 'build: publish releases through anonymous Maven repository'
           git push origin HEAD:fix/issue-62-maven-central
+      - name: Upload refactor diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-repository-refactor-diagnostics
+          path: target/refactor-diagnostics
+          if-no-files-found: error
+          retention-days: 1
