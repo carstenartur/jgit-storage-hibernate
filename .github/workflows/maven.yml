@@ -25,13 +25,16 @@ jobs:
         with: {distribution: temurin, java-version: '21', cache: maven}
       - name: Verify Docker for PostgreSQL integration tests
         run: docker info
-      - name: Verify release tooling and repository consistency
+      - name: Parse release tooling
         run: |
           bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
           python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py
-          python3 .github/scripts/test_update_release_metadata.py
-          python3 .github/scripts/verify-release-consistency.py
-          python3 .github/scripts/verify-public-repository-publishing.py
+      - name: Test release metadata updater
+        run: python3 .github/scripts/test_update_release_metadata.py
+      - name: Verify release consistency
+        run: python3 .github/scripts/verify-release-consistency.py
+      - name: Verify public repository publishing contract
+        run: python3 .github/scripts/verify-public-repository-publishing.py
       - name: Build
         run: |
           set +e; mvn -B -q verify > build.log 2>&1; status=$?; tail -n 80 build.log; exit $status
