@@ -1,0 +1,43 @@
+name: Prepare release 0.1.11
+
+on:
+  push:
+    branches:
+      - prepare/release-0.1.11
+    paths:
+      - '.github/workflows/prepare-release-0.1.11.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.event.head_commit.message == 'Run release 0.1.11 preparation'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout preparation branch
+        uses: actions/checkout@v5
+        with:
+          ref: prepare/release-0.1.11
+          fetch-depth: 0
+          token: ${{ github.token }}
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Advance snapshot and metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          mvn -B versions:set -DnewVersion=0.1.11-SNAPSHOT -DgenerateBackupPoms=false
+          python3 .github/scripts/update-release-metadata.py 0.1.11-SNAPSHOT
+          python3 .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/verify-public-repository-publishing.py
+          git diff --check
+          git add pom.xml '*/pom.xml' CITATION.cff CITATION.md .zenodo.json codemeta.json
+          git commit -m 'Prepare release 0.1.11'
+          git push origin HEAD:prepare/release-0.1.11
