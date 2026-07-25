@@ -18,70 +18,75 @@ on:
         type: boolean
         default: false
       dry_run:
-        description: 'Validate, sign and inspect a Central bundle without uploading, tagging or pushing'
+        description: 'Stage and verify the static Maven repository without publishing or tagging'
         required: false
         type: boolean
         default: false
-      publish_github_packages:
-        description: 'Publish an optional secondary copy to GitHub Packages after Central succeeds'
-        required: false
-        type: boolean
-        default: true
+  push:
+    branches:
+      - 'release-request/**'
 
 permissions:
   contents: write
-  packages: write
 
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: jgit-storage-hibernate-release
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Build, publish and prepare next development version
+    name: Build and publish immutable release
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    env:
-      CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-      CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-      MAVEN_GPG_KEY: ${{ secrets.MAVEN_CENTRAL_GPG_PRIVATE_KEY }}
-      MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}
-      GITHUB_ACTOR: ${{ github.actor }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
-      - name: Checkout
+      - name: Checkout authoritative main
         uses: actions/checkout@v5
         with:
+          ref: main
           fetch-depth: 0
           token: ${{ github.token }}
-
-      - name: Set up JDK 21 and Maven Central credentials
+      - name: Resolve workflow inputs or guarded release request
+        id: request
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_RELEASE: ${{ inputs.release_version }}
+          INPUT_NEXT: ${{ inputs.next_development_version }}
+          INPUT_SKIP: ${{ inputs.skip_tests }}
+          INPUT_DRY: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            version="$INPUT_RELEASE"; next="$INPUT_NEXT"; skip="$INPUT_SKIP"; dry="$INPUT_DRY"; request=''
+          else
+            version=${REF_NAME#release-request/}; request="$REF_NAME"; next=''; skip=false; dry=false
+            git fetch origin "$REF_NAME"
+            marker=$(git show "origin/$REF_NAME:.github/release-request" | tr -d '[:space:]')
+            [[ "$marker" == "$version" ]] || { echo "::error::Release marker $marker does not match branch version $version"; exit 1; }
+          fi
+          echo "release_version=$version" >> "$GITHUB_OUTPUT"
+          echo "next_version=$next" >> "$GITHUB_OUTPUT"
+          echo "skip_tests=$skip" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry" >> "$GITHUB_OUTPUT"
+          echo "request_branch=$request" >> "$GITHUB_OUTPUT"
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-          server-id: central
-          server-username: CENTRAL_USERNAME
-          server-password: CENTRAL_PASSWORD
-
-      - name: Run release script
+      - name: Run release state machine
         env:
-          RELEASE_VERSION: ${{ inputs.release_version }}
-          NEXT_VERSION_INPUT: ${{ inputs.next_development_version }}
-          SKIP_TESTS: ${{ inputs.skip_tests }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          PUBLISH_GITHUB_PACKAGES: ${{ inputs.publish_github_packages }}
-          SOURCE_BRANCH: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.request.outputs.release_version }}
+          NEXT_VERSION_INPUT: ${{ steps.request.outputs.next_version }}
+          SKIP_TESTS: ${{ steps.request.outputs.skip_tests }}
+          DRY_RUN: ${{ steps.request.outputs.dry_run }}
+          SOURCE_BRANCH: main
+          REQUEST_BRANCH: ${{ steps.request.outputs.request_branch }}
+          PUBLIC_REPOSITORY_URL: https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/
         run: |
-          chmod +x \
-            .github/scripts/release.sh \
-            .github/scripts/verify-central-consumption.sh \
-            .github/scripts/update-release-metadata.py \
-            .github/scripts/verify-central-bundle.py \
-            .github/scripts/verify-central-publishing.py \
-            .github/scripts/verify-release-consistency.py
-          python3 .github/scripts/verify-central-publishing.py
+          chmod +x .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
+          python3 .github/scripts/verify-public-repository-publishing.py
           .github/scripts/release.sh
