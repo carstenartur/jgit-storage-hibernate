@@ -1,0 +1,34 @@
+name: Report release 0.1.10 status
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/release-0.1.10-status.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  report:
+    if: github.event.head_commit.message == 'Report release 0.1.10 status'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture recent release runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${REPOSITORY}/actions/runs?per_page=50" \
+            --jq '.workflow_runs[] | select(.name == "Release" or .name == "Dispatch release 0.1.10") | [.id,.name,.event,.status,(.conclusion // ""),.head_branch,.head_sha,.created_at,.updated_at,.html_url] | @tsv' \
+            > /tmp/release-status.txt
+          cat /tmp/release-status.txt
+          status_sha=$(gh api "repos/${REPOSITORY}/contents/.github/release-0.1.10-status.txt?ref=main" --jq '.sha' 2>/dev/null || true)
+          content=$(base64 -w0 /tmp/release-status.txt)
+          if [[ -n "$status_sha" ]]; then
+            gh api -X PUT "repos/${REPOSITORY}/contents/.github/release-0.1.10-status.txt" -f message='Update release 0.1.10 status' -f content="$content" -f sha="$status_sha" -f branch=main >/dev/null
+          else
+            gh api -X PUT "repos/${REPOSITORY}/contents/.github/release-0.1.10-status.txt" -f message='Update release 0.1.10 status' -f content="$content" -f branch=main >/dev/null
+          fi
