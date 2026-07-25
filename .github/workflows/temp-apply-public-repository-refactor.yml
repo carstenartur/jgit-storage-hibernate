@@ -29,30 +29,16 @@ jobs:
       - name: Apply refactor patch
         run: |
           set -euo pipefail
-          mkdir -p target/refactor-diagnostics
           cat .github/public-repo-patch/part-* | base64 --decode | gzip --decompress > /tmp/public-repository.patch
-          sha256sum /tmp/public-repository.patch | tee target/refactor-diagnostics/patch-sha256.txt
           test "$(sha256sum /tmp/public-repository.patch | cut -d' ' -f1)" = "03f9cd6c5b3d0d425e39a62801fdb4eb4f0da5d0fa3d3f29dde29ca07501f3e6"
           git apply --index /tmp/public-repository.patch
           rm -rf .github/public-repo-patch
-          cp .github/scripts/prepare-public-repository.py target/refactor-diagnostics/
-          python3 --version > target/refactor-diagnostics/python-version.txt 2>&1
-      - name: Compile repository preparation script
-        run: python3 -m py_compile .github/scripts/prepare-public-repository.py
-      - name: Compile publishing contract script
-        run: python3 -m py_compile .github/scripts/verify-public-repository-publishing.py
-      - name: Parse release script
-        run: bash -n .github/scripts/release.sh
-      - name: Parse anonymous consumer script
-        run: bash -n .github/scripts/verify-public-repository-consumption.sh
-      - name: Verify public repository contract
+      - name: Verify non-workflow implementation
         run: |
-          set -o pipefail
-          python3 .github/scripts/verify-public-repository-publishing.py 2>&1 | tee target/refactor-diagnostics/publishing-contract.txt
-      - name: Verify release consistency
-        run: python3 .github/scripts/verify-release-consistency.py
-      - name: Parse Maven POMs
-        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/verify-public-repository-publishing.py
+          bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
+          python3 .github/scripts/verify-release-consistency.py
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           from pathlib import Path
@@ -61,13 +47,12 @@ jobs:
                   ET.parse(path)
           print('All Maven POMs parsed successfully')
           PY
-      - name: Verify patch whitespace
-        run: git diff --check
+          git diff --check
       - name: Restore workflows for connector-managed update
         run: |
           set -euo pipefail
           git checkout HEAD -- .github/workflows/maven.yml .github/workflows/release.yml .github/workflows/publish-snapshot.yml .github/workflows/temp-public-repo-source-export.yml .github/workflows/temp-apply-public-repository-refactor.yml
-          rm -f .github/public-repository-refactor-trigger .github/public-repository-contract-ready .github/public-repository-contract-check-*
+          rm -f .github/public-repository-refactor-trigger .github/public-repository-contract-ready .github/public-repository-contract-check-* .github/public-repository-refactor-trigger
       - name: Commit and push verified non-workflow changes
         run: |
           set -euo pipefail
@@ -76,11 +61,3 @@ jobs:
           git add -A
           git commit -m 'build: publish releases through anonymous Maven repository'
           git push origin HEAD:fix/issue-62-maven-central
-      - name: Upload refactor diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: public-repository-refactor-diagnostics
-          path: target/refactor-diagnostics
-          if-no-files-found: error
-          retention-days: 1
