@@ -37,7 +37,7 @@ jobs:
             "03f9cd6c5b3d0d425e39a62801fdb4eb4f0da5d0fa3d3f29dde29ca07501f3e6"
           git apply --index /tmp/public-repository.patch
           rm -rf .github/public-repo-patch
-      - name: Verify publishing contract
+      - name: Verify complete publishing contract
         run: |
           set -euo pipefail
           python3 -m py_compile \
@@ -57,7 +57,16 @@ jobs:
           print('All Maven POMs parsed successfully')
           PY
           git diff --check
-      - name: Commit and push non-workflow changes
+      - name: Restore workflows for connector-managed update
+        run: |
+          set -euo pipefail
+          git checkout HEAD -- \
+            .github/workflows/maven.yml \
+            .github/workflows/release.yml \
+            .github/workflows/publish-snapshot.yml \
+            .github/workflows/temp-public-repo-source-export.yml \
+            .github/workflows/temp-apply-public-repository-refactor.yml
+      - name: Commit and push verified non-workflow changes
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
