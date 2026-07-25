@@ -42,7 +42,7 @@ jobs:
       - name: Verify release and publishing consistency
         run: |
           python3 .github/scripts/verify-release-consistency.py
-          python3 .github/scripts/verify-central-publishing.py
+          python3 .github/scripts/verify-public-repository-publishing.py
 
       - name: Build and deploy snapshot
         env:
