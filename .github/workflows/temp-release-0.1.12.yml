@@ -27,6 +27,7 @@ jobs:
       - name: Determine whether release is still required
         id: state
         run: |
+          # This dispatcher is idempotent and is retriggered only while the tag is absent.
           if git ls-remote --exit-code --tags origin refs/tags/v0.1.12 >/dev/null 2>&1; then
             echo 'needed=false' >> "$GITHUB_OUTPUT"
           else
