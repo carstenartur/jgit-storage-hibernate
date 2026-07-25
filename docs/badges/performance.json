@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
   "label": "JMH",
-  "message": "not run",
-  "color": "lightgrey"
+  "message": "readBlobFromWarmCache 0.01 ms/op",
+  "color": "brightgreen"
 }
