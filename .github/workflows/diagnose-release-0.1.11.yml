@@ -1,0 +1,24 @@
+name: Diagnose release 0.1.11
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.head_ref == 'diagnose/release-0.1.11'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report recent release runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?per_page=20" \
+            --jq '.workflow_runs | sort_by(.created_at) | reverse | .[] | [.id,.event,.status,(.conclusion // ""),.head_branch,.head_sha,.created_at,.updated_at,.html_url] | @tsv'
