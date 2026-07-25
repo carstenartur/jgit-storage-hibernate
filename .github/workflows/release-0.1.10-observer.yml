@@ -1,0 +1,61 @@
+name: Observe release 0.1.10 completion
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/release-0.1.10-observer.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  observe:
+    if: github.event.head_commit.message == 'Observe release 0.1.10 completion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    steps:
+      - name: Wait for canonical release and capture result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          OBSERVER: .github/workflows/release-0.1.10-observer.yml
+          STATUS: .github/release-0.1.10-result.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=$(gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?event=workflow_dispatch&per_page=20" \
+            --jq '.workflow_runs | sort_by(.created_at) | reverse | .[0].id')
+          test -n "$run_id"
+          for attempt in $(seq 1 180); do
+            status=$(gh api "repos/${REPOSITORY}/actions/runs/${run_id}" --jq '.status')
+            [[ "$status" == completed ]] && break
+            sleep 20
+          done
+          status=$(gh api "repos/${REPOSITORY}/actions/runs/${run_id}" --jq '.status')
+          conclusion=$(gh api "repos/${REPOSITORY}/actions/runs/${run_id}" --jq '.conclusion // ""')
+          {
+            echo "run_id=${run_id}"
+            echo "status=${status}"
+            echo "conclusion=${conclusion}"
+            echo "url=https://github.com/${REPOSITORY}/actions/runs/${run_id}"
+          } > "$STATUS"
+          if [[ "$status" == completed && "$conclusion" != success ]]; then
+            failed_job=$(gh api "repos/${REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "failure") | .id' | head -n1)
+            if [[ -n "$failed_job" ]]; then
+              gh api -H 'Accept: application/vnd.github+json' \
+                "repos/${REPOSITORY}/actions/jobs/${failed_job}/logs" > /tmp/release.log || true
+              echo >> "$STATUS"
+              tail -n 160 /tmp/release.log >> "$STATUS" || true
+            fi
+          fi
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git" repo
+          cd repo
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          cp "../$STATUS" "$STATUS"
+          git add "$STATUS"
+          git commit -m 'Record release 0.1.10 result'
+          git push origin HEAD:main
