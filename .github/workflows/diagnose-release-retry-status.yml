@@ -1,0 +1,31 @@
+name: Diagnose release retry status
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.head_ref == 'diagnose/release-retry-status'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report recent release runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${REPOSITORY}/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.name == "Release" or .name == "Retry release 0.1.10") | [.id,.name,.event,.status,(.conclusion // ""),.head_branch,.head_sha,.created_at,.updated_at,.html_url] | @tsv' \
+            | tee release-retry-status.txt
+      - name: Upload status
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-retry-status
+          path: release-retry-status.txt
+          if-no-files-found: error
+          retention-days: 1
