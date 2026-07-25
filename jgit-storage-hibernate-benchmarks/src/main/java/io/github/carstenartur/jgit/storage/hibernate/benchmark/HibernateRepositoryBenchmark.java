@@ -10,10 +10,15 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
 import org.eclipse.jgit.internal.storage.dfs.DfsBlockCacheConfig;
 import org.eclipse.jgit.lib.CommitBuilder;
@@ -25,7 +30,9 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TreeFormatter;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -33,12 +40,20 @@ import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
+/**
+ * Runs one JGit workload against the filesystem and both Hibernate-backed database variants.
+ *
+ * <p>The benchmark intentionally uses only the public {@link Repository} API in measured methods.
+ * Backend-specific setup and lifecycle code stays outside the measured operations. PostgreSQL
+ * connection properties are supplied by the JUnit/Testcontainers harness to every JMH fork.
+ */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS)
@@ -47,9 +62,21 @@ import org.openjdk.jmh.annotations.Warmup;
 @State(Scope.Thread)
 public class HibernateRepositoryBenchmark {
 
+  static final String FILESYSTEM = "filesystem";
+  static final String HSQLDB = "hsqldb";
+  static final String POSTGRESQL = "postgresql";
+  static final String POSTGRESQL_URL_PROPERTY = "jgit.storage.benchmark.postgresql.url";
+  static final String POSTGRESQL_USER_PROPERTY = "jgit.storage.benchmark.postgresql.user";
+  static final String POSTGRESQL_PASSWORD_PROPERTY = "jgit.storage.benchmark.postgresql.password";
+
   private final AtomicInteger counter = new AtomicInteger();
+
+  @Param({FILESYSTEM, HSQLDB, POSTGRESQL})
+  public String backend;
+
   private HibernateSessionFactoryProvider provider;
-  private HibernateRepository repository;
+  private Repository repository;
+  private Path repositoryDirectory;
   private String repositoryName;
   private ObjectId blobId;
   private ObjectId commitId;
@@ -57,9 +84,8 @@ public class HibernateRepositoryBenchmark {
   @Setup(Level.Trial)
   public void setup() throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
-    repositoryName = "jmh-hibernate-repository-" + Long.toHexString(System.nanoTime());
-    provider = new HibernateSessionFactoryProvider(h2Properties(repositoryName));
-    repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+    repositoryName = "jmh-" + backend + "-" + Long.toHexString(System.nanoTime());
+    repository = createRepository();
     repository.create(true);
     blobId = writeBlob("initial blob");
     commitId = writeCommitWithFile("Initial commit", "README.md", "initial content");
@@ -67,13 +93,14 @@ public class HibernateRepositoryBenchmark {
   }
 
   @TearDown(Level.Trial)
-  public void tearDown() {
+  public void tearDown() throws IOException {
     if (repository != null) {
       repository.close();
     }
     if (provider != null) {
       provider.close();
     }
+    deleteRecursively(repositoryDirectory);
   }
 
   @Benchmark
@@ -81,8 +108,14 @@ public class HibernateRepositoryBenchmark {
     return writeBlob("payload-" + counter.incrementAndGet());
   }
 
+  /**
+   * Measures repeated reads of one already accessed object through JGit's normal caches.
+   *
+   * <p>This intentionally represents hot application-level lookup latency, not a physical disk or
+   * database round trip.
+   */
   @Benchmark
-  public byte[] readBlob() throws Exception {
+  public byte[] readBlobFromWarmCache() throws Exception {
     try (ObjectReader reader = repository.newObjectReader()) {
       ObjectLoader loader = reader.open(blobId);
       return loader.getBytes();
@@ -100,8 +133,41 @@ public class HibernateRepositoryBenchmark {
   @Benchmark
   public ObjectId reopenAndResolveMain() throws Exception {
     repository.close();
-    repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+    repository = reopenRepository();
     return repository.exactRef("refs/heads/main").getObjectId();
+  }
+
+  private Repository createRepository() throws IOException {
+    return switch (backend) {
+      case FILESYSTEM -> createFilesystemRepository();
+      case HSQLDB -> createHibernateRepository(hsqlDbProperties(repositoryName));
+      case POSTGRESQL -> createHibernateRepository(postgreSqlProperties());
+      default -> throw new IllegalArgumentException("Unsupported benchmark backend: " + backend);
+    };
+  }
+
+  private Repository reopenRepository() throws IOException {
+    if (FILESYSTEM.equals(backend)) {
+      return new FileRepositoryBuilder()
+          .setGitDir(repositoryDirectory.toFile())
+          .setBare()
+          .setMustExist(true)
+          .build();
+    }
+    return HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+  }
+
+  private Repository createFilesystemRepository() throws IOException {
+    repositoryDirectory = Files.createTempDirectory("jgit-filesystem-benchmark-");
+    return new FileRepositoryBuilder()
+        .setGitDir(repositoryDirectory.toFile())
+        .setBare()
+        .build();
+  }
+
+  private Repository createHibernateRepository(Properties properties) throws IOException {
+    provider = new HibernateSessionFactoryProvider(properties);
+    return HibernateRepository.create(provider.getSessionFactory(), repositoryName);
   }
 
   private ObjectId writeBlob(String content) throws Exception {
@@ -138,13 +204,54 @@ public class HibernateRepositoryBenchmark {
     }
   }
 
-  private static Properties h2Properties(String name) {
+  private static Properties hsqlDbProperties(String name) {
+    Properties properties = commonHibernateProperties();
+    properties.put("hibernate.connection.url", "jdbc:hsqldb:mem:" + name);
+    properties.put("hibernate.connection.driver_class", "org.hsqldb.jdbc.JDBCDriver");
+    properties.put("hibernate.dialect", "org.hibernate.dialect.HSQLDialect");
+    return properties;
+  }
+
+  private static Properties postgreSqlProperties() {
+    Properties properties = commonHibernateProperties();
+    properties.put("hibernate.connection.url", requiredSystemProperty(POSTGRESQL_URL_PROPERTY));
+    properties.put(
+        "hibernate.connection.username", requiredSystemProperty(POSTGRESQL_USER_PROPERTY));
+    properties.put(
+        "hibernate.connection.password", requiredSystemProperty(POSTGRESQL_PASSWORD_PROPERTY));
+    properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
+    properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+    return properties;
+  }
+
+  private static Properties commonHibernateProperties() {
     Properties properties = new Properties();
-    properties.put("hibernate.connection.url", "jdbc:h2:mem:" + name + ";DB_CLOSE_DELAY=-1");
-    properties.put("hibernate.connection.driver_class", "org.h2.Driver");
-    properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
     properties.put("hibernate.hbm2ddl.auto", "create-drop");
     properties.put("hibernate.show_sql", "false");
+    properties.put("hibernate.format_sql", "false");
+    properties.put("hibernate.connection.pool_size", "4");
     return properties;
+  }
+
+  private static String requiredSystemProperty(String name) {
+    String value = System.getProperty(name);
+    if (value == null || value.isBlank()) {
+      throw new IllegalStateException(
+          "Missing PostgreSQL benchmark system property "
+              + name
+              + "; run the benchmark through the Maven benchmark-comparison profile");
+    }
+    return value;
+  }
+
+  private static void deleteRecursively(Path root) throws IOException {
+    if (root == null || !Files.exists(root)) {
+      return;
+    }
+    try (Stream<Path> paths = Files.walk(root)) {
+      for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+        Files.deleteIfExists(path);
+      }
+    }
   }
 }

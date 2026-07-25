@@ -13,12 +13,14 @@ concurrency:
 
 permissions:
   contents: write
+  deployments: write
+  pull-requests: write
 
 jobs:
   jmh:
-    name: Hibernate storage JMH benchmarks
+    name: JGit repository backend comparison
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -31,17 +33,29 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build benchmark jar
-        run: mvn -B -q -pl jgit-storage-hibernate-benchmarks -am package -DskipTests
-
-      - name: Run JMH benchmarks
+      - name: Build benchmark module with Maven
+        shell: bash
         run: |
           mkdir -p target/benchmarks
-          java -jar jgit-storage-hibernate-benchmarks/target/benchmarks.jar \
-            -wi 1 -i 3 -f 1 -r 1s -w 1s \
-            -rf json -rff target/benchmarks/jmh-result.json \
-            '.*HibernateRepositoryBenchmark.*' \
-            | tee target/benchmarks/jmh-output.txt
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/benchmarks/maven-build.log
+
+      - name: Run JUnit and Testcontainers benchmark comparison with Maven
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pbenchmark-comparison \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/benchmarks/jmh-result.json" 2>&1 \
+            | tee target/benchmarks/maven-benchmark.log
+
+      - name: Convert results for comparison charts
+        run: |
+          python3 .github/scripts/convert-jmh-backend-comparison.py \
+            target/benchmarks/jmh-result.json \
+            target/benchmarks/backend-comparison.json
+          cat target/benchmarks/backend-comparison.json
 
       - name: Generate JMH performance badge
         if: always()
@@ -50,14 +64,56 @@ jobs:
             python3 .github/scripts/write-performance-badge.py target/benchmarks/jmh-result.json
           fi
 
+      - name: Initialize benchmark history branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            exit 0
+          fi
+          empty_tree="$(git mktree </dev/null)"
+          export GIT_AUTHOR_NAME='github-actions[bot]'
+          export GIT_AUTHOR_EMAIL='github-actions[bot]@users.noreply.github.com'
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          initial_commit="$(printf '%s\n' 'Initialize benchmark history' | git commit-tree "$empty_tree")"
+          git push origin "$initial_commit:refs/heads/gh-pages"
+
+      - name: Store benchmark history and publish charts
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Repository backend comparison
+          tool: customSmallerIsBetter
+          output-file-path: target/benchmarks/backend-comparison.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          alert-threshold: '150%'
+          comment-on-alert: true
+          fail-on-alert: false
+          alert-comment-cc-users: '@carstenartur'
+          summary-always: true
+          max-items-in-chart: 100
+
       - name: Upload JMH benchmark results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jmh-benchmark-results
+          name: jmh-backend-comparison-results
           path: |
             target/benchmarks/*
             docs/badges/performance.json
+
+      - name: Report benchmark dashboard
+        if: always()
+        run: |
+          echo '### Repository backend performance' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Compared backends: JGit + filesystem, JGit + HSQLDB (in-memory), JGit + PostgreSQL.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'PostgreSQL is provided by the JUnit Testcontainers extension; the workflow only invokes Maven.' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Update performance badge data on main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
