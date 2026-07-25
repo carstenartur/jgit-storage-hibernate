@@ -5,6 +5,10 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/temp-release-0.1.12.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/temp-release-0.1.12.yml'
 
 permissions:
   contents: write
@@ -15,6 +19,7 @@ concurrency:
 
 jobs:
   release:
+    if: github.event_name == 'push' || github.head_ref == 'dispatch/release-0.1.12'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -27,7 +32,6 @@ jobs:
       - name: Determine whether release is still required
         id: state
         run: |
-          # This dispatcher is idempotent and is retriggered only while the tag is absent.
           if git ls-remote --exit-code --tags origin refs/tags/v0.1.12 >/dev/null 2>&1; then
             echo 'needed=false' >> "$GITHUB_OUTPUT"
           else
