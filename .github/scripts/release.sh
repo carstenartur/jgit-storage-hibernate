@@ -52,8 +52,16 @@ python3 .github/scripts/prepare-public-repository.py "$RELEASE_VERSION" "$PUBLIC
 MAVEN_COMMAND=mvn PUBLIC_REPOSITORY_ATTEMPTS=1 .github/scripts/verify-public-repository-consumption.sh "$RELEASE_VERSION" "file://$PUBLIC_REPOSITORY_STAGE"
 if [[ "$DRY_RUN" == true ]]; then echo "Dry run completed after local anonymous repository verification."; exit 0; fi
 
+remove_volatile_version_files(){
+  local root=$1
+  [[ -d "$root/io/github/carstenartur" ]] || return 0
+  find "$root/io/github/carstenartur" -type f -path "*/$RELEASE_VERSION/*" \
+    \( -name '*.md5' -o -name '*.sha1' -o -name '*.lastUpdated' -o -name '_remote.repositories' \) \
+    -delete
+}
+
 publish_repository(){
-  local exists=false file rel dest changed=false
+  local exists=false file rel dest
   git ls-remote --exit-code --heads origin "refs/heads/$PUBLIC_REPOSITORY_BRANCH" >/dev/null 2>&1 && exists=true
   WORKTREE=$(mktemp -d); rmdir "$WORKTREE"
   if [[ "$exists" == true ]]; then
@@ -66,6 +74,7 @@ publish_repository(){
   fi
   git -C "$WORKTREE" config user.name 'github-actions[bot]'
   git -C "$WORKTREE" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+  remove_volatile_version_files "$WORKTREE"
   while IFS= read -r -d '' file; do
     rel=${file#"$PUBLIC_REPOSITORY_STAGE/"}
     case "$rel" in */"$RELEASE_VERSION"/*)
