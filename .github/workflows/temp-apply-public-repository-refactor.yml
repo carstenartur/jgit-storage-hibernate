@@ -33,11 +33,14 @@ jobs:
           test "$(sha256sum /tmp/public-repository.patch | cut -d' ' -f1)" = "03f9cd6c5b3d0d425e39a62801fdb4eb4f0da5d0fa3d3f29dde29ca07501f3e6"
           git apply --index /tmp/public-repository.patch
           rm -rf .github/public-repo-patch
-      - name: Verify script syntax
-        run: |
-          set -euo pipefail
-          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/verify-public-repository-publishing.py
-          bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
+      - name: Compile repository preparation script
+        run: python3 -m py_compile .github/scripts/prepare-public-repository.py
+      - name: Compile publishing contract script
+        run: python3 -m py_compile .github/scripts/verify-public-repository-publishing.py
+      - name: Parse release script
+        run: bash -n .github/scripts/release.sh
+      - name: Parse anonymous consumer script
+        run: bash -n .github/scripts/verify-public-repository-consumption.sh
       - name: Verify public repository contract
         run: python3 .github/scripts/verify-public-repository-publishing.py
       - name: Verify release consistency
