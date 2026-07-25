@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Validate a staged static Maven repository and emit audit evidence."""
+"""Validate and canonicalize a staged static Maven repository."""
 from __future__ import annotations
-import argparse, hashlib, json, re, sys
+
+import argparse
+import hashlib
+import json
+import re
+import sys
 from pathlib import Path
 
 GROUP = Path("io/github/carstenartur")
@@ -14,6 +19,8 @@ JARS = (
     "jgit-storage-hibernate-benchmarks",
 )
 VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+VOLATILE_NAMES = {"_remote.repositories"}
+VOLATILE_SUFFIXES = (".md5", ".sha1", ".lastUpdated")
 
 
 def required(version: str) -> list[Path]:
@@ -21,10 +28,25 @@ def required(version: str) -> list[Path]:
     for artifact in JARS:
         base = GROUP / artifact / version / f"{artifact}-{version}"
         result.extend([
-            Path(f"{base}.pom"), Path(f"{base}.jar"),
-            Path(f"{base}-sources.jar"), Path(f"{base}-javadoc.jar"),
+            Path(f"{base}.pom"),
+            Path(f"{base}.jar"),
+            Path(f"{base}-sources.jar"),
+            Path(f"{base}-javadoc.jar"),
         ])
     return result
+
+
+def is_volatile(path: Path) -> bool:
+    return path.name in VOLATILE_NAMES or path.name.endswith(VOLATILE_SUFFIXES)
+
+
+def remove_volatile_files(repository: Path) -> list[Path]:
+    removed: list[Path] = []
+    for path in repository.rglob("*"):
+        if path.is_file() and is_volatile(path):
+            removed.append(path.relative_to(repository))
+            path.unlink()
+    return removed
 
 
 def main() -> None:
@@ -39,6 +61,7 @@ def main() -> None:
     if not repository.is_dir():
         raise SystemExit(f"repository does not exist: {repository}")
 
+    removed = remove_volatile_files(repository)
     errors: list[str] = []
     manifest_files: list[dict[str, object]] = []
     for relative in required(args.version):
@@ -55,13 +78,18 @@ def main() -> None:
         path.with_name(path.name + ".sha256").write_text(sha256 + "\n", encoding="ascii")
         path.with_name(path.name + ".sha512").write_text(sha512 + "\n", encoding="ascii")
         manifest_files.append({
-            "path": relative.as_posix(), "size": len(data),
-            "sha256": sha256, "sha512": sha512,
+            "path": relative.as_posix(),
+            "size": len(data),
+            "sha256": sha256,
+            "sha512": sha512,
         })
 
     snapshots = [p for p in repository.rglob("*") if p.is_file() and "SNAPSHOT" in p.as_posix()]
     if snapshots:
-        errors.append("SNAPSHOT files in release repository: " + ", ".join(str(p.relative_to(repository)) for p in snapshots[:20]))
+        errors.append(
+            "SNAPSHOT files in release repository: "
+            + ", ".join(str(p.relative_to(repository)) for p in snapshots[:20])
+        )
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
@@ -73,10 +101,19 @@ def main() -> None:
         "schemaVersion": 1,
         "groupId": "io.github.carstenartur",
         "version": args.version,
+        "canonicalChecksums": ["sha256", "sha512"],
+        "removedVolatileFiles": sorted(path.as_posix() for path in removed),
         "files": sorted(manifest_files, key=lambda item: str(item["path"])),
     }
-    args.evidence.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Verified static Maven repository {repository} for {args.version}: {len(manifest_files)} release files")
+    args.evidence.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(
+        f"Verified static Maven repository {repository} for {args.version}: "
+        f"{len(manifest_files)} release files; removed {len(removed)} volatile files"
+    )
+
 
 if __name__ == "__main__":
     main()
