@@ -1,0 +1,5 @@
+30149281130	Release	workflow_dispatch	completed	failure	main	d122cf63338282e52be373e6436d524a8490182a	2026-07-25T07:25:37Z	2026-07-25T07:27:50Z	https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/30149281130
+30149201163	Release	workflow_dispatch	completed	success	main	b22f190f5f821a966333ea2bc8a2d49cfea12b65	2026-07-25T07:22:51Z	2026-07-25T07:25:32Z	https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/30149201163
+30149197689	Dispatch release 0.1.10	push	completed	failure	main	b22f190f5f821a966333ea2bc8a2d49cfea12b65	2026-07-25T07:22:43Z	2026-07-25T07:27:53Z	https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/30149197689
+30149105915	Release	push	completed	cancelled	release-request/0.1.10	94ee7f3777e390ee03cf56f83798e3efd6bdf8d6	2026-07-25T07:19:33Z	2026-07-25T07:22:53Z	https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/30149105915
+30149102148	Release	push	completed	failure	release-request/0.1.10	f6ea2aad333069301f528b2a17c1595f4a5ad2c6	2026-07-25T07:19:24Z	2026-07-25T07:23:14Z	https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/30149102148
