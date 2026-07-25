@@ -29,25 +29,21 @@ jobs:
       - name: Apply refactor patch
         run: |
           set -euo pipefail
-          cat .github/public-repo-patch/part-* \
-            | base64 --decode \
-            | gzip --decompress \
-            > /tmp/public-repository.patch
-          test "$(sha256sum /tmp/public-repository.patch | cut -d' ' -f1)" = \
-            "03f9cd6c5b3d0d425e39a62801fdb4eb4f0da5d0fa3d3f29dde29ca07501f3e6"
+          cat .github/public-repo-patch/part-* | base64 --decode | gzip --decompress > /tmp/public-repository.patch
+          test "$(sha256sum /tmp/public-repository.patch | cut -d' ' -f1)" = "03f9cd6c5b3d0d425e39a62801fdb4eb4f0da5d0fa3d3f29dde29ca07501f3e6"
           git apply --index /tmp/public-repository.patch
           rm -rf .github/public-repo-patch
-      - name: Verify complete publishing contract
+      - name: Verify script syntax
         run: |
           set -euo pipefail
-          python3 -m py_compile \
-            .github/scripts/prepare-public-repository.py \
-            .github/scripts/verify-public-repository-publishing.py
-          bash -n \
-            .github/scripts/release.sh \
-            .github/scripts/verify-public-repository-consumption.sh
-          python3 .github/scripts/verify-public-repository-publishing.py
-          python3 .github/scripts/verify-release-consistency.py
+          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/verify-public-repository-publishing.py
+          bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
+      - name: Verify public repository contract
+        run: python3 .github/scripts/verify-public-repository-publishing.py
+      - name: Verify release consistency
+        run: python3 .github/scripts/verify-release-consistency.py
+      - name: Parse Maven POMs
+        run: |
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           from pathlib import Path
@@ -56,16 +52,12 @@ jobs:
                   ET.parse(path)
           print('All Maven POMs parsed successfully')
           PY
-          git diff --check
+      - name: Verify patch whitespace
+        run: git diff --check
       - name: Restore workflows for connector-managed update
         run: |
           set -euo pipefail
-          git checkout HEAD -- \
-            .github/workflows/maven.yml \
-            .github/workflows/release.yml \
-            .github/workflows/publish-snapshot.yml \
-            .github/workflows/temp-public-repo-source-export.yml \
-            .github/workflows/temp-apply-public-repository-refactor.yml
+          git checkout HEAD -- .github/workflows/maven.yml .github/workflows/release.yml .github/workflows/publish-snapshot.yml .github/workflows/temp-public-repo-source-export.yml .github/workflows/temp-apply-public-repository-refactor.yml
       - name: Commit and push verified non-workflow changes
         run: |
           set -euo pipefail
