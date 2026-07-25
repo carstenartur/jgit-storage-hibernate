@@ -29,6 +29,14 @@ import org.hibernate.annotations.Nationalized;
     })
 public class GitReflogEntity {
 
+  /**
+   * Portable maximum for a nationalized variable-length column.
+   *
+   * <p>Oracle maps {@link Nationalized} strings to {@code NVARCHAR2}. With the commonly used
+   * AL16UTF16 national character set, the 4,000-byte SQL limit allows at most 2,000 characters.
+   */
+  public static final int MAX_MESSAGE_LENGTH = 2000;
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -63,7 +71,7 @@ public class GitReflogEntity {
   private Instant when;
 
   @Nationalized
-  @Column(name = "message", length = 2048)
+  @Column(name = "message", length = MAX_MESSAGE_LENGTH)
   private String message;
 
   public Long getId() {
