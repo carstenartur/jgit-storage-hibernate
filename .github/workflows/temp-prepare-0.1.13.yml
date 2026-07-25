@@ -1,0 +1,65 @@
+name: Prepare reproducible 0.1.13
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/temp-prepare-0.1.13.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.head_ref == 'prepare/release-0.1.13'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: prepare/release-0.1.13
+          fetch-depth: 0
+          token: ${{ github.token }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Set reproducible archive timestamp and next version
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          pom = Path('pom.xml')
+          text = pom.read_text(encoding='utf-8')
+          marker = '    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>\n'
+          setting = '    <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>\n'
+          if setting not in text:
+              if marker not in text:
+                  raise SystemExit('POM encoding marker not found')
+              text = text.replace(marker, marker + setting, 1)
+              pom.write_text(text, encoding='utf-8')
+          PY
+          mvn -B versions:set -DnewVersion=0.1.13-SNAPSHOT -DgenerateBackupPoms=false
+          python3 .github/scripts/update-release-metadata.py 0.1.13-SNAPSHOT
+          python3 .github/scripts/test_update_release_metadata.py
+          python3 .github/scripts/verify-release-consistency.py
+      - name: Prove attached archives are reproducible
+        run: |
+          set -euo pipefail
+          mvn -B -q clean package -DskipTests
+          find . -type f \( -path '*/target/*-sources.jar' -o -path '*/target/*-javadoc.jar' \) -print0 \
+            | sort -z | xargs -0 sha512sum > /tmp/attached-first.sha512
+          test -s /tmp/attached-first.sha512
+          mvn -B -q clean package -DskipTests
+          find . -type f \( -path '*/target/*-sources.jar' -o -path '*/target/*-javadoc.jar' \) -print0 \
+            | sort -z | xargs -0 sha512sum > /tmp/attached-second.sha512
+          diff -u /tmp/attached-first.sha512 /tmp/attached-second.sha512
+      - name: Commit prepared candidate
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add pom.xml */pom.xml CITATION.cff CITATION.md .zenodo.json codemeta.json
+          git commit -m 'Prepare reproducible 0.1.13 release'
+          git push origin HEAD:prepare/release-0.1.13
