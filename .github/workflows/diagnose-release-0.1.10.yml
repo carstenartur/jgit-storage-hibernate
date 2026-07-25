@@ -1,0 +1,31 @@
+name: Diagnose release 0.1.10
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.head_ref == 'diagnose/release-0.1.10'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download failed release log
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh run view 30149281130 --repo "$REPOSITORY" --log-failed > release-failure.log 2>&1 || true
+          tail -n 700 release-failure.log > release-failure-tail.log
+          cat release-failure-tail.log
+      - name: Upload failed release log
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-0.1.10-failure-log
+          path: release-failure-tail.log
+          if-no-files-found: error
+          retention-days: 1
