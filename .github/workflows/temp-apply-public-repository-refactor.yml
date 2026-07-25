@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/issue-62-maven-central
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,7 +14,7 @@ permissions:
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
+    if: (github.head_ref == 'fix/issue-62-maven-central' || github.ref_name == 'fix/issue-62-maven-central') && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
