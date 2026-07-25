@@ -1,0 +1,84 @@
+name: Retry release 0.1.10
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/release-0.1.10-retry-dispatch.yml'
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: release-retry-0.1.10
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: github.event.head_commit.message == 'Retry release 0.1.10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Remove temporary diagnostics and dispatch canonical release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          delete_file_if_present() {
+            local path="$1"
+            local sha
+            sha=$(gh api "repos/${REPOSITORY}/contents/${path}?ref=main" --jq '.sha' 2>/dev/null || true)
+            if [[ -n "$sha" ]]; then
+              gh api -X DELETE "repos/${REPOSITORY}/contents/${path}" \
+                -f message="Remove temporary release diagnostic: ${path}" \
+                -f sha="$sha" \
+                -f branch=main >/dev/null
+            fi
+          }
+
+          delete_file_if_present '.github/workflows/release-0.1.10-status.yml'
+          delete_file_if_present '.github/release-0.1.10-status.txt'
+          delete_file_if_present '.github/workflows/release-failure-report-2.yml'
+          delete_file_if_present '.github/release-0.1.10-failure.txt'
+          delete_file_if_present '.github/workflows/release-0.1.10-retry-dispatch.yml'
+
+          before=$(mktemp)
+          gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?event=workflow_dispatch&per_page=100" \
+            --jq '.workflow_runs[].id' > "$before"
+
+          gh workflow run release.yml \
+            --repo "$REPOSITORY" \
+            --ref main \
+            -f release_version=0.1.10 \
+            -f next_development_version=0.1.11-SNAPSHOT \
+            -f skip_tests=false \
+            -f dry_run=false
+
+          run_id=''
+          for attempt in $(seq 1 60); do
+            while IFS= read -r candidate; do
+              if ! grep -qx "$candidate" "$before"; then
+                run_id="$candidate"
+                break
+              fi
+            done < <(
+              gh api "repos/${REPOSITORY}/actions/workflows/release.yml/runs?event=workflow_dispatch&per_page=100" \
+                --jq '.workflow_runs | sort_by(.created_at) | reverse | .[].id'
+            )
+            [[ -n "$run_id" ]] && break
+            sleep 2
+          done
+          rm -f "$before"
+
+          [[ -n "$run_id" ]] || { echo '::error::Could not identify release workflow run'; exit 1; }
+          echo "Release workflow run: $run_id"
+          gh run watch "$run_id" --repo "$REPOSITORY" --exit-status
+
+          for branch in diagnose/release-0.1.10 tmp-tree-probe tmp-tree-probe-2 tmp-tree-probe-3 tmp-tree-probe-4 tmp-tree-probe-5 tmp-tree-probe-6 tmp-tree-probe-final tmp-tree-probe-stop; do
+            encoded=${branch//\//%2F}
+            gh api -X DELETE "repos/${REPOSITORY}/git/refs/heads/${encoded}" >/dev/null 2>&1 || true
+          done
