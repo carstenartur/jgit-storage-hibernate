@@ -17,125 +17,70 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Set up JDK 21
         uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
+        with: {distribution: temurin, java-version: '21', cache: maven}
       - name: Verify Docker for PostgreSQL integration tests
         run: docker info
-
       - name: Verify release tooling and repository consistency
         run: |
-          bash -n \
-            .github/scripts/release.sh \
-            .github/scripts/verify-central-consumption.sh
-          python3 -m py_compile \
-            .github/scripts/build-central-bundle.py \
-            .github/scripts/update-release-metadata.py \
-            .github/scripts/test_update_release_metadata.py \
-            .github/scripts/verify-central-bundle.py \
-            .github/scripts/verify-central-publishing.py \
-            .github/scripts/verify-release-consistency.py
+          bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
+          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py
           python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/verify-release-consistency.py
-          python3 .github/scripts/verify-central-publishing.py
-
+          python3 .github/scripts/verify-public-repository-publishing.py
       - name: Build
         run: |
-          set +e
-          mvn -B -q verify > build.log 2>&1
-          status=$?
-          tail -n 80 build.log
-          exit $status
-
+          set +e; mvn -B -q verify > build.log 2>&1; status=$?; tail -n 80 build.log; exit $status
       - name: Generate coverage and test-count badges
         if: always()
         run: python3 .github/scripts/generate-metrics-badges.py
-
       - name: Upload Maven build log
         if: always()
         uses: actions/upload-artifact@v4
-        with:
-          name: maven-build-log
-          path: build.log
-
+        with: {name: maven-build-log, path: build.log}
       - name: Upload badge metrics
         if: always()
         uses: actions/upload-artifact@v4
-        with:
-          name: badge-metrics
-          path: docs/badges/*.json
-
+        with: {name: badge-metrics, path: 'docs/badges/*.json'}
       - name: Update badge data on main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
         run: |
-          if git diff --quiet -- docs/badges; then
-            echo "Badge data unchanged"
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add docs/badges/*.json
-          git commit -m "Update build metric badges [skip ci]"
-          git push
+          git diff --quiet -- docs/badges && exit 0
+          git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/badges/*.json; git commit -m "Update build metric badges [skip ci]"; git push
 
-  central-release-contract:
-    name: Maven Central release contract
+  public-repository-contract:
+    name: Public Maven repository contract
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    permissions:
-      contents: read
-
+    permissions: {contents: read}
     steps:
-      - name: Checkout complete history
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Build signed Central bundle without publishing
+      - uses: actions/checkout@v5
+        with: {fetch-depth: 0}
+      - uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: '21', cache: maven}
+      - name: Stage and anonymously resolve a release repository
         env:
           SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           set -o pipefail
-          chmod +x \
-            .github/scripts/release.sh \
-            .github/scripts/verify-central-consumption.sh
-          CURRENT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
-          case "$CURRENT_VERSION" in
-            *-SNAPSHOT) RELEASE_VERSION=${CURRENT_VERSION%-SNAPSHOT} ;;
-            *) echo "::error::Expected a SNAPSHOT development version, found $CURRENT_VERSION"; exit 1 ;;
-          esac
-          RELEASE_VERSION="$RELEASE_VERSION" \
-          DRY_RUN=true \
-          SKIP_TESTS=true \
-          PUBLISH_GITHUB_PACKAGES=false \
-            .github/scripts/release.sh 2>&1 | tee central-release-contract.log
-
-      - name: Require Central bundle evidence
-        run: test -s target/central-publishing/central-bundle.zip
-
-      - name: Upload Central release evidence
+          chmod +x .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
+          current=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          case "$current" in *-SNAPSHOT) release=${current%-SNAPSHOT};; *) exit 1;; esac
+          RELEASE_VERSION="$release" DRY_RUN=true SKIP_TESTS=true .github/scripts/release.sh 2>&1 | tee public-repository-contract.log
+      - name: Require repository evidence
+        run: test -s target/public-repository-evidence/manifest.json
+      - name: Upload public repository evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: central-release-contract
+          name: public-maven-repository-contract
           path: |
-            central-release-contract.log
-            target/central-publishing/*.zip
+            public-repository-contract.log
+            target/public-repository-evidence/manifest.json
           if-no-files-found: error
