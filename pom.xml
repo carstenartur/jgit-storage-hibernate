@@ -47,19 +47,6 @@
     <tag>HEAD</tag>
   </scm>
 
-  <distributionManagement>
-    <repository>
-      <id>github</id>
-      <name>GitHub Packages</name>
-      <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
-    </repository>
-    <snapshotRepository>
-      <id>github</id>
-      <name>GitHub Packages Snapshots</name>
-      <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
-    </snapshotRepository>
-  </distributionManagement>
-
   <properties>
     <java.version>21</java.version>
     <maven.compiler.release>${java.version}</maven.compiler.release>
@@ -81,6 +68,7 @@
     <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
     <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+    <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
     <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
@@ -208,7 +196,7 @@
           <executions>
             <execution>
               <id>attach-sources</id>
-              <phase>verify</phase>
+              <phase>package</phase>
               <goals>
                 <goal>jar-no-fork</goal>
               </goals>
@@ -222,11 +210,25 @@
             <failOnWarnings>false</failOnWarnings>
             <additionalJOption>-Xdoclint:none</additionalJOption>
           </configuration>
+          <executions>
+            <execution>
+              <id>attach-javadocs</id>
+              <phase>package</phase>
+              <goals>
+                <goal>jar</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
           <version>${maven-shade-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>${maven-deploy-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -290,6 +292,36 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>github-packages</id>
+      <distributionManagement>
+        <repository>
+          <id>github</id>
+          <name>GitHub Packages</name>
+          <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
+        </repository>
+        <snapshotRepository>
+          <id>github</id>
+          <name>GitHub Packages Snapshots</name>
+          <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
+        </snapshotRepository>
+      </distributionManagement>
+    </profile>
+
+    <profile>
+      <id>public-repository-release</id>
+      <properties>
+        <public.repository.directory>${maven.multiModuleProjectDirectory}/target/public-maven-repository</public.repository.directory>
+      </properties>
+      <distributionManagement>
+        <repository>
+          <id>public-repository</id>
+          <name>Static public Maven repository staging directory</name>
+          <url>file://${public.repository.directory}</url>
+        </repository>
+      </distributionManagement>
+    </profile>
+
     <profile>
       <id>dependency-linkage</id>
       <build>

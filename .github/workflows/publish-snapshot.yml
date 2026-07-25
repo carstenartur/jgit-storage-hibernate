@@ -39,10 +39,12 @@ jobs:
       - name: Verify Docker for PostgreSQL integration tests
         run: docker info
 
-      - name: Verify release and documentation consistency
-        run: python3 .github/scripts/verify-release-consistency.py
+      - name: Verify release and publishing consistency
+        run: |
+          python3 .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/verify-public-repository-publishing.py
 
       - name: Build and deploy snapshot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mvn -B deploy
+        run: mvn -B -Pgithub-packages deploy

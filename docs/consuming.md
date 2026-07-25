@@ -34,34 +34,22 @@ Production sequence:
 - `update` may be useful for a disposable local database, but its changes are not a versioned deployment contract;
 - use packaged migrations plus `validate` for persistent development, staging and production.
 
-## GitHub Packages repository
+## Anonymous public Maven repository
 
-Until the project is published to Maven Central, configure GitHub Packages:
+Configure the static public release repository:
 
 ```xml
 <repositories>
   <repository>
-    <id>github</id>
-    <url>https://maven.pkg.github.com/carstenartur/jgit-storage-hibernate</url>
+    <id>jgit-storage-hibernate-public</id>
+    <url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</url>
+    <releases><enabled>true</enabled></releases>
+    <snapshots><enabled>false</enabled></snapshots>
   </repository>
 </repositories>
 ```
 
-For private package access, add credentials to `~/.m2/settings.xml`:
-
-```xml
-<settings>
-  <servers>
-    <server>
-      <id>github</id>
-      <username>YOUR_GITHUB_USERNAME</username>
-      <password>YOUR_GITHUB_TOKEN</password>
-    </server>
-  </servers>
-</settings>
-```
-
-The token needs at least `read:packages` for consuming and `write:packages` for publishing.
+No GitHub username, token or Maven `settings.xml` server entry is required. Development snapshots may still be published to GitHub Packages, but released versions use the anonymous repository above.
 
 ## Dependencies
 

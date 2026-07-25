@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.carstenartur.verification</groupId>
+  <artifactId>jgit-storage-hibernate-public-repository-consumer</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <name>jgit-storage-hibernate anonymous public repository consumer</name>
+  <description>Resolves every public release artifact without credentials.</description>
+
+  <properties>
+    <public.version>0.0.0</public.version>
+    <public.repository.url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</public.repository.url>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>jgit-storage-hibernate-public</id>
+      <url>${public.repository.url}</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-core</artifactId><version>${public.version}</version></dependency>
+    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-search</artifactId><version>${public.version}</version></dependency>
+    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-java-analysis</artifactId><version>${public.version}</version></dependency>
+    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-architecture</artifactId><version>${public.version}</version></dependency>
+    <dependency><groupId>io.github.carstenartur</groupId><artifactId>jgit-storage-hibernate-benchmarks</artifactId><version>${public.version}</version></dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.11.0</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>

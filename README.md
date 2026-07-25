@@ -105,7 +105,22 @@ Git objects and refs remain authoritative. Search, Java Analysis and Architectur
 
 The documented release line is **0.1.9**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; HSQLDB 2.7 is supported for embedded persistent deployments; H2 2.4.x remains supported for tests, demos and lightweight development.
 
-### 1. Add the Core dependency
+### 1. Configure the anonymous release repository
+
+```xml
+<repositories>
+  <repository>
+    <id>jgit-storage-hibernate-public</id>
+    <url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</url>
+    <releases><enabled>true</enabled></releases>
+    <snapshots><enabled>false</enabled></snapshots>
+  </repository>
+</repositories>
+```
+
+No GitHub token or Maven Central account is required.
+
+### 2. Add the Core dependency
 
 ```xml
 <dependency>
@@ -117,7 +132,7 @@ The documented release line is **0.1.9**. Java 21 is required. PostgreSQL 17 is 
 
 Add `jgit-storage-hibernate-search` and `jgit-storage-hibernate-java-analysis` at the same version when their derived query layers are needed.
 
-### 2. Apply the packaged migration before Hibernate starts
+### 3. Apply the packaged migration before Hibernate starts
 
 ```java
 Flyway.configure()
@@ -130,7 +145,7 @@ Flyway.configure()
 
 Use `CoreSchemaMigrations.HSQLDB_LOCATION` for HSQLDB. A shared schema, an existing 0.1.4 installation or a copied pre-library Taxonomy schema requires a deliberate one-time procedure. Do not enable `baselineOnMigrate` blindly; follow the provisioning runbooks in [docs/consuming.md](docs/consuming.md) and the [Taxonomy adoption runbook](docs/taxonomy-adoption.md).
 
-### 3. Make Hibernate validate, not mutate, the production schema
+### 4. Make Hibernate validate, not mutate, the production schema
 
 ```properties
 hibernate.hbm2ddl.auto=validate
@@ -138,7 +153,7 @@ hibernate.hbm2ddl.auto=validate
 
 `update` and `create-drop` are reserved for disposable local databases and isolated tests.
 
-### 4. Open the repository through the public facade
+### 5. Open the repository through the public facade
 
 ```java
 try (HibernateSessionFactoryProvider provider =
