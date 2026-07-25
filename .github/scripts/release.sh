@@ -36,6 +36,7 @@ python3 .github/scripts/verify-release-consistency.py
 python3 .github/scripts/verify-public-repository-publishing.py
 git fetch origin --tags --force
 if git rev-parse "${TAG_NAME}^{commit}" >/dev/null 2>&1; then echo "::error::Tag $TAG_NAME already exists"; exit 1; fi
+# Automatic release preparation updates Maven coordinates and public documentation together.
 mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
 python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release
 python3 .github/scripts/verify-release-consistency.py
@@ -78,11 +79,11 @@ publish_repository(){
   cat > "$WORKTREE/README.md" <<EOF
 # jgit-storage-hibernate Maven repository
 
-Anonymous release repository for \\`io.github.carstenartur\\` artifacts.
+Anonymous release repository for \`io.github.carstenartur\` artifacts.
 
-Maven URL: \\`$PUBLIC_REPOSITORY_URL\\`
+Maven URL: \`$PUBLIC_REPOSITORY_URL\`
 
-Published release: \\`$RELEASE_VERSION\\`
+Published release: \`$RELEASE_VERSION\`
 EOF
   cat > "$WORKTREE/index.html" <<EOF
 <!doctype html><meta charset="utf-8"><title>jgit-storage-hibernate Maven repository</title><h1>jgit-storage-hibernate Maven repository</h1><p>Anonymous Maven URL: <code>$PUBLIC_REPOSITORY_URL</code></p><p>Latest published release: <strong>$RELEASE_VERSION</strong></p>
