@@ -34,13 +34,13 @@ run_clean() {
 resolve_once() {
   rm -rf "$LOCAL_REPO"; : > "$LOG"
   set +e
-  {
+  (
     run_clean org.apache.maven.plugins:maven-dependency-plugin:3.11.0:get \
       -Dartifact="io.github.carstenartur:jgit-storage-hibernate-parent:${VERSION}:pom" \
-      -DremoteRepositories="jgit-public::default::${REPOSITORY_URL}" -Dtransitive=false
-    run_clean -f "$CONSUMER_POM" \
+      -DremoteRepositories="jgit-public::default::${REPOSITORY_URL}" -Dtransitive=false \
+    && run_clean -f "$CONSUMER_POM" \
       -Dpublic.version="$VERSION" -Dpublic.repository.url="$REPOSITORY_URL" dependency:go-offline
-  } 2>&1 | tee "$LOG"
+  ) 2>&1 | tee "$LOG"
   status=${PIPESTATUS[0]}; set -e
   [[ $status -eq 0 ]] || return "$status"
 
