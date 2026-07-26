@@ -21,9 +21,9 @@ JARS = (
 VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 VOLATILE_NAMES = {"_remote.repositories"}
 # Maven-generated MD5 and transfer-state files are discarded. SHA-1 is
-# regenerated canonically because Maven Resolver still uses that sidecar for
-# checksum validation on simple static HTTP repositories. SHA-256/SHA-512 are
-# also published for modern independent verification.
+# regenerated as a compatibility sidecar because Maven Resolver still uses it
+# for transport validation on simple static HTTP repositories. SHA-256/SHA-512
+# remain the canonical strong verification algorithms.
 VOLATILE_SUFFIXES = (".md5", ".lastUpdated")
 
 
@@ -117,7 +117,8 @@ def main() -> None:
         "schemaVersion": 1,
         "groupId": "io.github.carstenartur",
         "version": args.version,
-        "canonicalChecksums": ["sha1", "sha256", "sha512"],
+        "canonicalChecksums": ["sha256", "sha512"],
+        "compatibilityChecksums": ["sha1"],
         "removedVolatileFiles": sorted(path.as_posix() for path in removed),
         "files": sorted(manifest_files, key=lambda item: str(item["path"])),
     }
