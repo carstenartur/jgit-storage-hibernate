@@ -56,7 +56,7 @@ remove_volatile_version_files(){
   local root=$1
   [[ -d "$root/io/github/carstenartur" ]] || return 0
   find "$root/io/github/carstenartur" -type f -path "*/$RELEASE_VERSION/*" \
-    \( -name '*.md5' -o -name '*.sha1' -o -name '*.lastUpdated' -o -name '_remote.repositories' \) \
+    \( -name '*.md5' -o -name '*.lastUpdated' -o -name '_remote.repositories' \) \
     -delete
 }
 
