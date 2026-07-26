@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785060694297,
+  "lastUpdate": 1785074020449,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -322,6 +322,114 @@ window.BENCHMARK_DATA = {
             "name": "writeCommitAndUpdateRef — JGit + filesystem",
             "value": 1.2948106747295618,
             "range": "3.1713840180918207",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f04e9457384c8507f3467f9c6c1e2a24e82a07aa",
+          "message": "Merge pull request #92 from carstenartur/dependabot/maven/jgit-4bbe80ab37",
+          "timestamp": "2026-07-26T15:50:29+02:00",
+          "tree_id": "a8f78317cd5f1f20b6262c40bf3b747ed66dd7e1",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/f04e9457384c8507f3467f9c6c1e2a24e82a07aa"
+        },
+        "date": 1785074019126,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "readBlobFromWarmCache — JGit + HSQLDB (in-memory)",
+            "value": 0.00043761114439898997,
+            "range": "0.0001241418044136924",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "readBlobFromWarmCache — JGit + PostgreSQL",
+            "value": 0.00043689998983714013,
+            "range": "0.00007044614149488563",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "readBlobFromWarmCache — JGit + filesystem",
+            "value": 0.010943996626847002,
+            "range": "0.0028941468724315777",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "reopenAndResolveMain — JGit + HSQLDB (in-memory)",
+            "value": 0.4433577364034058,
+            "range": "3.146280532052669",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "reopenAndResolveMain — JGit + PostgreSQL",
+            "value": 1.2858910887478154,
+            "range": "3.9327593693905722",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "reopenAndResolveMain — JGit + filesystem",
+            "value": 0.14691778430207866,
+            "range": "0.42925199534772013",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "writeBlob — JGit + HSQLDB (in-memory)",
+            "value": 3.4378583961397218,
+            "range": "6.155239421874515",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "writeBlob — JGit + PostgreSQL",
+            "value": 5.937366005445288,
+            "range": "3.5138369878229403",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "writeBlob — JGit + filesystem",
+            "value": 0.18249080406797613,
+            "range": "0.17109007707383758",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "writeCommitAndUpdateRef — JGit + HSQLDB (in-memory)",
+            "value": 7.345853952123633,
+            "range": "31.211807809189697",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "writeCommitAndUpdateRef — JGit + PostgreSQL",
+            "value": 11.844196703826237,
+            "range": "13.438024604338608",
+            "unit": "ms/op",
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.11\nMode: avgt\nForks: 1"
+          },
+          {
+            "name": "writeCommitAndUpdateRef — JGit + filesystem",
+            "value": 1.3688586135565284,
+            "range": "3.8486828516283156",
             "unit": "ms/op",
             "extra": "Backend: JGit + filesystem\nJDK: 21.0.11\nMode: avgt\nForks: 1"
           }
