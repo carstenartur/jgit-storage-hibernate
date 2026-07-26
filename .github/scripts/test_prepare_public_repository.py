@@ -69,7 +69,8 @@ def main() -> None:
                 assert sidecar.read_text(encoding="ascii").strip() == digest
 
         manifest = json.loads(evidence.read_text(encoding="utf-8"))
-        assert manifest["canonicalChecksums"] == ["sha1", "sha256", "sha512"]
+        assert manifest["canonicalChecksums"] == ["sha256", "sha512"]
+        assert manifest["compatibilityChecksums"] == ["sha1"]
         assert len(manifest["files"]) == len(MODULE.required(version))
         assert manifest["removedVolatileFiles"], (
             "expected volatile files to be reported"
