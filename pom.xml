@@ -54,7 +54,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <project.build.outputTimestamp>2026-07-25T19:34:40Z</project.build.outputTimestamp>
 
-    <jgit.version>7.7.0.202606012155-r</jgit.version>
+    <jgit.version>7.7.1.202607240634-r</jgit.version>
     <hibernate.version>7.4.5.Final</hibernate.version>
     <hibernate-search.version>8.4.0.Final</hibernate-search.version>
     <jakarta.xml.bind.version>4.0.5</jakarta.xml.bind.version>
