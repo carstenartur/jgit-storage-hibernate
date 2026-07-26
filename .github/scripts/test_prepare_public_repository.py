@@ -2,6 +2,7 @@
 """Regression tests for canonical public Maven repository preparation."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -22,14 +23,25 @@ def main() -> None:
         root = Path(directory)
         repository = root / "repository"
         evidence = root / "evidence" / "manifest.json"
+        expected: dict[Path, bytes] = {}
         for index, relative in enumerate(MODULE.required(version)):
             path = repository / relative
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(f"artifact-{index}\n".encode())
-            path.with_name(path.name + ".sha1").write_text("volatile\n", encoding="ascii")
-            path.with_name(path.name + ".md5").write_text("volatile\n", encoding="ascii")
-            path.parent.joinpath("_remote.repositories").write_text("volatile\n", encoding="utf-8")
-            path.parent.joinpath(path.name + ".lastUpdated").write_text("volatile\n", encoding="utf-8")
+            data = f"artifact-{index}\n".encode()
+            expected[relative] = data
+            path.write_bytes(data)
+            path.with_name(path.name + ".sha1").write_text(
+                "stale-sha1\n", encoding="ascii"
+            )
+            path.with_name(path.name + ".md5").write_text(
+                "volatile\n", encoding="ascii"
+            )
+            path.parent.joinpath("_remote.repositories").write_text(
+                "volatile\n", encoding="utf-8"
+            )
+            path.parent.joinpath(path.name + ".lastUpdated").write_text(
+                "volatile\n", encoding="utf-8"
+            )
 
         subprocess.run(
             [sys.executable, str(SCRIPT), version, str(repository), str(evidence)],
@@ -43,16 +55,27 @@ def main() -> None:
         ]
         assert not volatile, f"volatile repository files remain: {volatile}"
 
-        for relative in MODULE.required(version):
+        for relative, data in expected.items():
             path = repository / relative
             assert path.is_file()
-            assert path.with_name(path.name + ".sha256").is_file()
-            assert path.with_name(path.name + ".sha512").is_file()
+            expected_digests = {
+                "sha1": hashlib.sha1(data, usedforsecurity=False).hexdigest(),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "sha512": hashlib.sha512(data).hexdigest(),
+            }
+            for algorithm, digest in expected_digests.items():
+                sidecar = path.with_name(path.name + f".{algorithm}")
+                assert sidecar.is_file()
+                assert sidecar.read_text(encoding="ascii").strip() == digest
 
         manifest = json.loads(evidence.read_text(encoding="utf-8"))
-        assert manifest["canonicalChecksums"] == ["sha256", "sha512"]
+        assert manifest["canonicalChecksums"] == ["sha1", "sha256", "sha512"]
         assert len(manifest["files"]) == len(MODULE.required(version))
-        assert manifest["removedVolatileFiles"], "expected volatile files to be reported"
+        assert manifest["removedVolatileFiles"], (
+            "expected volatile files to be reported"
+        )
+        for item in manifest["files"]:
+            assert set(("sha1", "sha256", "sha512")).issubset(item)
 
     print("Public repository canonicalization regression tests passed")
 
