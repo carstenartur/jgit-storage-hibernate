@@ -20,7 +20,11 @@ JARS = (
 )
 VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 VOLATILE_NAMES = {"_remote.repositories"}
-VOLATILE_SUFFIXES = (".md5", ".sha1", ".lastUpdated")
+# Maven-generated MD5 and transfer-state files are discarded. SHA-1 is
+# regenerated as a compatibility sidecar because Maven Resolver still uses it
+# for transport validation on simple static HTTP repositories. SHA-256/SHA-512
+# remain the canonical strong verification algorithms.
+VOLATILE_SUFFIXES = (".md5", ".lastUpdated")
 
 
 def required(version: str) -> list[Path]:
@@ -49,6 +53,19 @@ def remove_volatile_files(repository: Path) -> list[Path]:
     return removed
 
 
+def write_checksum_sidecars(path: Path, data: bytes) -> dict[str, str]:
+    checksums = {
+        "sha1": hashlib.sha1(data, usedforsecurity=False).hexdigest(),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "sha512": hashlib.sha512(data).hexdigest(),
+    }
+    for algorithm, digest in checksums.items():
+        path.with_name(path.name + f".{algorithm}").write_text(
+            digest + "\n", encoding="ascii"
+        )
+    return checksums
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("version")
@@ -73,22 +90,21 @@ def main() -> None:
         if not data:
             errors.append(f"empty {relative.as_posix()}")
             continue
-        sha256 = hashlib.sha256(data).hexdigest()
-        sha512 = hashlib.sha512(data).hexdigest()
-        path.with_name(path.name + ".sha256").write_text(sha256 + "\n", encoding="ascii")
-        path.with_name(path.name + ".sha512").write_text(sha512 + "\n", encoding="ascii")
+        checksums = write_checksum_sidecars(path, data)
         manifest_files.append({
             "path": relative.as_posix(),
             "size": len(data),
-            "sha256": sha256,
-            "sha512": sha512,
+            **checksums,
         })
 
-    snapshots = [p for p in repository.rglob("*") if p.is_file() and "SNAPSHOT" in p.as_posix()]
+    snapshots = [
+        path for path in repository.rglob("*")
+        if path.is_file() and "SNAPSHOT" in path.as_posix()
+    ]
     if snapshots:
         errors.append(
             "SNAPSHOT files in release repository: "
-            + ", ".join(str(p.relative_to(repository)) for p in snapshots[:20])
+            + ", ".join(str(path.relative_to(repository)) for path in snapshots[:20])
         )
     if errors:
         for error in errors:
@@ -102,6 +118,7 @@ def main() -> None:
         "groupId": "io.github.carstenartur",
         "version": args.version,
         "canonicalChecksums": ["sha256", "sha512"],
+        "compatibilityChecksums": ["sha1"],
         "removedVolatileFiles": sorted(path.as_posix() for path in removed),
         "files": sorted(manifest_files, key=lambda item: str(item["path"])),
     }
