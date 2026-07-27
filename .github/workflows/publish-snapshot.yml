@@ -47,4 +47,4 @@ jobs:
       - name: Build and deploy snapshot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mvn -B -Pdependency-linkage -Pgithub-packages deploy
+        run: mvn -B -Pgithub-packages deploy
