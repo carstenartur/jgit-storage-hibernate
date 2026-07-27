@@ -43,7 +43,7 @@ jobs:
       - name: Verify against JGit ${{ matrix.jgit }}
         run: |
           set +e
-          mvn -B -q -Pdependency-linkage verify -Djgit.version=${{ matrix.jgit }} > jgit-compatibility.log 2>&1
+          mvn -B -q verify -Djgit.version=${{ matrix.jgit }} > jgit-compatibility.log 2>&1
           status=$?
           tail -n 120 jgit-compatibility.log
           exit $status
