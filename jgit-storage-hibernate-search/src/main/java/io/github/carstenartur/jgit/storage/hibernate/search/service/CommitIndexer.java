@@ -19,6 +19,7 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -107,10 +108,19 @@ public class CommitIndexer {
     projection.setObjectId(commit.name());
     projection.setShortMessage(commit.getShortMessage());
     projection.setFullMessage(commit.getFullMessage());
-    if (commit.getAuthorIdent() != null) {
-      projection.setAuthorName(commit.getAuthorIdent().getName());
-      projection.setAuthorEmail(commit.getAuthorIdent().getEmailAddress());
-      projection.setCommitTime(commit.getAuthorIdent().getWhenAsInstant());
+
+    PersonIdent author = commit.getAuthorIdent();
+    if (author != null) {
+      projection.setAuthorName(author.getName());
+      projection.setAuthorEmail(author.getEmailAddress());
+      projection.setAuthorTime(author.getWhenAsInstant());
+    }
+
+    PersonIdent committer = commit.getCommitterIdent();
+    if (committer != null) {
+      projection.setCommitterName(committer.getName());
+      projection.setCommitterEmail(committer.getEmailAddress());
+      projection.setCommitterTime(committer.getWhenAsInstant());
     }
 
     TreeText treeText = readChangedTreeText(repository, revWalk, commit);
@@ -194,7 +204,10 @@ public class CommitIndexer {
           existing.setFullMessage(projection.getFullMessage());
           existing.setAuthorName(projection.getAuthorName());
           existing.setAuthorEmail(projection.getAuthorEmail());
-          existing.setCommitTime(projection.getCommitTime());
+          existing.setAuthorTime(projection.getAuthorTime());
+          existing.setCommitterName(projection.getCommitterName());
+          existing.setCommitterEmail(projection.getCommitterEmail());
+          existing.setCommitterTime(projection.getCommitterTime());
           existing.setChangedPaths(projection.getChangedPaths());
           existing.setChangedText(projection.getChangedText());
         }
