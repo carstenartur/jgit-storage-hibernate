@@ -64,7 +64,7 @@ class PublicApiBoundaryTest {
           .filter(path -> path.getFileName().toString().endsWith(".class"))
           .filter(path -> !path.getFileName().toString().contains("$"))
           .filter(path -> !path.getFileName().toString().equals("package-info.class"))
-          .map(path -> loadClass(classesRoot, path))
+          .<Class<?>>map(path -> loadClass(classesRoot, path))
           .filter(clazz -> Modifier.isPublic(clazz.getModifiers()))
           .toList();
     }
