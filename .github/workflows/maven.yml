@@ -39,7 +39,7 @@ jobs:
         run: python3 .github/scripts/verify-public-repository-publishing.py
       - name: Build
         run: |
-          set +e; mvn -B -q -Pdependency-linkage verify > build.log 2>&1; status=$?; tail -n 80 build.log; exit $status
+          set +e; mvn -B -q verify > build.log 2>&1; status=$?; tail -n 80 build.log; exit $status
       - name: Generate coverage and test-count badges
         if: always()
         run: python3 .github/scripts/generate-metrics-badges.py
