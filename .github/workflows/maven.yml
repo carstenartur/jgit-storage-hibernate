@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -19,22 +19,24 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with: {distribution: temurin, java-version: '21', cache: maven}
       - name: Verify Docker for PostgreSQL integration tests
         run: docker info
       - name: Parse release tooling
         run: |
           bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
-          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py
+          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py .github/scripts/verify-security-policy.py
       - name: Test release tooling
         run: |
           python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/test_prepare_public_repository.py
-      - name: Verify release consistency
-        run: python3 .github/scripts/verify-release-consistency.py
+      - name: Verify release and security consistency
+        run: |
+          python3 .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/verify-security-policy.py
       - name: Verify public repository publishing contract
         run: python3 .github/scripts/verify-public-repository-publishing.py
       - name: Build
@@ -45,18 +47,36 @@ jobs:
         run: python3 .github/scripts/generate-metrics-badges.py
       - name: Upload Maven build log
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with: {name: maven-build-log, path: build.log}
       - name: Upload badge metrics
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with: {name: badge-metrics, path: 'docs/badges/*.json'}
-      - name: Update badge data on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+
+  update-badge-data:
+    name: Update badge data
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download generated badge data
+        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
+        with:
+          name: badge-metrics
+          path: docs/badges
+      - name: Commit changed badge data
         run: |
           git diff --quiet -- docs/badges && exit 0
-          git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/badges/*.json; git commit -m "Update build metric badges [skip ci]"; git push
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/badges/*.json
+          git commit -m "Update build metric badges [skip ci]"
+          git push
 
   public-repository-contract:
     name: Public Maven repository contract
@@ -65,9 +85,9 @@ jobs:
     timeout-minutes: 45
     permissions: {contents: read}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {fetch-depth: 0}
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with: {distribution: temurin, java-version: '21', cache: maven}
       - name: Stage and anonymously resolve a release repository
         env:
@@ -82,7 +102,7 @@ jobs:
         run: test -s target/public-repository-evidence/manifest.json
       - name: Upload public repository evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: public-maven-repository-contract
           path: |

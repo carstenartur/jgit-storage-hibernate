@@ -1,9 +1,5 @@
 /*
  * Copyright (C) 2026, Carsten Hammer and contributors.
- *
- * This program and the accompanying materials are made available under the
- * terms of the BSD 3-Clause License.
- *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 package io.github.carstenartur.jgit.storage.hibernate;
@@ -23,49 +19,77 @@ import java.lang.reflect.WildcardType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class PublicApiBoundaryTest {
 
-  private static final String PUBLIC_API_PACKAGE = "io.github.carstenartur.jgit.storage.hibernate";
+  private static final String BASE_PACKAGE = "io.github.carstenartur.jgit.storage.hibernate";
   private static final String FORBIDDEN_JGIT_INTERNAL_PREFIX = "org.eclipse.jgit.internal.";
+  private static final Set<String> REQUIRED_INTERNAL_PACKAGES =
+      Set.of(BASE_PACKAGE + ".objects", BASE_PACKAGE + ".refs", BASE_PACKAGE + ".repository");
 
   @Test
-  void publicApiDoesNotExposeJGitInternalTypes() throws Exception {
+  void supportedPublicApiDoesNotExposeJGitInternalTypes() throws Exception {
     Path classesRoot =
         Path.of(HibernateGitStorage.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-    Path publicApiDirectory = classesRoot.resolve(PUBLIC_API_PACKAGE.replace('.', '/'));
+    Path baseDirectory = classesRoot.resolve(BASE_PACKAGE.replace('.', '/'));
 
     assertTrue(
-        Files.isDirectory(publicApiDirectory),
-        () -> "Public API class directory does not exist: " + publicApiDirectory);
+        Files.isDirectory(baseDirectory),
+        () -> "Public API class directory does not exist: " + baseDirectory);
 
-    for (Class<?> apiClass : publicApiClasses(publicApiDirectory)) {
-      assertClassBoundary(apiClass);
+    List<Class<?>> publicClasses = publicClasses(classesRoot, baseDirectory);
+    for (String packageName : REQUIRED_INTERNAL_PACKAGES) {
+      assertTrue(
+          publicClasses.stream()
+              .map(Class::getPackage)
+              .filter(java.util.Objects::nonNull)
+              .anyMatch(pack -> pack.getName().equals(packageName) && isInternal(pack)),
+          () -> "Expected implementation package is not marked @InternalApi: " + packageName);
+    }
+
+    for (Class<?> apiClass : publicClasses) {
+      if (!isInternal(apiClass) && !isInternal(apiClass.getPackage())) {
+        assertClassBoundary(apiClass);
+      }
     }
   }
 
-  private static List<Class<?>> publicApiClasses(Path publicApiDirectory) throws Exception {
-    try (Stream<Path> classFiles = Files.list(publicApiDirectory)) {
+  private static List<Class<?>> publicClasses(Path classesRoot, Path baseDirectory) throws Exception {
+    try (Stream<Path> classFiles = Files.walk(baseDirectory)) {
       return classFiles
+          .filter(Files::isRegularFile)
           .filter(path -> path.getFileName().toString().endsWith(".class"))
           .filter(path -> !path.getFileName().toString().contains("$"))
           .filter(path -> !path.getFileName().toString().equals("package-info.class"))
-          .map(PublicApiBoundaryTest::loadClass)
+          .<Class<?>>map(path -> loadClass(classesRoot, path))
           .filter(clazz -> Modifier.isPublic(clazz.getModifiers()))
           .toList();
     }
   }
 
-  private static Class<?> loadClass(Path classFile) {
-    String fileName = classFile.getFileName().toString();
-    String simpleName = fileName.substring(0, fileName.length() - ".class".length());
+  private static Class<?> loadClass(Path classesRoot, Path classFile) {
+    String className =
+        classesRoot
+            .relativize(classFile)
+            .toString()
+            .replace(java.io.File.separatorChar, '.')
+            .replaceAll("\\.class$", "");
     try {
-      return Class.forName(PUBLIC_API_PACKAGE + "." + simpleName);
-    } catch (ClassNotFoundException e) {
-      throw new AssertionError("Could not load public API class " + simpleName, e);
+      return Class.forName(className);
+    } catch (ClassNotFoundException exception) {
+      throw new AssertionError("Could not load public API class " + className, exception);
     }
+  }
+
+  private static boolean isInternal(Class<?> type) {
+    return type != null && type.isAnnotationPresent(InternalApi.class);
+  }
+
+  private static boolean isInternal(Package packageObject) {
+    return packageObject != null && packageObject.isAnnotationPresent(InternalApi.class);
   }
 
   private static void assertClassBoundary(Class<?> apiClass) {
@@ -102,6 +126,9 @@ class PublicApiBoundaryTest {
   }
 
   private static void assertNoForbiddenType(Object owner, Type type) {
+    if (type == null) {
+      return;
+    }
     if (type instanceof Class<?> clazz) {
       assertNoForbiddenClass(owner, clazz);
       return;
@@ -132,7 +159,7 @@ class PublicApiBoundaryTest {
       return;
     }
     if (clazz.getName().startsWith(FORBIDDEN_JGIT_INTERNAL_PREFIX)) {
-      fail("Public API exposes JGit internal type " + clazz.getName() + " through " + owner);
+      fail("Supported public API exposes JGit internal type " + clazz.getName() + " through " + owner);
     }
   }
 }

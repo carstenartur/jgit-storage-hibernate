@@ -8,12 +8,15 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.repository;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import io.github.carstenartur.jgit.storage.hibernate.objects.HibernateObjDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import jakarta.persistence.LockModeType;
 import java.io.IOException;
+import java.time.Instant;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogReader;
@@ -36,12 +39,7 @@ public class HibernateRepository extends DfsRepository {
   private final String repositoryName;
   private String gitwebDescription;
 
-  /**
-   * Create a repository from a builder.
-   *
-   * @param builder configured repository builder
-   */
-  HibernateRepository(HibernateRepositoryBuilder builder) {
+  HibernateRepository(HibernateRepositoryBuilder builder) throws IOException {
     super(builder);
     this.sessionFactory = builder.getSessionFactory();
     this.repositoryName = builder.getRepositoryName();
@@ -55,16 +53,9 @@ public class HibernateRepository extends DfsRepository {
             transactionContext);
     this.reflogWriter = new HibernateReflogWriter(transactionContext, repositoryName);
     this.refDatabase = new HibernateRefDatabase(this);
+    ensureRepositoryLockRow();
   }
 
-  /**
-   * Create a repository for the given logical repository name.
-   *
-   * @param sessionFactory Hibernate session factory
-   * @param repositoryName logical repository name
-   * @return configured repository instance
-   * @throws IOException if repository cannot be built
-   */
   public static HibernateRepository create(SessionFactory sessionFactory, String repositoryName)
       throws IOException {
     return new HibernateRepositoryBuilder()
@@ -83,42 +74,74 @@ public class HibernateRepository extends DfsRepository {
     return refDatabase;
   }
 
-  /**
-   * Return the logical database repository name.
-   *
-   * @return repository name
-   */
   public String getRepositoryName() {
     return repositoryName;
   }
 
-  /**
-   * Return the Hibernate session factory.
-   *
-   * @return session factory
-   */
   public SessionFactory getSessionFactory() {
     return sessionFactory;
   }
 
-  /**
-   * Execute repository storage work in one shared transaction.
-   *
-   * <p>If a transaction is rolled back after JGit has constructed an in-memory pack or Reftable
-   * view, the repository caches are invalidated before the failure is returned. The next read then
-   * rebuilds its view from committed database rows instead of retaining rolled-back state.
-   *
-   * @param work work that may persist packs, refs and reflog rows
-   * @param <T> work result type
-   * @return work result
-   * @throws IOException if storage work fails
-   */
+  /** Execute repository storage work in one shared transaction. */
   public <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
     try {
       return transactionContext.execute(work);
     } catch (IOException | RuntimeException exception) {
       invalidateStorageCaches(exception);
       throw exception;
+    }
+  }
+
+  /**
+   * Execute a ref mutation while holding the cross-SessionFactory repository lock.
+   *
+   * <p>Both the DFS pack list and Reftable stack are invalidated after the database row lock is
+   * obtained. The optimistic expected-old-ID comparison therefore observes updates committed by a
+   * different repository instance before the lock was acquired.
+   */
+  public <T> T inRefTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
+    return inTransaction(
+        session -> {
+          GitRepositoryLockEntity lock =
+              session.find(
+                  GitRepositoryLockEntity.class, repositoryName, LockModeType.PESSIMISTIC_WRITE);
+          if (lock == null) {
+            throw new IOException("Missing repository lock row for " + repositoryName);
+          }
+          objectDatabase.close();
+          refDatabase.refresh();
+          return work.execute(session);
+        });
+  }
+
+  private void ensureRepositoryLockRow() throws IOException {
+    try {
+      transactionContext.execute(
+          session -> {
+            if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
+              GitRepositoryLockEntity lock = new GitRepositoryLockEntity();
+              lock.setRepositoryName(repositoryName);
+              lock.setCreatedAt(Instant.now());
+              session.persist(lock);
+              session.flush();
+            }
+            return null;
+          });
+    } catch (RuntimeException concurrentInsert) {
+      try {
+        transactionContext.execute(
+            session -> {
+              if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
+                throw concurrentInsert;
+              }
+              return null;
+            });
+      } catch (IOException | RuntimeException verificationFailure) {
+        if (verificationFailure != concurrentInsert) {
+          verificationFailure.addSuppressed(concurrentInsert);
+        }
+        throw verificationFailure;
+      }
     }
   }
 
@@ -135,14 +158,6 @@ public class HibernateRepository extends DfsRepository {
     }
   }
 
-  /**
-   * Return the queryable reflog writer.
-   *
-   * <p>Normal {@code RefUpdate} operations already write queryable reflogs. This writer remains
-   * available for importing externally produced history.
-   *
-   * @return reflog writer
-   */
   public HibernateReflogWriter getReflogWriter() {
     return reflogWriter;
   }

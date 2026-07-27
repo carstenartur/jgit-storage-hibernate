@@ -24,23 +24,10 @@ public class GitHistorySearchService {
 
   private final SessionFactory sessionFactory;
 
-  /**
-   * Create a query service.
-   *
-   * @param sessionFactory Hibernate session factory containing search projections
-   */
   public GitHistorySearchService(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
   }
 
-  /**
-   * Full-text search over commit messages, changed paths and indexed changed-file content.
-   *
-   * @param repositoryName logical repository name
-   * @param query search query
-   * @param limit maximum hits
-   * @return matching commit projections
-   */
   public List<GitCommitIndex> searchCommitText(String repositoryName, String query, int limit) {
     return findChanges(
         CommitHistoryQuery.forRepository(repositoryName)
@@ -52,11 +39,9 @@ public class GitHistorySearchService {
   /**
    * Find commits matching all supplied full-text, author, changed-path, time and candidate predicates.
    *
-   * <p>This is the reusable projection equivalent of manually walking commits with JGit, diffing
-   * every commit against its first parent and applying the predicates in application code.
-   *
-   * @param query compound query
-   * @return matching commits, relevance-ranked when full text is present and newest-first otherwise
+   * <p>Results are relevance-ranked when full text is present and newest-first otherwise. The
+   * chronological dimension is selected by {@link CommitHistoryQuery#timestampField()} and defaults
+   * to committer time.
    */
   public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
     Objects.requireNonNull(query, "query");
@@ -67,6 +52,7 @@ public class GitHistorySearchService {
   }
 
   private List<GitCommitIndex> findFullTextChanges(CommitHistoryQuery query) {
+    String timeField = searchTimeField(query);
     try (Session session = sessionFactory.openSession()) {
       SearchSession searchSession = Search.session(session);
       return searchSession
@@ -88,12 +74,10 @@ public class GitHistorySearchService {
                                     "changedText")
                                 .matching(query.text()));
                 if (query.hasObjectIdRestriction()) {
-                  predicate.filter(
-                      f.terms().field("objectId").matchingAny(query.objectIds()));
+                  predicate.filter(f.terms().field("objectId").matchingAny(query.objectIds()));
                 }
                 if (query.authorEmail() != null) {
-                  predicate.filter(
-                      f.match().field("authorEmail").matching(query.authorEmail()));
+                  predicate.filter(f.match().field("authorEmail").matching(query.authorEmail()));
                 }
                 if (query.pathFragment() != null) {
                   predicate.filter(
@@ -103,10 +87,10 @@ public class GitHistorySearchService {
                           .defaultOperator(BooleanOperator.AND));
                 }
                 if (query.from() != null) {
-                  predicate.filter(f.range().field("commitTime").atLeast(query.from()));
+                  predicate.filter(f.range().field(timeField).atLeast(query.from()));
                 }
                 if (query.to() != null) {
-                  predicate.filter(f.range().field("commitTime").atMost(query.to()));
+                  predicate.filter(f.range().field(timeField).atMost(query.to()));
                 }
                 return predicate;
               })
@@ -115,6 +99,7 @@ public class GitHistorySearchService {
   }
 
   private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
+    String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
         new StringBuilder("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
     if (query.hasObjectIdRestriction()) {
@@ -127,12 +112,12 @@ public class GitHistorySearchService {
       hql.append(" AND LOWER(c.changedPaths) LIKE :path ESCAPE '!'");
     }
     if (query.from() != null) {
-      hql.append(" AND c.commitTime >= :from");
+      hql.append(" AND c.").append(timeProperty).append(" >= :from");
     }
     if (query.to() != null) {
-      hql.append(" AND c.commitTime <= :to");
+      hql.append(" AND c.").append(timeProperty).append(" <= :to");
     }
-    hql.append(" ORDER BY c.commitTime DESC");
+    hql.append(" ORDER BY c.").append(timeProperty).append(" DESC");
 
     try (Session session = sessionFactory.openSession()) {
       var selection =
@@ -160,14 +145,16 @@ public class GitHistorySearchService {
     }
   }
 
-  /**
-   * Find commits whose changed-path list contains the given path fragment.
-   *
-   * @param repositoryName logical repository name
-   * @param pathFragment path fragment
-   * @param limit maximum hits
-   * @return matching commits
-   */
+  private static String hqlTimeProperty(CommitHistoryQuery query) {
+    return query.timestampField() == CommitHistoryQuery.TimestampField.AUTHOR
+        ? "authorTime"
+        : "committerTime";
+  }
+
+  private static String searchTimeField(CommitHistoryQuery query) {
+    return hqlTimeProperty(query);
+  }
+
   public List<GitCommitIndex> findByPath(String repositoryName, String pathFragment, int limit) {
     return findChanges(
         CommitHistoryQuery.forRepository(repositoryName)
@@ -176,14 +163,6 @@ public class GitHistorySearchService {
             .build());
   }
 
-  /**
-   * Return commits by author email.
-   *
-   * @param repositoryName logical repository name
-   * @param authorEmail author email
-   * @param limit maximum hits
-   * @return matching commits
-   */
   public List<GitCommitIndex> findByAuthorEmail(
       String repositoryName, String authorEmail, int limit) {
     return findChanges(
@@ -193,30 +172,26 @@ public class GitHistorySearchService {
             .build());
   }
 
-  /**
-   * Return commits in an inclusive timestamp range.
-   *
-   * @param repositoryName logical repository name
-   * @param from inclusive lower bound
-   * @param to inclusive upper bound
-   * @param limit maximum hits
-   * @return matching commits
-   */
+  /** Return commits whose committer timestamps are in the inclusive range. */
   public List<GitCommitIndex> findBetween(
       String repositoryName, Instant from, Instant to, int limit) {
     return findChanges(
         CommitHistoryQuery.forRepository(repositoryName)
-            .between(from, to)
+            .committedBetween(from, to)
             .limit(limit)
             .build());
   }
 
-  /**
-   * Count indexed commits for a repository.
-   *
-   * @param repositoryName logical repository name
-   * @return indexed commit count
-   */
+  /** Return commits whose author timestamps are in the inclusive range. */
+  public List<GitCommitIndex> findAuthoredBetween(
+      String repositoryName, Instant from, Instant to, int limit) {
+    return findChanges(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .authoredBetween(from, to)
+            .limit(limit)
+            .build());
+  }
+
   public long countIndexedCommits(String repositoryName) {
     try (Session session = sessionFactory.openSession()) {
       Long count =

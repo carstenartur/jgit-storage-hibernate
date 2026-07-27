@@ -38,7 +38,9 @@ import org.hibernate.search.mapper.pojo.mapping.definition.annotation.PropertyVa
     indexes = {
       @Index(name = "idx_commit_repo", columnList = "repository_name"),
       @Index(name = "idx_commit_repo_time", columnList = "repository_name, commit_time"),
-      @Index(name = "idx_commit_repo_author", columnList = "repository_name, author_email")
+      @Index(name = "idx_commit_repo_author_time", columnList = "repository_name, author_time"),
+      @Index(name = "idx_commit_repo_author", columnList = "repository_name, author_email"),
+      @Index(name = "idx_commit_repo_committer", columnList = "repository_name, committer_email")
     },
     uniqueConstraints = {
       @UniqueConstraint(
@@ -91,8 +93,27 @@ public class GitCommitIndex {
   private String authorEmail;
 
   @GenericField
+  @Column(name = "author_time")
+  private Instant authorTime;
+
+  @KeywordField
+  @Nationalized
+  @Column(name = "committer_name")
+  private String committerName;
+
+  @KeywordField
+  @Nationalized
+  @Column(name = "committer_email")
+  private String committerEmail;
+
+  /**
+   * Committer timestamp used for default Git-history ordering.
+   *
+   * <p>The database column retains its historic {@code commit_time} name for schema compatibility.
+   */
+  @GenericField
   @Column(name = "commit_time")
-  private Instant commitTime;
+  private Instant committerTime;
 
   @FullTextField(analyzer = GitTextAnalysis.STRUCTURED_TEXT_ANALYZER)
   @Nationalized
@@ -160,12 +181,58 @@ public class GitCommitIndex {
     this.authorEmail = authorEmail;
   }
 
-  public Instant getCommitTime() {
-    return commitTime;
+  public Instant getAuthorTime() {
+    return authorTime;
   }
 
+  public void setAuthorTime(Instant authorTime) {
+    this.authorTime = authorTime;
+  }
+
+  public String getCommitterName() {
+    return committerName;
+  }
+
+  public void setCommitterName(String committerName) {
+    this.committerName = committerName;
+  }
+
+  public String getCommitterEmail() {
+    return committerEmail;
+  }
+
+  public void setCommitterEmail(String committerEmail) {
+    this.committerEmail = committerEmail;
+  }
+
+  public Instant getCommitterTime() {
+    return committerTime;
+  }
+
+  public void setCommitterTime(Instant committerTime) {
+    this.committerTime = committerTime;
+  }
+
+  /**
+   * Compatibility alias for the committer timestamp.
+   *
+   * @return the committer timestamp
+   * @deprecated use {@link #getCommitterTime()}; older releases stored author time under this name
+   */
+  @Deprecated(forRemoval = false)
+  public Instant getCommitTime() {
+    return getCommitterTime();
+  }
+
+  /**
+   * Compatibility alias for setting the committer timestamp.
+   *
+   * @param commitTime committer timestamp
+   * @deprecated use {@link #setCommitterTime(Instant)}
+   */
+  @Deprecated(forRemoval = false)
   public void setCommitTime(Instant commitTime) {
-    this.commitTime = commitTime;
+    setCommitterTime(commitTime);
   }
 
   public String getChangedPaths() {

@@ -8,7 +8,9 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import jakarta.persistence.LockModeType;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
@@ -29,21 +31,10 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
   private final SessionFactory sessionFactory;
   private final List<RepositoryDeletionParticipant> deletionParticipants;
 
-  /**
-   * Create a repository factory.
-   *
-   * @param sessionFactory Hibernate session factory configured with the core storage entities
-   */
   public DefaultHibernateRepositoryFactory(SessionFactory sessionFactory) {
     this(sessionFactory, List.of());
   }
 
-  /**
-   * Create a repository factory with optional projection deletion participants.
-   *
-   * @param sessionFactory Hibernate session factory configured with all required entities
-   * @param deletionParticipants optional module cleanup hooks
-   */
   public DefaultHibernateRepositoryFactory(
       SessionFactory sessionFactory,
       Collection<? extends RepositoryDeletionParticipant> deletionParticipants) {
@@ -95,6 +86,16 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
         Session session = sessionFactory.openSession()) {
       Transaction transaction = session.beginTransaction();
       try {
+        GitRepositoryLockEntity repositoryLock =
+            session.find(
+                GitRepositoryLockEntity.class,
+                repositoryName.value(),
+                LockModeType.PESSIMISTIC_WRITE);
+        if (repositoryLock == null) {
+          throw new HibernateStorageException(
+              "Missing repository lock row for " + repositoryName.value());
+        }
+
         int projectionRows = 0;
         for (RepositoryDeletionParticipant participant : deletionParticipants) {
           projectionRows =
@@ -113,11 +114,9 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
                     "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo")
                 .setParameter("repo", repositoryName.value())
                 .executeUpdate();
+        session.remove(repositoryLock);
         transaction.commit();
 
-        // Closing this repository clears its pack list and Reftable stack. Lifecycle reservation
-        // prevents every factory sharing this SessionFactory from opening the same repository while
-        // deletion is active, and deletion starts only after all such handles have closed.
         cacheScope.getRefDatabase().refresh();
         return new RepositoryDeletionResult(packRows, reflogRows, projectionRows);
       } catch (RuntimeException exception) {

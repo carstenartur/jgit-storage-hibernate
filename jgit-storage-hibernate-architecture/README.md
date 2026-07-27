@@ -4,6 +4,9 @@ Version architecture intent beside the code and produce explainable drift findin
 
 Choose this module when architecture decisions must be reviewable, versioned and enforceable without reducing the result to an unexplained pass/fail gate.
 
+> [!IMPORTANT]
+> The parser, snapshot, semantic-diff, mapping and drift-evaluation APIs are usable. The Hibernate/Hibernate Search entity layer is **incubating** in the `0.1.x` line: the artifact does not yet ship module-owned Flyway migrations, transactional projection writers/rebuilders or repository-deletion integration. Production applications should keep architecture sources in Git and use the in-memory reports, or explicitly own and test any experimental persistence schema.
+
 ## Dependency
 
 ```xml
@@ -22,7 +25,7 @@ Choose this module when architecture decisions must be reviewable, versioned and
 - code-to-architecture mapping through versioned selectors;
 - rule evaluation against `JavaSoftwareGraph`;
 - deterministic findings with rule, element, code location and evidence provenance;
-- Hibernate/Hibernate Search projections for rules, evidence and findings.
+- incubating Jakarta Persistence/Hibernate Search entity models for applications that deliberately own the schema and lifecycle.
 
 ## Reference DSL
 
@@ -82,6 +85,8 @@ List<ArchitectureChange> changes =
 
 Elements, relations, rules and evidence are compared by stable IDs, so text movement and formatting changes do not masquerade as architectural changes.
 
-## Persistence
+## Persistence maturity
 
-Register `ArchitectureEntities.annotatedClasses()` together with the Core, Search and Java-analysis entities. Rules, evidence and drift findings are rebuildable projections; the Git history and versioned architecture sources remain authoritative.
+The authoritative state is the Git history containing the architecture sources. Drift reports and any database rows derived from them are rebuildable projections.
+
+`ArchitectureEntities.annotatedClasses()` exposes incubating entity mappings for controlled experiments. In `0.1.x`, a consuming application that registers them must also provide its own versioned migrations, persistence/upsert logic, reindex procedure and repository cleanup. The helper is not yet part of the production schema contract documented for Core and Search.

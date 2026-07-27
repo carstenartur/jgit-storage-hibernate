@@ -22,11 +22,21 @@ import java.util.Objects;
  * changed. When {@link #text()} is present, path text is interpreted by the full-text analyzer;
  * otherwise path matching retains its literal, case-insensitive fragment semantics.
  *
+ * <p>Time predicates and newest-first ordering use committer time by default. Call {@link
+ * Builder#usingAuthorTime()} when the question concerns when the original author wrote the change
+ * rather than when the commit entered the current history.
+ *
  * <p>An object-id restriction is distinct from no restriction. An explicitly empty candidate set
  * matches no commits, while omitting the restriction searches every indexed commit in the logical
  * repository.
  */
 public final class CommitHistoryQuery {
+
+  /** Timestamp dimension used for range predicates and chronological ordering. */
+  public enum TimestampField {
+    AUTHOR,
+    COMMITTER
+  }
 
   private static final int DEFAULT_LIMIT = 100;
 
@@ -36,6 +46,7 @@ public final class CommitHistoryQuery {
   private final String pathFragment;
   private final Instant from;
   private final Instant to;
+  private final TimestampField timestampField;
   private final boolean objectIdRestriction;
   private final List<String> objectIds;
   private final int limit;
@@ -47,6 +58,7 @@ public final class CommitHistoryQuery {
     pathFragment = normalize(builder.pathFragment);
     from = builder.from;
     to = builder.to;
+    timestampField = Objects.requireNonNull(builder.timestampField, "timestampField");
     objectIdRestriction = builder.objectIds != null;
     objectIds = builder.objectIds == null ? List.of() : builder.objectIds;
     limit = builder.limit;
@@ -59,12 +71,7 @@ public final class CommitHistoryQuery {
     }
   }
 
-  /**
-   * Start a query for one logical repository.
-   *
-   * @param repositoryName logical repository name
-   * @return query builder
-   */
+  /** Start a query for one logical repository. */
   public static Builder forRepository(String repositoryName) {
     return new Builder(repositoryName);
   }
@@ -93,6 +100,10 @@ public final class CommitHistoryQuery {
     return to;
   }
 
+  public TimestampField timestampField() {
+    return timestampField;
+  }
+
   public boolean hasObjectIdRestriction() {
     return objectIdRestriction;
   }
@@ -114,6 +125,7 @@ public final class CommitHistoryQuery {
     private String pathFragment;
     private Instant from;
     private Instant to;
+    private TimestampField timestampField = TimestampField.COMMITTER;
     private List<String> objectIds;
     private int limit = DEFAULT_LIMIT;
 
@@ -121,48 +133,21 @@ public final class CommitHistoryQuery {
       this.repositoryName = requireText(repositoryName, "repositoryName");
     }
 
-    /**
-     * Restrict results using a simple-query-string expression over messages, paths and changed text.
-     *
-     * @param text full-text expression, or {@code null} to omit the predicate
-     * @return this builder
-     */
     public Builder matchingText(String text) {
       this.text = text;
       return this;
     }
 
-    /**
-     * Restrict results to commits authored with the exact email address.
-     *
-     * @param authorEmail author email, or {@code null} to omit the predicate
-     * @return this builder
-     */
     public Builder authoredBy(String authorEmail) {
       this.authorEmail = authorEmail;
       return this;
     }
 
-    /**
-     * Restrict results to commits that changed a path containing the fragment.
-     *
-     * @param pathFragment path fragment, or {@code null} to omit the predicate
-     * @return this builder
-     */
     public Builder touchingPath(String pathFragment) {
       this.pathFragment = pathFragment;
       return this;
     }
 
-    /**
-     * Restrict results to an exact set of commit object IDs.
-     *
-     * <p>The supplied IDs are trimmed, deduplicated and defensively copied. An empty collection is a
-     * deliberate match-none restriction; omit this method to search every commit in the repository.
-     *
-     * @param objectIds exact candidate commit IDs
-     * @return this builder
-     */
     public Builder restrictedToObjectIds(Collection<String> objectIds) {
       Objects.requireNonNull(objectIds, "objectIds");
       LinkedHashSet<String> normalized = new LinkedHashSet<>();
@@ -173,47 +158,45 @@ public final class CommitHistoryQuery {
       return this;
     }
 
-    /**
-     * Restrict results to commits at or after the inclusive instant.
-     *
-     * @param from inclusive lower bound
-     * @return this builder
-     */
+    /** Use author time for range predicates and result ordering. */
+    public Builder usingAuthorTime() {
+      timestampField = TimestampField.AUTHOR;
+      return this;
+    }
+
+    /** Use committer time for range predicates and result ordering. This is the default. */
+    public Builder usingCommitterTime() {
+      timestampField = TimestampField.COMMITTER;
+      return this;
+    }
+
     public Builder from(Instant from) {
       this.from = from;
       return this;
     }
 
-    /**
-     * Restrict results to commits at or before the inclusive instant.
-     *
-     * @param to inclusive upper bound
-     * @return this builder
-     */
     public Builder to(Instant to) {
       this.to = to;
       return this;
     }
 
-    /**
-     * Restrict results to an inclusive time interval.
-     *
-     * @param from inclusive lower bound
-     * @param to inclusive upper bound
-     * @return this builder
-     */
+    /** Restrict the selected timestamp dimension to an inclusive interval. */
     public Builder between(Instant from, Instant to) {
       this.from = Objects.requireNonNull(from, "from");
       this.to = Objects.requireNonNull(to, "to");
       return this;
     }
 
-    /**
-     * Set the maximum number of results.
-     *
-     * @param limit non-negative result limit
-     * @return this builder
-     */
+    /** Restrict author time to an inclusive interval. */
+    public Builder authoredBetween(Instant from, Instant to) {
+      return usingAuthorTime().between(from, to);
+    }
+
+    /** Restrict committer time to an inclusive interval. */
+    public Builder committedBetween(Instant from, Instant to) {
+      return usingCommitterTime().between(from, to);
+    }
+
     public Builder limit(int limit) {
       this.limit = limit;
       return this;

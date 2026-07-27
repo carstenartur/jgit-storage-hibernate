@@ -1,9 +1,5 @@
 /*
  * Copyright (C) 2026, Carsten Hammer and contributors.
- *
- * This program and the accompanying materials are made available under the
- * terms of the BSD 3-Clause License.
- *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 package io.github.carstenartur.jgit.storage.hibernate;
@@ -55,6 +51,8 @@ class CoreSchemaMigrationIntegrationTest {
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
   private static final String H2_LEGACY_SCHEMA =
       "/db/legacy/jgit-storage-hibernate/core/0.1.4/h2/schema.sql";
+  private static final List<String> EXPECTED_MIGRATIONS =
+      List.of("0.1.4", "0.1.5", "0.1.14");
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
@@ -73,7 +71,7 @@ class CoreSchemaMigrationIntegrationTest {
   static void verifyEmptyMigrationAndRestart(TestDatabase database) throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     migrate(database, false);
-    assertEquals(List.of("0.1.4", "0.1.5"), migrationVersions(database));
+    assertEquals(EXPECTED_MIGRATIONS, migrationVersions(database));
 
     String incompleteRepositoryName = "incomplete-only";
     insertUncommittedPack(database, incompleteRepositoryName);
@@ -83,6 +81,7 @@ class CoreSchemaMigrationIntegrationTest {
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
       verifyUncommittedPackInvisible(provider.getSessionFactory(), incompleteRepositoryName);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
+      assertRepositoryLockRow(database, repositoryName);
     }
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
@@ -94,15 +93,20 @@ class CoreSchemaMigrationIntegrationTest {
   static void verifyLegacyUpgrade(TestDatabase database) throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     installLegacySchema(database);
+    String legacyIncompleteRepository = "legacy-incomplete";
+    insertUncommittedPack(database, legacyIncompleteRepository);
+
+    // Current mappings are deliberately not opened against an unmigrated 0.1.4 schema.
+    migrate(database, true);
+    assertEquals(EXPECTED_MIGRATIONS, migrationVersions(database));
 
     String repositoryName = "legacy-0.1.4";
     StoredHistory storedHistory;
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
+      verifyUncommittedPackInvisible(provider.getSessionFactory(), legacyIncompleteRepository);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
+      assertRepositoryLockRow(database, repositoryName);
     }
-
-    migrate(database, true);
-    assertEquals(List.of("0.1.4", "0.1.5"), migrationVersions(database));
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
       verifyHistory(provider.getSessionFactory(), repositoryName, storedHistory);
@@ -228,6 +232,20 @@ class CoreSchemaMigrationIntegrationTest {
     }
   }
 
+  private static void assertRepositoryLockRow(TestDatabase database, String repositoryName)
+      throws SQLException {
+    try (Connection connection = database.openConnection();
+        var statement =
+            connection.prepareStatement(
+                "select count(*) from git_repository_lock where repository_name = ?")) {
+      statement.setString(1, repositoryName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+      }
+    }
+  }
+
   private static void installLegacySchema(TestDatabase database) throws IOException, SQLException {
     String script = readResource(database.legacySchemaResource());
     try (Connection connection = database.openConnection();
@@ -266,8 +284,8 @@ class CoreSchemaMigrationIntegrationTest {
         Flyway.configure()
             .dataSource(database.url(), database.username(), database.password())
             .locations(database.coreMigrationLocation())
-            .table(CoreSchemaMigrations.SCHEMA_HISTORY_TABLE);
-    configuration.baselineOnMigrate(true);
+            .table(CoreSchemaMigrations.SCHEMA_HISTORY_TABLE)
+            .baselineOnMigrate(true);
     if (legacyBaseline) {
       configuration
           .baselineVersion(CoreSchemaMigrations.LEGACY_SCHEMA_VERSION)
@@ -339,7 +357,7 @@ class CoreSchemaMigrationIntegrationTest {
       SqlCleanup cleanup)
       implements AutoCloseable {
 
-    private Connection openConnection() throws SQLException {
+    Connection openConnection() throws SQLException {
       return DriverManager.getConnection(url, username, password);
     }
 

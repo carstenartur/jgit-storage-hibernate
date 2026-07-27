@@ -1,15 +1,12 @@
 /*
  * Copyright (C) 2026, Carsten Hammer and contributors.
- *
- * This program and the accompanying materials are made available under the
- * terms of the BSD 3-Clause License.
- *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 package io.github.carstenartur.jgit.storage.hibernate.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
@@ -20,9 +17,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +38,8 @@ class SearchSchemaMigrationIntegrationTest {
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
   private static final String H2_LEGACY_SCHEMA =
       "/db/legacy/jgit-storage-hibernate/search/0.1.4/h2/schema.sql";
+  private static final Instant TEST_AUTHOR_TIME = Instant.parse("2026-07-17T12:00:00Z");
+  private static final Instant TEST_COMMITTER_TIME = Instant.parse("2026-07-18T12:00:00Z");
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
@@ -70,32 +71,70 @@ class SearchSchemaMigrationIntegrationTest {
 
   static void verifyLegacyUpgrade(TestDatabase database) throws Exception {
     installLegacySchema(database);
-
-    Long projectionId;
-    try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
-      projectionId = persistProjection(provider.getSessionFactory(), "legacy-object");
-    }
+    Long projectionId = insertLegacyProjection(database, "legacy-object");
 
     migrate(database, true);
     assertMigrationVersions(database);
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
-      verifyProjection(provider.getSessionFactory(), projectionId, "legacy-object");
+      verifyLegacyProjectionAfterMigration(
+          provider.getSessionFactory(), projectionId, "legacy-object");
     }
   }
 
   private static Long persistProjection(SessionFactory sessionFactory, String objectId) {
+    GitCommitIndex projection = baseProjection(objectId);
+    projection.setAuthorTime(TEST_AUTHOR_TIME);
+    projection.setCommitterName("Migration Committer");
+    projection.setCommitterEmail("committer@example.invalid");
+    projection.setCommitterTime(TEST_COMMITTER_TIME);
+    persist(sessionFactory, projection);
+    return projection.getId();
+  }
+
+  private static Long insertLegacyProjection(TestDatabase database, String objectId)
+      throws SQLException {
+    String sql =
+        "insert into git_commit_index "
+            + "(repository_name, object_id, short_message, full_message, author_name, "
+            + "author_email, commit_time, changed_paths, changed_text) "
+            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    try (Connection connection = database.openConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      statement.setString(1, "schema-migration-search");
+      statement.setString(2, objectId);
+      statement.setString(3, "Versioned migration projection");
+      statement.setString(4, "Projection persisted before a SessionFactory restart");
+      statement.setString(5, "Migration Author");
+      statement.setString(6, "author@example.invalid");
+      statement.setTimestamp(7, Timestamp.from(TEST_AUTHOR_TIME));
+      statement.setString(8, "src/main/java/Example.java");
+      statement.setString(9, "class Example {}");
+      statement.executeUpdate();
+      try (ResultSet keys = statement.getGeneratedKeys()) {
+        if (!keys.next()) {
+          throw new SQLException("legacy insert did not return an id");
+        }
+        return keys.getLong(1);
+      }
+    }
+  }
+
+  private static GitCommitIndex baseProjection(String objectId) {
     GitCommitIndex projection = new GitCommitIndex();
     projection.setRepositoryName("schema-migration-search");
     projection.setObjectId(objectId);
     projection.setShortMessage("Versioned migration projection");
     projection.setFullMessage("Projection persisted before a SessionFactory restart");
-    projection.setAuthorName("Migration Test");
-    projection.setAuthorEmail("migration@example.invalid");
-    projection.setCommitTime(Instant.parse("2026-07-18T12:00:00Z"));
+    projection.setAuthorName("Migration Author");
+    projection.setAuthorEmail("author@example.invalid");
     projection.setChangedPaths("src/main/java/Example.java");
     projection.setChangedText("class Example {}");
+    return projection;
+  }
 
+  private static void persist(SessionFactory sessionFactory, GitCommitIndex projection) {
     try (Session session = sessionFactory.openSession()) {
       Transaction transaction = session.beginTransaction();
       try {
@@ -109,7 +148,6 @@ class SearchSchemaMigrationIntegrationTest {
       }
     }
     assertNotNull(projection.getId());
-    return projection.getId();
   }
 
   private static void verifyProjection(
@@ -119,8 +157,23 @@ class SearchSchemaMigrationIntegrationTest {
       assertNotNull(projection);
       assertEquals("schema-migration-search", projection.getRepositoryName());
       assertEquals(expectedObjectId, projection.getObjectId());
-      assertEquals("Versioned migration projection", projection.getShortMessage());
-      assertEquals("src/main/java/Example.java", projection.getChangedPaths());
+      assertEquals(TEST_AUTHOR_TIME, projection.getAuthorTime());
+      assertEquals("Migration Committer", projection.getCommitterName());
+      assertEquals("committer@example.invalid", projection.getCommitterEmail());
+      assertEquals(TEST_COMMITTER_TIME, projection.getCommitterTime());
+    }
+  }
+
+  private static void verifyLegacyProjectionAfterMigration(
+      SessionFactory sessionFactory, Long projectionId, String expectedObjectId) {
+    try (Session session = sessionFactory.openSession()) {
+      GitCommitIndex projection = session.find(GitCommitIndex.class, projectionId);
+      assertNotNull(projection);
+      assertEquals(expectedObjectId, projection.getObjectId());
+      assertEquals(TEST_AUTHOR_TIME, projection.getAuthorTime());
+      assertEquals(TEST_AUTHOR_TIME, projection.getCommitterTime());
+      assertNull(projection.getCommitterName());
+      assertNull(projection.getCommitterEmail());
     }
   }
 
@@ -191,12 +244,10 @@ class SearchSchemaMigrationIntegrationTest {
         Flyway.configure()
             .dataSource(database.url(), database.username(), database.password())
             .locations(location)
-            .table(historyTable);
-    configuration.baselineOnMigrate(true);
+            .table(historyTable)
+            .baselineOnMigrate(true);
     if (legacyBaseline) {
-      configuration
-          .baselineVersion(baselineVersion)
-          .baselineDescription(baselineDescription);
+      configuration.baselineVersion(baselineVersion).baselineDescription(baselineDescription);
     } else {
       configuration
           .baselineVersion(preMigrationBaselineVersion)
@@ -207,10 +258,10 @@ class SearchSchemaMigrationIntegrationTest {
 
   private static void assertMigrationVersions(TestDatabase database) throws SQLException {
     assertEquals(
-        List.of("0.1.4", "0.1.5"),
+        List.of("0.1.4", "0.1.5", "0.1.14"),
         migrationVersions(database, CoreSchemaMigrations.SCHEMA_HISTORY_TABLE));
     assertEquals(
-        List.of("0.1.4", "0.1.5"),
+        List.of("0.1.4", "0.1.5", "0.1.14"),
         migrationVersions(database, SearchSchemaMigrations.SCHEMA_HISTORY_TABLE));
   }
 
@@ -276,7 +327,7 @@ class SearchSchemaMigrationIntegrationTest {
       SqlCleanup cleanup)
       implements AutoCloseable {
 
-    private Connection openConnection() throws SQLException {
+    Connection openConnection() throws SQLException {
       return DriverManager.getConnection(url, username, password);
     }
 
