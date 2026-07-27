@@ -17,7 +17,6 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
@@ -38,13 +37,15 @@ import org.hibernate.SessionFactory;
  * <p>Pack extensions are first written as uncommitted rows and become visible only when JGit calls
  * {@link #commitPackImpl(Collection, Collection)}. This mirrors the DFS contract more closely than
  * immediately exposing partially written pack files.
+ *
+ * <p>Shallow repositories are not supported. A non-empty shallow boundary is rejected explicitly
+ * instead of being retained only in memory and silently lost on restart.
  */
 public class HibernateObjDatabase extends DfsObjDatabase {
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
-  private Set<ObjectId> shallowCommits = Collections.emptySet();
 
   /**
    * Create an object database.
@@ -198,12 +199,15 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   @Override
   public Set<ObjectId> getShallowCommits() throws IOException {
-    return shallowCommits;
+    return Set.of();
   }
 
   @Override
   public void setShallowCommits(Set<ObjectId> shallowCommits) {
-    this.shallowCommits = shallowCommits != null ? shallowCommits : Collections.emptySet();
+    if (shallowCommits != null && !shallowCommits.isEmpty()) {
+      throw new UnsupportedOperationException(
+          "Shallow repositories are not supported by jgit-storage-hibernate");
+    }
   }
 
   @Override
@@ -212,16 +216,18 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     return 0L;
   }
 
-  private static final class HibernatePackOutputStream extends DfsOutputStream {
+  static final class HibernatePackOutputStream extends DfsOutputStream {
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
     private final HibernateTransactionContext transactionContext;
     private final String repositoryName;
     private final String packName;
     private final String packExtension;
     private byte[] data;
-    private boolean flushed;
+    private int modificationVersion;
+    private int persistedVersion = -1;
+    private boolean closed;
 
-    private HibernatePackOutputStream(
+    HibernatePackOutputStream(
         HibernateTransactionContext transactionContext,
         String repositoryName,
         String packName,
@@ -233,9 +239,11 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     }
 
     @Override
-    public void write(byte[] source, int offset, int length) {
+    public void write(byte[] source, int offset, int length) throws IOException {
+      ensureOpen();
       data = null;
       buffer.write(source, offset, length);
+      modificationVersion++;
     }
 
     @Override
@@ -251,10 +259,10 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
     @Override
     public void flush() throws IOException {
-      if (flushed) {
+      ensureOpen();
+      if (persistedVersion == modificationVersion) {
         return;
       }
-      flushed = true;
       byte[] bytes = bytes();
       transactionContext.execute(
           session -> {
@@ -284,11 +292,22 @@ public class HibernateObjDatabase extends DfsObjDatabase {
             }
             return null;
           });
+      persistedVersion = modificationVersion;
     }
 
     @Override
     public void close() throws IOException {
+      if (closed) {
+        return;
+      }
       flush();
+      closed = true;
+    }
+
+    private void ensureOpen() throws IOException {
+      if (closed) {
+        throw new IOException("Pack output stream is closed");
+      }
     }
 
     private byte[] bytes() {
