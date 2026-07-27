@@ -28,13 +28,15 @@ jobs:
       - name: Parse release tooling
         run: |
           bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
-          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py
+          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py .github/scripts/verify-security-policy.py
       - name: Test release tooling
         run: |
           python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/test_prepare_public_repository.py
-      - name: Verify release consistency
-        run: python3 .github/scripts/verify-release-consistency.py
+      - name: Verify release and security consistency
+        run: |
+          python3 .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/verify-security-policy.py
       - name: Verify public repository publishing contract
         run: python3 .github/scripts/verify-public-repository-publishing.py
       - name: Build
