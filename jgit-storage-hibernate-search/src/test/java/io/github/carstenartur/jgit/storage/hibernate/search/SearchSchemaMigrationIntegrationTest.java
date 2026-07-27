@@ -6,6 +6,7 @@ package io.github.carstenartur.jgit.storage.hibernate.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
@@ -16,9 +17,11 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,11 +71,7 @@ class SearchSchemaMigrationIntegrationTest {
 
   static void verifyLegacyUpgrade(TestDatabase database) throws Exception {
     installLegacySchema(database);
-
-    Long projectionId;
-    try (HibernateSessionFactoryProvider provider = legacyProvider(database)) {
-      projectionId = persistLegacyProjection(provider.getSessionFactory(), "legacy-object");
-    }
+    Long projectionId = insertLegacyProjection(database, "legacy-object");
 
     migrate(database, true);
     assertMigrationVersions(database);
@@ -93,11 +92,33 @@ class SearchSchemaMigrationIntegrationTest {
     return projection.getId();
   }
 
-  private static Long persistLegacyProjection(SessionFactory sessionFactory, String objectId) {
-    GitCommitIndex projection = baseProjection(objectId);
-    projection.setCommitterTime(TEST_AUTHOR_TIME);
-    persist(sessionFactory, projection);
-    return projection.getId();
+  private static Long insertLegacyProjection(TestDatabase database, String objectId)
+      throws SQLException {
+    String sql =
+        "insert into git_commit_index "
+            + "(repository_name, object_id, short_message, full_message, author_name, "
+            + "author_email, commit_time, changed_paths, changed_text) "
+            + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    try (Connection connection = database.openConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+      statement.setString(1, "schema-migration-search");
+      statement.setString(2, objectId);
+      statement.setString(3, "Versioned migration projection");
+      statement.setString(4, "Projection persisted before a SessionFactory restart");
+      statement.setString(5, "Migration Author");
+      statement.setString(6, "author@example.invalid");
+      statement.setTimestamp(7, Timestamp.from(TEST_AUTHOR_TIME));
+      statement.setString(8, "src/main/java/Example.java");
+      statement.setString(9, "class Example {}");
+      statement.executeUpdate();
+      try (ResultSet keys = statement.getGeneratedKeys()) {
+        if (!keys.next()) {
+          throw new SQLException("legacy insert did not return an id");
+        }
+        return keys.getLong(1);
+      }
+    }
   }
 
   private static GitCommitIndex baseProjection(String objectId) {
@@ -151,8 +172,8 @@ class SearchSchemaMigrationIntegrationTest {
       assertEquals(expectedObjectId, projection.getObjectId());
       assertEquals(TEST_AUTHOR_TIME, projection.getAuthorTime());
       assertEquals(TEST_AUTHOR_TIME, projection.getCommitterTime());
-      assertEquals(null, projection.getCommitterName());
-      assertEquals(null, projection.getCommitterEmail());
+      assertNull(projection.getCommitterName());
+      assertNull(projection.getCommitterEmail());
     }
   }
 
@@ -262,15 +283,6 @@ class SearchSchemaMigrationIntegrationTest {
   }
 
   private static HibernateSessionFactoryProvider provider(TestDatabase database, String ddlMode) {
-    return provider(database, ddlMode, SearchEntities.annotatedClasses());
-  }
-
-  private static HibernateSessionFactoryProvider legacyProvider(TestDatabase database) {
-    return provider(database, "validate", List.of(LegacyGitCommitIndex.class));
-  }
-
-  private static HibernateSessionFactoryProvider provider(
-      TestDatabase database, String ddlMode, List<Class<?>> additionalClasses) {
     Properties properties = new Properties();
     properties.put("hibernate.connection.url", database.url());
     properties.put("hibernate.connection.username", database.username());
@@ -281,7 +293,7 @@ class SearchSchemaMigrationIntegrationTest {
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.search.backend.type", "lucene");
     properties.put("hibernate.search.backend.directory.type", "local-heap");
-    return new HibernateSessionFactoryProvider(properties, additionalClasses);
+    return new HibernateSessionFactoryProvider(properties, SearchEntities.annotatedClasses());
   }
 
   private static TestDatabase h2Database(String purpose) {
@@ -296,41 +308,6 @@ class SearchSchemaMigrationIntegrationTest {
         SearchSchemaMigrations.H2_LOCATION,
         H2_LEGACY_SCHEMA,
         () -> {});
-  }
-
-  @jakarta.persistence.Entity(name = "GitCommitIndex")
-  @jakarta.persistence.Table(name = "git_commit_index")
-  static class LegacyGitCommitIndex {
-    @jakarta.persistence.Id
-    @jakarta.persistence.GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
-    private Long id;
-
-    @jakarta.persistence.Column(name = "repository_name", nullable = false, length = 255)
-    private String repositoryName;
-
-    @jakarta.persistence.Column(name = "object_id", nullable = false, length = 40)
-    private String objectId;
-
-    @jakarta.persistence.Column(name = "short_message", length = 2048)
-    private String shortMessage;
-
-    @jakarta.persistence.Column(name = "full_message", length = 8192)
-    private String fullMessage;
-
-    @jakarta.persistence.Column(name = "author_name")
-    private String authorName;
-
-    @jakarta.persistence.Column(name = "author_email")
-    private String authorEmail;
-
-    @jakarta.persistence.Column(name = "commit_time")
-    private Instant commitTime;
-
-    @jakarta.persistence.Column(name = "changed_paths", length = 16384)
-    private String changedPaths;
-
-    @jakarta.persistence.Column(name = "changed_text", length = 262144)
-    private String changedText;
   }
 
   @FunctionalInterface
@@ -350,7 +327,7 @@ class SearchSchemaMigrationIntegrationTest {
       SqlCleanup cleanup)
       implements AutoCloseable {
 
-    private Connection openConnection() throws SQLException {
+    Connection openConnection() throws SQLException {
       return DriverManager.getConnection(url, username, password);
     }
 
