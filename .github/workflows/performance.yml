@@ -12,9 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  deployments: write
-  pull-requests: write
+  contents: read
 
 jobs:
   jmh:
@@ -24,10 +22,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with:
           distribution: temurin
           java-version: '21'
@@ -64,41 +62,9 @@ jobs:
             python3 .github/scripts/write-performance-badge.py target/benchmarks/jmh-result.json
           fi
 
-      - name: Initialize benchmark history branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
-            exit 0
-          fi
-          empty_tree="$(git mktree </dev/null)"
-          export GIT_AUTHOR_NAME='github-actions[bot]'
-          export GIT_AUTHOR_EMAIL='github-actions[bot]@users.noreply.github.com'
-          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
-          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
-          initial_commit="$(printf '%s\n' 'Initialize benchmark history' | git commit-tree "$empty_tree")"
-          git push origin "$initial_commit:refs/heads/gh-pages"
-
-      - name: Store benchmark history and publish charts
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Repository backend comparison
-          tool: customSmallerIsBetter
-          output-file-path: target/benchmarks/backend-comparison.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          gh-pages-branch: gh-pages
-          benchmark-data-dir-path: dev/bench
-          alert-threshold: '150%'
-          comment-on-alert: true
-          fail-on-alert: false
-          alert-comment-cc-users: '@carstenartur'
-          summary-always: true
-          max-items-in-chart: 100
-
       - name: Upload JMH benchmark results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: jmh-backend-comparison-results
           path: |
@@ -115,8 +81,56 @@ jobs:
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Update performance badge data on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
+  publish-history:
+    name: Publish benchmark history
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: jmh
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
+        with:
+          name: jmh-backend-comparison-results
+          path: .
+
+      - name: Initialize benchmark history branch
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            exit 0
+          fi
+          empty_tree="$(git mktree </dev/null)"
+          export GIT_AUTHOR_NAME='github-actions[bot]'
+          export GIT_AUTHOR_EMAIL='github-actions[bot]@users.noreply.github.com'
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          initial_commit="$(printf '%s\n' 'Initialize benchmark history' | git commit-tree "$empty_tree")"
+          git push origin "$initial_commit:refs/heads/gh-pages"
+
+      - name: Store benchmark history and publish charts
+        uses: benchmark-action/github-action-benchmark@67cf262e8c79ad6f86652f2cb0c4ea19dbd5660a # v1.22.1
+        with:
+          name: Repository backend comparison
+          tool: customSmallerIsBetter
+          output-file-path: target/benchmarks/backend-comparison.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          alert-threshold: '150%'
+          comment-on-alert: true
+          fail-on-alert: false
+          alert-comment-cc-users: '@carstenartur'
+          summary-always: true
+          max-items-in-chart: 100
+
+      - name: Update performance badge data
         run: |
           if git diff --quiet -- docs/badges/performance.json; then
             echo "Performance badge data unchanged"
