@@ -15,7 +15,13 @@ import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaRef
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaSymbolIndex;
 import java.util.List;
 
-/** Entity registration helper for consumers creating Hibernate session factories manually. */
+/**
+ * Incubating entity registration helper for controlled Java-analysis persistence experiments.
+ *
+ * <p>The {@code 0.1.x} module does not yet ship Flyway migrations, a projection writer/rebuilder or
+ * repository-deletion integration for these mappings. Applications registering them must own and
+ * test the complete schema and lifecycle; the supported default is to use analysis DTOs in memory.
+ */
 public final class JavaAnalysisEntities {
 
   private JavaAnalysisEntities() {}
