@@ -7,18 +7,21 @@ io.github.carstenartur:jgit-storage-hibernate-core
 io.github.carstenartur:jgit-storage-hibernate-search
 ```
 
-Core provides database-backed JGit repositories. Search is optional and adds generic Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation and have their own module guides.
+Core provides database-backed JGit repositories. Search is optional and adds generic Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
 
-The documented release line is **0.1.13**. It uses Java 21, Hibernate ORM 7.4.5.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published artifacts instead of overriding only one side of the stack.
+The documented release line is **0.1.13**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate Search 8.4.0.Final and is tested with Flyway 13.0.0. Keep those versions aligned through the published artifacts and tested deployment stack instead of overriding only one side of the stack.
 
 ## Supported databases and operating model
 
-| Database | Supported use | Tested version |
-|---|---|---|
-| PostgreSQL | persistent development, staging and production | PostgreSQL 17.10 through Testcontainers |
-| H2 | tests, demos and lightweight/disposable development | H2 2.4.x |
+| Database | Core | Search | Tested version and intended use |
+|---|---|---|---|
+| PostgreSQL | Supported | Supported | PostgreSQL 17.10 through Testcontainers; persistent development, staging and production |
+| HSQLDB | Supported | Not currently shipped | HSQLDB 2.7.4; embedded persistent Core deployments and restart tests |
+| H2 | Supported | Supported | H2 2.4.x; tests, demos and lightweight/disposable development |
 
-The migration SQL is dialect-specific. Never run the H2 resources against PostgreSQL or the PostgreSQL resources against H2.
+Support means that the artifact ships dialect-specific Flyway migrations and automated integration coverage for the listed module. Java Analysis and Architecture do not yet ship module-owned migrations for any database.
+
+The migration SQL is dialect-specific. Never run H2, HSQLDB or PostgreSQL resources against a different database.
 
 Production sequence:
 
@@ -82,33 +85,36 @@ Optional generic history search:
 
 Reftable-related files are stored in `git_packs`. Core and Search have separate history tables because both publish artifact-aligned versions such as 0.1.4 and 0.1.5.
 
-Application workflow, session, audit, outbox and domain-projection tables are outside these migration locations. The consuming application owns and migrates them even when all entities share one `SessionFactory` and database schema.
+Application workflow, session, audit, outbox and domain-projection tables are outside these migration locations. The consuming application owns and migrates them even when all entities share one `SessionFactory` and database schema. The same rule currently applies to any experimental Java Analysis or Architecture entity persistence.
 
 ## Packaged migration locations
 
 | Artifact | Database | Classpath location |
 |---|---|---|
 | Core | H2 | `classpath:db/migration/jgit-storage-hibernate/core/h2` |
+| Core | HSQLDB | `classpath:db/migration/jgit-storage-hibernate/core/hsqldb` |
 | Core | PostgreSQL | `classpath:db/migration/jgit-storage-hibernate/core/postgresql` |
 | Search | H2 | `classpath:db/migration/jgit-storage-hibernate/search/h2` |
 | Search | PostgreSQL | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` |
 
 The public constants in `CoreSchemaMigrations` and `SearchSchemaMigrations` avoid copying these strings or history-table names into consumer code.
 
-Flyway is a deployment concern and is intentionally not a runtime dependency of the published storage artifacts. Add it to the application, migration module or deployment tool. PostgreSQL also needs Flyway's PostgreSQL module:
+Flyway is a deployment concern and is intentionally not a runtime dependency of the published storage artifacts. Add it to the application, migration module or deployment tool. Use the same Flyway line exercised by this repository:
 
 ```xml
 <dependency>
   <groupId>org.flywaydb</groupId>
   <artifactId>flyway-core</artifactId>
-  <version>12.8.1</version>
+  <version>13.0.0</version>
 </dependency>
 <dependency>
   <groupId>org.flywaydb</groupId>
   <artifactId>flyway-database-postgresql</artifactId>
-  <version>12.8.1</version>
+  <version>13.0.0</version>
 </dependency>
 ```
+
+For HSQLDB Core deployments, use `flyway-database-hsqldb` at the same version instead of the PostgreSQL database module.
 
 ## Provisioning runbook A: empty dedicated schema
 
@@ -123,7 +129,7 @@ Flyway.configure()
     .migrate();
 ```
 
-Flyway applies all available Core migrations in order. Start Hibernate with `validate` only after migration succeeds.
+Use `CoreSchemaMigrations.HSQLDB_LOCATION` for HSQLDB. Flyway applies all available Core migrations in order. Start Hibernate with `validate` only after migration succeeds.
 
 ## Provisioning runbook B: shared schema without JGit tables
 
@@ -182,7 +188,7 @@ For Search, repeat the operation using `SearchSchemaMigrations` and its history 
 
 Do not baseline an unknown, partially created or manually modified schema. Baselining records that the existing structure is already the trusted 0.1.4 baseline; it does not verify or repair that structure.
 
-The repository's upgrade tests create the legacy state from immutable H2 and PostgreSQL 0.1.4 DDL fixtures. They do not generate the old schema from current entity mappings.
+The repository's upgrade tests create the legacy state from immutable H2, HSQLDB and PostgreSQL 0.1.4 DDL fixtures where the corresponding adoption path is supported. They do not generate the old schema from current entity mappings.
 
 ## Hibernate startup
 
@@ -192,7 +198,7 @@ Set:
 hibernate.hbm2ddl.auto=validate
 ```
 
-`HibernateSessionFactoryProvider` always registers the Core entities and can register additional application or projection entities:
+`HibernateSessionFactoryProvider` always registers the Core entities and can register additional application or supported projection entities:
 
 ```java
 Properties properties = new Properties();
@@ -313,6 +319,7 @@ mvn verify
 The Core and Search suites exercise:
 
 - fresh installation on H2 and PostgreSQL;
+- Core installation and restart behavior on HSQLDB;
 - adoption of immutable 0.1.4 fixtures;
 - Flyway history versions;
 - Hibernate `validate`;
@@ -320,7 +327,7 @@ The Core and Search suites exercise:
 - Search projection persistence;
 - `SessionFactory` restart.
 
-When Docker is unavailable, Testcontainers marks only the PostgreSQL classes as disabled; H2 tests still run. CI runners provide Docker and therefore execute the real-database paths on every pull request.
+When Docker is unavailable, Testcontainers marks only the PostgreSQL classes as disabled; H2 and HSQLDB tests still run. CI runners provide Docker and therefore execute the real-database paths on every pull request.
 
 ## Recommended integration in audio-analyzer
 
