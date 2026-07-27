@@ -1,9 +1,5 @@
 /*
  * Copyright (C) 2026, Carsten Hammer and contributors.
- *
- * This program and the accompanying materials are made available under the
- * terms of the BSD 3-Clause License.
- *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
@@ -33,9 +29,26 @@ class CommitHistoryQueryTest {
     assertEquals("repository", query.repositoryName());
     assertNull(query.text());
     assertEquals("author@example.com", query.authorEmail());
+    assertEquals(CommitHistoryQuery.TimestampField.COMMITTER, query.timestampField());
     assertFalse(query.hasObjectIdRestriction());
     assertEquals(List.of(), query.objectIds());
     assertEquals(0, query.limit());
+  }
+
+  @Test
+  void selectsAuthorOrCommitterTimeExplicitly() {
+    Instant from = Instant.parse("2026-01-01T00:00:00Z");
+    Instant to = Instant.parse("2026-01-31T23:59:59Z");
+
+    CommitHistoryQuery authorQuery =
+        CommitHistoryQuery.forRepository("repository").authoredBetween(from, to).build();
+    assertEquals(CommitHistoryQuery.TimestampField.AUTHOR, authorQuery.timestampField());
+    assertEquals(from, authorQuery.from());
+    assertEquals(to, authorQuery.to());
+
+    CommitHistoryQuery committerQuery =
+        CommitHistoryQuery.forRepository("repository").committedBetween(from, to).build();
+    assertEquals(CommitHistoryQuery.TimestampField.COMMITTER, committerQuery.timestampField());
   }
 
   @Test
