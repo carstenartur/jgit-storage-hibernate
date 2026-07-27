@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.refs;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.IOException;
+import java.util.Objects;
 import org.eclipse.jgit.internal.storage.dfs.DfsReftableDatabase;
 import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
 import org.eclipse.jgit.lib.ObjectId;
@@ -66,11 +67,32 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
   }
 
   boolean compareAndPutRef(Ref oldRef, Ref newRef) throws IOException {
+    Ref current = exactRef(oldRef.getName());
+    if (!sameRef(current, oldRef)) {
+      return false;
+    }
     return super.compareAndPut(oldRef, newRef);
   }
 
   boolean compareAndRemoveRef(Ref oldRef) throws IOException {
+    Ref current = exactRef(oldRef.getName());
+    if (!sameRef(current, oldRef)) {
+      return false;
+    }
     return super.compareAndRemove(oldRef);
+  }
+
+  private static boolean sameRef(Ref current, Ref expected) {
+    if (expected == null || expected.getStorage() == Ref.Storage.NEW) {
+      return current == null;
+    }
+    if (current == null || current.isSymbolic() != expected.isSymbolic()) {
+      return false;
+    }
+    if (current.isSymbolic()) {
+      return Objects.equals(current.getTarget().getName(), expected.getTarget().getName());
+    }
+    return Objects.equals(current.getObjectId(), expected.getObjectId());
   }
 
   <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
