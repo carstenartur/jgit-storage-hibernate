@@ -75,6 +75,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - name: Verify security policy
+        run: python3 .github/scripts/verify-security-policy.py
       - name: Run release state machine
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
