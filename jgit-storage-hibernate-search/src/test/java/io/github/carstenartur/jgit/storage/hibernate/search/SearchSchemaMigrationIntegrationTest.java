@@ -1,9 +1,5 @@
 /*
  * Copyright (C) 2026, Carsten Hammer and contributors.
- *
- * This program and the accompanying materials are made available under the
- * terms of the BSD 3-Clause License.
- *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 package io.github.carstenartur.jgit.storage.hibernate.search;
@@ -39,6 +35,8 @@ class SearchSchemaMigrationIntegrationTest {
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
   private static final String H2_LEGACY_SCHEMA =
       "/db/legacy/jgit-storage-hibernate/search/0.1.4/h2/schema.sql";
+  private static final Instant TEST_AUTHOR_TIME = Instant.parse("2026-07-17T12:00:00Z");
+  private static final Instant TEST_COMMITTER_TIME = Instant.parse("2026-07-18T12:00:00Z");
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
@@ -72,30 +70,50 @@ class SearchSchemaMigrationIntegrationTest {
     installLegacySchema(database);
 
     Long projectionId;
-    try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
-      projectionId = persistProjection(provider.getSessionFactory(), "legacy-object");
+    try (HibernateSessionFactoryProvider provider = legacyProvider(database)) {
+      projectionId = persistLegacyProjection(provider.getSessionFactory(), "legacy-object");
     }
 
     migrate(database, true);
     assertMigrationVersions(database);
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
-      verifyProjection(provider.getSessionFactory(), projectionId, "legacy-object");
+      verifyLegacyProjectionAfterMigration(
+          provider.getSessionFactory(), projectionId, "legacy-object");
     }
   }
 
   private static Long persistProjection(SessionFactory sessionFactory, String objectId) {
+    GitCommitIndex projection = baseProjection(objectId);
+    projection.setAuthorTime(TEST_AUTHOR_TIME);
+    projection.setCommitterName("Migration Committer");
+    projection.setCommitterEmail("committer@example.invalid");
+    projection.setCommitterTime(TEST_COMMITTER_TIME);
+    persist(sessionFactory, projection);
+    return projection.getId();
+  }
+
+  private static Long persistLegacyProjection(SessionFactory sessionFactory, String objectId) {
+    GitCommitIndex projection = baseProjection(objectId);
+    projection.setCommitterTime(TEST_AUTHOR_TIME);
+    persist(sessionFactory, projection);
+    return projection.getId();
+  }
+
+  private static GitCommitIndex baseProjection(String objectId) {
     GitCommitIndex projection = new GitCommitIndex();
     projection.setRepositoryName("schema-migration-search");
     projection.setObjectId(objectId);
     projection.setShortMessage("Versioned migration projection");
     projection.setFullMessage("Projection persisted before a SessionFactory restart");
-    projection.setAuthorName("Migration Test");
-    projection.setAuthorEmail("migration@example.invalid");
-    projection.setCommitTime(Instant.parse("2026-07-18T12:00:00Z"));
+    projection.setAuthorName("Migration Author");
+    projection.setAuthorEmail("author@example.invalid");
     projection.setChangedPaths("src/main/java/Example.java");
     projection.setChangedText("class Example {}");
+    return projection;
+  }
 
+  private static void persist(SessionFactory sessionFactory, GitCommitIndex projection) {
     try (Session session = sessionFactory.openSession()) {
       Transaction transaction = session.beginTransaction();
       try {
@@ -109,7 +127,6 @@ class SearchSchemaMigrationIntegrationTest {
       }
     }
     assertNotNull(projection.getId());
-    return projection.getId();
   }
 
   private static void verifyProjection(
@@ -119,8 +136,23 @@ class SearchSchemaMigrationIntegrationTest {
       assertNotNull(projection);
       assertEquals("schema-migration-search", projection.getRepositoryName());
       assertEquals(expectedObjectId, projection.getObjectId());
-      assertEquals("Versioned migration projection", projection.getShortMessage());
-      assertEquals("src/main/java/Example.java", projection.getChangedPaths());
+      assertEquals(TEST_AUTHOR_TIME, projection.getAuthorTime());
+      assertEquals("Migration Committer", projection.getCommitterName());
+      assertEquals("committer@example.invalid", projection.getCommitterEmail());
+      assertEquals(TEST_COMMITTER_TIME, projection.getCommitterTime());
+    }
+  }
+
+  private static void verifyLegacyProjectionAfterMigration(
+      SessionFactory sessionFactory, Long projectionId, String expectedObjectId) {
+    try (Session session = sessionFactory.openSession()) {
+      GitCommitIndex projection = session.find(GitCommitIndex.class, projectionId);
+      assertNotNull(projection);
+      assertEquals(expectedObjectId, projection.getObjectId());
+      assertEquals(TEST_AUTHOR_TIME, projection.getAuthorTime());
+      assertEquals(TEST_AUTHOR_TIME, projection.getCommitterTime());
+      assertEquals(null, projection.getCommitterName());
+      assertEquals(null, projection.getCommitterEmail());
     }
   }
 
@@ -191,12 +223,10 @@ class SearchSchemaMigrationIntegrationTest {
         Flyway.configure()
             .dataSource(database.url(), database.username(), database.password())
             .locations(location)
-            .table(historyTable);
-    configuration.baselineOnMigrate(true);
+            .table(historyTable)
+            .baselineOnMigrate(true);
     if (legacyBaseline) {
-      configuration
-          .baselineVersion(baselineVersion)
-          .baselineDescription(baselineDescription);
+      configuration.baselineVersion(baselineVersion).baselineDescription(baselineDescription);
     } else {
       configuration
           .baselineVersion(preMigrationBaselineVersion)
@@ -210,7 +240,7 @@ class SearchSchemaMigrationIntegrationTest {
         List.of("0.1.4", "0.1.5"),
         migrationVersions(database, CoreSchemaMigrations.SCHEMA_HISTORY_TABLE));
     assertEquals(
-        List.of("0.1.4", "0.1.5"),
+        List.of("0.1.4", "0.1.5", "0.1.14"),
         migrationVersions(database, SearchSchemaMigrations.SCHEMA_HISTORY_TABLE));
   }
 
@@ -232,6 +262,15 @@ class SearchSchemaMigrationIntegrationTest {
   }
 
   private static HibernateSessionFactoryProvider provider(TestDatabase database, String ddlMode) {
+    return provider(database, ddlMode, SearchEntities.annotatedClasses());
+  }
+
+  private static HibernateSessionFactoryProvider legacyProvider(TestDatabase database) {
+    return provider(database, "validate", List.of(LegacyGitCommitIndex.class));
+  }
+
+  private static HibernateSessionFactoryProvider provider(
+      TestDatabase database, String ddlMode, List<Class<?>> additionalClasses) {
     Properties properties = new Properties();
     properties.put("hibernate.connection.url", database.url());
     properties.put("hibernate.connection.username", database.username());
@@ -242,7 +281,7 @@ class SearchSchemaMigrationIntegrationTest {
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.search.backend.type", "lucene");
     properties.put("hibernate.search.backend.directory.type", "local-heap");
-    return new HibernateSessionFactoryProvider(properties, SearchEntities.annotatedClasses());
+    return new HibernateSessionFactoryProvider(properties, additionalClasses);
   }
 
   private static TestDatabase h2Database(String purpose) {
@@ -257,6 +296,41 @@ class SearchSchemaMigrationIntegrationTest {
         SearchSchemaMigrations.H2_LOCATION,
         H2_LEGACY_SCHEMA,
         () -> {});
+  }
+
+  @jakarta.persistence.Entity(name = "GitCommitIndex")
+  @jakarta.persistence.Table(name = "git_commit_index")
+  static class LegacyGitCommitIndex {
+    @jakarta.persistence.Id
+    @jakarta.persistence.GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
+    private Long id;
+
+    @jakarta.persistence.Column(name = "repository_name", nullable = false, length = 255)
+    private String repositoryName;
+
+    @jakarta.persistence.Column(name = "object_id", nullable = false, length = 40)
+    private String objectId;
+
+    @jakarta.persistence.Column(name = "short_message", length = 2048)
+    private String shortMessage;
+
+    @jakarta.persistence.Column(name = "full_message", length = 8192)
+    private String fullMessage;
+
+    @jakarta.persistence.Column(name = "author_name")
+    private String authorName;
+
+    @jakarta.persistence.Column(name = "author_email")
+    private String authorEmail;
+
+    @jakarta.persistence.Column(name = "commit_time")
+    private Instant commitTime;
+
+    @jakarta.persistence.Column(name = "changed_paths", length = 16384)
+    private String changedPaths;
+
+    @jakarta.persistence.Column(name = "changed_text", length = 262144)
+    private String changedText;
   }
 
   @FunctionalInterface
