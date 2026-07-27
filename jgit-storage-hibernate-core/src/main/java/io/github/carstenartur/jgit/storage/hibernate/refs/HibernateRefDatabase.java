@@ -25,11 +25,6 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
 
   private final HibernateRepository repository;
 
-  /**
-   * Create a reference database.
-   *
-   * @param repository owning Hibernate repository
-   */
   public HibernateRefDatabase(HibernateRepository repository) {
     super(repository);
     this.repository = repository;
@@ -79,7 +74,7 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
   }
 
   <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
-    return repository.inTransaction(work);
+    return repository.inRefTransaction(work);
   }
 
   void writeReflog(
