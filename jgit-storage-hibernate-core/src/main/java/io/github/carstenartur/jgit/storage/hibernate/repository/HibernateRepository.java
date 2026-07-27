@@ -39,11 +39,6 @@ public class HibernateRepository extends DfsRepository {
   private final String repositoryName;
   private String gitwebDescription;
 
-  /**
-   * Create a repository from a builder.
-   *
-   * @param builder configured repository builder
-   */
   HibernateRepository(HibernateRepositoryBuilder builder) throws IOException {
     super(builder);
     this.sessionFactory = builder.getSessionFactory();
@@ -61,14 +56,6 @@ public class HibernateRepository extends DfsRepository {
     ensureRepositoryLockRow();
   }
 
-  /**
-   * Create a repository for the given logical repository name.
-   *
-   * @param sessionFactory Hibernate session factory
-   * @param repositoryName logical repository name
-   * @return configured repository instance
-   * @throws IOException if repository cannot be built
-   */
   public static HibernateRepository create(SessionFactory sessionFactory, String repositoryName)
       throws IOException {
     return new HibernateRepositoryBuilder()
@@ -108,8 +95,9 @@ public class HibernateRepository extends DfsRepository {
   /**
    * Execute a ref mutation while holding the cross-SessionFactory repository lock.
    *
-   * <p>The Reftable view is refreshed after the database row lock is obtained, so an optimistic
-   * expected-old-ID comparison observes a ref update committed by another repository instance.
+   * <p>Both the DFS pack list and Reftable stack are invalidated after the database row lock is
+   * obtained. The optimistic expected-old-ID comparison therefore observes updates committed by a
+   * different repository instance before the lock was acquired.
    */
   public <T> T inRefTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
     return inTransaction(
@@ -120,6 +108,7 @@ public class HibernateRepository extends DfsRepository {
           if (lock == null) {
             throw new IOException("Missing repository lock row for " + repositoryName);
           }
+          objectDatabase.close();
           refDatabase.refresh();
           return work.execute(session);
         });
@@ -139,8 +128,6 @@ public class HibernateRepository extends DfsRepository {
             return null;
           });
     } catch (RuntimeException concurrentInsert) {
-      // Two independent SessionFactories may open a previously unseen logical repository at once.
-      // The losing insert transaction is rolled back; a new transaction then observes the row.
       try {
         transactionContext.execute(
             session -> {
