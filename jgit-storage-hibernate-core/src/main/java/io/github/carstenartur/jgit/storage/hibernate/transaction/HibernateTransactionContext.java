@@ -12,6 +12,7 @@ import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEnt
 import jakarta.persistence.LockModeType;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.atomic.LongAdder;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -25,8 +26,18 @@ import org.hibernate.Transaction;
  */
 public final class HibernateTransactionContext {
 
+  /** Enable lightweight repository transaction and lock acquisition counters. */
+  public static final String METRICS_ENABLED_PROPERTY =
+      "jgit.storage.hibernate.metrics.enabled";
+
   private final SessionFactory sessionFactory;
   private final ThreadLocal<Session> activeSession = new ThreadLocal<>();
+  private final boolean metricsEnabled;
+  private final LongAdder transactionsStarted = new LongAdder();
+  private final LongAdder transactionsCommitted = new LongAdder();
+  private final LongAdder transactionsRolledBack = new LongAdder();
+  private final LongAdder repositoryLocksAcquired = new LongAdder();
+  private final LongAdder repositoryLockAcquisitionNanos = new LongAdder();
 
   /**
    * Create a transaction context.
@@ -35,6 +46,8 @@ public final class HibernateTransactionContext {
    */
   public HibernateTransactionContext(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
+    Object configured = sessionFactory.getProperties().get(METRICS_ENABLED_PROPERTY);
+    metricsEnabled = configured != null && Boolean.parseBoolean(configured.toString());
   }
 
   /**
@@ -52,16 +65,25 @@ public final class HibernateTransactionContext {
       return work.execute(existing);
     }
 
+    if (metricsEnabled) {
+      transactionsStarted.increment();
+    }
     try (Session session = sessionFactory.openSession()) {
       Transaction transaction = session.beginTransaction();
       activeSession.set(session);
       try {
         T result = work.execute(session);
         transaction.commit();
+        if (metricsEnabled) {
+          transactionsCommitted.increment();
+        }
         return result;
       } catch (IOException | RuntimeException exception) {
         if (transaction.isActive()) {
           transaction.rollback();
+          if (metricsEnabled) {
+            transactionsRolledBack.increment();
+          }
         }
         throw exception;
       } finally {
@@ -87,16 +109,56 @@ public final class HibernateTransactionContext {
     Objects.requireNonNull(work, "work");
     return execute(
         session -> {
-          GitRepositoryLockEntity repositoryLock =
-              session.find(
-                  GitRepositoryLockEntity.class,
-                  repositoryName,
-                  LockModeType.PESSIMISTIC_WRITE);
-          if (repositoryLock == null) {
-            throw new IOException("Missing repository lock row for " + repositoryName);
-          }
+          acquireRepositoryLock(session, repositoryName);
           return work.execute(session);
         });
+  }
+
+  /**
+   * Acquire the pessimistic row lock for a repository inside the caller's active transaction.
+   *
+   * <p>The measured duration includes both database round-trip latency and any contention wait. It
+   * is therefore an end-to-end acquisition metric rather than a database-specific lock-wait value.
+   *
+   * @param session active Hibernate session and transaction
+   * @param repositoryName logical repository name
+   * @throws IOException if the lock row does not exist
+   */
+  public void acquireRepositoryLock(Session session, String repositoryName) throws IOException {
+    Objects.requireNonNull(session, "session");
+    Objects.requireNonNull(repositoryName, "repositoryName");
+    long started = metricsEnabled ? System.nanoTime() : 0L;
+    GitRepositoryLockEntity repositoryLock =
+        session.find(
+            GitRepositoryLockEntity.class,
+            repositoryName,
+            LockModeType.PESSIMISTIC_WRITE);
+    if (metricsEnabled) {
+      repositoryLockAcquisitionNanos.add(System.nanoTime() - started);
+    }
+    if (repositoryLock == null) {
+      throw new IOException("Missing repository lock row for " + repositoryName);
+    }
+    if (metricsEnabled) {
+      repositoryLocksAcquired.increment();
+    }
+  }
+
+  /**
+   * Return a monotone metrics snapshot for this repository transaction context.
+   *
+   * @return current counters, or {@link StorageOperationMetrics#ZERO} when metrics are disabled
+   */
+  public StorageOperationMetrics metricsSnapshot() {
+    if (!metricsEnabled) {
+      return StorageOperationMetrics.ZERO;
+    }
+    return new StorageOperationMetrics(
+        transactionsStarted.sum(),
+        transactionsCommitted.sum(),
+        transactionsRolledBack.sum(),
+        repositoryLocksAcquired.sum(),
+        repositoryLockAcquisitionNanos.sum());
   }
 
   /** Unit of repository persistence work that may report an I/O failure to JGit. */
