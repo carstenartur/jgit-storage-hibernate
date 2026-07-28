@@ -16,6 +16,11 @@
     Versioned architecture DSL SPI, evidence, constraints and code-to-architecture drift detection.
   </description>
 
+  <properties>
+    <jacoco.minimum.line>0.75</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.60</jacoco.minimum.branch>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
@@ -46,5 +51,4 @@
       <plugin><artifactId>maven-javadoc-plugin</artifactId></plugin>
     </plugins>
   </build>
-
 </project>
