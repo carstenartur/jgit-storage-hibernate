@@ -15,10 +15,31 @@
   <name>jgit-storage-hibernate Benchmarks</name>
   <description>JMH comparisons of filesystem, HSQLDB and PostgreSQL JGit repository storage.</description>
 
+  <properties>
+    <jacoco.skip>true</jacoco.skip>
+    <japicmp.skip>true</japicmp.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
       <artifactId>jgit-storage-hibernate-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-search</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-architecture</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
