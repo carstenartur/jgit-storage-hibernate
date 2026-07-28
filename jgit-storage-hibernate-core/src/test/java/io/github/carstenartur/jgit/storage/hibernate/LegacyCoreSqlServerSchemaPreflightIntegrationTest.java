@@ -97,9 +97,13 @@ class LegacyCoreSqlServerSchemaPreflightIntegrationTest {
 
   private static void updatePackExtension(Connection connection, String extension) throws Exception {
     try (PreparedStatement statement =
-        connection.prepareStatement("update git_packs set pack_extension = ?")) {
+        connection.prepareStatement(
+            "update git_packs set pack_extension = ? "
+                + "where repository_name = ? and pack_name = ?")) {
       statement.setString(1, extension);
-      statement.executeUpdate();
+      statement.setString(2, "demo");
+      statement.setString(3, "pack-a");
+      assertEquals(1, statement.executeUpdate());
     }
   }
 
