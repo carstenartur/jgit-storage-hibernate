@@ -211,7 +211,12 @@ public final class HibernateTransactionContext {
           transactionsCommitted.increment();
         }
       } catch (RuntimeException failure) {
-        rollbackActiveTransaction();
+        completed = true;
+        try {
+          rollbackActiveTransaction();
+        } catch (RuntimeException rollbackFailure) {
+          failure.addSuppressed(rollbackFailure);
+        }
         throw failure;
       } finally {
         cleanup();
