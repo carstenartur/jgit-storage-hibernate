@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert JMH JSON into github-action-benchmark's custom smaller-is-better format."""
+"""Convert JMH JSON into the dashboard's custom smaller-is-better format."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ BACKEND_LABELS = {
     "filesystem": "JGit + filesystem",
     "hsqldb": "JGit + HSQLDB (in-memory)",
     "postgresql": "JGit + PostgreSQL",
+    "postgresql-hikari": "JGit + PostgreSQL + HikariCP",
 }
 
 
