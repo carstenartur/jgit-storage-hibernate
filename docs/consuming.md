@@ -47,7 +47,7 @@ Configure the static public release repository:
     <id>jgit-storage-hibernate-public</id>
     <url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</url>
     <releases><enabled>true</enabled></releases>
-    <snapshots><enabled>false</snapshots>
+    <snapshots><enabled>false</enabled></snapshots>
   </repository>
 </repositories>
 ```
