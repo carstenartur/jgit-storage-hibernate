@@ -17,6 +17,11 @@
     Core Hibernate-backed JGit repository storage for packs, reftables and reflogs.
   </description>
 
+  <properties>
+    <jacoco.minimum.line>0.70</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.55</jacoco.minimum.branch>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
