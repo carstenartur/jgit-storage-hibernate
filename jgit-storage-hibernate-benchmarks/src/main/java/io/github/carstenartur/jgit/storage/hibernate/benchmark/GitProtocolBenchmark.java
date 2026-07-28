@@ -13,10 +13,13 @@ import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateReposit
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -54,18 +57,20 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.BenchmarkParams;
 
 /**
  * Measures real JGit upload-pack and receive-pack workflows against each storage backend.
  *
- * <p>The clients are fresh in-memory repositories so the measurements emphasize server-side pack
- * generation, ingestion, ref publication and backend persistence. Repository construction, history
- * preparation and result verification happen outside the measured invocation.
+ * <p>Every measured invocation receives a fresh server and client prepared outside the timing
+ * window. This avoids repository growth across samples and makes initial and incremental scenarios
+ * independent. Clients are in-memory repositories so the result emphasizes server-side pack
+ * generation, ingestion, ref publication and backend persistence.
  */
-@BenchmarkMode(Mode.AverageTime)
+@BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS)
-@Measurement(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
+@Warmup(iterations = 1)
+@Measurement(iterations = 5)
 @Fork(1)
 @State(Scope.Thread)
 public class GitProtocolBenchmark {
@@ -74,14 +79,16 @@ public class GitProtocolBenchmark {
   private static final int BASE_HISTORY_COMMITS = 20;
   private static final int INCREMENTAL_COMMITS = 4;
   private static final int PAYLOAD_BYTES = 32 * 1024;
+  private static final int INITIAL_PUSH_SEED = 0x13572468;
+  private static final int INCREMENTAL_PUSH_SEED = 0x24681357;
+  private static final int INITIAL_CLONE_SEED = 0x31415926;
+  private static final int INCREMENTAL_FETCH_SEED = 0x27182818;
   private static final String SOURCE_REF = "refs/heads/source";
   private static final String LOCAL_MAIN_REF = "refs/heads/main";
-  private static final String CLONE_REMOTE_REF = "refs/heads/protocol-clone";
-  private static final String FETCH_BASE_REMOTE_REF = "refs/heads/protocol-fetch-base";
-  private static final String FETCH_TIP_REMOTE_REF = "refs/heads/protocol-fetch-tip";
+  private static final String REMOTE_MAIN_REF = "refs/heads/main";
+  private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
 
   private final AtomicInteger invocationCounter = new AtomicInteger();
-  private final Object connectionContext = new Object();
 
   @Param({
     HibernateRepositoryBenchmark.FILESYSTEM,
@@ -96,235 +103,240 @@ public class GitProtocolBenchmark {
   private Path serverDirectory;
   private TestProtocol<Object> protocol;
   private URIish serverUri;
-
-  private ObjectId cloneTip;
-  private ObjectId fetchBaseTip;
-  private ObjectId fetchTip;
-
-  private InMemoryRepository initialPushClient;
-  private ObjectId initialPushTip;
-  private String initialPushRemoteRef;
-
-  private InMemoryRepository incrementalPushClient;
-  private ObjectId incrementalPushBase;
-  private ObjectId incrementalPushTip;
-  private String incrementalPushRemoteRef;
-
-  private InMemoryRepository initialCloneClient;
-  private InMemoryRepository incrementalFetchClient;
+  private InMemoryRepository client;
+  private ObjectId expectedOld;
+  private ObjectId expectedTip;
 
   @Setup(Level.Trial)
-  public void setupTrial() throws Exception {
-    String serverName = "jmh-protocol-" + backend + "-" + Long.toHexString(System.nanoTime());
+  public void setupTrial() {
+    if (!HibernateRepositoryBenchmark.FILESYSTEM.equals(backend)) {
+      String databaseName = "jmh-protocol-" + backend + "-" + Long.toHexString(System.nanoTime());
+      Properties properties =
+          switch (backend) {
+            case HibernateRepositoryBenchmark.HSQLDB -> hsqlDbProperties(databaseName);
+            case HibernateRepositoryBenchmark.POSTGRESQL -> postgreSqlProperties(false);
+            case HibernateRepositoryBenchmark.POSTGRESQL_HIKARI -> postgreSqlProperties(true);
+            default -> throw new IllegalArgumentException("Unsupported benchmark backend: " + backend);
+          };
+      provider = new HibernateSessionFactoryProvider(properties);
+    }
+  }
+
+  @Setup(Level.Invocation)
+  public void setupInvocation(BenchmarkParams benchmarkParams) throws Exception {
+    int invocation = invocationCounter.incrementAndGet();
+    String operation = benchmarkParams.getBenchmark();
+    operation = operation.substring(operation.lastIndexOf('.') + 1);
+    String serverName =
+        "jmh-protocol-" + backend + "-" + operation + "-" + invocation + "-"
+            + Long.toHexString(System.nanoTime());
+
     server = createServerRepository(serverName);
     server.create(true);
+    client = newMemoryRepository(operation + "-" + invocation);
+    expectedOld = ObjectId.zeroId();
 
-    cloneTip =
-        writeHistory(
-            server,
-            null,
-            INITIAL_HISTORY_COMMITS,
-            PAYLOAD_BYTES,
-            0x434c4f4e,
-            CLONE_REMOTE_REF);
-    fetchBaseTip =
-        writeHistory(
-            server,
-            null,
-            BASE_HISTORY_COMMITS,
-            PAYLOAD_BYTES,
-            0x46455443,
-            FETCH_BASE_REMOTE_REF);
-    fetchTip =
-        writeHistory(
-            server,
-            fetchBaseTip,
-            INCREMENTAL_COMMITS,
-            PAYLOAD_BYTES,
-            0x44454c54,
-            FETCH_TIP_REMOTE_REF);
+    switch (operation) {
+      case "initialPushViaReceivePack" ->
+          expectedTip =
+              writeHistory(
+                  client,
+                  null,
+                  0,
+                  INITIAL_HISTORY_COMMITS,
+                  INITIAL_PUSH_SEED,
+                  SOURCE_REF);
+      case "incrementalPushViaReceivePack" -> prepareIncrementalPush();
+      case "initialCloneViaUploadPack" ->
+          expectedTip =
+              writeHistory(
+                  server,
+                  null,
+                  0,
+                  INITIAL_HISTORY_COMMITS,
+                  INITIAL_CLONE_SEED,
+                  REMOTE_MAIN_REF);
+      case "incrementalFetchViaUploadPack" -> prepareIncrementalFetch();
+      default -> throw new IllegalArgumentException("Unsupported protocol benchmark: " + operation);
+    }
 
     protocol =
         new TestProtocol<>(
             (Object request, Repository repository) -> new UploadPack(repository),
             (Object request, Repository repository) -> new ReceivePack(repository));
     Transport.register(protocol);
-    serverUri = protocol.register(connectionContext, server);
-  }
-
-  @Setup(Level.Invocation)
-  public void setupInvocation() throws Exception {
-    int invocation = invocationCounter.incrementAndGet();
-
-    initialPushClient = newMemoryRepository("initial-push-" + invocation);
-    initialPushTip =
-        writeHistory(
-            initialPushClient,
-            null,
-            INITIAL_HISTORY_COMMITS,
-            PAYLOAD_BYTES,
-            0x10000000 + invocation,
-            SOURCE_REF);
-    initialPushRemoteRef = "refs/heads/initial-push-" + invocation;
-
-    incrementalPushClient = newMemoryRepository("incremental-push-" + invocation);
-    incrementalPushBase =
-        writeHistory(
-            incrementalPushClient,
-            null,
-            BASE_HISTORY_COMMITS,
-            PAYLOAD_BYTES,
-            0x20000000 + invocation,
-            SOURCE_REF);
-    incrementalPushRemoteRef = "refs/heads/incremental-push-" + invocation;
-    push(
-        incrementalPushClient,
-        SOURCE_REF,
-        incrementalPushRemoteRef,
-        ObjectId.zeroId(),
-        incrementalPushBase);
-    incrementalPushTip =
-        writeHistory(
-            incrementalPushClient,
-            incrementalPushBase,
-            INCREMENTAL_COMMITS,
-            PAYLOAD_BYTES,
-            0x30000000 + invocation,
-            SOURCE_REF);
-
-    initialCloneClient = newMemoryRepository("initial-clone-" + invocation);
-
-    incrementalFetchClient = newMemoryRepository("incremental-fetch-" + invocation);
-    fetch(incrementalFetchClient, FETCH_BASE_REMOTE_REF, LOCAL_MAIN_REF, fetchBaseTip);
+    serverUri = protocol.register(new Object(), server);
   }
 
   @TearDown(Level.Invocation)
-  public void tearDownInvocation() {
-    close(initialPushClient);
-    close(incrementalPushClient);
-    close(initialCloneClient);
-    close(incrementalFetchClient);
-    initialPushClient = null;
-    incrementalPushClient = null;
-    initialCloneClient = null;
-    incrementalFetchClient = null;
+  public void tearDownInvocation() throws IOException {
+    if (protocol != null) {
+      Transport.unregister(protocol);
+      protocol = null;
+    }
+    close(client);
+    close(server);
+    client = null;
+    server = null;
+    serverUri = null;
+    expectedOld = null;
+    expectedTip = null;
+    deleteRecursively(serverDirectory);
+    serverDirectory = null;
   }
 
   @TearDown(Level.Trial)
-  public void tearDownTrial() throws IOException {
-    if (protocol != null) {
-      Transport.unregister(protocol);
-    }
-    if (server != null) {
-      server.close();
-    }
+  public void tearDownTrial() {
     if (provider != null) {
       provider.close();
+      provider = null;
     }
-    deleteRecursively(serverDirectory);
   }
 
   /** Receives an unrelated complete history and creates a new remote branch. */
   @Benchmark
   public ObjectId initialPushViaReceivePack() throws Exception {
-    push(
-        initialPushClient,
-        SOURCE_REF,
-        initialPushRemoteRef,
-        ObjectId.zeroId(),
-        initialPushTip);
-    return initialPushTip;
+    push(expectedOld, expectedTip);
+    return expectedTip;
   }
 
   /** Receives four descendants after the server already has the twenty-commit base history. */
   @Benchmark
   public ObjectId incrementalPushViaReceivePack() throws Exception {
-    push(
-        incrementalPushClient,
-        SOURCE_REF,
-        incrementalPushRemoteRef,
-        incrementalPushBase,
-        incrementalPushTip);
-    return incrementalPushTip;
+    push(expectedOld, expectedTip);
+    return expectedTip;
   }
 
   /** Fetches a complete history into an otherwise empty bare repository. */
   @Benchmark
   public ObjectId initialCloneViaUploadPack() throws Exception {
-    fetch(initialCloneClient, CLONE_REMOTE_REF, LOCAL_MAIN_REF, cloneTip);
-    return cloneTip;
+    fetch(expectedTip);
+    return expectedTip;
   }
 
   /** Fetches only four descendants into a client that already has the twenty-commit base. */
   @Benchmark
   public ObjectId incrementalFetchViaUploadPack() throws Exception {
-    fetch(incrementalFetchClient, FETCH_TIP_REMOTE_REF, LOCAL_MAIN_REF, fetchTip);
-    return fetchTip;
+    fetch(expectedTip);
+    return expectedTip;
   }
 
-  private void push(
-      Repository client,
-      String localRef,
-      String remoteRef,
-      ObjectId expectedOld,
-      ObjectId expectedTip)
-      throws Exception {
+  private void prepareIncrementalPush() throws Exception {
+    ObjectId serverBase =
+        writeHistory(
+            server,
+            null,
+            0,
+            BASE_HISTORY_COMMITS,
+            INCREMENTAL_PUSH_SEED,
+            REMOTE_MAIN_REF);
+    ObjectId clientBase =
+        writeHistory(
+            client,
+            null,
+            0,
+            BASE_HISTORY_COMMITS,
+            INCREMENTAL_PUSH_SEED,
+            SOURCE_REF);
+    requireSameBase(serverBase, clientBase);
+    expectedOld = serverBase;
+    expectedTip =
+        writeHistory(
+            client,
+            clientBase,
+            BASE_HISTORY_COMMITS,
+            INCREMENTAL_COMMITS,
+            INCREMENTAL_PUSH_SEED,
+            SOURCE_REF);
+  }
+
+  private void prepareIncrementalFetch() throws Exception {
+    ObjectId serverBase =
+        writeHistory(
+            server,
+            null,
+            0,
+            BASE_HISTORY_COMMITS,
+            INCREMENTAL_FETCH_SEED,
+            "refs/heads/base");
+    expectedTip =
+        writeHistory(
+            server,
+            serverBase,
+            BASE_HISTORY_COMMITS,
+            INCREMENTAL_COMMITS,
+            INCREMENTAL_FETCH_SEED,
+            REMOTE_MAIN_REF);
+    ObjectId clientBase =
+        writeHistory(
+            client,
+            null,
+            0,
+            BASE_HISTORY_COMMITS,
+            INCREMENTAL_FETCH_SEED,
+            LOCAL_MAIN_REF);
+    requireSameBase(serverBase, clientBase);
+  }
+
+  private void push(ObjectId oldId, ObjectId tip) throws Exception {
     RemoteRefUpdate update =
-        new RemoteRefUpdate(client, localRef, remoteRef, false, null, expectedOld);
+        new RemoteRefUpdate(client, SOURCE_REF, REMOTE_MAIN_REF, false, null, oldId);
     try (Transport transport = Transport.open(client, serverUri)) {
       transport.push(NullProgressMonitor.INSTANCE, List.of(update));
     }
     if (update.getStatus() != RemoteRefUpdate.Status.OK
         && update.getStatus() != RemoteRefUpdate.Status.UP_TO_DATE) {
       throw new IllegalStateException(
-          "Push of " + remoteRef + " failed with " + update.getStatus() + ": " + update.getMessage());
+          "Push failed with " + update.getStatus() + ": " + update.getMessage());
     }
-    Ref remote = server.exactRef(remoteRef);
-    if (remote == null || !expectedTip.equals(remote.getObjectId())) {
-      throw new IllegalStateException("Remote ref " + remoteRef + " did not reach " + expectedTip);
+    Ref remote = server.exactRef(REMOTE_MAIN_REF);
+    if (remote == null || !tip.equals(remote.getObjectId())) {
+      throw new IllegalStateException("Remote main did not reach " + tip);
     }
   }
 
-  private void fetch(
-      Repository client, String remoteRef, String localRef, ObjectId expectedTip) throws Exception {
+  private void fetch(ObjectId tip) throws Exception {
     try (Transport transport = Transport.open(client, serverUri)) {
       transport.fetch(
-          NullProgressMonitor.INSTANCE, List.of(new RefSpec(remoteRef + ":" + localRef)));
+          NullProgressMonitor.INSTANCE,
+          List.of(new RefSpec(REMOTE_MAIN_REF + ":" + LOCAL_MAIN_REF)));
     }
-    Ref local = client.exactRef(localRef);
-    if (local == null || !expectedTip.equals(local.getObjectId())) {
-      throw new IllegalStateException("Local ref " + localRef + " did not reach " + expectedTip);
+    Ref local = client.exactRef(LOCAL_MAIN_REF);
+    if (local == null || !tip.equals(local.getObjectId())) {
+      throw new IllegalStateException("Local main did not reach " + tip);
     }
   }
 
   private static ObjectId writeHistory(
       Repository repository,
       ObjectId parent,
+      int startIndex,
       int commitCount,
-      int payloadBytes,
       int seed,
       String refName)
       throws Exception {
-    Random random = new Random(seed);
     ObjectId tip = parent;
     try (ObjectInserter inserter = repository.newObjectInserter()) {
-      for (int index = 0; index < commitCount; index++) {
-        byte[] payload = new byte[payloadBytes];
-        random.nextBytes(payload);
-        payload[0] ^= (byte) index;
+      for (int index = startIndex; index < startIndex + commitCount; index++) {
+        byte[] payload = new byte[PAYLOAD_BYTES];
+        new Random((((long) seed) << 32) ^ index).nextBytes(payload);
         ObjectId blob = inserter.insert(Constants.OBJ_BLOB, payload);
 
         TreeFormatter tree = new TreeFormatter();
         tree.append("payload.bin", FileMode.REGULAR_FILE, blob);
         ObjectId treeId = inserter.insert(tree);
 
+        Date timestamp =
+            Date.from(Instant.ofEpochSecond(1_700_000_000L + (seed & 0xffffL) * 100L + index));
+        PersonIdent identity =
+            new PersonIdent("Protocol benchmark", "benchmark@example.invalid", timestamp, UTC);
         CommitBuilder commit = new CommitBuilder();
         commit.setTreeId(treeId);
         if (tip != null) {
           commit.setParentId(tip);
         }
-        commit.setAuthor(new PersonIdent("Protocol benchmark", "benchmark@example.invalid"));
-        commit.setCommitter(new PersonIdent("Protocol benchmark", "benchmark@example.invalid"));
+        commit.setAuthor(identity);
+        commit.setCommitter(identity);
         commit.setMessage("Protocol history " + seed + " commit " + index);
         tip = inserter.insert(commit);
       }
@@ -332,6 +344,13 @@ public class GitProtocolBenchmark {
     }
     updateRef(repository, refName, tip);
     return tip;
+  }
+
+  private static void requireSameBase(ObjectId serverBase, ObjectId clientBase) {
+    if (!serverBase.equals(clientBase)) {
+      throw new IllegalStateException(
+          "Deterministic protocol base differs: server=" + serverBase + ", client=" + clientBase);
+    }
   }
 
   private static void updateRef(Repository repository, String refName, ObjectId objectId)
@@ -347,25 +366,10 @@ public class GitProtocolBenchmark {
   }
 
   private Repository createServerRepository(String name) throws IOException {
-    return switch (backend) {
-      case HibernateRepositoryBenchmark.FILESYSTEM -> createFilesystemRepository();
-      case HibernateRepositoryBenchmark.HSQLDB -> createHibernateRepository(hsqlDbProperties(name), name);
-      case HibernateRepositoryBenchmark.POSTGRESQL ->
-          createHibernateRepository(postgreSqlProperties(false), name);
-      case HibernateRepositoryBenchmark.POSTGRESQL_HIKARI ->
-          createHibernateRepository(postgreSqlProperties(true), name);
-      default -> throw new IllegalArgumentException("Unsupported benchmark backend: " + backend);
-    };
-  }
-
-  private Repository createFilesystemRepository() throws IOException {
-    serverDirectory = Files.createTempDirectory("jgit-protocol-filesystem-benchmark-");
-    return new FileRepositoryBuilder().setGitDir(serverDirectory.toFile()).setBare().build();
-  }
-
-  private Repository createHibernateRepository(Properties properties, String name)
-      throws IOException {
-    provider = new HibernateSessionFactoryProvider(properties);
+    if (HibernateRepositoryBenchmark.FILESYSTEM.equals(backend)) {
+      serverDirectory = Files.createTempDirectory("jgit-protocol-filesystem-benchmark-");
+      return new FileRepositoryBuilder().setGitDir(serverDirectory.toFile()).setBare().build();
+    }
     return HibernateRepository.create(provider.getSessionFactory(), name);
   }
 
