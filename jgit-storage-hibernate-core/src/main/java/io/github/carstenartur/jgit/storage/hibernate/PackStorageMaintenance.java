@@ -20,8 +20,9 @@ import org.hibernate.SessionFactory;
  * Operator-facing maintenance for abandoned, uncommitted pack payloads.
  *
  * <p>Cleanup is repository-scoped and uses the same pessimistic database row lock as pack and ref
- * publication. A row is eligible only when it was created before the operator-selected cutoff and
- * has no current writer lease. Published packs are never candidates.
+ * publication. A pack name is eligible only when every persisted extension is old, uncommitted and
+ * has no current writer lease. Published packs and partially active multi-extension packs are never
+ * candidates.
  */
 public final class PackStorageMaintenance {
 
@@ -32,10 +33,11 @@ public final class PackStorageMaintenance {
   }
 
   /**
-   * Delete expired, uncommitted pack rows for one logical repository.
+   * Delete expired, uncommitted pack groups for one logical repository.
    *
    * @param repositoryName logical repository
-   * @param createdBefore delete only rows created strictly before this instant
+   * @param createdBefore delete only pack groups whose persisted extensions were created strictly
+   *     before this instant
    * @param now instant used to decide whether a writer lease has expired
    * @return deleted pack/chunk counts and the declared payload bytes reclaimed
    */
@@ -54,22 +56,39 @@ public final class PackStorageMaintenance {
       return context.executeWithRepositoryLock(
           repositoryName.value(),
           session -> {
+            List<String> packNames =
+                session
+                    .createQuery(
+                        "SELECT DISTINCT p.packName FROM GitPackEntity p "
+                            + "WHERE p.repositoryName = :repo AND p.committed = false "
+                            + "AND p.createdAt < :createdBefore "
+                            + "AND (p.writeLeaseUntil IS NULL OR p.writeLeaseUntil < :now) "
+                            + "AND NOT EXISTS (SELECT active.id FROM GitPackEntity active "
+                            + "WHERE active.repositoryName = p.repositoryName "
+                            + "AND active.packName = p.packName "
+                            + "AND (active.committed = true "
+                            + "OR active.createdAt >= :createdBefore "
+                            + "OR (active.writeLeaseUntil IS NOT NULL "
+                            + "AND active.writeLeaseUntil >= :now)))",
+                        String.class)
+                    .setParameter("repo", repositoryName.value())
+                    .setParameter("createdBefore", createdBefore)
+                    .setParameter("now", now)
+                    .getResultList();
+            if (packNames.isEmpty()) {
+              return new PackCleanupResult(0, 0, 0);
+            }
+
             List<Object[]> rows =
                 session
                     .createQuery(
                         "SELECT p.id, p.fileSize FROM GitPackEntity p "
                             + "WHERE p.repositoryName = :repo AND p.committed = false "
-                            + "AND p.createdAt < :createdBefore "
-                            + "AND (p.writeLeaseUntil IS NULL OR p.writeLeaseUntil < :now)",
+                            + "AND p.packName IN :packNames",
                         Object[].class)
                     .setParameter("repo", repositoryName.value())
-                    .setParameter("createdBefore", createdBefore)
-                    .setParameter("now", now)
+                    .setParameter("packNames", packNames)
                     .getResultList();
-            if (rows.isEmpty()) {
-              return new PackCleanupResult(0, 0, 0);
-            }
-
             List<Long> packIds = rows.stream().map(row -> (Long) row[0]).toList();
             long payloadBytes =
                 rows.stream().mapToLong(row -> ((Number) row[1]).longValue()).sum();
