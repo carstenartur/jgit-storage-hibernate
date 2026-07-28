@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.Random;
@@ -53,6 +54,32 @@ class AdaptiveHibernatePackStorageH2Test {
   }
 
   @Test
+  void ownershipOnlyClosePreservesAlreadyFlushedInlinePayload() throws Exception {
+    String repositoryName = "inline-close-" + UUID.randomUUID();
+    try (HibernateSessionFactoryProvider provider = provider(repositoryName);
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      byte[] payload = "inline payload survives close".getBytes(StandardCharsets.UTF_8);
+      HibernateObjDatabase.HibernatePackOutputStream stream =
+          new HibernateObjDatabase.HibernatePackOutputStream(
+              new HibernateTransactionContext(provider.getSessionFactory()),
+              repositoryName,
+              "manual-pack",
+              "pack");
+
+      stream.write(payload, 0, payload.length);
+      stream.flush();
+      assertArrayEquals(payload, inlinePayload(provider, repositoryName, "manual-pack"));
+      assertEquals(0L, countChunkRows(provider, repositoryName));
+
+      stream.close();
+      assertArrayEquals(payload, inlinePayload(provider, repositoryName, "manual-pack"));
+      assertEquals(0L, countChunkRows(provider, repositoryName));
+    }
+  }
+
+  @Test
   void keepsLargePayloadsChunkedAndReadable() throws Exception {
     String repositoryName = "chunked-" + UUID.randomUUID();
     try (HibernateSessionFactoryProvider provider = provider(repositoryName);
@@ -81,6 +108,20 @@ class AdaptiveHibernatePackStorageH2Test {
       ObjectId objectId = inserter.insert(Constants.OBJ_BLOB, payload);
       inserter.flush();
       return objectId;
+    }
+  }
+
+  private static byte[] inlinePayload(
+      HibernateSessionFactoryProvider provider, String repositoryName, String packName) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      return session
+          .createQuery(
+              "SELECT p.data FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                  + "AND p.packName = :name AND p.packExtension = 'pack'",
+              byte[].class)
+          .setParameter("repo", repositoryName)
+          .setParameter("name", packName)
+          .getSingleResult();
     }
   }
 
