@@ -11,7 +11,9 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Comparator;
@@ -128,7 +130,13 @@ public class GitProtocolBenchmark {
     String operation = benchmarkParams.getBenchmark();
     operation = operation.substring(operation.lastIndexOf('.') + 1);
     String serverName =
-        "jmh-protocol-" + backend + "-" + operation + "-" + invocation + "-"
+        "jmh-protocol-"
+            + backend
+            + "-"
+            + operation
+            + "-"
+            + invocation
+            + "-"
             + Long.toHexString(System.nanoTime());
 
     server = createServerRepository(serverName);
@@ -440,10 +448,20 @@ public class GitProtocolBenchmark {
     if (root == null || !Files.exists(root)) {
       return;
     }
-    try (Stream<Path> paths = Files.walk(root)) {
-      for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
-        Files.deleteIfExists(path);
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try (Stream<Path> paths = Files.walk(root)) {
+        for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+          Files.deleteIfExists(path);
+        }
+        return;
+      } catch (UncheckedIOException exception) {
+        if (!(exception.getCause() instanceof NoSuchFileException)) {
+          throw exception;
+        }
       }
+    }
+    if (Files.exists(root)) {
+      throw new IOException("Could not remove transient benchmark repository " + root);
     }
   }
 }
