@@ -16,6 +16,11 @@
     Versioned architecture DSL SPI, evidence, constraints and code-to-architecture drift detection.
   </description>
 
+  <properties>
+    <jacoco.minimum.line>0.92</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.65</jacoco.minimum.branch>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
@@ -44,7 +49,15 @@
       <plugin><artifactId>maven-surefire-plugin</artifactId></plugin>
       <plugin><artifactId>maven-source-plugin</artifactId></plugin>
       <plugin><artifactId>maven-javadoc-plugin</artifactId></plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/architecture/entity/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
-
 </project>

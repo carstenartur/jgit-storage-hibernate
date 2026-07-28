@@ -17,6 +17,11 @@
     Optional Hibernate Search projections and query services for database-backed JGit history.
   </description>
 
+  <properties>
+    <jacoco.minimum.line>0.85</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.75</jacoco.minimum.branch>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
@@ -86,21 +91,11 @@
 
   <build>
     <plugins>
-      <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-surefire-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-source-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <artifactId>maven-javadoc-plugin</artifactId>
-      </plugin>
+      <plugin><artifactId>maven-compiler-plugin</artifactId></plugin>
+      <plugin><artifactId>maven-surefire-plugin</artifactId></plugin>
+      <plugin><artifactId>maven-jar-plugin</artifactId></plugin>
+      <plugin><artifactId>maven-source-plugin</artifactId></plugin>
+      <plugin><artifactId>maven-javadoc-plugin</artifactId></plugin>
     </plugins>
   </build>
 </project>
