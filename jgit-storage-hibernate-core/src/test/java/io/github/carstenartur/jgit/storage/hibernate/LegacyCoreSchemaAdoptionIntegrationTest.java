@@ -364,9 +364,12 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
       statement.execute("drop table git_pack_chunks");
       statement.execute("drop table git_repository_lock");
       statement.execute("drop table \"" + CoreSchemaMigrations.SCHEMA_HISTORY_TABLE + "\"");
+      statement.execute("drop index idx_pack_repo_lease");
       statement.execute("drop index idx_pack_repo_committed");
       statement.execute("alter table git_packs drop constraint uk_pack_repo_name_ext");
       statement.execute("alter table git_packs alter column data set not null");
+      statement.execute("alter table git_packs drop column write_lease_until");
+      statement.execute("alter table git_packs drop column write_token");
       statement.execute("alter table git_packs drop column committed_at");
       statement.execute("alter table git_packs drop column committed");
       statement.execute(
@@ -463,6 +466,8 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
           tableExists(connection, CoreSchemaMigrations.LEGACY_ADOPTION_SCHEMA_HISTORY_TABLE));
       assertFalse(tableExists(connection, "git_pack_chunks"));
       assertFalse(tableExists(connection, "git_repository_lock"));
+      assertFalse(columnExists(connection, "git_packs", "write_token"));
+      assertFalse(columnExists(connection, "git_packs", "write_lease_until"));
     }
   }
 
@@ -501,6 +506,20 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
       }
     }
     throw new AssertionError("Column not found: " + table + "." + column);
+  }
+
+  private static boolean columnExists(Connection connection, String table, String column)
+      throws Exception {
+    DatabaseMetaData metadata = connection.getMetaData();
+    try (ResultSet resultSet = metadata.getColumns(null, connection.getSchema(), "%", "%")) {
+      while (resultSet.next()) {
+        if (table.equalsIgnoreCase(resultSet.getString("TABLE_NAME"))
+            && column.equalsIgnoreCase(resultSet.getString("COLUMN_NAME"))) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private static boolean tableExists(Connection connection, String table) throws Exception {
