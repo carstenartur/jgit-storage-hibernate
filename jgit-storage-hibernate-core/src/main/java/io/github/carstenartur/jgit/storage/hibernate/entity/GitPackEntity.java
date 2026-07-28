@@ -54,9 +54,16 @@ public class GitPackEntity {
   @Column(name = "pack_extension", nullable = false, length = 32)
   private String packExtension;
 
+  /**
+   * Legacy inline payload.
+   *
+   * <p>Rows written by the chunked storage path leave this column {@code null} and store their
+   * payload in {@code git_pack_chunks}. Keeping the column allows existing installations to be
+   * upgraded without rewriting every already published pack.
+   */
   @JdbcTypeCode(SqlTypes.LONG32VARBINARY)
   @Basic(fetch = FetchType.LAZY)
-  @Column(name = "data", nullable = false)
+  @Column(name = "data")
   private byte[] data;
 
   @Column(name = "file_size", nullable = false)
