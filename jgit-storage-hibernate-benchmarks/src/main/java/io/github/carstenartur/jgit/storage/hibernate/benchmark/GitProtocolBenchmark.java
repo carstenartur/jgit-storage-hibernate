@@ -58,6 +58,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.BenchmarkParams;
 
@@ -68,12 +69,16 @@ import org.openjdk.jmh.infra.BenchmarkParams;
  * window. This avoids repository growth across samples and makes initial and incremental scenarios
  * independent. Clients are in-memory repositories so the result emphasizes server-side pack
  * generation, ingestion, ref publication and backend persistence.
+ *
+ * <p>The JGit transport registry is JVM-global. This benchmark therefore explicitly runs with one
+ * JMH thread; backend variants and forks remain isolated in their normal JMH processes.
  */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 1)
 @Measurement(iterations = 5)
 @Fork(1)
+@Threads(1)
 @State(Scope.Thread)
 public class GitProtocolBenchmark {
 
@@ -366,9 +371,7 @@ public class GitProtocolBenchmark {
     RefUpdate update = repository.updateRef(refName);
     update.setNewObjectId(objectId);
     RefUpdate.Result result = update.update();
-    if (result != RefUpdate.Result.NEW
-        && result != RefUpdate.Result.FAST_FORWARD
-        && result != RefUpdate.Result.FORCED) {
+    if (result != RefUpdate.Result.NEW && result != RefUpdate.Result.FAST_FORWARD) {
       throw new IOException("Unexpected ref update result " + result + " for " + refName);
     }
   }
