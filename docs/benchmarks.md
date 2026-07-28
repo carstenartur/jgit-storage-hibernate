@@ -27,7 +27,7 @@ The measured methods use the common public JGit `Repository` API. Backend-specif
 
 ## Measured workloads
 
-The comparison covers eight operations in three categories.
+The comparison covers nine operations in three categories.
 
 ### Fixed-cost probes
 
@@ -44,12 +44,15 @@ These intentionally expose the fixed cost of transactions, pack publication, ref
 ```text
 readBlobFromWarmCache
 readBlobAfterJGitCacheReset
+readLargeBlobSequentiallyAfterJGitCacheReset
 resolveMainOnOpenRepository
 ```
 
 `readBlobFromWarmCache` measures repeated application-level retrieval through JGit's normal caches. It is deliberately not described as a physical filesystem or database read.
 
 `readBlobAfterJGitCacheReset` clears JGit's DFS block cache immediately before lookup. Operating-system and database caches remain warm, so the result represents a JGit-cache-cold application read rather than cold storage hardware.
+
+`readLargeBlobSequentiallyAfterJGitCacheReset` streams a deterministic non-compressible object slightly larger than two MiB. The object crosses multiple database chunks and approximates the sequential access pattern of clone, fetch and large binary-object export.
 
 `resolveMainOnOpenRepository` measures the common steady-state operation of resolving a frequently used ref without rebuilding the repository object.
 
@@ -66,13 +69,15 @@ writeCommitSeries10AndUpdateMain
 
 All results use JMH average time in `ms/op`, so lower values are better. Batch operations report time per complete batch, not per individual blob or commit.
 
-## Adaptive pack persistence under test
+## Adaptive pack persistence and read-ahead under test
 
 The Hibernate backend stores small PACK, IDX and REFTABLE payloads up to 256 KiB in the existing inline payload column. Larger payloads continue to use bounded one MiB chunks.
 
 This removes the additional chunk row, chunk insert and preliminary chunk delete from common small application commits. New large files also skip the previously unconditional delete before their first chunk insert. Repeated flushes of an already persisted large file still use the conservative full-rewrite path; incremental append-only chunk persistence remains a separately measured follow-up.
 
-The core migration, deletion and roundtrip tests accept both valid representations while still requiring every committed non-empty file to have exactly one payload representation. Historical inline rows remain readable, and large pack capacity remains bounded through the chunk table.
+For sequential large reads, JGit's requested read-ahead window is translated into one ordered Hibernate query for up to sixteen consecutive chunks. The cache is local to the readable channel, is cleared on unrelated seeks, and does not keep a Hibernate session or JDBC connection open between reads. A core H2 test requires three consecutive chunks to be served with one query and retains hard failure on missing or corrupt intermediate chunks.
+
+The core migration, deletion and roundtrip tests accept both valid payload representations while still requiring every committed non-empty file to have exactly one representation. Historical inline rows remain readable, and large pack capacity remains bounded through the chunk table.
 
 ## Maven, JUnit and Testcontainers architecture
 
@@ -84,7 +89,7 @@ Maven Failsafe runs `RepositoryBackendBenchmarkIT`. That JUnit integration test:
 2. obtains the dynamically mapped JDBC URL and credentials;
 3. launches JMH forks for filesystem, HSQLDB, PostgreSQL built-in pooling and PostgreSQL HikariCP;
 4. passes the Testcontainers connection properties to every PostgreSQL JMH fork;
-5. asserts that all eight operations were recorded for all four configurations;
+5. asserts that all nine operations were recorded for all four configurations;
 6. writes the raw JMH JSON and text output.
 
 GitHub Actions does not declare or manage a PostgreSQL service. The workflow only sets up Java and invokes Maven. The same Maven profile is therefore executable from a normal checkout on any machine with Java 21, Maven and Docker.
@@ -104,8 +109,8 @@ Pull requests execute the benchmark and upload the raw artifacts, but do not mod
 Each operation/configuration pair is stored as a separate time series, for example:
 
 ```text
+readLargeBlobSequentiallyAfterJGitCacheReset — JGit + PostgreSQL
 writeBatchOf100Blobs — JGit + filesystem
-writeBatchOf100Blobs — JGit + PostgreSQL
 writeBatchOf100Blobs — JGit + PostgreSQL + HikariCP
 ```
 
@@ -138,7 +143,7 @@ target/benchmarks/jmh-output.txt
 jgit-storage-hibernate-benchmarks/target/failsafe-reports/
 ```
 
-The JUnit integration test fails if JMH does not return exactly eight operations for each of the four configured backends.
+The JUnit integration test fails if JMH does not return exactly nine operations for each of the four configured backends.
 
 ### Convert local JMH output to chart input
 
@@ -171,7 +176,8 @@ This comparison is a controlled regression and architecture benchmark, not a com
 - PostgreSQL runs locally in a Testcontainers container rather than over a production network;
 - host and container performance vary, especially for I/O-heavy measurements;
 - HikariCP cannot remove transaction, locking, WAL or ORM costs and is primarily expected to help concurrent or connection-heavy use;
-- the single-operation probes exaggerate fixed durable-publication cost, while the batch workloads show amortized throughput.
+- the single-operation probes exaggerate fixed durable-publication cost, while the batch workloads show amortized throughput;
+- the large sequential-read benchmark measures decompression and JGit streaming in addition to database chunk access.
 
 The workflow therefore uses a conservative 150% regression alert threshold and keeps the raw JMH JSON for deeper investigation.
 
@@ -181,7 +187,7 @@ The next high-value storage measurements are full protocol and concurrency scena
 
 - initial and incremental push through JGit `ReceivePack`;
 - clone and incremental fetch through `UploadPack`;
-- sequential read throughput for multi-chunk packs with different read-ahead values;
+- compare one-, four- and sixteen-chunk read-ahead windows with query counts and transferred bytes;
 - concurrent readers and writers using independent `SessionFactory` instances;
 - p50, p95 and p99 latency plus SQL statement, transaction and lock-wait counts;
 - repository-open cost with 1, 100 and 10,000 packs or refs.
