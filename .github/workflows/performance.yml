@@ -85,10 +85,7 @@ jobs:
 
   pack-capacity:
     name: Chunked pack capacity 1/16/128 MiB
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule' ||
-      (github.event_name == 'pull_request' && github.head_ref == 'feature/chunked-pack-storage')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
