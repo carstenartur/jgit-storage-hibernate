@@ -29,6 +29,7 @@ import java.util.TreeSet;
 public final class LegacyCoreSchemaAdoption {
 
   private static final int CORE_PACK_EXTENSION_LENGTH = 32;
+  private static final int VALIDATION_FETCH_SIZE = 512;
 
   private static final Set<String> REQUIRED_LEGACY_COLUMNS =
       Set.of(
@@ -149,11 +150,20 @@ public final class LegacyCoreSchemaAdoption {
   }
 
   private static long countOverlongPackExtensionRows(Connection connection) {
-    try {
-      return count(
-          connection,
-          "select count(*) from git_packs where character_length(pack_extension) > "
-              + CORE_PACK_EXTENSION_LENGTH);
+    long overlongRows = 0;
+    try (Statement statement = connection.createStatement()) {
+      statement.setFetchSize(VALIDATION_FETCH_SIZE);
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              "select pack_extension from git_packs where pack_extension is not null")) {
+        while (resultSet.next()) {
+          String extension = resultSet.getString(1);
+          if (extension.codePointCount(0, extension.length()) > CORE_PACK_EXTENSION_LENGTH) {
+            overlongRows++;
+          }
+        }
+      }
+      return overlongRows;
     } catch (SQLException exception) {
       throw new LegacyCoreSchemaAdoptionException(
           "Could not validate existing git_packs pack_extension values", exception);
