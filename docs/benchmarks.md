@@ -23,7 +23,7 @@ The storage benchmark runs the same public JGit workload against four repository
 
 The built-in PostgreSQL configuration is retained as a stable baseline. Hibernate documents that its built-in pool is not intended for production; the HikariCP variant shows whether a production-grade pool changes steady-state repository latency.
 
-The measured methods use public JGit repository and transport APIs. Backend construction, schema creation, client preparation and result verification happen outside measured invocations.
+The measured methods use public JGit repository and transport APIs. Backend construction, schema creation and client preparation happen outside measured invocations.
 
 ## Measured workloads
 
@@ -86,7 +86,35 @@ These workloads use JGit's in-process `TestProtocol`, `ReceivePack`, `UploadPack
 
 `incrementalFetchViaUploadPack` prepares a client with the 20-commit base and then fetches only four descendants.
 
-All results use JMH average time in `ms/op`, so lower values are better. Batch and protocol operations report time per complete operation, not per individual object or commit.
+The repository and object-level probes use JMH average time in `ms/op`. Protocol workflows use single-shot time with one warm-up and five measured fresh repositories, avoiding accumulated repository growth across samples. Lower values are better. Batch and protocol operations report time per complete operation, not per individual object or commit.
+
+## Per-operation database cost counters
+
+The protocol benchmarks enable diagnostic counters only for their benchmark-managed Hibernate `SessionFactory`. Fixture construction is completed first, then Hibernate statistics and the repository metrics baseline are reset immediately before the measured transport operation.
+
+The raw JMH JSON therefore includes these secondary event counters for every Hibernate protocol sample:
+
+| Counter | Meaning |
+|---|---|
+| `hibernateQueries` | Hibernate HQL/criteria query executions |
+| `preparedStatements` | JDBC statements prepared by Hibernate |
+| `hibernateTransactions` | Hibernate transaction completions observed by statistics |
+| `connections` | JDBC connection acquisitions |
+| `storageTransactions` | top-level repository storage transactions started |
+| `storageCommits` | repository storage transactions committed |
+| `storageRollbacks` | repository storage transactions rolled back |
+| `repositoryLocks` | pessimistic repository row locks acquired |
+| `repositoryLockAcquisitionMicros` | end-to-end lock acquisition time, including database round-trip and contention wait |
+
+The lock duration is deliberately not labelled as pure database lock wait: portable Hibernate timing cannot separate the SQL round trip from contention. Filesystem samples publish zero for all database counters. The dashboard continues to chart only primary latency; secondary metrics remain in the raw JMH artifact for architecture decisions.
+
+Storage metrics use the opt-in property:
+
+```properties
+jgit.storage.hibernate.metrics.enabled=true
+```
+
+The property defaults to `false`, so ordinary consumers do not pay the `LongAdder` update cost. Hibernate's own `hibernate.generate_statistics` setting remains separately controlled by the application.
 
 ## Adaptive pack persistence and read-ahead under test
 
@@ -95,6 +123,8 @@ The Hibernate backend stores small PACK, IDX and REFTABLE payloads up to 256 KiB
 This removes the additional chunk row, chunk insert and preliminary chunk delete from common small application commits. New large files also skip the previously unconditional delete before their first chunk insert. Repeated flushes of an already persisted large file still use the conservative full-rewrite path; incremental append-only chunk persistence remains a separately measured follow-up.
 
 For sequential large reads, JGit's requested read-ahead window is translated into one ordered Hibernate query for up to sixteen consecutive chunks. The cache is local to the readable channel, is cleared on unrelated seeks, and does not keep a Hibernate session or JDBC connection open between reads. A core H2 test requires three consecutive chunks to be served with one query and retains hard failure on missing or corrupt intermediate chunks.
+
+Writable, chunked and inline channels report the same one MiB DFS alignment. Persisted pack descriptions restore extension file sizes when the repository pack list is rebuilt. These contracts are required by JGit's `UploadPack` copy-as-is path; normal H2 and HSQLDB regression tests cover incremental fetch from a two-pack server after cache and pack-list reload.
 
 The core migration, deletion and roundtrip tests accept both valid payload representations while still requiring every committed non-empty file to have exactly one representation. Historical inline rows remain readable, and large pack capacity remains bounded through the chunk table.
 
@@ -197,15 +227,17 @@ This comparison is a controlled regression and architecture benchmark, not a com
 - HikariCP cannot remove transaction, locking, WAL or ORM costs and is primarily expected to help concurrent or connection-heavy use;
 - the single-operation probes exaggerate fixed durable-publication cost, while the batch workloads show amortized throughput;
 - the large sequential-read benchmark measures decompression and JGit streaming in addition to database chunk access;
-- protocol benchmarks use an in-process transport and therefore exclude network latency, TLS and HTTP/SSH server overhead.
+- protocol benchmarks use an in-process transport and therefore exclude network latency, TLS and HTTP/SSH server overhead;
+- instrumentation counts portable Hibernate activity but not database-specific WAL bytes, server CPU or pure lock contention time.
 
 The workflow therefore uses a conservative 150% regression alert threshold and keeps the raw JMH JSON for deeper investigation.
 
 ## Next benchmark slices
 
-The next high-value storage measurements are instrumentation and concurrency scenarios:
+The next high-value storage measurements are write-path and concurrency scenarios:
 
-- record SQL statement counts, transaction counts, connection acquisitions, transferred bytes and repository-lock wait time per workload;
+- use protocol statement and transaction counts to select incremental pack persistence or JDBC batching as the next implementation;
+- record transferred pack bytes and database payload bytes per workflow;
 - compare one-, four- and sixteen-chunk read-ahead windows with query counts and transferred bytes;
 - add concurrent readers and writers using independent `SessionFactory` instances;
 - report p50, p95 and p99 latency for contended workloads;
