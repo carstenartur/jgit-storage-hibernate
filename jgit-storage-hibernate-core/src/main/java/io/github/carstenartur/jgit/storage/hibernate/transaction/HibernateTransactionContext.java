@@ -8,6 +8,8 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.transaction;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
+import jakarta.persistence.LockModeType;
 import java.io.IOException;
 import java.util.Objects;
 import org.hibernate.Session;
@@ -66,6 +68,35 @@ public final class HibernateTransactionContext {
         activeSession.remove();
       }
     }
+  }
+
+  /**
+   * Execute storage work while holding the cross-SessionFactory lock for one logical repository.
+   *
+   * <p>Pack publication, lease renewal, abandoned-write cleanup and ref publication use the same
+   * row lock so maintenance cannot race a writer between its ownership check and mutation.
+   *
+   * @param repositoryName logical repository name
+   * @param work storage work
+   * @param <T> result type
+   * @return work result
+   * @throws IOException if the lock row is missing or storage work fails
+   */
+  public <T> T executeWithRepositoryLock(String repositoryName, Work<T> work) throws IOException {
+    Objects.requireNonNull(repositoryName, "repositoryName");
+    Objects.requireNonNull(work, "work");
+    return execute(
+        session -> {
+          GitRepositoryLockEntity repositoryLock =
+              session.find(
+                  GitRepositoryLockEntity.class,
+                  repositoryName,
+                  LockModeType.PESSIMISTIC_WRITE);
+          if (repositoryLock == null) {
+            throw new IOException("Missing repository lock row for " + repositoryName);
+          }
+          return work.execute(session);
+        });
   }
 
   /** Unit of repository persistence work that may report an I/O failure to JGit. */
