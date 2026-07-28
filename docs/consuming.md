@@ -12,7 +12,7 @@ Search/Lucene projections. The higher-level `java-analysis` and `architecture` m
 foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their
 module guides before registering those entities.
 
-The documented release line is **0.1.14**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate
+The documented release line is **0.1.15**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate
 Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and
 tested deployment stack instead of overriding only one side of the stack.
 
@@ -74,7 +74,7 @@ Core only:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.1.14</version>
+  <version>0.1.15</version>
 </dependency>
 ```
 
@@ -84,7 +84,7 @@ Optional generic history search:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.1.14</version>
+  <version>0.1.15</version>
 </dependency>
 ```
 
