@@ -21,6 +21,7 @@ import java.time.Instant;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogReader;
+import org.eclipse.jgit.transport.ReceivePack;
 import org.hibernate.SessionFactory;
 
 /**
@@ -84,6 +85,24 @@ public class HibernateRepository extends DfsRepository {
   }
 
   /**
+   * Create a receive-pack server that commits one logical push in one repository transaction.
+   *
+   * <p>The returned adapter starts its transaction when pack ingestion begins, joins pack,
+   * reftable, reflog and ref storage callbacks, commits before JGit sends the success status, and
+   * rolls back plus invalidates storage caches when processing fails. A ref-only push starts the
+   * transaction immediately before command execution.
+   *
+   * <p>Callers may configure hooks and limits on the returned instance exactly as on a normal
+   * {@link ReceivePack}. Pre-receive hooks run while the transaction is active; post-receive hooks
+   * run after commit.
+   *
+   * @return transaction-aware receive-pack instance
+   */
+  public ReceivePack newReceivePack() {
+    return new HibernateReceivePack(this);
+  }
+
+  /**
    * Return monotone transaction and repository-lock metrics for this repository instance.
    *
    * @return current metrics snapshot, or zero counters when metrics are disabled
@@ -122,6 +141,15 @@ public class HibernateRepository extends DfsRepository {
       invalidateStorageCaches(exception);
       throw exception;
     }
+  }
+
+  HibernateTransactionContext.TransactionScope beginReceiveTransaction() {
+    return transactionContext.beginScope();
+  }
+
+  void resetStorageCaches() {
+    objectDatabase.close();
+    refDatabase.refresh();
   }
 
   private void ensureRepositoryLockRow() throws IOException {
