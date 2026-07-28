@@ -1,9 +1,9 @@
 # jgit-storage-hibernate
 
 [![Java CI with Maven](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/coverage.json)](docs/badges/coverage.json)
-[![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/tests.json)](docs/badges/tests.json)
-[![JMH](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/gh-pages/badges/coverage.json)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
+[![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/gh-pages/badges/tests.json)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
+[![JMH](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/gh-pages/badges/performance.json)](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
 [![JMH Workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)](pom.xml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
