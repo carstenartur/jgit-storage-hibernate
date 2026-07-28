@@ -61,7 +61,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   static final int PACK_CHUNK_SIZE = 1024 * 1024;
   static final Duration PACK_WRITE_LEASE = Duration.ofMinutes(30);
   static final Duration PACK_LEASE_RENEWAL_INTERVAL = Duration.ofMinutes(5);
-  private static final int CHUNK_BATCH_SIZE = 32;
+  private static final int CHUNK_BATCH_SIZE = 8;
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
@@ -353,6 +353,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       ensureOpen();
       Instant now = Instant.now();
       boolean payloadChanged = persistedVersion != modificationVersion;
+      boolean previouslyPersisted = persistedVersion >= 0;
       boolean leaseDue = !now.isBefore(renewLeaseAfter);
       if (!payloadChanged && !leaseDue && !forceOwnershipCheck) {
         return;
@@ -372,6 +373,10 @@ public class HibernateObjDatabase extends DfsObjDatabase {
                     .setParameter("ext", packExtension)
                     .uniqueResult();
 
+            if (entity == null && previouslyPersisted) {
+              throw new IOException(
+                  "Pack writer ownership was lost for " + packName + "." + packExtension);
+            }
             boolean rewritePayload = payloadChanged || entity == null;
             if (entity != null) {
               if (entity.isCommitted()) {
