@@ -11,7 +11,9 @@ package io.github.carstenartur.jgit.storage.hibernate.transaction;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import jakarta.persistence.LockModeType;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.LongAdder;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -22,7 +24,8 @@ import org.hibernate.Transaction;
  *
  * <p>The context is deliberately scoped to one repository instance. Nested storage operations on
  * the same thread join the active session; unrelated repository operations keep independent
- * transactions.
+ * transactions. Repository row locks are reentrant inside one active transaction, so pack,
+ * reftable, reflog and ref publication do not repeatedly issue the same pessimistic lock statement.
  */
 public final class HibernateTransactionContext {
 
@@ -32,6 +35,7 @@ public final class HibernateTransactionContext {
 
   private final SessionFactory sessionFactory;
   private final ThreadLocal<Session> activeSession = new ThreadLocal<>();
+  private final ThreadLocal<Set<String>> heldRepositoryLocks = new ThreadLocal<>();
   private final boolean metricsEnabled;
   private final LongAdder transactionsStarted = new LongAdder();
   private final LongAdder transactionsCommitted = new LongAdder();
@@ -65,31 +69,43 @@ public final class HibernateTransactionContext {
       return work.execute(existing);
     }
 
+    try (TransactionScope scope = beginScope()) {
+      T result = work.execute(scope.session());
+      scope.commit();
+      return result;
+    }
+  }
+
+  /**
+   * Begin an explicit repository transaction on the current thread.
+   *
+   * <p>This advanced scope is used by protocol adapters that must keep several otherwise independent
+   * JGit storage callbacks in one transaction and commit before reporting success to a client. The
+   * scope owns one Hibernate session and must be completed on the same thread. Closing an uncommitted
+   * scope rolls it back.
+   *
+   * @return new transaction scope
+   * @throws IllegalStateException if this context already has an active transaction on the thread
+   */
+  public TransactionScope beginScope() {
+    if (activeSession.get() != null) {
+      throw new IllegalStateException("A repository transaction is already active on this thread");
+    }
+
+    Session session = sessionFactory.openSession();
+    Transaction transaction;
+    try {
+      transaction = session.beginTransaction();
+    } catch (RuntimeException failure) {
+      session.close();
+      throw failure;
+    }
     if (metricsEnabled) {
       transactionsStarted.increment();
     }
-    try (Session session = sessionFactory.openSession()) {
-      Transaction transaction = session.beginTransaction();
-      activeSession.set(session);
-      try {
-        T result = work.execute(session);
-        transaction.commit();
-        if (metricsEnabled) {
-          transactionsCommitted.increment();
-        }
-        return result;
-      } catch (IOException | RuntimeException exception) {
-        if (transaction.isActive()) {
-          transaction.rollback();
-          if (metricsEnabled) {
-            transactionsRolledBack.increment();
-          }
-        }
-        throw exception;
-      } finally {
-        activeSession.remove();
-      }
-    }
+    activeSession.set(session);
+    heldRepositoryLocks.set(new HashSet<>());
+    return new TransactionScope(session, transaction);
   }
 
   /**
@@ -97,6 +113,7 @@ public final class HibernateTransactionContext {
    *
    * <p>Pack publication, lease renewal, abandoned-write cleanup and ref publication use the same
    * row lock so maintenance cannot race a writer between its ownership check and mutation.
+   * Repeated calls for the same repository inside one transaction reuse the already-held lock.
    *
    * @param repositoryName logical repository name
    * @param work storage work
@@ -127,6 +144,11 @@ public final class HibernateTransactionContext {
   public void acquireRepositoryLock(Session session, String repositoryName) throws IOException {
     Objects.requireNonNull(session, "session");
     Objects.requireNonNull(repositoryName, "repositoryName");
+    Set<String> heldLocks = heldRepositoryLocks.get();
+    if (heldLocks != null && heldLocks.contains(repositoryName)) {
+      return;
+    }
+
     long started = metricsEnabled ? System.nanoTime() : 0L;
     GitRepositoryLockEntity repositoryLock =
         session.find(
@@ -138,6 +160,9 @@ public final class HibernateTransactionContext {
     }
     if (repositoryLock == null) {
       throw new IOException("Missing repository lock row for " + repositoryName);
+    }
+    if (heldLocks != null) {
+      heldLocks.add(repositoryName);
     }
     if (metricsEnabled) {
       repositoryLocksAcquired.increment();
@@ -159,6 +184,78 @@ public final class HibernateTransactionContext {
         transactionsRolledBack.sum(),
         repositoryLocksAcquired.sum(),
         repositoryLockAcquisitionNanos.sum());
+  }
+
+  /** Explicit same-thread transaction scope used by protocol adapters. */
+  public final class TransactionScope implements AutoCloseable {
+    private final Session session;
+    private final Transaction transaction;
+    private boolean completed;
+
+    private TransactionScope(Session session, Transaction transaction) {
+      this.session = session;
+      this.transaction = transaction;
+    }
+
+    private Session session() {
+      return session;
+    }
+
+    /** Commit the transaction and release its session. */
+    public void commit() {
+      ensureOpen();
+      try {
+        transaction.commit();
+        completed = true;
+        if (metricsEnabled) {
+          transactionsCommitted.increment();
+        }
+      } catch (RuntimeException failure) {
+        rollbackActiveTransaction();
+        throw failure;
+      } finally {
+        cleanup();
+      }
+    }
+
+    /** Roll back the transaction if still active and release its session. */
+    public void rollback() {
+      if (completed) {
+        return;
+      }
+      try {
+        rollbackActiveTransaction();
+      } finally {
+        completed = true;
+        cleanup();
+      }
+    }
+
+    @Override
+    public void close() {
+      rollback();
+    }
+
+    private void rollbackActiveTransaction() {
+      if (transaction.isActive()) {
+        transaction.rollback();
+        if (metricsEnabled) {
+          transactionsRolledBack.increment();
+        }
+      }
+    }
+
+    private void cleanup() {
+      activeSession.remove();
+      heldRepositoryLocks.remove();
+      session.close();
+    }
+
+    private void ensureOpen() {
+      if (completed) {
+        throw new IllegalStateException("Repository transaction scope is already completed");
+      }
+    }
   }
 
   /** Unit of repository persistence work that may report an I/O failure to JGit. */
