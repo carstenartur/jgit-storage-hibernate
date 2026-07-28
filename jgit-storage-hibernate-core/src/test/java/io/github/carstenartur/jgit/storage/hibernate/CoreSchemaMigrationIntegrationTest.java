@@ -82,7 +82,7 @@ class CoreSchemaMigrationIntegrationTest {
       verifyUncommittedPackInvisible(provider.getSessionFactory(), incompleteRepositoryName);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
       assertRepositoryLockRow(database, repositoryName);
-      assertChunkedPayloadRows(database, repositoryName);
+      assertPersistedPayloadRows(database, repositoryName);
     }
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
@@ -97,7 +97,6 @@ class CoreSchemaMigrationIntegrationTest {
     String legacyIncompleteRepository = "legacy-incomplete";
     insertUncommittedPack(database, legacyIncompleteRepository);
 
-    // Current mappings are deliberately not opened against an unmigrated 0.1.4 schema.
     migrate(database, true);
     assertEquals(EXPECTED_MIGRATIONS, migrationVersions(database));
 
@@ -107,7 +106,7 @@ class CoreSchemaMigrationIntegrationTest {
       verifyUncommittedPackInvisible(provider.getSessionFactory(), legacyIncompleteRepository);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
       assertRepositoryLockRow(database, repositoryName);
-      assertChunkedPayloadRows(database, repositoryName);
+      assertPersistedPayloadRows(database, repositoryName);
     }
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
@@ -248,27 +247,46 @@ class CoreSchemaMigrationIntegrationTest {
     }
   }
 
-  private static void assertChunkedPayloadRows(TestDatabase database, String repositoryName)
+  private static void assertPersistedPayloadRows(TestDatabase database, String repositoryName)
       throws SQLException {
+    String hasPayload =
+        "select count(*) from git_packs p where p.repository_name = ? and p.committed = true "
+            + "and p.file_size > 0 and (p.data is not null or exists "
+            + "(select 1 from git_pack_chunks c where c.pack_id = p.id))";
+    assertCountGreaterThanZero(database, hasPayload, repositoryName);
+
+    String missingPayload =
+        "select count(*) from git_packs p where p.repository_name = ? and p.committed = true "
+            + "and p.file_size > 0 and p.data is null and not exists "
+            + "(select 1 from git_pack_chunks c where c.pack_id = p.id)";
+    assertCount(database, missingPayload, repositoryName, 0);
+
+    String duplicatedPayload =
+        "select count(*) from git_packs p where p.repository_name = ? and p.data is not null "
+            + "and exists (select 1 from git_pack_chunks c where c.pack_id = p.id)";
+    assertCount(database, duplicatedPayload, repositoryName, 0);
+  }
+
+  private static void assertCountGreaterThanZero(
+      TestDatabase database, String sql, String repositoryName) throws SQLException {
     try (Connection connection = database.openConnection();
-        var statement =
-            connection.prepareStatement(
-                "select count(*) from git_pack_chunks c join git_packs p on p.id = c.pack_id "
-                    + "where p.repository_name = ?")) {
+        var statement = connection.prepareStatement(sql)) {
       statement.setString(1, repositoryName);
       try (ResultSet resultSet = statement.executeQuery()) {
         assertTrue(resultSet.next());
         assertTrue(resultSet.getLong(1) > 0);
       }
     }
+  }
+
+  private static void assertCount(
+      TestDatabase database, String sql, String repositoryName, long expected) throws SQLException {
     try (Connection connection = database.openConnection();
-        var statement =
-            connection.prepareStatement(
-                "select count(*) from git_packs where repository_name = ? and data is not null")) {
+        var statement = connection.prepareStatement(sql)) {
       statement.setString(1, repositoryName);
       try (ResultSet resultSet = statement.executeQuery()) {
         assertTrue(resultSet.next());
-        assertEquals(0, resultSet.getLong(1));
+        assertEquals(expected, resultSet.getLong(1));
       }
     }
   }
