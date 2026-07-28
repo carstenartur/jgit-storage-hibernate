@@ -15,7 +15,7 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
-import jakarta.persistence.LockModeType;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.time.Instant;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
@@ -83,6 +83,15 @@ public class HibernateRepository extends DfsRepository {
     return sessionFactory;
   }
 
+  /**
+   * Return monotone transaction and repository-lock metrics for this repository instance.
+   *
+   * @return current metrics snapshot, or zero counters when metrics are disabled
+   */
+  public StorageOperationMetrics getStorageOperationMetrics() {
+    return transactionContext.metricsSnapshot();
+  }
+
   /** Execute repository storage work in one shared transaction. */
   public <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
     try {
@@ -101,18 +110,18 @@ public class HibernateRepository extends DfsRepository {
    * different repository instance before the lock was acquired.
    */
   public <T> T inRefTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
-    return inTransaction(
-        session -> {
-          GitRepositoryLockEntity lock =
-              session.find(
-                  GitRepositoryLockEntity.class, repositoryName, LockModeType.PESSIMISTIC_WRITE);
-          if (lock == null) {
-            throw new IOException("Missing repository lock row for " + repositoryName);
-          }
-          objectDatabase.close();
-          refDatabase.refresh();
-          return work.execute(session);
-        });
+    try {
+      return transactionContext.executeWithRepositoryLock(
+          repositoryName,
+          session -> {
+            objectDatabase.close();
+            refDatabase.refresh();
+            return work.execute(session);
+          });
+    } catch (IOException | RuntimeException exception) {
+      invalidateStorageCaches(exception);
+      throw exception;
+    }
   }
 
   private void ensureRepositoryLockRow() throws IOException {
