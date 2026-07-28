@@ -70,9 +70,9 @@ All results use JMH average time in `ms/op`, so lower values are better. Batch o
 
 The Hibernate backend stores small PACK, IDX and REFTABLE payloads up to 256 KiB in the existing inline payload column. Larger payloads continue to use bounded one MiB chunks.
 
-For a growing chunked file, a repeated JGit flush rewrites only the previous partial chunk and newly appended chunks. It no longer deletes and persists the entire file after every flush. The core H2 tests verify both the inline and chunked representations and read the stored object back through the public JGit API.
+This removes the additional chunk row, chunk insert and preliminary chunk delete from common small application commits. New large files also skip the previously unconditional delete before their first chunk insert. Repeated flushes of an already persisted large file still use the conservative full-rewrite path; incremental append-only chunk persistence remains a separately measured follow-up.
 
-The threshold is deliberately conservative. Historical rows using the inline format remain readable, and large pack capacity remains bounded through the chunk table.
+The core migration, deletion and roundtrip tests accept both valid representations while still requiring every committed non-empty file to have exactly one payload representation. Historical inline rows remain readable, and large pack capacity remains bounded through the chunk table.
 
 ## Maven, JUnit and Testcontainers architecture
 
