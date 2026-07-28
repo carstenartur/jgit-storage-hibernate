@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.PackCleanupResult;
@@ -21,6 +22,7 @@ import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
@@ -86,6 +88,42 @@ class PackStorageMaintenanceH2Test {
       assertEquals(first.length + second.length + 5L, secondCleanup.payloadBytes());
       assertEquals(0, countPackRows(provider, "active-pack"));
       assertEquals(1, countPackRows(provider, "published-pack"));
+    }
+  }
+
+  @Test
+  void reclaimedWriterCannotSilentlyRecreateItsExpiredPack() throws Exception {
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository ignored =
+            HibernateRepository.create(provider.getSessionFactory(), "maintenance-repo")) {
+      Instant now = Instant.parse("2026-07-28T03:00:00Z");
+      Instant old = now.minusSeconds(172_800);
+      Instant cutoff = now.minusSeconds(86_400);
+
+      HibernateObjDatabase.HibernatePackOutputStream stalled =
+          new HibernateObjDatabase.HibernatePackOutputStream(
+              new HibernateTransactionContext(provider.getSessionFactory()),
+              "maintenance-repo",
+              "stalled-pack",
+              "pack");
+      byte[] payload = bytes(128, 41);
+      stalled.write(payload, 0, payload.length);
+      stalled.flush();
+      agePack(provider, "stalled-pack", old, now.minusSeconds(1));
+
+      PackCleanupResult cleanup =
+          new PackStorageMaintenance(provider.getSessionFactory())
+              .deleteExpiredUncommittedPacks(
+                  new RepositoryName("maintenance-repo"), cutoff, now);
+      assertEquals(new PackCleanupResult(1, 1, payload.length), cleanup);
+      assertEquals(0, countPackRows(provider, "stalled-pack"));
+
+      IOException writeFailure =
+          assertThrows(IOException.class, () -> stalled.write(payload, 0, payload.length));
+      assertTrue(writeFailure.getMessage().contains("ownership was lost"));
+      IOException closeFailure = assertThrows(IOException.class, stalled::close);
+      assertTrue(closeFailure.getMessage().contains("ownership was lost"));
+      assertEquals(0, countPackRows(provider, "stalled-pack"));
     }
   }
 
