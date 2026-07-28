@@ -117,6 +117,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: jmh
     runs-on: ubuntu-latest
+    concurrency:
+      group: benchmark-history-publication-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -130,6 +133,15 @@ jobs:
         with:
           name: jmh-backend-comparison-results
           path: ${{ runner.temp }}/jmh-benchmark-artifact
+
+      - name: Locate benchmark comparison artifact
+        id: benchmark-artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(find "${RUNNER_TEMP}/jmh-benchmark-artifact" -type f -name backend-comparison.json -print -quit)"
+          test -s "$result"
+          echo "path=$result" >> "$GITHUB_OUTPUT"
 
       - name: Initialize benchmark history branch
         run: |
@@ -149,9 +161,10 @@ jobs:
         with:
           name: Repository backend comparison
           tool: customSmallerIsBetter
-          output-file-path: ${{ runner.temp }}/jmh-benchmark-artifact/target/benchmarks/backend-comparison.json
+          output-file-path: ${{ steps.benchmark-artifact.outputs.path }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
+          gh-repository: github.com/carstenartur/jgit-storage-hibernate
           gh-pages-branch: gh-pages
           benchmark-data-dir-path: dev/bench
           alert-threshold: '150%'
@@ -166,6 +179,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: jmh
     runs-on: ubuntu-latest
+    concurrency:
+      group: repository-badge-publication-${{ github.repository }}-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -184,29 +200,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source_badge="${RUNNER_TEMP}/jmh-benchmark-artifact/docs/badges/performance.json"
+          source_badge="$(find "${RUNNER_TEMP}/jmh-benchmark-artifact" -type f -path '*/docs/badges/performance.json' -print -quit)"
+          if [ -z "$source_badge" ]; then
+            source_badge="$(find "${RUNNER_TEMP}/jmh-benchmark-artifact" -type f -name performance.json -print -quit)"
+          fi
           test -s "$source_badge"
 
-          git fetch origin main
-          git checkout -B main origin/main
-          if cmp -s "$source_badge" docs/badges/performance.json; then
-            echo 'Performance badge data unchanged'
-            exit 0
-          fi
-
-          cp "$source_badge" docs/badges/performance.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/badges/performance.json
-          git commit -m 'Update JMH performance badge [skip ci]'
 
           for attempt in 1 2 3; do
             git fetch origin main
-            git rebase origin/main
+            git checkout -B main origin/main
+
+            if cmp -s "$source_badge" docs/badges/performance.json; then
+              echo 'Performance badge data unchanged'
+              exit 0
+            fi
+
+            cp "$source_badge" docs/badges/performance.json
+            git add docs/badges/performance.json
+            git commit -m 'Update JMH performance badge [skip ci]'
             if git push origin HEAD:main; then
               exit 0
             fi
             sleep $((attempt * 2))
           done
+
           echo 'Could not publish performance badge after three attempts' >&2
           exit 1
