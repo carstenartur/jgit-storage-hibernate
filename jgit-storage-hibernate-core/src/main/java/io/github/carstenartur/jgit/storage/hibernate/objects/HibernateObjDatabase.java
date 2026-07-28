@@ -8,14 +8,19 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
-import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +34,7 @@ import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.ObjectId;
+import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
 /**
@@ -38,10 +44,17 @@ import org.hibernate.SessionFactory;
  * {@link #commitPackImpl(Collection, Collection)}. This mirrors the DFS contract more closely than
  * immediately exposing partially written pack files.
  *
+ * <p>New payloads are written through a temporary file and persisted as bounded chunks. Existing
+ * installations may still contain legacy inline payloads; those rows remain readable without a
+ * destructive data migration.
+ *
  * <p>Shallow repositories are not supported. A non-empty shallow boundary is rejected explicitly
  * instead of being retained only in memory and silently lost on restart.
  */
 public class HibernateObjDatabase extends DfsObjDatabase {
+
+  static final int PACK_CHUNK_SIZE = 1024 * 1024;
+  private static final int CHUNK_BATCH_SIZE = 32;
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
@@ -173,20 +186,27 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       throws FileNotFoundException, IOException {
     return transactionContext.execute(
         session -> {
-          GitPackEntity entity =
+          Object[] row =
               session
                   .createQuery(
-                      "FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name "
+                      "SELECT p.id, p.fileSize, p.data FROM GitPackEntity p "
+                          + "WHERE p.repositoryName = :repo AND p.packName = :name "
                           + "AND p.packExtension = :ext AND p.committed = true",
-                      GitPackEntity.class)
+                      Object[].class)
                   .setParameter("repo", repositoryName)
                   .setParameter("name", baseName(description))
                   .setParameter("ext", extension.getExtension())
                   .uniqueResult();
-          if (entity == null) {
+          if (row == null) {
             throw new FileNotFoundException(description.getFileName(extension));
           }
-          return new ByteArrayReadableChannel(entity.getData());
+          Long packId = (Long) row[0];
+          long fileSize = ((Number) row[1]).longValue();
+          byte[] inlineData = (byte[]) row[2];
+          if (inlineData != null) {
+            return new ByteArrayReadableChannel(inlineData);
+          }
+          return new ChunkedReadableChannel(sessionFactory, packId, fileSize);
         });
   }
 
@@ -212,17 +232,18 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   @Override
   public long getApproximateObjectCount() {
-    // Pack-blob storage does not maintain a reliable object-level count.
+    // Pack storage does not maintain a reliable object-level count.
     return 0L;
   }
 
   static final class HibernatePackOutputStream extends DfsOutputStream {
-    private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
     private final HibernateTransactionContext transactionContext;
     private final String repositoryName;
     private final String packName;
     private final String packExtension;
-    private byte[] data;
+    private final Path temporaryFile;
+    private final FileChannel fileChannel;
+    private long fileSize;
     private int modificationVersion;
     private int persistedVersion = -1;
     private boolean closed;
@@ -231,30 +252,68 @@ public class HibernateObjDatabase extends DfsObjDatabase {
         HibernateTransactionContext transactionContext,
         String repositoryName,
         String packName,
-        String packExtension) {
+        String packExtension)
+        throws IOException {
       this.transactionContext = transactionContext;
       this.repositoryName = repositoryName;
       this.packName = packName;
       this.packExtension = packExtension;
+      temporaryFile = Files.createTempFile("jgit-storage-pack-", ".tmp");
+      fileChannel =
+          FileChannel.open(
+              temporaryFile,
+              StandardOpenOption.READ,
+              StandardOpenOption.WRITE,
+              StandardOpenOption.TRUNCATE_EXISTING);
     }
 
     @Override
     public void write(byte[] source, int offset, int length) throws IOException {
       ensureOpen();
-      data = null;
-      buffer.write(source, offset, length);
+      if (offset < 0 || length < 0 || offset > source.length - length) {
+        throw new IndexOutOfBoundsException();
+      }
+      ByteBuffer buffer = ByteBuffer.wrap(source, offset, length);
+      long writePosition = fileSize;
+      while (buffer.hasRemaining()) {
+        int count = fileChannel.write(buffer, writePosition);
+        if (count <= 0) {
+          throw new IOException("Could not append to temporary pack file");
+        }
+        writePosition += count;
+      }
+      fileSize = writePosition;
       modificationVersion++;
     }
 
     @Override
-    public int read(long position, ByteBuffer destination) {
-      byte[] bytes = bytes();
-      int count = Math.min(destination.remaining(), bytes.length - (int) position);
-      if (count <= 0) {
+    public int read(long position, ByteBuffer destination) throws IOException {
+      ensureOpen();
+      if (position < 0) {
+        throw new IllegalArgumentException("position must not be negative");
+      }
+      if (position >= fileSize) {
         return -1;
       }
-      destination.put(bytes, (int) position, count);
-      return count;
+      int total = 0;
+      long readPosition = position;
+      while (destination.hasRemaining() && readPosition < fileSize) {
+        int originalLimit = destination.limit();
+        int allowed = (int) Math.min(destination.remaining(), fileSize - readPosition);
+        destination.limit(destination.position() + allowed);
+        int count;
+        try {
+          count = fileChannel.read(destination, readPosition);
+        } finally {
+          destination.limit(originalLimit);
+        }
+        if (count <= 0) {
+          break;
+        }
+        total += count;
+        readPosition += count;
+      }
+      return total == 0 ? -1 : total;
     }
 
     @Override
@@ -263,7 +322,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       if (persistedVersion == modificationVersion) {
         return;
       }
-      byte[] bytes = bytes();
+      long sizeAtFlush = fileSize;
       transactionContext.execute(
           session -> {
             GitPackEntity entity =
@@ -282,17 +341,66 @@ public class HibernateObjDatabase extends DfsObjDatabase {
               entity.setPackName(packName);
               entity.setPackExtension(packExtension);
               entity.setCreatedAt(Instant.now());
-            }
-            entity.setData(bytes);
-            entity.setFileSize(bytes.length);
-            entity.setCommitted(false);
-            entity.setCommittedAt(null);
-            if (entity.getId() == null) {
               session.persist(entity);
             }
+            entity.setData(null);
+            entity.setFileSize(sizeAtFlush);
+            entity.setCommitted(false);
+            entity.setCommittedAt(null);
+            session.flush();
+
+            Long packId = entity.getId();
+            session
+                .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId = :packId")
+                .setParameter("packId", packId)
+                .executeUpdate();
+            session.flush();
+            persistChunks(session, packId, sizeAtFlush);
             return null;
           });
       persistedVersion = modificationVersion;
+    }
+
+    private void persistChunks(Session session, Long packId, long sizeAtFlush) throws IOException {
+      byte[] chunkBuffer = new byte[PACK_CHUNK_SIZE];
+      long position = 0;
+      int chunkIndex = 0;
+      int pendingChunks = 0;
+      while (position < sizeAtFlush) {
+        int chunkLength = (int) Math.min(PACK_CHUNK_SIZE, sizeAtFlush - position);
+        ByteBuffer destination = ByteBuffer.wrap(chunkBuffer, 0, chunkLength);
+        long chunkPosition = position;
+        while (destination.hasRemaining()) {
+          int count = fileChannel.read(destination, chunkPosition);
+          if (count <= 0) {
+            throw new IOException(
+                "Temporary pack file ended before declared size " + sizeAtFlush);
+          }
+          chunkPosition += count;
+        }
+
+        GitPackChunkEntity chunk = new GitPackChunkEntity();
+        chunk.setPackId(packId);
+        chunk.setChunkIndex(chunkIndex);
+        chunk.setChunkSize(chunkLength);
+        chunk.setData(
+            chunkLength == PACK_CHUNK_SIZE
+                ? chunkBuffer.clone()
+                : Arrays.copyOf(chunkBuffer, chunkLength));
+        session.persist(chunk);
+
+        position += chunkLength;
+        chunkIndex++;
+        pendingChunks++;
+        if (pendingChunks == CHUNK_BATCH_SIZE) {
+          session.flush();
+          session.clear();
+          pendingChunks = 0;
+        }
+      }
+      if (pendingChunks > 0) {
+        session.flush();
+      }
     }
 
     @Override
@@ -300,8 +408,34 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       if (closed) {
         return;
       }
-      flush();
+      IOException failure = null;
+      try {
+        flush();
+      } catch (IOException exception) {
+        failure = exception;
+      }
       closed = true;
+      try {
+        fileChannel.close();
+      } catch (IOException exception) {
+        failure = combine(failure, exception);
+      }
+      try {
+        Files.deleteIfExists(temporaryFile);
+      } catch (IOException exception) {
+        failure = combine(failure, exception);
+      }
+      if (failure != null) {
+        throw failure;
+      }
+    }
+
+    private static IOException combine(IOException primary, IOException additional) {
+      if (primary == null) {
+        return additional;
+      }
+      primary.addSuppressed(additional);
+      return primary;
     }
 
     private void ensureOpen() throws IOException {
@@ -309,12 +443,131 @@ public class HibernateObjDatabase extends DfsObjDatabase {
         throw new IOException("Pack output stream is closed");
       }
     }
+  }
 
-    private byte[] bytes() {
-      if (data == null) {
-        data = buffer.toByteArray();
+  static final class ChunkedReadableChannel implements ReadableChannel {
+    private final SessionFactory sessionFactory;
+    private final Long packId;
+    private final long fileSize;
+    private long position;
+    private boolean open = true;
+    private int cachedChunkIndex = -1;
+    private byte[] cachedChunk;
+
+    ChunkedReadableChannel(SessionFactory sessionFactory, Long packId, long fileSize) {
+      this.sessionFactory = sessionFactory;
+      this.packId = packId;
+      this.fileSize = fileSize;
+    }
+
+    @Override
+    public int read(ByteBuffer destination) throws IOException {
+      ensureOpen();
+      if (position >= fileSize) {
+        return -1;
       }
-      return data;
+      int total = 0;
+      while (destination.hasRemaining() && position < fileSize) {
+        long chunkNumber = position / PACK_CHUNK_SIZE;
+        int chunkIndex = Math.toIntExact(chunkNumber);
+        int offset = (int) (position % PACK_CHUNK_SIZE);
+        byte[] chunk = loadChunk(chunkIndex);
+        int count =
+            (int)
+                Math.min(
+                    Math.min(destination.remaining(), chunk.length - offset), fileSize - position);
+        if (count <= 0) {
+          throw new IOException(
+              "Invalid chunk " + chunkIndex + " for pack " + packId + " at position " + position);
+        }
+        destination.put(chunk, offset, count);
+        position += count;
+        total += count;
+      }
+      return total;
+    }
+
+    private byte[] loadChunk(int chunkIndex) throws IOException {
+      if (cachedChunkIndex == chunkIndex && cachedChunk != null) {
+        return cachedChunk;
+      }
+      try (Session session = sessionFactory.openSession()) {
+        Object[] row =
+            session
+                .createQuery(
+                    "SELECT c.data, c.chunkSize FROM GitPackChunkEntity c "
+                        + "WHERE c.packId = :packId AND c.chunkIndex = :chunkIndex",
+                    Object[].class)
+                .setParameter("packId", packId)
+                .setParameter("chunkIndex", chunkIndex)
+                .uniqueResult();
+        if (row == null) {
+          throw new IOException("Missing chunk " + chunkIndex + " for pack " + packId);
+        }
+        byte[] data = (byte[]) row[0];
+        int declaredSize = ((Number) row[1]).intValue();
+        if (data.length != declaredSize || declaredSize > PACK_CHUNK_SIZE) {
+          throw new IOException(
+              "Corrupt chunk "
+                  + chunkIndex
+                  + " for pack "
+                  + packId
+                  + ": declared="
+                  + declaredSize
+                  + ", actual="
+                  + data.length);
+        }
+        cachedChunkIndex = chunkIndex;
+        cachedChunk = data;
+        return data;
+      }
+    }
+
+    @Override
+    public void close() {
+      open = false;
+      cachedChunk = null;
+      cachedChunkIndex = -1;
+    }
+
+    @Override
+    public boolean isOpen() {
+      return open;
+    }
+
+    @Override
+    public long position() {
+      return position;
+    }
+
+    @Override
+    public void position(long newPosition) {
+      if (newPosition < 0 || newPosition > fileSize) {
+        throw new IllegalArgumentException(
+            "position must be between 0 and " + fileSize + ": " + newPosition);
+      }
+      position = newPosition;
+    }
+
+    @Override
+    public long size() {
+      return fileSize;
+    }
+
+    @Override
+    public int blockSize() {
+      return PACK_CHUNK_SIZE;
+    }
+
+    @Override
+    public void setReadAheadBytes(int readAheadBytes) {
+      // The channel caches one complete bounded chunk and does not prefetch additional rows.
+    }
+
+    private void ensureOpen() throws IOException {
+      if (!open) {
+        throw new IOException("Pack channel is closed");
+      }
     }
   }
 
