@@ -112,26 +112,6 @@ public final class HibernateTransactionContext {
         });
   }
 
-  /** Record binary payload bytes materialized from database storage. */
-  public void recordPayloadBytesRead(long bytes) {
-    storageMetrics.recordPayloadBytesRead(bytes);
-  }
-
-  /** Record binary payload bytes inserted or updated in database storage. */
-  public void recordPayloadBytesWritten(long bytes) {
-    storageMetrics.recordPayloadBytesWritten(bytes);
-  }
-
-  /** Record newly inserted bounded chunk rows. */
-  public void recordChunkRowsInserted(long rows) {
-    storageMetrics.recordChunkRowsInserted(rows);
-  }
-
-  /** Record bounded chunk rows removed before replacement or deletion. */
-  public void recordChunkRowsDeleted(long rows) {
-    storageMetrics.recordChunkRowsDeleted(rows);
-  }
-
   /** Unit of repository persistence work that may report an I/O failure to JGit. */
   @FunctionalInterface
   public interface Work<T> {
