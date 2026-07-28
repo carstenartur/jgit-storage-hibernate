@@ -23,7 +23,7 @@ The storage benchmark runs the same public JGit workload against four repository
 
 The built-in PostgreSQL configuration is retained as a stable baseline. Hibernate documents that its built-in pool is not intended for production; the HikariCP variant shows whether a production-grade pool changes steady-state repository latency.
 
-The measured methods use public JGit repository and transport APIs. Backend construction, schema creation, client preparation and result verification happen outside measured invocations.
+The measured methods use public JGit repository and transport APIs. Backend construction, schema creation and client preparation happen outside measured invocations.
 
 ## Measured workloads
 
@@ -86,7 +86,18 @@ These workloads use JGit's in-process `TestProtocol`, `ReceivePack`, `UploadPack
 
 `incrementalFetchViaUploadPack` prepares a client with the 20-commit base and then fetches only four descendants.
 
-All results use JMH average time in `ms/op`, so lower values are better. Batch and protocol operations report time per complete operation, not per individual object or commit.
+The repository and object-level probes use JMH average time in `ms/op`. Protocol workflows use single-shot time with one warm-up and five measured fresh repositories, avoiding accumulated repository growth across samples. Lower values are better. Batch and protocol operations report time per complete operation, not per individual object or commit.
+
+The first complete protocol run produced these point estimates:
+
+| Operation | Filesystem | HSQLDB | PostgreSQL | PostgreSQL + HikariCP |
+|---|---:|---:|---:|---:|
+| Initial push, 24 commits | 133.3 ms | 203.6 ms | 220.6 ms | 220.3 ms |
+| Incremental push, 4 commits | 53.0 ms | 70.2 ms | 42.2 ms | 76.1 ms |
+| Initial clone-style fetch | 129.6 ms | 113.0 ms | 117.5 ms | 128.1 ms |
+| Incremental fetch, 4 commits | 18.8 ms | 18.6 ms | 23.9 ms | 19.8 ms |
+
+The single-shot confidence intervals are still wide, especially for pushes. These values establish workload scale and regression history; they are not yet production sizing claims. They do show that database storage is competitive for clone/fetch and incremental workflows, while initial durable ingestion remains the clearest optimization target. HikariCP does not provide a repeatable serial latency advantage in this matrix.
 
 ## Adaptive pack persistence and read-ahead under test
 
@@ -95,6 +106,8 @@ The Hibernate backend stores small PACK, IDX and REFTABLE payloads up to 256 KiB
 This removes the additional chunk row, chunk insert and preliminary chunk delete from common small application commits. New large files also skip the previously unconditional delete before their first chunk insert. Repeated flushes of an already persisted large file still use the conservative full-rewrite path; incremental append-only chunk persistence remains a separately measured follow-up.
 
 For sequential large reads, JGit's requested read-ahead window is translated into one ordered Hibernate query for up to sixteen consecutive chunks. The cache is local to the readable channel, is cleared on unrelated seeks, and does not keep a Hibernate session or JDBC connection open between reads. A core H2 test requires three consecutive chunks to be served with one query and retains hard failure on missing or corrupt intermediate chunks.
+
+Writable, inline and chunked channels report the same one MiB DFS alignment. Persisted pack descriptions restore every extension's file size when the pack list is rebuilt. Both contracts are required by JGit's `UploadPack` copy-as-is path. H2 and HSQLDB regression tests exercise incremental fetch from a server containing a base pack plus a descendant pack after cache and pack-list reload.
 
 The core migration, deletion and roundtrip tests accept both valid payload representations while still requiring every committed non-empty file to have exactly one representation. Historical inline rows remain readable, and large pack capacity remains bounded through the chunk table.
 
@@ -203,9 +216,11 @@ The workflow therefore uses a conservative 150% regression alert threshold and k
 
 ## Next benchmark slices
 
-The next high-value storage measurements are instrumentation and concurrency scenarios:
+The next high-value storage measurements are write-path and concurrency scenarios:
 
-- record SQL statement counts, transaction counts, connection acquisitions, transferred bytes and repository-lock wait time per workload;
+- record SQL statement counts, transaction counts, connection acquisitions and repository-lock acquisition time per protocol workload;
+- use those counts to select incremental pack persistence or JDBC batching as the next implementation;
+- record transferred pack bytes and database payload bytes per workflow;
 - compare one-, four- and sixteen-chunk read-ahead windows with query counts and transferred bytes;
 - add concurrent readers and writers using independent `SessionFactory` instances;
 - report p50, p95 and p99 latency for contended workloads;
