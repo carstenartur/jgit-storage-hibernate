@@ -138,7 +138,7 @@ class ReadAheadHibernateObjDatabaseH2Test {
     try (ReadableChannel channel = inlineChannel(data)) {
       assertTrue(channel.isOpen());
       assertEquals(3L, channel.size());
-      assertEquals(0, channel.blockSize());
+      assertEquals(HibernateObjDatabase.PACK_CHUNK_SIZE, channel.blockSize());
       channel.setReadAheadBytes(Integer.MAX_VALUE);
 
       ByteBuffer first = ByteBuffer.allocate(2);
