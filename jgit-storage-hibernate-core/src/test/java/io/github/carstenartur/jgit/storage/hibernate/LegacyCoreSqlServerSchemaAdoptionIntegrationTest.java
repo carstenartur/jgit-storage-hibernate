@@ -59,10 +59,12 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
     migrateCurrent();
     StoredRepository stored = writeRepository("sandbox-legacy");
     materializeChunkedPayloads();
+    downgradeToLegacySandboxSchema();
+
+    // Record the exact legacy representation after the controlled downgrade. In particular,
+    // datetime2(6) has microsecond precision; adoption must preserve that state exactly.
     List<String> packChecksumsBefore = packChecksums();
     List<ReflogRow> reflogRowsBefore = reflogRows();
-
-    downgradeToLegacySandboxSchema();
     try (Connection connection = openConnection()) {
       LegacyCoreSchemaAdoption.LegacySchemaReport report =
           LegacyCoreSchemaAdoption.requireSafeToAdopt(connection);
