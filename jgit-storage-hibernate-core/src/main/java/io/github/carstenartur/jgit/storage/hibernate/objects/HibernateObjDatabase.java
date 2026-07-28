@@ -18,6 +18,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,12 +49,18 @@ import org.hibernate.SessionFactory;
  * installations may still contain legacy inline payloads; those rows remain readable without a
  * destructive data migration.
  *
+ * <p>Every uncommitted row has a writer token and renewable lease. Pack persistence, publication,
+ * rollback and abandoned-write cleanup use the same repository lock so a maintenance operation
+ * cannot race a live writer.
+ *
  * <p>Shallow repositories are not supported. A non-empty shallow boundary is rejected explicitly
  * instead of being retained only in memory and silently lost on restart.
  */
 public class HibernateObjDatabase extends DfsObjDatabase {
 
   static final int PACK_CHUNK_SIZE = 1024 * 1024;
+  static final Duration PACK_WRITE_LEASE = Duration.ofMinutes(30);
+  static final Duration PACK_LEASE_RENEWAL_INTERVAL = Duration.ofMinutes(5);
   private static final int CHUNK_BATCH_SIZE = 32;
 
   private final SessionFactory sessionFactory;
@@ -130,30 +137,31 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   protected void commitPackImpl(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
-    transactionContext.execute(
+    transactionContext.executeWithRepositoryLock(
+        repositoryName,
         session -> {
           if (replaces != null) {
             for (DfsPackDescription replace : replaces) {
-              session
-                  .createMutationQuery(
-                      "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                          + "AND p.packName = :name")
-                  .setParameter("repo", repositoryName)
-                  .setParameter("name", baseName(replace))
-                  .executeUpdate();
+              deletePackRows(session, repositoryName, baseName(replace));
             }
           }
           Instant committedAt = Instant.now();
           for (DfsPackDescription description : descriptions) {
-            session
-                .createMutationQuery(
-                    "UPDATE GitPackEntity p SET p.committed = true, "
-                        + "p.committedAt = :committedAt WHERE p.repositoryName = :repo "
-                        + "AND p.packName = :name")
-                .setParameter("committedAt", committedAt)
-                .setParameter("repo", repositoryName)
-                .setParameter("name", baseName(description))
-                .executeUpdate();
+            int updated =
+                session
+                    .createMutationQuery(
+                        "UPDATE GitPackEntity p SET p.committed = true, "
+                            + "p.committedAt = :committedAt, p.writeToken = null, "
+                            + "p.writeLeaseUntil = null WHERE p.repositoryName = :repo "
+                            + "AND p.packName = :name AND p.committed = false")
+                    .setParameter("committedAt", committedAt)
+                    .setParameter("repo", repositoryName)
+                    .setParameter("name", baseName(description))
+                    .executeUpdate();
+            if (updated == 0) {
+              throw new IOException(
+                  "Cannot publish missing or already committed pack " + baseName(description));
+            }
           }
           return null;
         });
@@ -163,21 +171,38 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   @Override
   protected void rollbackPack(Collection<DfsPackDescription> descriptions) {
     try {
-      transactionContext.execute(
+      transactionContext.executeWithRepositoryLock(
+          repositoryName,
           session -> {
             for (DfsPackDescription description : descriptions) {
-              session
-                  .createMutationQuery(
-                      "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                          + "AND p.packName = :name")
-                  .setParameter("repo", repositoryName)
-                  .setParameter("name", baseName(description))
-                  .executeUpdate();
+              deletePackRows(session, repositoryName, baseName(description));
             }
             return null;
           });
     } catch (IOException | RuntimeException ignored) {
       // Rollback is best-effort and must not mask the original JGit exception.
+    }
+  }
+
+  private static void deletePackRows(Session session, String repositoryName, String packName) {
+    List<Long> packIds =
+        session
+            .createQuery(
+                "SELECT p.id FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                    + "AND p.packName = :name",
+                Long.class)
+            .setParameter("repo", repositoryName)
+            .setParameter("name", packName)
+            .getResultList();
+    if (!packIds.isEmpty()) {
+      session
+          .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId IN :packIds")
+          .setParameter("packIds", packIds)
+          .executeUpdate();
+      session
+          .createMutationQuery("DELETE FROM GitPackEntity p WHERE p.id IN :packIds")
+          .setParameter("packIds", packIds)
+          .executeUpdate();
     }
   }
 
@@ -241,11 +266,13 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     private final String repositoryName;
     private final String packName;
     private final String packExtension;
+    private final String writeToken = UUID.randomUUID().toString();
     private final Path temporaryFile;
     private final FileChannel fileChannel;
     private long fileSize;
     private int modificationVersion;
     private int persistedVersion = -1;
+    private Instant renewLeaseAfter = Instant.MIN;
     private boolean closed;
 
     HibernatePackOutputStream(
@@ -273,6 +300,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       if (offset < 0 || length < 0 || offset > source.length - length) {
         throw new IndexOutOfBoundsException();
       }
+      renewLeaseIfDue();
       ByteBuffer buffer = ByteBuffer.wrap(source, offset, length);
       long writePosition = fileSize;
       while (buffer.hasRemaining()) {
@@ -318,12 +346,20 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
     @Override
     public void flush() throws IOException {
+      flush(false);
+    }
+
+    private void flush(boolean forceOwnershipCheck) throws IOException {
       ensureOpen();
-      if (persistedVersion == modificationVersion) {
+      Instant now = Instant.now();
+      boolean payloadChanged = persistedVersion != modificationVersion;
+      boolean leaseDue = !now.isBefore(renewLeaseAfter);
+      if (!payloadChanged && !leaseDue && !forceOwnershipCheck) {
         return;
       }
       long sizeAtFlush = fileSize;
-      transactionContext.execute(
+      transactionContext.executeWithRepositoryLock(
+          repositoryName,
           session -> {
             GitPackEntity entity =
                 session
@@ -335,30 +371,53 @@ public class HibernateObjDatabase extends DfsObjDatabase {
                     .setParameter("name", packName)
                     .setParameter("ext", packExtension)
                     .uniqueResult();
-            if (entity == null) {
+
+            boolean rewritePayload = payloadChanged || entity == null;
+            if (entity != null) {
+              if (entity.isCommitted()) {
+                throw new IOException("Pack is already committed: " + packName + "." + packExtension);
+              }
+              String owner = entity.getWriteToken();
+              if (owner != null && !writeToken.equals(owner)) {
+                throw new IOException(
+                    "Pack writer ownership was lost for " + packName + "." + packExtension);
+              }
+            } else {
               entity = new GitPackEntity();
               entity.setRepositoryName(repositoryName);
               entity.setPackName(packName);
               entity.setPackExtension(packExtension);
-              entity.setCreatedAt(Instant.now());
+              entity.setCreatedAt(now);
               session.persist(entity);
             }
+
             entity.setData(null);
             entity.setFileSize(sizeAtFlush);
             entity.setCommitted(false);
             entity.setCommittedAt(null);
+            entity.setWriteToken(writeToken);
+            entity.setWriteLeaseUntil(now.plus(PACK_WRITE_LEASE));
             session.flush();
 
-            Long packId = entity.getId();
-            session
-                .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId = :packId")
-                .setParameter("packId", packId)
-                .executeUpdate();
-            session.flush();
-            persistChunks(session, packId, sizeAtFlush);
+            if (rewritePayload) {
+              Long packId = entity.getId();
+              session
+                  .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId = :packId")
+                  .setParameter("packId", packId)
+                  .executeUpdate();
+              session.flush();
+              persistChunks(session, packId, sizeAtFlush);
+            }
             return null;
           });
       persistedVersion = modificationVersion;
+      renewLeaseAfter = now.plus(PACK_LEASE_RENEWAL_INTERVAL);
+    }
+
+    private void renewLeaseIfDue() throws IOException {
+      if (persistedVersion >= 0 && !Instant.now().isBefore(renewLeaseAfter)) {
+        flush(false);
+      }
     }
 
     private void persistChunks(Session session, Long packId, long sizeAtFlush) throws IOException {
@@ -410,7 +469,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       }
       IOException failure = null;
       try {
-        flush();
+        flush(true);
       } catch (IOException exception) {
         failure = exception;
       }
@@ -428,6 +487,10 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       if (failure != null) {
         throw failure;
       }
+    }
+
+    String writeToken() {
+      return writeToken;
     }
 
     private static IOException combine(IOException primary, IOException additional) {
