@@ -29,6 +29,10 @@ public final class CoreSchemaMigrations {
   public static final String POSTGRESQL_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/core/postgresql";
 
+  /** Flyway location for Microsoft SQL Server migrations. */
+  public static final String SQL_SERVER_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/core/sqlserver";
+
   /** Flyway location for adopting the pre-library schema on HSQLDB. */
   public static final String HSQLDB_LEGACY_ADOPTION_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/core/adoption/hsqldb";
@@ -36,6 +40,10 @@ public final class CoreSchemaMigrations {
   /** Flyway location for adopting the pre-library schema on PostgreSQL. */
   public static final String POSTGRESQL_LEGACY_ADOPTION_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/core/adoption/postgresql";
+
+  /** Flyway location for adopting the pre-library schema on Microsoft SQL Server. */
+  public static final String SQL_SERVER_LEGACY_ADOPTION_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/core/adoption/sqlserver";
 
   /** Dedicated Flyway schema history table for core storage. */
   public static final String SCHEMA_HISTORY_TABLE =
