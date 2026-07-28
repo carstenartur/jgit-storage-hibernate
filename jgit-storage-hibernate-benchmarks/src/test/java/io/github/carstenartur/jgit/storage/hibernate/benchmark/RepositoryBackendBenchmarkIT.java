@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class RepositoryBackendBenchmarkIT {
 
-  private static final int EXPECTED_OPERATION_COUNT = 13;
+  private static final int EXPECTED_OPERATION_COUNT = 15;
   private static final Set<String> EXPECTED_BACKENDS =
       Set.of(
           HibernateRepositoryBenchmark.FILESYSTEM,
