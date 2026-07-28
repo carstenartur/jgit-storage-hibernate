@@ -99,6 +99,16 @@ The first complete protocol run produced these point estimates:
 
 The single-shot confidence intervals are still wide, especially for pushes. These values establish workload scale and regression history; they are not yet production sizing claims. They do show that database storage is competitive for clone/fetch and incremental workflows, while initial durable ingestion remains the clearest optimization target. HikariCP does not provide a repeatable serial latency advantage in this matrix.
 
+## Per-operation storage metrics
+
+The four protocol workloads publish Hibernate and repository coordination costs as JMH secondary metrics. Fixture construction is completed before the counters are reset, so schema creation and deterministic baseline histories are excluded.
+
+The secondary results include Hibernate queries, prepared statements, transactions and connection acquisitions plus top-level storage transactions, commits, rollbacks, repository-lock acquisitions and cumulative lock acquisition time. Filesystem runs publish zero for database-specific counters.
+
+Detailed counter semantics, the opt-in property and interpretation guidance are documented in [Protocol storage metrics](protocol-storage-metrics.md).
+
+The public dashboard continues to chart primary latency. Secondary metrics remain in the raw JMH JSON workflow artifact for architecture decisions.
+
 ## Adaptive pack persistence and read-ahead under test
 
 The Hibernate backend stores small PACK, IDX and REFTABLE payloads up to 256 KiB in the existing inline payload column. Larger payloads continue to use bounded one MiB chunks.
@@ -210,7 +220,8 @@ This comparison is a controlled regression and architecture benchmark, not a com
 - HikariCP cannot remove transaction, locking, WAL or ORM costs and is primarily expected to help concurrent or connection-heavy use;
 - the single-operation probes exaggerate fixed durable-publication cost, while the batch workloads show amortized throughput;
 - the large sequential-read benchmark measures decompression and JGit streaming in addition to database chunk access;
-- protocol benchmarks use an in-process transport and therefore exclude network latency, TLS and HTTP/SSH server overhead.
+- protocol benchmarks use an in-process transport and therefore exclude network latency, TLS and HTTP/SSH server overhead;
+- lock acquisition time includes the database round trip and is not a portable measure of pure contention wait.
 
 The workflow therefore uses a conservative 150% regression alert threshold and keeps the raw JMH JSON for deeper investigation.
 
@@ -218,8 +229,7 @@ The workflow therefore uses a conservative 150% regression alert threshold and k
 
 The next high-value storage measurements are write-path and concurrency scenarios:
 
-- record SQL statement counts, transaction counts, connection acquisitions and repository-lock acquisition time per protocol workload;
-- use those counts to select incremental pack persistence or JDBC batching as the next implementation;
+- use protocol statement and transaction counts to select incremental pack persistence or JDBC batching as the next implementation;
 - record transferred pack bytes and database payload bytes per workflow;
 - compare one-, four- and sixteen-chunk read-ahead windows with query counts and transferred bytes;
 - add concurrent readers and writers using independent `SessionFactory` instances;
