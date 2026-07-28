@@ -92,7 +92,7 @@ class PackStorageMaintenanceH2Test {
   }
 
   @Test
-  void reclaimedWriterCannotSilentlyRecreateItsExpiredPack() throws Exception {
+  void reclaimedWriterCannotPersistOrRecreateItsExpiredPack() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository ignored =
             HibernateRepository.create(provider.getSessionFactory(), "maintenance-repo")) {
@@ -118,9 +118,9 @@ class PackStorageMaintenanceH2Test {
       assertEquals(new PackCleanupResult(1, 1, payload.length), cleanup);
       assertEquals(0, countPackRows(provider, "stalled-pack"));
 
-      IOException writeFailure =
-          assertThrows(IOException.class, () -> stalled.write(payload, 0, payload.length));
-      assertTrue(writeFailure.getMessage().contains("ownership was lost"));
+      // A resumed process may still append to its local temporary file before touching the DB.
+      // The mandatory ownership check at close must reject persistence and must not recreate rows.
+      stalled.write(payload, 0, payload.length);
       IOException closeFailure = assertThrows(IOException.class, stalled::close);
       assertTrue(closeFailure.getMessage().contains("ownership was lost"));
       assertEquals(0, countPackRows(provider, "stalled-pack"));
