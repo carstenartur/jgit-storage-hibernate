@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
@@ -34,7 +35,7 @@ class AdaptiveHibernatePackStorageH2Test {
         Repository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      byte[] payload = "small application commit payload".getBytes(Constants.CHARSET);
+      byte[] payload = "small application commit payload".getBytes(StandardCharsets.UTF_8);
       ObjectId objectId = insertBlob(repository, payload);
 
       try (ObjectReader reader = repository.newObjectReader()) {
