@@ -14,11 +14,7 @@ public record HibernateStorageMetricsSnapshot(
     long transactionsCommitted,
     long transactionsRolledBack,
     long repositoryLockAcquisitions,
-    long repositoryLockWaitNanos,
-    long payloadBytesRead,
-    long payloadBytesWritten,
-    long chunkRowsInserted,
-    long chunkRowsDeleted) {
+    long repositoryLockWaitNanos) {
 
   /** Repository-lock wait time converted to milliseconds for reports and operational telemetry. */
   public double repositoryLockWaitMillis() {
