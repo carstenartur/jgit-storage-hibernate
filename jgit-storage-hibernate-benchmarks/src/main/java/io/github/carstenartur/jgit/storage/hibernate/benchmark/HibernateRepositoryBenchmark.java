@@ -11,11 +11,13 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -73,9 +75,11 @@ public class HibernateRepositoryBenchmark {
 
   private static final int BULK_BLOB_COUNT = 100;
   private static final int COMMIT_SERIES_LENGTH = 10;
+  private static final int LARGE_BLOB_SIZE = 2 * 1024 * 1024 + 257;
   private static final String PAYLOAD_PADDING = "x".repeat(1024);
 
   private final AtomicInteger counter = new AtomicInteger();
+  private final byte[] streamBuffer = new byte[64 * 1024];
 
   @Param({FILESYSTEM, HSQLDB, POSTGRESQL, POSTGRESQL_HIKARI})
   public String backend;
@@ -85,6 +89,7 @@ public class HibernateRepositoryBenchmark {
   private Path repositoryDirectory;
   private String repositoryName;
   private ObjectId blobId;
+  private ObjectId largeBlobId;
   private ObjectId commitId;
 
   @Setup(Level.Trial)
@@ -94,6 +99,9 @@ public class HibernateRepositoryBenchmark {
     repository = createRepository();
     repository.create(true);
     blobId = writeBlob("initial blob");
+    byte[] largePayload = new byte[LARGE_BLOB_SIZE];
+    new Random(42).nextBytes(largePayload);
+    largeBlobId = writeBlob(largePayload);
     commitId = writeCommitWithFile("Initial commit", "README.md", "initial content");
     updateRef("refs/heads/main", commitId);
   }
@@ -133,6 +141,29 @@ public class HibernateRepositoryBenchmark {
   public byte[] readBlobAfterJGitCacheReset() throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     return readBlob(blobId);
+  }
+
+  /**
+   * Streams a non-compressible multi-chunk blob after resetting JGit's block cache.
+   *
+   * <p>This approximates the sequential pack access used by clone, fetch and large binary-object
+   * export while leaving operating-system and database buffer caches warm.
+   */
+  @Benchmark
+  public long readLargeBlobSequentiallyAfterJGitCacheReset() throws Exception {
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    try (ObjectReader reader = repository.newObjectReader();
+        InputStream input = reader.open(largeBlobId).openStream()) {
+      long total = 0;
+      int count;
+      while ((count = input.read(streamBuffer)) >= 0) {
+        total += count;
+      }
+      if (total != LARGE_BLOB_SIZE) {
+        throw new IllegalStateException("Expected " + LARGE_BLOB_SIZE + " bytes, read " + total);
+      }
+      return total;
+    }
   }
 
   /** Measures resolving a frequently used ref while the repository instance remains open. */
@@ -265,8 +296,12 @@ public class HibernateRepositoryBenchmark {
   }
 
   private ObjectId writeBlob(String content) throws Exception {
+    return writeBlob(content.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private ObjectId writeBlob(byte[] content) throws Exception {
     try (ObjectInserter inserter = repository.newObjectInserter()) {
-      ObjectId id = inserter.insert(Constants.OBJ_BLOB, content.getBytes(StandardCharsets.UTF_8));
+      ObjectId id = inserter.insert(Constants.OBJ_BLOB, content);
       inserter.flush();
       return id;
     }
