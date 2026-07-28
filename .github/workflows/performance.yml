@@ -113,12 +113,12 @@ jobs:
           if-no-files-found: error
 
   publish-history:
-    name: Publish benchmark history
+    name: Publish benchmark history and badge
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: jmh
     runs-on: ubuntu-latest
     concurrency:
-      group: benchmark-history-publication-${{ github.repository }}
+      group: repository-pages-publication-${{ github.repository }}
       cancel-in-progress: false
     permissions:
       contents: write
@@ -134,98 +134,61 @@ jobs:
           name: jmh-backend-comparison-results
           path: ${{ runner.temp }}/jmh-benchmark-artifact
 
-      - name: Locate benchmark comparison artifact
-        id: benchmark-artifact
+      - name: Publish generated benchmark pages
         shell: bash
         run: |
           set -euo pipefail
-          result="$(find "${RUNNER_TEMP}/jmh-benchmark-artifact" -type f -name backend-comparison.json -print -quit)"
-          test -s "$result"
-          echo "path=$result" >> "$GITHUB_OUTPUT"
+          artifact_root="${RUNNER_TEMP}/jmh-benchmark-artifact"
+          benchmark_source="$(find "$artifact_root" -type f -name backend-comparison.json -print -quit)"
+          badge_source="$(find "$artifact_root" -type f -name performance.json -print -quit)"
+          test -s "$benchmark_source"
+          test -s "$badge_source"
 
-      - name: Initialize benchmark history branch
-        run: |
-          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
-            exit 0
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            empty_tree="$(git mktree </dev/null)"
+            initial_commit="$(printf '%s\n' 'Initialize generated project pages' | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$empty_tree")"
+            git push origin "$initial_commit:refs/heads/gh-pages"
           fi
-          empty_tree="$(git mktree </dev/null)"
-          export GIT_AUTHOR_NAME='github-actions[bot]'
-          export GIT_AUTHOR_EMAIL='github-actions[bot]@users.noreply.github.com'
-          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
-          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
-          initial_commit="$(printf '%s\n' 'Initialize benchmark history' | git commit-tree "$empty_tree")"
-          git push origin "$initial_commit:refs/heads/gh-pages"
 
-      - name: Store benchmark history and publish charts
-        uses: benchmark-action/github-action-benchmark@67cf262e8c79ad6f86652f2cb0c4ea19dbd5660a # v1.22.1
-        with:
-          name: Repository backend comparison
-          tool: customSmallerIsBetter
-          output-file-path: ${{ steps.benchmark-artifact.outputs.path }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          gh-repository: github.com/carstenartur/jgit-storage-hibernate
-          gh-pages-branch: gh-pages
-          benchmark-data-dir-path: dev/bench
-          alert-threshold: '150%'
-          comment-on-alert: true
-          fail-on-alert: false
-          alert-comment-cc-users: '@carstenartur'
-          summary-always: true
-          max-items-in-chart: 100
-
-  update-performance-badge:
-    name: Update JMH performance badge
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: jmh
-    runs-on: ubuntu-latest
-    concurrency:
-      group: repository-badge-publication-${{ github.repository }}-${{ github.ref }}
-      cancel-in-progress: false
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Download generated badge outside the worktree
-        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
-        with:
-          name: jmh-backend-comparison-results
-          path: ${{ runner.temp }}/jmh-benchmark-artifact
-
-      - name: Commit performance badge without racing other badge jobs
-        shell: bash
-        run: |
-          set -euo pipefail
-          source_badge="$(find "${RUNNER_TEMP}/jmh-benchmark-artifact" -type f -path '*/docs/badges/performance.json' -print -quit)"
-          if [ -z "$source_badge" ]; then
-            source_badge="$(find "${RUNNER_TEMP}/jmh-benchmark-artifact" -type f -name performance.json -print -quit)"
-          fi
-          test -s "$source_badge"
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          pages_dir="${RUNNER_TEMP}/generated-pages-jmh"
+          summary_file="${RUNNER_TEMP}/benchmark-comparison-summary.md"
+          published_at="$(date +%s%3N)"
 
           for attempt in 1 2 3; do
-            git fetch origin main
-            git checkout -B main origin/main
+            git fetch origin gh-pages
+            git worktree remove --force "$pages_dir" >/dev/null 2>&1 || true
+            git worktree prune
+            git worktree add --detach "$pages_dir" origin/gh-pages
+            rm -f "$summary_file"
 
-            if cmp -s "$source_badge" docs/badges/performance.json; then
-              echo 'Performance badge data unchanged'
+            python3 .github/scripts/publish-benchmark-history.py \
+              --data-file "$pages_dir/dev/bench/data.js" \
+              --benchmark-file "$benchmark_source" \
+              --repository-dir "$GITHUB_WORKSPACE" \
+              --repository-url "https://github.com/${GITHUB_REPOSITORY}" \
+              --commit "$GITHUB_SHA" \
+              --actor "$GITHUB_ACTOR" \
+              --timestamp-ms "$published_at" \
+              --summary-file "$summary_file" \
+              --alert-threshold 1.5
+
+            mkdir -p "$pages_dir/badges"
+            cp "$badge_source" "$pages_dir/badges/performance.json"
+            git -C "$pages_dir" add dev/bench/data.js badges/performance.json
+
+            if git -C "$pages_dir" diff --cached --quiet; then
+              cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+              echo 'Benchmark history and badge unchanged'
               exit 0
             fi
 
-            cp "$source_badge" docs/badges/performance.json
-            git add docs/badges/performance.json
-            git commit -m 'Update JMH performance badge [skip ci]'
-            if git push origin HEAD:main; then
+            git -C "$pages_dir" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Add benchmark result for ${GITHUB_SHA}"
+            if git -C "$pages_dir" push origin HEAD:gh-pages; then
+              cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             sleep $((attempt * 2))
           done
 
-          echo 'Could not publish performance badge after three attempts' >&2
+          echo 'Could not publish benchmark history after three attempts' >&2
           exit 1
