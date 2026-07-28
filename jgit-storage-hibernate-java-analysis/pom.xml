@@ -17,6 +17,11 @@
     Optional Java/JDT analysis and binding-aware Hibernate Search projections for Git history.
   </description>
 
+  <properties>
+    <jacoco.minimum.line>0.68</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.52</jacoco.minimum.branch>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
