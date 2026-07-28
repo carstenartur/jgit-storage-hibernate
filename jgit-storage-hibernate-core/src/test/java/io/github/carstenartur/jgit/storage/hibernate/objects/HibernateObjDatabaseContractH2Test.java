@@ -62,7 +62,7 @@ class HibernateObjDatabaseContractH2Test {
         new HibernateObjDatabase.HibernatePackOutputStream(
             transactionContext, "repo", "pack-test", "pack");
 
-    byte[] first = deterministicBytes(HibernateObjDatabase.PACK_CHUNK_SIZE + 17, 3);
+    byte[] first = deterministicBytes(HibernateObjDatabase.PACK_CHUNK_SIZE + 97, 3);
     byte[] second = deterministicBytes(HibernateObjDatabase.PACK_CHUNK_SIZE + 31, 97);
     byte[] expected = concatenate(first, second);
 
@@ -70,7 +70,10 @@ class HibernateObjDatabaseContractH2Test {
     ByteBuffer beforeFlush = ByteBuffer.allocate(32);
     assertEquals(32, stream.read(HibernateObjDatabase.PACK_CHUNK_SIZE - 8L, beforeFlush));
     assertArrayEquals(
-        Arrays.copyOfRange(first, HibernateObjDatabase.PACK_CHUNK_SIZE - 8, HibernateObjDatabase.PACK_CHUNK_SIZE + 24),
+        Arrays.copyOfRange(
+            first,
+            HibernateObjDatabase.PACK_CHUNK_SIZE - 8,
+            HibernateObjDatabase.PACK_CHUNK_SIZE + 24),
         beforeFlush.array());
 
     stream.flush();
@@ -104,7 +107,10 @@ class HibernateObjDatabaseContractH2Test {
               .setParameter("packId", packId)
               .getResultList();
       assertEquals(3, chunks.size());
-      assertTrue(chunks.stream().allMatch(chunk -> chunk.getData().length <= HibernateObjDatabase.PACK_CHUNK_SIZE));
+      assertTrue(
+          chunks.stream()
+              .allMatch(
+                  chunk -> chunk.getData().length <= HibernateObjDatabase.PACK_CHUNK_SIZE));
       assertArrayEquals(expected, concatenate(chunks));
     }
 
