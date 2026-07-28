@@ -81,7 +81,7 @@ See the complete [change-audit and Java-usage use case](docs/use-cases/change-au
 
 | Need | What the project adds | Maturity in `0.1.x` |
 |---|---|---|
-| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with transactional pack publication | Supported Core contract |
+| Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with chunked payloads and transactional publication | Supported Core contract |
 | Run repeated structured history queries | Materialized first-parent changed paths plus indexed author, committer and timestamp fields | Supported Search contract |
 | Search history content | Hibernate Search/Lucene indexes for messages, changed paths and selected changed-file text | Supported Search contract |
 | Understand Java evolution beyond tokens and lines | Binding-aware symbols, references, semantic diff, timelines and software graphs | Analysis API supported; persistence incubating |
@@ -170,10 +170,12 @@ Framework-managed applications can supply their own Hibernate `SessionFactory`. 
 
 Core uses explicit Hibernate transactions rather than presenting partially written database rows as repository state:
 
-- pack extensions are first persisted with `committed=false` and are invisible to readers;
-- publishing all extensions of a pack and deleting replaced packs happens in one transaction;
+- pack extensions are written through temporary files and persisted as ordered 1 MiB chunks with `committed=false`;
+- writer tokens and renewable leases prevent cleanup from deleting slow active writers;
+- publishing all extensions of a pack clears their leases and deleting replaced packs removes metadata plus chunks in one transaction;
 - normal JGit `RefUpdate` operations publish the Reftable and append the queryable `git_reflog` row in the same repository-scoped transaction;
 - failed optimistic ref updates do not append a queryable reflog entry;
+- lease-aware `PackStorageMaintenance` removes only old pack groups for which every persisted extension is uncommitted and inactive;
 - Search projection upserts remain separate, retryable derived-state operations.
 
 The guarantee is deliberately **per storage operation**. The implementation does not provide one ambient transaction spanning arbitrary application entities, Git insertion, Search indexing and Java analysis.
@@ -183,9 +185,12 @@ Independent `SessionFactory` instances are exercised against one PostgreSQL sche
 ## Current operational boundaries
 
 - Shallow repositories are rejected explicitly; shallow boundaries are not silently retained only in memory.
-- Pack payloads are currently materialized as complete byte arrays. This favors correctness and simplicity over very-large-pack streaming; consult [the capacity and recovery notes](docs/operations/capacity-and-recovery.md) before using large repositories.
+- New pack-related payloads use bounded chunks, but concurrent writers still require sufficient temporary-disk capacity and database throughput. Existing inline BLOB rows remain readable until replaced by a later repack.
+- The optional `pack-capacity` profile verifies 1 MiB, 16 MiB and 128 MiB payloads; it is evidence for bounded behavior, not an unlimited-repository claim.
 - Only packages not marked `@InternalApi` form the supported consumer API. DFS/Reftable adapter packages may change with the pinned JGit implementation.
 - Search rows created before the author/committer split must be reindexed after upgrading so committer metadata is authoritative.
+
+See [Pack capacity and recovery](docs/operations/capacity-and-recovery.md) for sizing, writer leases and cleanup.
 
 ## Versioned database contract
 
@@ -196,9 +201,11 @@ Independent `SessionFactory` instances are exercised against one PostgreSQL sche
 | Java Analysis entities | no module-owned contract | no | no | incubating |
 | Architecture entities | no module-owned contract | no | no | incubating |
 
+Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`. The chunk migration preserves existing inline BLOBs and applies chunking only to new writes.
+
 ## Verification
 
-`mvn verify` exercises H2, HSQLDB in-memory/file-backed restart paths and PostgreSQL through Testcontainers when Docker is available. CI also checks JGit 7.5, 7.6 and 7.7 compatibility, dependency changes, release consistency and repeatable JMH workloads.
+`mvn verify` exercises H2, HSQLDB in-memory/file-backed restart paths and PostgreSQL through Testcontainers when Docker is available. CI also checks JGit 7.5, 7.6 and 7.7 compatibility, dependency changes, release consistency and repeatable JMH workloads. The existing performance workflow additionally runs the 1/16/128 MiB pack-capacity profile manually and weekly.
 
 ## Documentation
 
