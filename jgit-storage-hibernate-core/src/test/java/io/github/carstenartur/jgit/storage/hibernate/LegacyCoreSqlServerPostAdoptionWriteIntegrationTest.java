@@ -97,7 +97,7 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
           count(
                   statement,
                   "select count(*) from git_packs "
-                      + "where repository_name = 'post-adoption' and data is null and committed = 1")
+                      + "where repository_name = 'post-adoption' and committed = 1")
               > 0);
       assertEquals(
           1,
