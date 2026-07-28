@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.config;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
@@ -22,7 +23,11 @@ import java.util.List;
 public final class CoreEntities {
 
   private static final List<Class<?>> ANNOTATED_CLASSES =
-      List.of(GitPackEntity.class, GitReflogEntity.class, GitRepositoryLockEntity.class);
+      List.of(
+          GitPackEntity.class,
+          GitPackChunkEntity.class,
+          GitReflogEntity.class,
+          GitRepositoryLockEntity.class);
 
   /**
    * Return the immutable list of annotated core entity classes.
