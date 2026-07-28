@@ -399,7 +399,9 @@ public class HibernateObjDatabase extends DfsObjDatabase {
             }
 
             boolean inlinePayload = sizeAtFlush <= INLINE_PAYLOAD_THRESHOLD;
-            entity.setData(rewritePayload && inlinePayload ? readInlinePayload(sizeAtFlush) : null);
+            if (rewritePayload) {
+              entity.setData(inlinePayload ? readInlinePayload(sizeAtFlush) : null);
+            }
             entity.setFileSize(sizeAtFlush);
             entity.setCommitted(false);
             entity.setCommittedAt(null);
