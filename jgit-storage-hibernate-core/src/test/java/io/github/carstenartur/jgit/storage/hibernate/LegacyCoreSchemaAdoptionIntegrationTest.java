@@ -18,6 +18,7 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
 import io.github.carstenartur.jgit.storage.hibernate.schema.LegacyCoreSchemaAdoption;
 import io.github.carstenartur.jgit.storage.hibernate.schema.LegacyCoreSchemaAdoptionException;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Connection;
@@ -215,9 +216,7 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
     assertEquals(CORE_REF_NAME_LENGTH, columnSize(database, "git_reflog", "ref_name"));
     assertEquals(
         List.of(
-            "0",
-            RELEASED_0_1_8_ADOPTION_VERSION,
-            CoreSchemaMigrations.LEGACY_ADOPTION_VERSION),
+            "0", RELEASED_0_1_8_ADOPTION_VERSION, CoreSchemaMigrations.LEGACY_ADOPTION_VERSION),
         adoptionVersions(database));
     assertEquals(checksumsBefore, packChecksums(database));
     assertEquals(reflogRowsBefore, reflogRows(database));
@@ -227,6 +226,8 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
       assertFalse(report.requiresAdoption());
       assertEquals(0, report.incompletePackRows());
       assertTrue(report.duplicatePackIdentities().isEmpty());
+      assertTrue(tableExists(connection, "git_pack_chunks"));
+      assertTrue(tableExists(connection, "git_repository_lock"));
       try (Statement statement = connection.createStatement();
           ResultSet resultSet =
               statement.executeQuery(
@@ -357,17 +358,62 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
   }
 
   private static void downgradeToPreLibrarySchema(AdoptionDatabase database) throws Exception {
+    materializeChunkedPayloads(database);
     try (Connection connection = database.openConnection();
         Statement statement = connection.createStatement()) {
+      statement.execute("drop table git_pack_chunks");
+      statement.execute("drop table git_repository_lock");
       statement.execute("drop table \"" + CoreSchemaMigrations.SCHEMA_HISTORY_TABLE + "\"");
+      statement.execute("drop index idx_pack_repo_lease");
       statement.execute("drop index idx_pack_repo_committed");
       statement.execute("alter table git_packs drop constraint uk_pack_repo_name_ext");
+      statement.execute("alter table git_packs alter column data set not null");
+      statement.execute("alter table git_packs drop column write_lease_until");
+      statement.execute("alter table git_packs drop column write_token");
       statement.execute("alter table git_packs drop column committed_at");
       statement.execute("alter table git_packs drop column committed");
       statement.execute(
           "alter table git_packs alter column pack_extension set data type varchar(255)");
       statement.execute(
           "alter table git_reflog alter column ref_name set data type varchar(255)");
+    }
+  }
+
+  private static void materializeChunkedPayloads(AdoptionDatabase database) throws Exception {
+    List<Long> packIds = new ArrayList<>();
+    try (Connection connection = database.openConnection();
+        Statement statement = connection.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery("select id from git_packs where data is null order by id")) {
+      while (resultSet.next()) {
+        packIds.add(resultSet.getLong(1));
+      }
+    }
+
+    for (Long packId : packIds) {
+      byte[] payload;
+      try (Connection connection = database.openConnection();
+          var statement =
+              connection.prepareStatement(
+                  "select chunk_data from git_pack_chunks where pack_id = ? order by chunk_index")) {
+        statement.setLong(1, packId);
+        try (ResultSet resultSet = statement.executeQuery();
+            ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+          while (resultSet.next()) {
+            output.write(resultSet.getBytes(1));
+          }
+          payload = output.toByteArray();
+        }
+      }
+      try (Connection connection = database.openConnection();
+          var statement =
+              connection.prepareStatement(
+                  "update git_packs set data = ?, file_size = ? where id = ?")) {
+        statement.setBytes(1, payload);
+        statement.setLong(2, payload.length);
+        statement.setLong(3, packId);
+        assertEquals(1, statement.executeUpdate());
+      }
     }
   }
 
@@ -418,6 +464,10 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
           columnSize(connection, "git_reflog", "ref_name"));
       assertFalse(
           tableExists(connection, CoreSchemaMigrations.LEGACY_ADOPTION_SCHEMA_HISTORY_TABLE));
+      assertFalse(tableExists(connection, "git_pack_chunks"));
+      assertFalse(tableExists(connection, "git_repository_lock"));
+      assertFalse(columnExists(connection, "git_packs", "write_token"));
+      assertFalse(columnExists(connection, "git_packs", "write_lease_until"));
     }
   }
 
@@ -456,6 +506,20 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
       }
     }
     throw new AssertionError("Column not found: " + table + "." + column);
+  }
+
+  private static boolean columnExists(Connection connection, String table, String column)
+      throws Exception {
+    DatabaseMetaData metadata = connection.getMetaData();
+    try (ResultSet resultSet = metadata.getColumns(null, connection.getSchema(), "%", "%")) {
+      while (resultSet.next()) {
+        if (table.equalsIgnoreCase(resultSet.getString("TABLE_NAME"))
+            && column.equalsIgnoreCase(resultSet.getString("COLUMN_NAME"))) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private static boolean tableExists(Connection connection, String table) throws Exception {

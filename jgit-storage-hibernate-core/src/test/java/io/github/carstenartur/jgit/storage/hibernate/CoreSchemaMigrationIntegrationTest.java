@@ -52,7 +52,7 @@ class CoreSchemaMigrationIntegrationTest {
   private static final String H2_LEGACY_SCHEMA =
       "/db/legacy/jgit-storage-hibernate/core/0.1.4/h2/schema.sql";
   private static final List<String> EXPECTED_MIGRATIONS =
-      List.of("0.1.4", "0.1.5", "0.1.14");
+      List.of("0.1.4", "0.1.5", "0.1.14", "0.1.14.1", "0.1.14.2");
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
@@ -82,6 +82,7 @@ class CoreSchemaMigrationIntegrationTest {
       verifyUncommittedPackInvisible(provider.getSessionFactory(), incompleteRepositoryName);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
       assertRepositoryLockRow(database, repositoryName);
+      assertChunkedPayloadRows(database, repositoryName);
     }
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
@@ -106,6 +107,7 @@ class CoreSchemaMigrationIntegrationTest {
       verifyUncommittedPackInvisible(provider.getSessionFactory(), legacyIncompleteRepository);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
       assertRepositoryLockRow(database, repositoryName);
+      assertChunkedPayloadRows(database, repositoryName);
     }
 
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
@@ -242,6 +244,31 @@ class CoreSchemaMigrationIntegrationTest {
       try (ResultSet resultSet = statement.executeQuery()) {
         assertTrue(resultSet.next());
         assertEquals(1, resultSet.getInt(1));
+      }
+    }
+  }
+
+  private static void assertChunkedPayloadRows(TestDatabase database, String repositoryName)
+      throws SQLException {
+    try (Connection connection = database.openConnection();
+        var statement =
+            connection.prepareStatement(
+                "select count(*) from git_pack_chunks c join git_packs p on p.id = c.pack_id "
+                    + "where p.repository_name = ?")) {
+      statement.setString(1, repositoryName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.getLong(1) > 0);
+      }
+    }
+    try (Connection connection = database.openConnection();
+        var statement =
+            connection.prepareStatement(
+                "select count(*) from git_packs where repository_name = ? and data is not null")) {
+      statement.setString(1, repositoryName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        assertTrue(resultSet.next());
+        assertEquals(0, resultSet.getLong(1));
       }
     }
   }

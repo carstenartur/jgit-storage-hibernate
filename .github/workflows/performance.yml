@@ -2,6 +2,8 @@ name: JMH Benchmarks
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
   pull_request:
     branches: [ main ]
   push:
@@ -80,6 +82,34 @@ jobs:
           echo 'PostgreSQL is provided by the JUnit Testcontainers extension; the workflow only invokes Maven.' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
+
+  pack-capacity:
+    name: Chunked pack capacity 1/16/128 MiB
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify bounded chunk storage capacity
+        run: mvn -B -pl jgit-storage-hibernate-core -Ppack-capacity verify
+
+      - name: Upload capacity test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chunked-pack-capacity-results
+          path: jgit-storage-hibernate-core/target/failsafe-reports/*
+          if-no-files-found: error
 
   publish-history:
     name: Publish benchmark history

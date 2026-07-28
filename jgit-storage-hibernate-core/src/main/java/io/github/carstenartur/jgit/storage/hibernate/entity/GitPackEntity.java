@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.entity;
 
 import jakarta.persistence.Basic;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,11 +17,16 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 
 /** Entity representing one persisted pack-related file, such as PACK, IDX or REFTABLE. */
@@ -30,7 +36,10 @@ import org.hibernate.type.SqlTypes;
     indexes = {
       @Index(name = "idx_pack_repo", columnList = "repository_name"),
       @Index(name = "idx_pack_repo_name", columnList = "repository_name, pack_name"),
-      @Index(name = "idx_pack_repo_committed", columnList = "repository_name, committed")
+      @Index(name = "idx_pack_repo_committed", columnList = "repository_name, committed"),
+      @Index(
+          name = "idx_pack_repo_lease",
+          columnList = "repository_name, committed, write_lease_until")
     },
     uniqueConstraints = {
       @UniqueConstraint(
@@ -54,16 +63,33 @@ public class GitPackEntity {
   @Column(name = "pack_extension", nullable = false, length = 32)
   private String packExtension;
 
+  /**
+   * Legacy inline payload.
+   *
+   * <p>Rows written by the chunked storage path leave this column {@code null} and store their
+   * payload in {@code git_pack_chunks}. Keeping the column allows existing installations to be
+   * upgraded without rewriting every already published pack.
+   */
   @JdbcTypeCode(SqlTypes.LONG32VARBINARY)
   @Basic(fetch = FetchType.LAZY)
-  @Column(name = "data", nullable = false)
+  @Column(name = "data")
   private byte[] data;
+
+  @OneToMany(mappedBy = "pack", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OnDelete(action = OnDeleteAction.CASCADE)
+  private List<GitPackChunkEntity> chunks = new ArrayList<>();
 
   @Column(name = "file_size", nullable = false)
   private long fileSize;
 
   @Column(name = "committed", nullable = false)
   private boolean committed;
+
+  @Column(name = "write_token", length = 36)
+  private String writeToken;
+
+  @Column(name = "write_lease_until")
+  private Instant writeLeaseUntil;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
@@ -111,6 +137,10 @@ public class GitPackEntity {
     this.data = data;
   }
 
+  public List<GitPackChunkEntity> getChunks() {
+    return chunks;
+  }
+
   public long getFileSize() {
     return fileSize;
   }
@@ -125,6 +155,22 @@ public class GitPackEntity {
 
   public void setCommitted(boolean committed) {
     this.committed = committed;
+  }
+
+  public String getWriteToken() {
+    return writeToken;
+  }
+
+  public void setWriteToken(String writeToken) {
+    this.writeToken = writeToken;
+  }
+
+  public Instant getWriteLeaseUntil() {
+    return writeLeaseUntil;
+  }
+
+  public void setWriteLeaseUntil(Instant writeLeaseUntil) {
+    this.writeLeaseUntil = writeLeaseUntil;
   }
 
   public Instant getCreatedAt() {
