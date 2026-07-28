@@ -22,16 +22,16 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.mssqlserver.MSSQLServerContainer;
 
 @Testcontainers(disabledWithoutDocker = true)
 class LegacyCoreSqlServerSchemaPreflightIntegrationTest {
 
   @Container
-  static final MSSQLServerContainer<?> SQL_SERVER =
-      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04")
+  static final MSSQLServerContainer SQL_SERVER =
+      new MSSQLServerContainer("mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04")
           .acceptLicense();
 
   @Test
