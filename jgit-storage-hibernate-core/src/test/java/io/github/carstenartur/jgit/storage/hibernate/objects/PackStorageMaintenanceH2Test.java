@@ -10,8 +10,6 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.PackCleanupResult;
@@ -36,7 +34,7 @@ class PackStorageMaintenanceH2Test {
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
 
   @Test
-  void deletesOnlyExpiredUncommittedWritersAndAllowsLeasedWriterToContinue() throws Exception {
+  void deletesOnlyExpiredPackGroupsAndAllowsLeasedWriterToContinue() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository ignored =
             HibernateRepository.create(provider.getSessionFactory(), "maintenance-repo")) {
@@ -56,9 +54,11 @@ class PackStorageMaintenanceH2Test {
       activeStream.flush();
       agePack(provider, "active-pack", old, now.plusSeconds(3_600));
 
-      persistPack(provider, "expired-pack", old, now.minusSeconds(1), false, 7);
-      persistPack(provider, "legacy-orphan", old, null, false, 9);
-      persistPack(provider, "published-pack", old, now.minusSeconds(1), true, 13);
+      // One expired sibling must not make a partially active multi-extension pack eligible.
+      persistPack(provider, "active-pack", "idx", old, now.minusSeconds(1), false, 5);
+      persistPack(provider, "expired-pack", "pack", old, now.minusSeconds(1), false, 7);
+      persistPack(provider, "legacy-orphan", "pack", old, null, false, 9);
+      persistPack(provider, "published-pack", "pack", old, null, true, 13);
 
       PackStorageMaintenance maintenance =
           new PackStorageMaintenance(provider.getSessionFactory());
@@ -67,30 +67,32 @@ class PackStorageMaintenanceH2Test {
               new RepositoryName("maintenance-repo"), cutoff, now);
 
       assertEquals(new PackCleanupResult(2, 2, 16), firstCleanup);
-      assertPackExists(provider, "active-pack", true);
-      assertPackExists(provider, "published-pack", true);
-      assertPackExists(provider, "expired-pack", false);
-      assertPackExists(provider, "legacy-orphan", false);
+      assertEquals(2, countPackRows(provider, "active-pack"));
+      assertEquals(1, countPackRows(provider, "published-pack"));
+      assertEquals(0, countPackRows(provider, "expired-pack"));
+      assertEquals(0, countPackRows(provider, "legacy-orphan"));
 
       activeStream.write(second, 0, second.length);
       activeStream.close();
-      assertArrayEquals(concatenate(first, second), readChunks(provider, "active-pack"));
+      assertArrayEquals(
+          concatenate(first, second), readChunks(provider, "active-pack", "pack"));
 
       agePack(provider, "active-pack", old, now.minusSeconds(1));
       PackCleanupResult secondCleanup =
           maintenance.deleteExpiredUncommittedPacks(
               new RepositoryName("maintenance-repo"), cutoff, now);
-      assertEquals(1, secondCleanup.packRows());
-      assertTrue(secondCleanup.chunkRows() > 0);
-      assertEquals(first.length + second.length, secondCleanup.payloadBytes());
-      assertPackExists(provider, "active-pack", false);
-      assertPackExists(provider, "published-pack", true);
+      assertEquals(2, secondCleanup.packRows());
+      assertTrue(secondCleanup.chunkRows() > 1);
+      assertEquals(first.length + second.length + 5L, secondCleanup.payloadBytes());
+      assertEquals(0, countPackRows(provider, "active-pack"));
+      assertEquals(1, countPackRows(provider, "published-pack"));
     }
   }
 
   private static void persistPack(
       HibernateSessionFactoryProvider provider,
       String packName,
+      String extension,
       Instant createdAt,
       Instant leaseUntil,
       boolean committed,
@@ -100,13 +102,13 @@ class PackStorageMaintenanceH2Test {
       GitPackEntity pack = new GitPackEntity();
       pack.setRepositoryName("maintenance-repo");
       pack.setPackName(packName);
-      pack.setPackExtension("pack");
+      pack.setPackExtension(extension);
       pack.setData(null);
       pack.setFileSize(size);
       pack.setCommitted(committed);
       pack.setCreatedAt(createdAt);
       pack.setCommittedAt(committed ? createdAt.plusSeconds(1) : null);
-      pack.setWriteToken(committed ? null : "writer-" + packName);
+      pack.setWriteToken(committed ? null : "writer-" + packName + "-" + extension);
       pack.setWriteLeaseUntil(committed ? null : leaseUntil);
       session.persist(pack);
       session.flush();
@@ -142,36 +144,33 @@ class PackStorageMaintenanceH2Test {
     }
   }
 
-  private static void assertPackExists(
-      HibernateSessionFactoryProvider provider, String packName, boolean expected) {
+  private static long countPackRows(
+      HibernateSessionFactoryProvider provider, String packName) {
     try (Session session = provider.getSessionFactory().openSession()) {
-      GitPackEntity pack =
-          session
-              .createQuery(
-                  "FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name",
-                  GitPackEntity.class)
-              .setParameter("repo", "maintenance-repo")
-              .setParameter("name", packName)
-              .uniqueResult();
-      if (expected) {
-        assertNotNull(pack);
-      } else {
-        assertNull(pack);
-      }
+      return session
+          .createQuery(
+              "SELECT COUNT(p) FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                  + "AND p.packName = :name",
+              Long.class)
+          .setParameter("repo", "maintenance-repo")
+          .setParameter("name", packName)
+          .getSingleResult();
     }
   }
 
-  private static byte[] readChunks(HibernateSessionFactoryProvider provider, String packName)
+  private static byte[] readChunks(
+      HibernateSessionFactoryProvider provider, String packName, String extension)
       throws Exception {
     try (Session session = provider.getSessionFactory().openSession()) {
       Long packId =
           session
               .createQuery(
                   "SELECT p.id FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                      + "AND p.packName = :name",
+                      + "AND p.packName = :name AND p.packExtension = :extension",
                   Long.class)
               .setParameter("repo", "maintenance-repo")
               .setParameter("name", packName)
+              .setParameter("extension", extension)
               .getSingleResult();
       List<byte[]> chunks =
           session
