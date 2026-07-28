@@ -1,6 +1,8 @@
 name: Deploy performance pages
 
 on:
+  push:
+    branches: [main]
   workflow_run:
     workflows: [JMH Benchmarks]
     types: [completed]
@@ -18,7 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -33,6 +35,7 @@ jobs:
       - name: Verify performance dashboard
         run: |
           test -s dev/bench/index.html
+          test -s dev/bench/dashboard.js
           test -s dev/bench/data.js
           test -s badges/performance.json
 
