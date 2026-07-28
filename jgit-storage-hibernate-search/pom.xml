@@ -18,8 +18,8 @@
   </description>
 
   <properties>
-    <jacoco.minimum.line>0.72</jacoco.minimum.line>
-    <jacoco.minimum.branch>0.58</jacoco.minimum.branch>
+    <jacoco.minimum.line>0.85</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.75</jacoco.minimum.branch>
   </properties>
 
   <dependencies>
