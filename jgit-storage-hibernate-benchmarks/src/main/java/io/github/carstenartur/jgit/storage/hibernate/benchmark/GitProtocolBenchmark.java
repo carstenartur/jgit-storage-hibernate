@@ -123,6 +123,7 @@ public class GitProtocolBenchmark {
   private ObjectId expectedTip;
   private Statistics hibernateStatistics;
   private StorageOperationMetrics storageMetricsBaseline = StorageOperationMetrics.ZERO;
+  private boolean transactionalReceivePack;
 
   @Setup(Level.Trial)
   public void setupTrial() {
@@ -145,6 +146,7 @@ public class GitProtocolBenchmark {
     int invocation = invocationCounter.incrementAndGet();
     String operation = benchmarkParams.getBenchmark();
     operation = operation.substring(operation.lastIndexOf('.') + 1);
+    transactionalReceivePack = operation.contains("TransactionalReceivePack");
     String serverName =
         "jmh-protocol-"
             + backend
@@ -161,7 +163,7 @@ public class GitProtocolBenchmark {
     expectedOld = ObjectId.zeroId();
 
     switch (operation) {
-      case "initialPushViaReceivePack" ->
+      case "initialPushViaReceivePack", "initialPushViaTransactionalReceivePack" ->
           expectedTip =
               writeHistory(
                   client,
@@ -170,7 +172,8 @@ public class GitProtocolBenchmark {
                   INITIAL_HISTORY_COMMITS,
                   INITIAL_PUSH_SEED,
                   SOURCE_REF);
-      case "incrementalPushViaReceivePack" -> prepareIncrementalPush();
+      case "incrementalPushViaReceivePack", "incrementalPushViaTransactionalReceivePack" ->
+          prepareIncrementalPush();
       case "initialCloneViaUploadPack" ->
           expectedTip =
               writeHistory(
@@ -187,7 +190,7 @@ public class GitProtocolBenchmark {
     protocol =
         new TestProtocol<>(
             (Object request, Repository repository) -> new UploadPack(repository),
-            (Object request, Repository repository) -> new ReceivePack(repository));
+            (Object request, Repository repository) -> createReceivePack(repository));
     Transport.register(protocol);
     serverUri = protocol.register(new Object(), server);
 
@@ -211,6 +214,7 @@ public class GitProtocolBenchmark {
     expectedOld = null;
     expectedTip = null;
     storageMetricsBaseline = StorageOperationMetrics.ZERO;
+    transactionalReceivePack = false;
     deleteRecursively(serverDirectory);
     serverDirectory = null;
   }
@@ -224,7 +228,7 @@ public class GitProtocolBenchmark {
     }
   }
 
-  /** Receives an unrelated complete history and creates a new remote branch. */
+  /** Receives an unrelated complete history with ordinary JGit transaction boundaries. */
   @Benchmark
   public ObjectId initialPushViaReceivePack(ProtocolStorageCounters counters) throws Exception {
     push(expectedOld, expectedTip);
@@ -232,9 +236,27 @@ public class GitProtocolBenchmark {
     return expectedTip;
   }
 
-  /** Receives four descendants after the server already has the twenty-commit base history. */
+  /** Receives the same complete history with one grouped Hibernate mutation transaction. */
+  @Benchmark
+  public ObjectId initialPushViaTransactionalReceivePack(ProtocolStorageCounters counters)
+      throws Exception {
+    push(expectedOld, expectedTip);
+    captureStorageCounters(counters);
+    return expectedTip;
+  }
+
+  /** Receives four descendants with ordinary JGit transaction boundaries. */
   @Benchmark
   public ObjectId incrementalPushViaReceivePack(ProtocolStorageCounters counters) throws Exception {
+    push(expectedOld, expectedTip);
+    captureStorageCounters(counters);
+    return expectedTip;
+  }
+
+  /** Receives four descendants with one grouped Hibernate mutation transaction. */
+  @Benchmark
+  public ObjectId incrementalPushViaTransactionalReceivePack(ProtocolStorageCounters counters)
+      throws Exception {
     push(expectedOld, expectedTip);
     captureStorageCounters(counters);
     return expectedTip;
@@ -254,6 +276,13 @@ public class GitProtocolBenchmark {
     fetch(expectedTip);
     captureStorageCounters(counters);
     return expectedTip;
+  }
+
+  private ReceivePack createReceivePack(Repository repository) {
+    if (transactionalReceivePack && repository instanceof HibernateRepository hibernateRepository) {
+      return hibernateRepository.newReceivePack();
+    }
+    return new ReceivePack(repository);
   }
 
   private void captureStorageCounters(ProtocolStorageCounters counters) {
