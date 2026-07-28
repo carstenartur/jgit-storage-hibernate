@@ -1,6 +1,6 @@
 # Performance optimization roadmap
 
-This document records the performance work that remains after adaptive small-pack persistence, bounded multi-chunk read-ahead and the real JGit protocol workload matrix.
+This document records the performance work that remains after adaptive small-pack persistence, bounded multi-chunk read-ahead, real JGit protocol workloads and per-operation storage instrumentation.
 
 ## Implemented performance slices
 
@@ -14,6 +14,10 @@ This document records the performance work that remains after adaptive small-pac
 - Restore persisted extension file sizes when rebuilding `DfsPackDescription` instances.
 - Measure initial and incremental push through `ReceivePack` plus clone-style and incremental fetch through `UploadPack`.
 - Cover incremental fetch from a server containing a base pack and a descendant pack through normal H2 and HSQLDB regression tests.
+- Record Hibernate queries, prepared statements, transactions and connection acquisitions for every protocol workload.
+- Record top-level repository transactions, commits, rollbacks, repository-lock acquisitions and end-to-end lock acquisition time.
+
+See [Protocol storage metrics](protocol-storage-metrics.md) for counter semantics and interpretation limits.
 
 ## Current protocol observations
 
@@ -25,20 +29,19 @@ The first 24-commit/4-commit protocol matrix shows:
 - HikariCP does not show a repeatable serial latency advantage;
 - protocol testing exposed and fixed DFS block-alignment and persisted-file-size contracts that object-level benchmarks did not exercise.
 
-The next implementation decision must use per-operation storage counters instead of relying only on elapsed time.
+The instrumentation slice now makes the next implementation decision depend on operation-level storage costs rather than elapsed time alone.
 
 ## Next implementation candidates
 
-1. Record Hibernate queries, prepared statements, transactions and connection acquisitions for each protocol workload.
-2. Record top-level repository transactions, repository-lock acquisitions and end-to-end lock acquisition time.
-3. Persist growing large pack files incrementally by replacing only the previous partial chunk and appending new chunks after a repeated flush.
-4. Replace identity-generated chunk IDs with a key strategy that permits real JDBC insert batching.
-5. Measure 16, 32 and 64 statement batch sizes before selecting a default.
-6. Record transferred pack bytes and database payload bytes per workflow.
-7. Compare one-, four- and sixteen-chunk read-ahead windows.
-8. Add independent-`SessionFactory` concurrency benchmarks with reader/writer mixes.
-9. Evaluate finer lock granularity only after contention measurements demonstrate that the repository lock is the limiting resource.
-10. Consider a small generation-aware metadata cache for pack manifests and ref-stack versions; do not duplicate JGit object payloads in Hibernate's second-level cache without evidence.
+1. Use protocol statement, transaction and lock counters to choose between incremental pack persistence, JDBC batching and transaction-boundary consolidation.
+2. Persist growing large pack files incrementally by replacing only the previous partial chunk and appending new chunks after a repeated flush.
+3. Replace identity-generated chunk IDs with a key strategy that permits real JDBC insert batching.
+4. Measure 16, 32 and 64 statement batch sizes before selecting a default.
+5. Record transferred pack bytes and database payload bytes per workflow.
+6. Compare one-, four- and sixteen-chunk read-ahead windows.
+7. Add independent-`SessionFactory` concurrency benchmarks with reader/writer mixes.
+8. Evaluate finer lock granularity only after contention measurements demonstrate that the repository lock is the limiting resource.
+9. Consider a small generation-aware metadata cache for pack manifests and ref-stack versions; do not duplicate JGit object payloads in Hibernate's second-level cache without evidence.
 
 ## Acceptance criteria for later optimizations
 

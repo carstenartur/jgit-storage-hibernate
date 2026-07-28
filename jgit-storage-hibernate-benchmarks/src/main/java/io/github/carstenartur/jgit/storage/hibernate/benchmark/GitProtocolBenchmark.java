@@ -10,6 +10,8 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -46,6 +48,8 @@ import org.eclipse.jgit.transport.TestProtocol;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.UploadPack;
+import org.hibernate.stat.Statistics;
+import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -72,6 +76,10 @@ import org.openjdk.jmh.infra.BenchmarkParams;
  *
  * <p>The JGit transport registry is JVM-global. This benchmark therefore explicitly runs with one
  * JMH thread; backend variants and forks remain isolated in their normal JMH processes.
+ *
+ * <p>For Hibernate backends, JMH secondary results expose query, statement, transaction, connection
+ * and repository-lock costs for the same measured operation. Counters are reset after fixture
+ * preparation and therefore exclude schema creation and baseline history construction.
  */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -113,6 +121,8 @@ public class GitProtocolBenchmark {
   private InMemoryRepository client;
   private ObjectId expectedOld;
   private ObjectId expectedTip;
+  private Statistics hibernateStatistics;
+  private StorageOperationMetrics storageMetricsBaseline = StorageOperationMetrics.ZERO;
 
   @Setup(Level.Trial)
   public void setupTrial() {
@@ -126,6 +136,7 @@ public class GitProtocolBenchmark {
             default -> throw new IllegalArgumentException("Unsupported benchmark backend: " + backend);
           };
       provider = new HibernateSessionFactoryProvider(properties);
+      hibernateStatistics = provider.getSessionFactory().getStatistics();
     }
   }
 
@@ -179,6 +190,11 @@ public class GitProtocolBenchmark {
             (Object request, Repository repository) -> new ReceivePack(repository));
     Transport.register(protocol);
     serverUri = protocol.register(new Object(), server);
+
+    if (server instanceof HibernateRepository hibernateRepository) {
+      hibernateStatistics.clear();
+      storageMetricsBaseline = hibernateRepository.getStorageOperationMetrics();
+    }
   }
 
   @TearDown(Level.Invocation)
@@ -194,6 +210,7 @@ public class GitProtocolBenchmark {
     serverUri = null;
     expectedOld = null;
     expectedTip = null;
+    storageMetricsBaseline = StorageOperationMetrics.ZERO;
     deleteRecursively(serverDirectory);
     serverDirectory = null;
   }
@@ -203,35 +220,58 @@ public class GitProtocolBenchmark {
     if (provider != null) {
       provider.close();
       provider = null;
+      hibernateStatistics = null;
     }
   }
 
   /** Receives an unrelated complete history and creates a new remote branch. */
   @Benchmark
-  public ObjectId initialPushViaReceivePack() throws Exception {
+  public ObjectId initialPushViaReceivePack(ProtocolStorageCounters counters) throws Exception {
     push(expectedOld, expectedTip);
+    captureStorageCounters(counters);
     return expectedTip;
   }
 
   /** Receives four descendants after the server already has the twenty-commit base history. */
   @Benchmark
-  public ObjectId incrementalPushViaReceivePack() throws Exception {
+  public ObjectId incrementalPushViaReceivePack(ProtocolStorageCounters counters) throws Exception {
     push(expectedOld, expectedTip);
+    captureStorageCounters(counters);
     return expectedTip;
   }
 
   /** Fetches a complete history into an otherwise empty bare repository. */
   @Benchmark
-  public ObjectId initialCloneViaUploadPack() throws Exception {
+  public ObjectId initialCloneViaUploadPack(ProtocolStorageCounters counters) throws Exception {
     fetch(expectedTip);
+    captureStorageCounters(counters);
     return expectedTip;
   }
 
   /** Fetches only four descendants into a client that already has the twenty-commit base. */
   @Benchmark
-  public ObjectId incrementalFetchViaUploadPack() throws Exception {
+  public ObjectId incrementalFetchViaUploadPack(ProtocolStorageCounters counters) throws Exception {
     fetch(expectedTip);
+    captureStorageCounters(counters);
     return expectedTip;
+  }
+
+  private void captureStorageCounters(ProtocolStorageCounters counters) {
+    if (!(server instanceof HibernateRepository hibernateRepository)) {
+      return;
+    }
+    StorageOperationMetrics storageDelta =
+        hibernateRepository.getStorageOperationMetrics().minus(storageMetricsBaseline);
+    counters.hibernateQueries = hibernateStatistics.getQueryExecutionCount();
+    counters.preparedStatements = hibernateStatistics.getPrepareStatementCount();
+    counters.hibernateTransactions = hibernateStatistics.getTransactionCount();
+    counters.connections = hibernateStatistics.getConnectCount();
+    counters.storageTransactions = storageDelta.transactionsStarted();
+    counters.storageCommits = storageDelta.transactionsCommitted();
+    counters.storageRollbacks = storageDelta.transactionsRolledBack();
+    counters.repositoryLocks = storageDelta.repositoryLocksAcquired();
+    counters.repositoryLockAcquisitionMicros =
+        TimeUnit.NANOSECONDS.toMicros(storageDelta.repositoryLockAcquisitionNanos());
   }
 
   private void prepareIncrementalPush() throws Exception {
@@ -427,6 +467,8 @@ public class GitProtocolBenchmark {
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.format_sql", "false");
     properties.put("hibernate.connection.pool_size", "4");
+    properties.put("hibernate.generate_statistics", "true");
+    properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
     return properties;
   }
 
@@ -465,6 +507,34 @@ public class GitProtocolBenchmark {
     }
     if (Files.exists(root)) {
       throw new IOException("Could not remove transient benchmark repository " + root);
+    }
+  }
+
+  /** Per-invocation storage costs published as JMH secondary event counters. */
+  @AuxCounters(AuxCounters.Type.EVENTS)
+  @State(Scope.Thread)
+  public static class ProtocolStorageCounters {
+    public long hibernateQueries;
+    public long preparedStatements;
+    public long hibernateTransactions;
+    public long connections;
+    public long storageTransactions;
+    public long storageCommits;
+    public long storageRollbacks;
+    public long repositoryLocks;
+    public long repositoryLockAcquisitionMicros;
+
+    @Setup(Level.Invocation)
+    public void reset() {
+      hibernateQueries = 0;
+      preparedStatements = 0;
+      hibernateTransactions = 0;
+      connections = 0;
+      storageTransactions = 0;
+      storageCommits = 0;
+      storageRollbacks = 0;
+      repositoryLocks = 0;
+      repositoryLockAcquisitionMicros = 0;
     }
   }
 }
