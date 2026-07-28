@@ -115,7 +115,7 @@ class PackStorageMaintenanceH2Test {
           new PackStorageMaintenance(provider.getSessionFactory())
               .deleteExpiredUncommittedPacks(
                   new RepositoryName("maintenance-repo"), cutoff, now);
-      assertEquals(new PackCleanupResult(1, 1, payload.length), cleanup);
+      assertEquals(new PackCleanupResult(1, 0, payload.length), cleanup);
       assertEquals(0, countPackRows(provider, "stalled-pack"));
 
       // A resumed process may still append to its local temporary file before touching the DB.

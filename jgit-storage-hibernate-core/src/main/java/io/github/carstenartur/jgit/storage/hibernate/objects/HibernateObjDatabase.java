@@ -45,9 +45,9 @@ import org.hibernate.SessionFactory;
  * {@link #commitPackImpl(Collection, Collection)}. This mirrors the DFS contract more closely than
  * immediately exposing partially written pack files.
  *
- * <p>New payloads are written through a temporary file and persisted as bounded chunks. Existing
- * installations may still contain legacy inline payloads; those rows remain readable without a
- * destructive data migration.
+ * <p>Small payloads are stored in the existing inline column to avoid an additional chunk row and
+ * ORM round trip. Larger payloads are written through a temporary file and persisted as bounded
+ * chunks. Existing inline and chunked rows remain readable without a destructive data migration.
  *
  * <p>Every uncommitted row has a writer token and renewable lease. Pack persistence, publication,
  * rollback and abandoned-write cleanup use the same repository lock so a maintenance operation
@@ -59,6 +59,7 @@ import org.hibernate.SessionFactory;
 public class HibernateObjDatabase extends DfsObjDatabase {
 
   static final int PACK_CHUNK_SIZE = 1024 * 1024;
+  static final int INLINE_PAYLOAD_THRESHOLD = 256 * 1024;
   static final Duration PACK_WRITE_LEASE = Duration.ofMinutes(30);
   static final Duration PACK_LEASE_RENEWAL_INTERVAL = Duration.ofMinutes(5);
   private static final int CHUNK_BATCH_SIZE = 8;
@@ -373,12 +374,13 @@ public class HibernateObjDatabase extends DfsObjDatabase {
                     .setParameter("ext", packExtension)
                     .uniqueResult();
 
-            if (entity == null && previouslyPersisted) {
+            boolean newEntity = entity == null;
+            if (newEntity && previouslyPersisted) {
               throw new IOException(
                   "Pack writer ownership was lost for " + packName + "." + packExtension);
             }
-            boolean rewritePayload = payloadChanged || entity == null;
-            if (entity != null) {
+            boolean rewritePayload = payloadChanged || newEntity;
+            if (!newEntity) {
               if (entity.isCommitted()) {
                 throw new IOException("Pack is already committed: " + packName + "." + packExtension);
               }
@@ -396,7 +398,10 @@ public class HibernateObjDatabase extends DfsObjDatabase {
               session.persist(entity);
             }
 
-            entity.setData(null);
+            boolean inlinePayload = sizeAtFlush <= INLINE_PAYLOAD_THRESHOLD;
+            if (rewritePayload) {
+              entity.setData(inlinePayload ? readInlinePayload(sizeAtFlush) : null);
+            }
             entity.setFileSize(sizeAtFlush);
             entity.setCommitted(false);
             entity.setCommittedAt(null);
@@ -404,19 +409,36 @@ public class HibernateObjDatabase extends DfsObjDatabase {
             entity.setWriteLeaseUntil(now.plus(PACK_WRITE_LEASE));
             session.flush();
 
-            if (rewritePayload) {
+            if (rewritePayload && !inlinePayload) {
               Long packId = entity.getId();
-              session
-                  .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId = :packId")
-                  .setParameter("packId", packId)
-                  .executeUpdate();
-              session.flush();
+              if (!newEntity) {
+                session
+                    .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId = :packId")
+                    .setParameter("packId", packId)
+                    .executeUpdate();
+                session.flush();
+              }
               persistChunks(session, packId, sizeAtFlush);
             }
             return null;
           });
       persistedVersion = modificationVersion;
       renewLeaseAfter = now.plus(PACK_LEASE_RENEWAL_INTERVAL);
+    }
+
+    private byte[] readInlinePayload(long sizeAtFlush) throws IOException {
+      byte[] data = new byte[Math.toIntExact(sizeAtFlush)];
+      ByteBuffer destination = ByteBuffer.wrap(data);
+      long position = 0;
+      while (destination.hasRemaining()) {
+        int count = fileChannel.read(destination, position);
+        if (count <= 0) {
+          throw new IOException(
+              "Temporary pack file ended before declared size " + sizeAtFlush);
+        }
+        position += count;
+      }
+      return data;
     }
 
     private void renewLeaseIfDue() throws IOException {

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>jgit-storage-hibernate performance history</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: BlinkMacSystemFont, -apple-system, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: Canvas;
+        color: CanvasText;
+      }
+      header,
+      main,
+      footer {
+        width: min(1400px, calc(100% - 32px));
+        margin-inline: auto;
+      }
+      header {
+        padding: 24px 0 12px;
+      }
+      header h1 {
+        margin: 0 0 12px;
+        font-size: clamp(1.8rem, 4vw, 3rem);
+      }
+      .metadata,
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+        align-items: center;
+      }
+      .controls {
+        margin-top: 16px;
+      }
+      a {
+        color: #3273dc;
+      }
+      button,
+      select {
+        font: inherit;
+        padding: 6px 10px;
+      }
+      .benchmark-set {
+        margin: 24px 0 40px;
+      }
+      .benchmark-set > h2 {
+        border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        padding-bottom: 8px;
+      }
+      .benchmark-chart-card {
+        margin: 20px 0;
+        padding: 16px;
+        border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        border-radius: 8px;
+        background: color-mix(in srgb, Canvas 96%, CanvasText 4%);
+      }
+      .benchmark-chart-card h3 {
+        margin: 0 0 12px;
+      }
+      .chart-container {
+        position: relative;
+        min-height: 420px;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 8px 0 24px;
+        font-size: 0.85rem;
+      }
+      .spacer {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Repository backend performance</h1>
+      <div class="metadata">
+        <span><strong>Last update:</strong> <span id="last-update"></span></span>
+        <span><strong>Repository:</strong> <a id="repository-link" rel="noopener"></a></span>
+      </div>
+      <div class="controls">
+        <label for="scale-select"><strong>Y-axis:</strong></label>
+        <select id="scale-select">
+          <option value="linear">Linear</option>
+          <option value="logarithmic">Logarithmic</option>
+        </select>
+        <span>Each chart groups the same JGit operation across all storage backends.</span>
+      </div>
+    </header>
+
+    <main id="main"></main>
+
+    <footer>
+      <button id="download-button">Download data as JSON</button>
+      <div class="spacer"></div>
+      <span>Rendered with <a href="https://www.chartjs.org/" rel="noopener">Chart.js</a></span>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.2/dist/Chart.min.js"></script>
+    <script src="data.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

@@ -12,28 +12,67 @@ It is not a runtime dependency for consumers. It exists for CI, maintainers and 
 
 ## Repository backend comparison
 
-The storage benchmark runs the same JGit workload against three repository backends:
+The storage benchmark runs the same public JGit workload against four repository configurations:
 
 | Backend label | Implementation used by the benchmark | Environment |
 |---|---|---|
 | `JGit + filesystem` | JGit `FileRepository` | Fresh temporary bare repository |
-| `JGit + HSQLDB (in-memory)` | `HibernateRepository` | HSQLDB 2.7 in-memory database |
-| `JGit + PostgreSQL` | `HibernateRepository` | PostgreSQL 17.10 container managed by JUnit Testcontainers |
+| `JGit + HSQLDB (in-memory)` | `HibernateRepository` | HSQLDB 2.7 in-memory database with Hibernate's built-in pool |
+| `JGit + PostgreSQL` | `HibernateRepository` | PostgreSQL 17.10 Testcontainer with Hibernate's built-in pool |
+| `JGit + PostgreSQL + HikariCP` | `HibernateRepository` | The same PostgreSQL container with `hibernate-hikaricp`, maximum pool size 4 and minimum idle 1 |
+
+The built-in PostgreSQL configuration is retained as a stable baseline. Hibernate documents that its built-in pool is not intended for production; the HikariCP variant shows whether a production-grade pool changes steady-state repository latency.
 
 The measured methods use the common public JGit `Repository` API. Backend-specific construction, schema creation and cleanup happen outside measured invocations.
 
-The comparison currently covers:
+## Measured workloads
+
+The comparison covers eight operations in three categories.
+
+### Fixed-cost probes
 
 ```text
 writeBlob
-readBlobFromWarmCache
 writeCommitAndUpdateRef
 reopenAndResolveMain
 ```
 
-`readBlobFromWarmCache` measures repeated application-level retrieval of one already accessed object through JGit's normal caches. It is deliberately not described as a physical filesystem or database read. The write and reopen operations exercise the respective storage implementation.
+These intentionally expose the fixed cost of transactions, pack publication, ref locking and repository reconstruction. A tiny synchronously flushed object is not representative of bulk throughput, but it is useful for detecting regressions in application-style single-commit operations.
 
-All results use JMH average time in `ms/op`, so lower values are better.
+### Read paths
+
+```text
+readBlobFromWarmCache
+readBlobAfterJGitCacheReset
+resolveMainOnOpenRepository
+```
+
+`readBlobFromWarmCache` measures repeated application-level retrieval through JGit's normal caches. It is deliberately not described as a physical filesystem or database read.
+
+`readBlobAfterJGitCacheReset` clears JGit's DFS block cache immediately before lookup. Operating-system and database caches remain warm, so the result represents a JGit-cache-cold application read rather than cold storage hardware.
+
+`resolveMainOnOpenRepository` measures the common steady-state operation of resolving a frequently used ref without rebuilding the repository object.
+
+### Amortized application workloads
+
+```text
+writeBatchOf100Blobs
+writeCommitSeries10AndUpdateMain
+```
+
+`writeBatchOf100Blobs` inserts 100 unique roughly one KiB blobs through one `ObjectInserter` and performs one flush. It shows whether pack and transaction overhead can be amortized across a batch.
+
+`writeCommitSeries10AndUpdateMain` writes ten linked commits through one inserter, flushes once and publishes the final commit with one update of `refs/heads/main`. This approximates an imported, synchronized or server-side generated change set.
+
+All results use JMH average time in `ms/op`, so lower values are better. Batch operations report time per complete batch, not per individual blob or commit.
+
+## Adaptive pack persistence under test
+
+The Hibernate backend stores small PACK, IDX and REFTABLE payloads up to 256 KiB in the existing inline payload column. Larger payloads continue to use bounded one MiB chunks.
+
+This removes the additional chunk row, chunk insert and preliminary chunk delete from common small application commits. New large files also skip the previously unconditional delete before their first chunk insert. Repeated flushes of an already persisted large file still use the conservative full-rewrite path; incremental append-only chunk persistence remains a separately measured follow-up.
+
+The core migration, deletion and roundtrip tests accept both valid representations while still requiring every committed non-empty file to have exactly one payload representation. Historical inline rows remain readable, and large pack capacity remains bounded through the chunk table.
 
 ## Maven, JUnit and Testcontainers architecture
 
@@ -43,9 +82,9 @@ Maven Failsafe runs `RepositoryBackendBenchmarkIT`. That JUnit integration test:
 
 1. starts PostgreSQL with the repository's established Testcontainers/JUnit extension pattern;
 2. obtains the dynamically mapped JDBC URL and credentials;
-3. launches the JMH forks for filesystem, HSQLDB and PostgreSQL;
-4. passes the Testcontainers connection properties to each PostgreSQL JMH fork;
-5. asserts that all four operations were recorded for all three backends;
+3. launches JMH forks for filesystem, HSQLDB, PostgreSQL built-in pooling and PostgreSQL HikariCP;
+4. passes the Testcontainers connection properties to every PostgreSQL JMH fork;
+5. asserts that all eight operations were recorded for all four configurations;
 6. writes the raw JMH JSON and text output.
 
 GitHub Actions does not declare or manage a PostgreSQL service. The workflow only sets up Java and invokes Maven. The same Maven profile is therefore executable from a normal checkout on any machine with Java 21, Maven and Docker.
@@ -54,20 +93,20 @@ The profile is not active during ordinary `mvn verify`, so routine builds do not
 
 ## Public performance history
 
-The benchmark workflow records successful `main` results with `github-action-benchmark` and publishes the chart dashboard at:
+The benchmark workflow records successful `main` results with the repository-owned history publisher and deploys the chart dashboard at:
 
 ```text
 https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/
 ```
 
-Pull requests execute the benchmark and upload the raw artifacts, but do not modify the public history. This prevents temporary pull-request revisions from becoming chart data. The first successful run on `main` initializes the `gh-pages` history branch.
+Pull requests execute the benchmark and upload the raw artifacts, but do not modify the public history. This prevents temporary pull-request revisions from becoming chart data.
 
-Each operation/backend pair is stored as a separate time series, for example:
+Each operation/configuration pair is stored as a separate time series, for example:
 
 ```text
-writeBlob — JGit + filesystem
-writeBlob — JGit + HSQLDB (in-memory)
-writeBlob — JGit + PostgreSQL
+writeBatchOf100Blobs — JGit + filesystem
+writeBatchOf100Blobs — JGit + PostgreSQL
+writeBatchOf100Blobs — JGit + PostgreSQL + HikariCP
 ```
 
 The raw JMH output remains available as a workflow artifact beside the converted comparison JSON and Maven logs.
@@ -99,7 +138,7 @@ target/benchmarks/jmh-output.txt
 jgit-storage-hibernate-benchmarks/target/failsafe-reports/
 ```
 
-The JUnit integration test fails if JMH does not return exactly four operations for each of the three configured backends.
+The JUnit integration test fails if JMH does not return exactly eight operations for each of the four configured backends.
 
 ### Convert local JMH output to chart input
 
@@ -125,22 +164,26 @@ PostgreSQL creation, readiness, mapped-port selection and cleanup remain inside 
 
 ## Interpretation limits
 
-This comparison answers whether the same small JGit operations became faster or slower over project revisions in the controlled environment. It is not a production sizing benchmark:
+This comparison is a controlled regression and architecture benchmark, not a complete production sizing exercise:
 
 - HSQLDB is deliberately in-memory, while filesystem and PostgreSQL perform operating-system or database I/O;
-- `readBlobFromWarmCache` is dominated by JGit's cache path and must not be read as backend round-trip latency;
+- warm and JGit-cache-reset reads do not clear the operating-system page cache or PostgreSQL shared buffers;
 - PostgreSQL runs locally in a Testcontainers container rather than over a production network;
 - host and container performance vary, especially for I/O-heavy measurements;
-- the workloads are intentionally small regression probes, not large clone, fetch or multi-user throughput tests.
+- HikariCP cannot remove transaction, locking, WAL or ORM costs and is primarily expected to help concurrent or connection-heavy use;
+- the single-operation probes exaggerate fixed durable-publication cost, while the batch workloads show amortized throughput.
 
 The workflow therefore uses a conservative 150% regression alert threshold and keeps the raw JMH JSON for deeper investigation.
 
-## Semantic history benchmark direction
+## Next benchmark slices
 
-The Java analysis module exposes semantic-history queries based on `JavaProjectAnalyzer`, `JavaSemanticDiff` and `SemanticHistoryQuery`. A practical next benchmark slice is comparing two analyzed commit snapshots and measuring:
+The next high-value storage measurements are full protocol and concurrency scenarios:
 
-- symbol extraction throughput;
-- semantic diff throughput;
-- query latency for moved symbols and impacted callers.
+- initial and incremental push through JGit `ReceivePack`;
+- clone and incremental fetch through `UploadPack`;
+- sequential read throughput for multi-chunk packs with different read-ahead values;
+- concurrent readers and writers using independent `SessionFactory` instances;
+- p50, p95 and p99 latency plus SQL statement, transaction and lock-wait counts;
+- repository-open cost with 1, 100 and 10,000 packs or refs.
 
-That work should remain separate from the storage-backend comparison so storage and semantic-analysis regressions are not conflated.
+The Java analysis module also exposes semantic-history queries based on `JavaProjectAnalyzer`, `JavaSemanticDiff` and `SemanticHistoryQuery`. Symbol extraction, semantic diff and moved-symbol query latency should remain a separate benchmark suite so storage and analysis regressions are not conflated.

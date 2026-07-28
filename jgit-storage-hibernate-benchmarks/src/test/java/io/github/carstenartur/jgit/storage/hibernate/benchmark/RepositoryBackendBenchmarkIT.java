@@ -30,12 +30,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class RepositoryBackendBenchmarkIT {
 
-  private static final int EXPECTED_OPERATION_COUNT = 4;
+  private static final int EXPECTED_OPERATION_COUNT = 8;
   private static final Set<String> EXPECTED_BACKENDS =
       Set.of(
           HibernateRepositoryBenchmark.FILESYSTEM,
           HibernateRepositoryBenchmark.HSQLDB,
-          HibernateRepositoryBenchmark.POSTGRESQL);
+          HibernateRepositoryBenchmark.POSTGRESQL,
+          HibernateRepositoryBenchmark.POSTGRESQL_HIKARI);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -61,7 +62,8 @@ class RepositoryBackendBenchmarkIT {
                 "backend",
                 HibernateRepositoryBenchmark.FILESYSTEM,
                 HibernateRepositoryBenchmark.HSQLDB,
-                HibernateRepositoryBenchmark.POSTGRESQL)
+                HibernateRepositoryBenchmark.POSTGRESQL,
+                HibernateRepositoryBenchmark.POSTGRESQL_HIKARI)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
             .result(resultFile.toString())

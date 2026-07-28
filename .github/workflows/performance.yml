@@ -57,6 +57,13 @@ jobs:
             target/benchmarks/backend-comparison.json
           cat target/benchmarks/backend-comparison.json
 
+      - name: Verify grouped dashboard template
+        run: |
+          test -s .github/benchmark-dashboard/index.html
+          test -s .github/benchmark-dashboard/dashboard.js
+          grep -F "Each chart groups the same JGit operation" .github/benchmark-dashboard/index.html
+          grep -F "datasets" .github/benchmark-dashboard/dashboard.js
+
       - name: Generate JMH performance badge
         if: always()
         run: |
@@ -79,7 +86,8 @@ jobs:
         run: |
           echo '### Repository backend performance' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Compared backends: JGit + filesystem, JGit + HSQLDB (in-memory), JGit + PostgreSQL.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Compared backends: JGit + filesystem, JGit + HSQLDB (in-memory), JGit + PostgreSQL, and JGit + PostgreSQL + HikariCP.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Related backend measurements are rendered as multiple lines in one chart per JGit operation.' >> "$GITHUB_STEP_SUMMARY"
           echo 'PostgreSQL is provided by the JUnit Testcontainers extension; the workflow only invokes Maven.' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
@@ -141,8 +149,12 @@ jobs:
           artifact_root="${RUNNER_TEMP}/jmh-benchmark-artifact"
           benchmark_source="$(find "$artifact_root" -type f -name backend-comparison.json -print -quit)"
           badge_source="$(find "$artifact_root" -type f -name performance.json -print -quit)"
+          dashboard_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/index.html"
+          dashboard_script_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/dashboard.js"
           test -s "$benchmark_source"
           test -s "$badge_source"
+          test -s "$dashboard_source"
+          test -s "$dashboard_script_source"
 
           if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
             empty_tree="$(git mktree </dev/null)"
@@ -172,13 +184,19 @@ jobs:
               --summary-file "$summary_file" \
               --alert-threshold 1.5
 
-            mkdir -p "$pages_dir/badges"
+            mkdir -p "$pages_dir/dev/bench" "$pages_dir/badges"
+            cp "$dashboard_source" "$pages_dir/dev/bench/index.html"
+            cp "$dashboard_script_source" "$pages_dir/dev/bench/dashboard.js"
             cp "$badge_source" "$pages_dir/badges/performance.json"
-            git -C "$pages_dir" add dev/bench/data.js badges/performance.json
+            git -C "$pages_dir" add \
+              dev/bench/index.html \
+              dev/bench/dashboard.js \
+              dev/bench/data.js \
+              badges/performance.json
 
             if git -C "$pages_dir" diff --cached --quiet; then
               cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
-              echo 'Benchmark history and badge unchanged'
+              echo 'Benchmark history, grouped dashboard, and badge unchanged'
               exit 0
             fi
 

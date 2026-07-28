@@ -29,6 +29,7 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TreeFormatter;
@@ -48,11 +49,11 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 /**
- * Runs one JGit workload against the filesystem and both Hibernate-backed database variants.
+ * Runs representative JGit workloads against filesystem and Hibernate-backed repository variants.
  *
- * <p>The benchmark intentionally uses only the public {@link Repository} API in measured methods.
- * Backend-specific setup and lifecycle code stays outside the measured operations. PostgreSQL
- * connection properties are supplied by the JUnit/Testcontainers harness to every JMH fork.
+ * <p>The measured methods use only the public {@link Repository} API. Backend construction, schema
+ * creation and cleanup stay outside measured invocations. PostgreSQL connection properties are
+ * supplied by the JUnit/Testcontainers harness to every JMH fork.
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -65,13 +66,18 @@ public class HibernateRepositoryBenchmark {
   static final String FILESYSTEM = "filesystem";
   static final String HSQLDB = "hsqldb";
   static final String POSTGRESQL = "postgresql";
+  static final String POSTGRESQL_HIKARI = "postgresql-hikari";
   static final String POSTGRESQL_URL_PROPERTY = "jgit.storage.benchmark.postgresql.url";
   static final String POSTGRESQL_USER_PROPERTY = "jgit.storage.benchmark.postgresql.user";
   static final String POSTGRESQL_PASSWORD_PROPERTY = "jgit.storage.benchmark.postgresql.password";
 
+  private static final int BULK_BLOB_COUNT = 100;
+  private static final int COMMIT_SERIES_LENGTH = 10;
+  private static final String PAYLOAD_PADDING = "x".repeat(1024);
+
   private final AtomicInteger counter = new AtomicInteger();
 
-  @Param({FILESYSTEM, HSQLDB, POSTGRESQL})
+  @Param({FILESYSTEM, HSQLDB, POSTGRESQL, POSTGRESQL_HIKARI})
   public String backend;
 
   private HibernateSessionFactoryProvider provider;
@@ -103,6 +109,7 @@ public class HibernateRepositoryBenchmark {
     deleteRecursively(repositoryDirectory);
   }
 
+  /** Measures the fixed cost of one tiny object insertion and immediate durable flush. */
   @Benchmark
   public ObjectId writeBlob() throws Exception {
     return writeBlob("payload-" + counter.incrementAndGet());
@@ -116,12 +123,29 @@ public class HibernateRepositoryBenchmark {
    */
   @Benchmark
   public byte[] readBlobFromWarmCache() throws Exception {
-    try (ObjectReader reader = repository.newObjectReader()) {
-      ObjectLoader loader = reader.open(blobId);
-      return loader.getBytes();
-    }
+    return readBlob(blobId);
   }
 
+  /**
+   * Measures a cache-cold JGit object lookup while leaving operating-system and database caches warm.
+   */
+  @Benchmark
+  public byte[] readBlobAfterJGitCacheReset() throws Exception {
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    return readBlob(blobId);
+  }
+
+  /** Measures resolving a frequently used ref while the repository instance remains open. */
+  @Benchmark
+  public ObjectId resolveMainOnOpenRepository() throws Exception {
+    Ref main = repository.exactRef("refs/heads/main");
+    if (main == null || main.getObjectId() == null) {
+      throw new IllegalStateException("refs/heads/main disappeared");
+    }
+    return main.getObjectId();
+  }
+
+  /** Measures one small commit and one independent ref publication. */
   @Benchmark
   public ObjectId writeCommitAndUpdateRef() throws Exception {
     int id = counter.incrementAndGet();
@@ -130,18 +154,88 @@ public class HibernateRepositoryBenchmark {
     return commit;
   }
 
+  /**
+   * Measures an application-style batch: one inserter writes 100 roughly one KiB blobs and flushes
+   * once, amortizing transaction and pack-publication overhead.
+   */
+  @Benchmark
+  public ObjectId writeBatchOf100Blobs() throws Exception {
+    int batchId = counter.incrementAndGet();
+    ObjectId last = null;
+    try (ObjectInserter inserter = repository.newObjectInserter()) {
+      for (int index = 0; index < BULK_BLOB_COUNT; index++) {
+        byte[] payload =
+            ("batch-" + batchId + "-" + index + "-" + PAYLOAD_PADDING)
+                .getBytes(StandardCharsets.UTF_8);
+        last = inserter.insert(Constants.OBJ_BLOB, payload);
+      }
+      inserter.flush();
+    }
+    return last;
+  }
+
+  /**
+   * Measures ten linked commits written by one inserter and published through a single main-ref
+   * update, approximating an imported or synchronized change set.
+   */
+  @Benchmark
+  public ObjectId writeCommitSeries10AndUpdateMain() throws Exception {
+    Ref main = repository.exactRef("refs/heads/main");
+    if (main == null || main.getObjectId() == null) {
+      throw new IllegalStateException("refs/heads/main disappeared");
+    }
+    ObjectId parent = main.getObjectId();
+    int seriesId = counter.incrementAndGet();
+    try (ObjectInserter inserter = repository.newObjectInserter()) {
+      for (int index = 0; index < COMMIT_SERIES_LENGTH; index++) {
+        ObjectId blob =
+            inserter.insert(
+                Constants.OBJ_BLOB,
+                ("series-" + seriesId + "-" + index + "-" + PAYLOAD_PADDING)
+                    .getBytes(StandardCharsets.UTF_8));
+        TreeFormatter tree = new TreeFormatter();
+        tree.append("file-" + index + ".txt", FileMode.REGULAR_FILE, blob);
+        ObjectId treeId = inserter.insert(tree);
+
+        CommitBuilder commit = new CommitBuilder();
+        commit.setTreeId(treeId);
+        commit.setParentId(parent);
+        commit.setAuthor(new PersonIdent("Benchmark", "benchmark@example.invalid"));
+        commit.setCommitter(new PersonIdent("Benchmark", "benchmark@example.invalid"));
+        commit.setMessage("Series " + seriesId + " commit " + index);
+        parent = inserter.insert(commit);
+      }
+      inserter.flush();
+    }
+    updateRef("refs/heads/main", parent);
+    return parent;
+  }
+
+  /** Measures repository reconstruction plus resolution of its primary ref. */
   @Benchmark
   public ObjectId reopenAndResolveMain() throws Exception {
     repository.close();
     repository = reopenRepository();
-    return repository.exactRef("refs/heads/main").getObjectId();
+    Ref main = repository.exactRef("refs/heads/main");
+    if (main == null || main.getObjectId() == null) {
+      throw new IllegalStateException("refs/heads/main disappeared after reopen");
+    }
+    return main.getObjectId();
+  }
+
+  private byte[] readBlob(ObjectId objectId) throws Exception {
+    try (ObjectReader reader = repository.newObjectReader()) {
+      ObjectLoader loader = reader.open(objectId);
+      return loader.getBytes();
+    }
   }
 
   private Repository createRepository() throws IOException {
     return switch (backend) {
       case FILESYSTEM -> createFilesystemRepository();
       case HSQLDB -> createHibernateRepository(hsqlDbProperties(repositoryName));
-      case POSTGRESQL -> createHibernateRepository(postgreSqlProperties());
+      case POSTGRESQL -> createHibernateRepository(postgreSqlProperties(false));
+      case POSTGRESQL_HIKARI -> createHibernateRepository(postgreSqlProperties(true));
       default -> throw new IllegalArgumentException("Unsupported benchmark backend: " + backend);
     };
   }
@@ -212,7 +306,7 @@ public class HibernateRepositoryBenchmark {
     return properties;
   }
 
-  private static Properties postgreSqlProperties() {
+  private static Properties postgreSqlProperties(boolean hikari) {
     Properties properties = commonHibernateProperties();
     properties.put("hibernate.connection.url", requiredSystemProperty(POSTGRESQL_URL_PROPERTY));
     properties.put(
@@ -221,6 +315,12 @@ public class HibernateRepositoryBenchmark {
         "hibernate.connection.password", requiredSystemProperty(POSTGRESQL_PASSWORD_PROPERTY));
     properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+    if (hikari) {
+      properties.put("hibernate.hikari.maximumPoolSize", "4");
+      properties.put("hibernate.hikari.minimumIdle", "1");
+      properties.put("hibernate.hikari.connectionTimeout", "10000");
+      properties.put("hibernate.hikari.poolName", "jgit-storage-hibernate-benchmark");
+    }
     return properties;
   }
 
