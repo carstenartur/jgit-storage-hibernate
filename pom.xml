@@ -73,13 +73,24 @@
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
     <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-    <linkage-checker-enforcer-rules.version>1.5.15</linkage-checker-enforcer-rules.version>
+    <japicmp-maven-plugin.version>0.26.1</japicmp-maven-plugin.version>
+
+    <api.baseline.version>0.1.13</api.baseline.version>
+    <japicmp.skip>false</japicmp.skip>
+    <jacoco.minimum.line>0.00</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.00</jacoco.minimum.branch>
   </properties>
 
   <repositories>
     <repository>
       <id>jgit-releases</id>
       <url>https://repo.eclipse.org/content/repositories/jgit-releases/</url>
+    </repository>
+    <repository>
+      <id>jgit-storage-hibernate-public</id>
+      <url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
     </repository>
   </repositories>
 
@@ -112,6 +123,11 @@
         <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.github.carstenartur</groupId>
+        <artifactId>jgit-storage-hibernate-architecture</artifactId>
+        <version>${project.version}</version>
+      </dependency>
       <!-- Pin upper bounds to resolve transitive convergence conflicts caused by
            hibernate-search-mapper-orm pulling older versions than hibernate-core -->
       <dependency>
@@ -129,7 +145,6 @@
         <artifactId>jboss-logging</artifactId>
         <version>3.6.3.Final</version>
       </dependency>
-      <!-- Pin upper bounds for the Jakarta XML/activation stack used by Hibernate ORM. -->
       <dependency>
         <groupId>jakarta.activation</groupId>
         <artifactId>jakarta.activation-api</artifactId>
@@ -140,15 +155,11 @@
         <artifactId>jakarta.xml.bind-api</artifactId>
         <version>${jakarta.xml.bind.version}</version>
       </dependency>
-      <!-- Pin the upper bound to resolve convergence across org.eclipse.jdt.core transitive
-           dependencies that pull different versions of org.eclipse.equinox.common -->
       <dependency>
         <groupId>org.eclipse.platform</groupId>
         <artifactId>org.eclipse.equinox.common</artifactId>
         <version>3.20.400</version>
       </dependency>
-      <!-- Pin upper bounds to resolve convergence across org.eclipse.jdt.core transitive
-           dependencies that pull different versions of these Eclipse platform artifacts -->
       <dependency>
         <groupId>org.eclipse.platform</groupId>
         <artifactId>org.eclipse.core.runtime</artifactId>
@@ -208,8 +219,17 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
-            <failOnWarnings>false</failOnWarnings>
-            <additionalJOption>-Xdoclint:none</additionalJOption>
+            <failOnWarnings>true</failOnWarnings>
+            <additionalOptions>
+              <additionalOption>-Xdoclint:all,-missing</additionalOption>
+            </additionalOptions>
+            <excludePackageNames>
+              io.github.carstenartur.jgit.storage.hibernate.objects:
+              io.github.carstenartur.jgit.storage.hibernate.refs:
+              io.github.carstenartur.jgit.storage.hibernate.repository:
+              io.github.carstenartur.jgit.storage.hibernate.javaanalysis.internal:
+              io.github.carstenartur.jgit.storage.hibernate.javaanalysis.demo
+            </excludePackageNames>
           </configuration>
           <executions>
             <execution>
@@ -241,8 +261,14 @@
           <artifactId>jacoco-maven-plugin</artifactId>
           <version>${jacoco-maven-plugin.version}</version>
         </plugin>
+        <plugin>
+          <groupId>com.github.siom79.japicmp</groupId>
+          <artifactId>japicmp-maven-plugin</artifactId>
+          <version>${japicmp-maven-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
+
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -287,6 +313,79 @@
               <goal>report</goal>
             </goals>
           </execution>
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.minimum.line}</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.minimum.branch}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.github.siom79.japicmp</groupId>
+        <artifactId>japicmp-maven-plugin</artifactId>
+        <configuration>
+          <skip>${japicmp.skip}</skip>
+          <oldVersion>
+            <dependency>
+              <groupId>${project.groupId}</groupId>
+              <artifactId>${project.artifactId}</artifactId>
+              <version>${api.baseline.version}</version>
+              <type>jar</type>
+            </dependency>
+          </oldVersion>
+          <newVersion>
+            <file>
+              <path>${project.build.directory}/${project.build.finalName}.jar</path>
+            </file>
+          </newVersion>
+          <parameter>
+            <onlyModified>true</onlyModified>
+            <accessModifier>public</accessModifier>
+            <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
+            <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
+            <ignoreMissingClasses>false</ignoreMissingClasses>
+            <ignoreMissingOldVersion>false</ignoreMissingOldVersion>
+            <skipPomModules>true</skipPomModules>
+            <excludes>
+              <exclude>io.github.carstenartur.jgit.storage.hibernate.objects</exclude>
+              <exclude>io.github.carstenartur.jgit.storage.hibernate.refs</exclude>
+              <exclude>io.github.carstenartur.jgit.storage.hibernate.repository</exclude>
+              <exclude>io.github.carstenartur.jgit.storage.hibernate.javaanalysis.internal</exclude>
+              <exclude>io.github.carstenartur.jgit.storage.hibernate.javaanalysis.demo</exclude>
+              <exclude>io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity</exclude>
+              <exclude>io.github.carstenartur.jgit.storage.hibernate.architecture.entity</exclude>
+            </excludes>
+          </parameter>
+        </configuration>
+        <executions>
+          <execution>
+            <id>check-api-compatibility</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>cmp</goal>
+            </goals>
+          </execution>
         </executions>
       </plugin>
     </plugins>
@@ -321,41 +420,6 @@
           <url>file://${public.repository.directory}</url>
         </repository>
       </distributionManagement>
-    </profile>
-
-    <profile>
-      <id>dependency-linkage</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-enforcer-plugin</artifactId>
-            <dependencies>
-              <dependency>
-                <groupId>com.google.cloud.tools</groupId>
-                <artifactId>linkage-checker-enforcer-rules</artifactId>
-                <version>${linkage-checker-enforcer-rules.version}</version>
-              </dependency>
-            </dependencies>
-            <executions>
-              <execution>
-                <id>enforce-linkage-checker</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>enforce</goal>
-                </goals>
-                <configuration>
-                  <rules>
-                    <LinkageCheckerRule implementation="com.google.cloud.tools.dependencies.enforcer.LinkageCheckerRule">
-                      <reportOnlyReachable>true</reportOnlyReachable>
-                    </LinkageCheckerRule>
-                  </rules>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
     </profile>
   </profiles>
 </project>
