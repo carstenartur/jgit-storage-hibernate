@@ -17,8 +17,8 @@
   </description>
 
   <properties>
-    <jacoco.minimum.line>0.75</jacoco.minimum.line>
-    <jacoco.minimum.branch>0.60</jacoco.minimum.branch>
+    <jacoco.minimum.line>0.92</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.65</jacoco.minimum.branch>
   </properties>
 
   <dependencies>
@@ -49,6 +49,15 @@
       <plugin><artifactId>maven-surefire-plugin</artifactId></plugin>
       <plugin><artifactId>maven-source-plugin</artifactId></plugin>
       <plugin><artifactId>maven-javadoc-plugin</artifactId></plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/architecture/entity/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>
