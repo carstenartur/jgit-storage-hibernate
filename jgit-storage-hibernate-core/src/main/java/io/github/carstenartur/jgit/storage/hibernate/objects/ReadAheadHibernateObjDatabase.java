@@ -12,8 +12,10 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransa
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
@@ -30,6 +32,11 @@ import org.hibernate.SessionFactory;
  * window with one ordered query, then serves all chunks from the channel-local cache. Random seeks
  * still load only the requested bounded window, and no Hibernate session or JDBC connection is held
  * for the lifetime of the channel.
+ *
+ * <p>The writable channel reports the same one MiB alignment used by persisted chunks and readable
+ * channels. This keeps JGit's write-time DFS block cache aligned with later reads after pack-list
+ * invalidation and prevents stale blocks with a different alignment from being reused by copy-as-is
+ * protocol transfers.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -47,6 +54,49 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
     this.transactionContext = transactionContext;
+  }
+
+  /**
+   * Reconstruct stored pack descriptions with the persisted size of every extension.
+   *
+   * <p>Ordinary object reads can discover an unknown size lazily from the readable channel. JGit's
+   * upload-pack copy-as-is path needs the extension sizes on {@link DfsPackDescription} before it
+   * copies compressed object representations. Omitting them can produce a malformed outgoing pack
+   * even though direct object reads remain successful.
+   */
+  @Override
+  protected List<DfsPackDescription> listPacks() throws IOException {
+    return transactionContext.execute(
+        session -> {
+          List<Object[]> rows =
+              session
+                  .createQuery(
+                      "SELECT p.packName, p.packExtension, p.fileSize FROM GitPackEntity p "
+                          + "WHERE p.repositoryName = :repo AND p.committed = true",
+                      Object[].class)
+                  .setParameter("repo", repositoryName)
+                  .getResultList();
+          LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
+          for (Object[] row : rows) {
+            String packName = (String) row[0];
+            String extension = (String) row[1];
+            long fileSize = ((Number) row[2]).longValue();
+            DfsPackDescription description =
+                descriptions.computeIfAbsent(
+                    packName,
+                    name ->
+                        new DfsPackDescription(
+                            getRepository().getDescription(), name, PackSource.INSERT));
+            for (PackExt packExtension : PackExt.values()) {
+              if (packExtension.getExtension().equals(extension)) {
+                description.addFileExt(packExtension);
+                description.setFileSize(packExtension, fileSize);
+                break;
+              }
+            }
+          }
+          return new ArrayList<>(descriptions.values());
+        });
   }
 
   @Override
@@ -78,10 +128,49 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         });
   }
 
+  @Override
+  protected DfsOutputStream writeFile(DfsPackDescription description, PackExt extension)
+      throws IOException {
+    return new AlignedDfsOutputStream(super.writeFile(description, extension));
+  }
+
   private static String baseName(DfsPackDescription description) {
     String fileName = description.getFileName(PackExt.PACK);
     int dot = fileName.lastIndexOf('.');
     return dot > 0 ? fileName.substring(0, dot) : fileName;
+  }
+
+  private static final class AlignedDfsOutputStream extends DfsOutputStream {
+    private final DfsOutputStream delegate;
+
+    private AlignedDfsOutputStream(DfsOutputStream delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int blockSize() {
+      return PACK_CHUNK_SIZE;
+    }
+
+    @Override
+    public void write(byte[] source, int offset, int length) throws IOException {
+      delegate.write(source, offset, length);
+    }
+
+    @Override
+    public int read(long position, ByteBuffer destination) throws IOException {
+      return delegate.read(position, destination);
+    }
+
+    @Override
+    public void flush() throws IOException {
+      delegate.flush();
+    }
+
+    @Override
+    public void close() throws IOException {
+      delegate.close();
+    }
   }
 
   static final class ReadAheadChunkedReadableChannel implements ReadableChannel {
@@ -301,7 +390,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
     @Override
     public int blockSize() {
-      return 0;
+      return PACK_CHUNK_SIZE;
     }
 
     @Override

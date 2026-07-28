@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
+import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
@@ -73,7 +74,10 @@ class ReadAheadHibernateObjDatabaseH2Test {
 
       channel.position(0);
       assertEquals(32, channel.read(ByteBuffer.allocate(32)));
-      assertEquals(1L, statistics.getQueryExecutionCount(), "Seek inside the cached chunk must reuse it");
+      assertEquals(
+          1L,
+          statistics.getQueryExecutionCount(),
+          "Seek inside the cached chunk must reuse it");
 
       channel.position(HibernateObjDatabase.PACK_CHUNK_SIZE + 7L);
       channel.setReadAheadBytes(HibernateObjDatabase.PACK_CHUNK_SIZE * 2);
@@ -133,12 +137,39 @@ class ReadAheadHibernateObjDatabaseH2Test {
   }
 
   @Test
+  void reportsAZeroLengthChunkAtAReadablePosition() throws Exception {
+    try (HibernateSessionFactoryProvider provider = provider()) {
+      PersistedPack pack = persistPack(provider, false);
+      try (Session session = provider.getSessionFactory().openSession()) {
+        Transaction transaction = session.beginTransaction();
+        GitPackChunkEntity chunk =
+            session
+                .createQuery(
+                    "FROM GitPackChunkEntity c "
+                        + "WHERE c.packId = :packId AND c.chunkIndex = 0",
+                    GitPackChunkEntity.class)
+                .setParameter("packId", pack.packId())
+                .getSingleResult();
+        chunk.setData(new byte[0]);
+        chunk.setChunkSize(0);
+        transaction.commit();
+      }
+
+      try (var channel = channel(provider, pack)) {
+        IOException exception =
+            assertThrows(IOException.class, () -> channel.read(ByteBuffer.allocate(1)));
+        assertTrue(exception.getMessage().contains("Invalid chunk 0"));
+      }
+    }
+  }
+
+  @Test
   void inlineChannelSupportsSeekEofAndCloseWithoutDatabaseState() throws Exception {
     byte[] data = {11, 22, 33};
     try (ReadableChannel channel = inlineChannel(data)) {
       assertTrue(channel.isOpen());
       assertEquals(3L, channel.size());
-      assertEquals(0, channel.blockSize());
+      assertEquals(HibernateObjDatabase.PACK_CHUNK_SIZE, channel.blockSize());
       channel.setReadAheadBytes(Integer.MAX_VALUE);
 
       ByteBuffer first = ByteBuffer.allocate(2);
@@ -161,6 +192,23 @@ class ReadAheadHibernateObjDatabaseH2Test {
     assertThrows(IOException.class, () -> closed.read(ByteBuffer.allocate(1)));
   }
 
+  @Test
+  void alignedOutputStreamUsesChunkAlignmentAndDelegatesAllOperations() throws Exception {
+    TrackingOutputStream delegate = new TrackingOutputStream();
+    DfsOutputStream aligned = alignedOutput(delegate);
+
+    assertEquals(HibernateObjDatabase.PACK_CHUNK_SIZE, aligned.blockSize());
+    aligned.write(new byte[] {11, 22, 33}, 0, 3);
+    ByteBuffer destination = ByteBuffer.allocate(2);
+    assertEquals(2, aligned.read(1, destination));
+    assertArrayEquals(new byte[] {22, 33}, destination.array());
+
+    aligned.flush();
+    aligned.close();
+    assertTrue(delegate.flushed);
+    assertTrue(delegate.closed);
+  }
+
   private static ReadAheadHibernateObjDatabase.ReadAheadChunkedReadableChannel channel(
       HibernateSessionFactoryProvider provider, PersistedPack pack) {
     return new ReadAheadHibernateObjDatabase.ReadAheadChunkedReadableChannel(
@@ -175,6 +223,16 @@ class ReadAheadHibernateObjDatabaseH2Test {
     Constructor<?> constructor = type.getDeclaredConstructor(byte[].class);
     constructor.setAccessible(true);
     return (ReadableChannel) constructor.newInstance((Object) data);
+  }
+
+  private static DfsOutputStream alignedOutput(DfsOutputStream delegate) throws Exception {
+    Class<?> type =
+        Class.forName(
+            "io.github.carstenartur.jgit.storage.hibernate.objects."
+                + "ReadAheadHibernateObjDatabase$AlignedDfsOutputStream");
+    Constructor<?> constructor = type.getDeclaredConstructor(DfsOutputStream.class);
+    constructor.setAccessible(true);
+    return (DfsOutputStream) constructor.newInstance(delegate);
   }
 
   private static PersistedPack persistPack(
@@ -256,4 +314,36 @@ class ReadAheadHibernateObjDatabaseH2Test {
   }
 
   private record PersistedPack(Long packId, byte[] expected) {}
+
+  private static final class TrackingOutputStream extends DfsOutputStream {
+    private byte[] data = new byte[0];
+    private boolean flushed;
+    private boolean closed;
+
+    @Override
+    public void write(byte[] source, int offset, int length) {
+      data = new byte[length];
+      System.arraycopy(source, offset, data, 0, length);
+    }
+
+    @Override
+    public int read(long position, ByteBuffer destination) {
+      if (position >= data.length) {
+        return -1;
+      }
+      int count = Math.min(destination.remaining(), data.length - Math.toIntExact(position));
+      destination.put(data, Math.toIntExact(position), count);
+      return count;
+    }
+
+    @Override
+    public void flush() {
+      flushed = true;
+    }
+
+    @Override
+    public void close() {
+      closed = true;
+    }
+  }
 }
