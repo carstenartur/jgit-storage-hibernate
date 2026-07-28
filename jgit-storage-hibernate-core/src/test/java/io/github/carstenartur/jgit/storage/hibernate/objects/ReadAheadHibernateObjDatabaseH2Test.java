@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,10 +18,12 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
+import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.stat.Statistics;
@@ -35,9 +38,7 @@ class ReadAheadHibernateObjDatabaseH2Test {
       Statistics statistics = provider.getSessionFactory().getStatistics();
       statistics.clear();
 
-      try (var channel =
-          new ReadAheadHibernateObjDatabase.ReadAheadChunkedReadableChannel(
-              provider.getSessionFactory(), pack.packId(), pack.expected().length)) {
+      try (var channel = channel(provider, pack)) {
         channel.setReadAheadBytes(pack.expected().length);
         ByteBuffer destination = ByteBuffer.allocate(pack.expected().length);
 
@@ -52,12 +53,53 @@ class ReadAheadHibernateObjDatabaseH2Test {
   }
 
   @Test
+  void reusesAWindowAndReloadsOnlyAfterASeekOutsideIt() throws Exception {
+    try (HibernateSessionFactoryProvider provider = provider()) {
+      PersistedPack pack = persistPack(provider, false);
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
+
+      var channel = channel(provider, pack);
+      assertTrue(channel.isOpen());
+      assertEquals(pack.expected().length, channel.size());
+      assertEquals(HibernateObjDatabase.PACK_CHUNK_SIZE, channel.blockSize());
+      assertEquals(0L, channel.position());
+
+      channel.setReadAheadBytes(-1);
+      ByteBuffer firstRead = ByteBuffer.allocate(32);
+      assertEquals(32, channel.read(firstRead));
+      assertEquals(32L, channel.position());
+      assertEquals(1L, statistics.getQueryExecutionCount());
+
+      channel.position(0);
+      assertEquals(32, channel.read(ByteBuffer.allocate(32)));
+      assertEquals(1L, statistics.getQueryExecutionCount(), "Seek inside the cached chunk must reuse it");
+
+      channel.position(HibernateObjDatabase.PACK_CHUNK_SIZE + 7L);
+      channel.setReadAheadBytes(HibernateObjDatabase.PACK_CHUNK_SIZE * 2);
+      assertEquals(1, channel.read(ByteBuffer.allocate(1)));
+      assertEquals(
+          2L,
+          statistics.getQueryExecutionCount(),
+          "Seek outside the cached window must load one new ordered window");
+
+      assertThrows(IllegalArgumentException.class, () -> channel.position(-1));
+      assertThrows(
+          IllegalArgumentException.class, () -> channel.position(pack.expected().length + 1L));
+      channel.position(pack.expected().length);
+      assertEquals(-1, channel.read(ByteBuffer.allocate(1)));
+
+      channel.close();
+      assertFalse(channel.isOpen());
+      assertThrows(IOException.class, () -> channel.read(ByteBuffer.allocate(1)));
+    }
+  }
+
+  @Test
   void reportsAMissingChunkInsideThePrefetchWindow() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider()) {
       PersistedPack pack = persistPack(provider, true);
-      try (var channel =
-          new ReadAheadHibernateObjDatabase.ReadAheadChunkedReadableChannel(
-              provider.getSessionFactory(), pack.packId(), pack.expected().length)) {
+      try (var channel = channel(provider, pack)) {
         channel.setReadAheadBytes(pack.expected().length);
 
         IOException exception =
@@ -65,6 +107,74 @@ class ReadAheadHibernateObjDatabaseH2Test {
         assertTrue(exception.getMessage().contains("Missing chunk 1"));
       }
     }
+  }
+
+  @Test
+  void reportsCorruptChunkMetadata() throws Exception {
+    try (HibernateSessionFactoryProvider provider = provider()) {
+      PersistedPack pack = persistPack(provider, false);
+      try (Session session = provider.getSessionFactory().openSession()) {
+        Transaction transaction = session.beginTransaction();
+        session
+            .createMutationQuery(
+                "UPDATE GitPackChunkEntity c SET c.chunkSize = c.chunkSize - 1 "
+                    + "WHERE c.packId = :packId AND c.chunkIndex = 0")
+            .setParameter("packId", pack.packId())
+            .executeUpdate();
+        transaction.commit();
+      }
+
+      try (var channel = channel(provider, pack)) {
+        IOException exception =
+            assertThrows(IOException.class, () -> channel.read(ByteBuffer.allocate(1)));
+        assertTrue(exception.getMessage().contains("Corrupt chunk 0"));
+      }
+    }
+  }
+
+  @Test
+  void inlineChannelSupportsSeekEofAndCloseWithoutDatabaseState() throws Exception {
+    byte[] data = {11, 22, 33};
+    try (ReadableChannel channel = inlineChannel(data)) {
+      assertTrue(channel.isOpen());
+      assertEquals(3L, channel.size());
+      assertEquals(0, channel.blockSize());
+      channel.setReadAheadBytes(Integer.MAX_VALUE);
+
+      ByteBuffer first = ByteBuffer.allocate(2);
+      assertEquals(2, channel.read(first));
+      assertArrayEquals(new byte[] {11, 22}, first.array());
+      assertEquals(2L, channel.position());
+
+      channel.position(1);
+      ByteBuffer remainder = ByteBuffer.allocate(2);
+      assertEquals(2, channel.read(remainder));
+      assertArrayEquals(new byte[] {22, 33}, remainder.array());
+      assertEquals(-1, channel.read(ByteBuffer.allocate(1)));
+      assertThrows(IllegalArgumentException.class, () -> channel.position(-1));
+      assertThrows(IllegalArgumentException.class, () -> channel.position(4));
+    }
+
+    ReadableChannel closed = inlineChannel(data);
+    closed.close();
+    assertFalse(closed.isOpen());
+    assertThrows(IOException.class, () -> closed.read(ByteBuffer.allocate(1)));
+  }
+
+  private static ReadAheadHibernateObjDatabase.ReadAheadChunkedReadableChannel channel(
+      HibernateSessionFactoryProvider provider, PersistedPack pack) {
+    return new ReadAheadHibernateObjDatabase.ReadAheadChunkedReadableChannel(
+        provider.getSessionFactory(), pack.packId(), pack.expected().length);
+  }
+
+  private static ReadableChannel inlineChannel(byte[] data) throws Exception {
+    Class<?> type =
+        Class.forName(
+            "io.github.carstenartur.jgit.storage.hibernate.objects."
+                + "ReadAheadHibernateObjDatabase$InlineReadableChannel");
+    Constructor<?> constructor = type.getDeclaredConstructor(byte[].class);
+    constructor.setAccessible(true);
+    return (ReadableChannel) constructor.newInstance((Object) data);
   }
 
   private static PersistedPack persistPack(
