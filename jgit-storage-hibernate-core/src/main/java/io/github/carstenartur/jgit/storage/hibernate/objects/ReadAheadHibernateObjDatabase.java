@@ -12,6 +12,7 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransa
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
@@ -34,8 +35,8 @@ import org.hibernate.SessionFactory;
  *
  * <p>The writable channel reports the same one MiB alignment used by persisted chunks and readable
  * channels. This keeps JGit's write-time DFS block cache aligned with later reads after pack-list
- * invalidation and prevents stale blocks with a different alignment from being reused by
- * copy-as-is protocol transfers.
+ * invalidation and prevents stale blocks with a different alignment from being reused by copy-as-is
+ * protocol transfers.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -53,6 +54,49 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
     this.transactionContext = transactionContext;
+  }
+
+  /**
+   * Reconstruct stored pack descriptions with the persisted size of every extension.
+   *
+   * <p>Ordinary object reads can discover an unknown size lazily from the readable channel. JGit's
+   * upload-pack copy-as-is path needs the extension sizes on {@link DfsPackDescription} before it
+   * copies compressed object representations. Omitting them can produce a malformed outgoing pack
+   * even though direct object reads remain successful.
+   */
+  @Override
+  protected List<DfsPackDescription> listPacks() throws IOException {
+    return transactionContext.execute(
+        session -> {
+          List<Object[]> rows =
+              session
+                  .createQuery(
+                      "SELECT p.packName, p.packExtension, p.fileSize FROM GitPackEntity p "
+                          + "WHERE p.repositoryName = :repo AND p.committed = true",
+                      Object[].class)
+                  .setParameter("repo", repositoryName)
+                  .getResultList();
+          LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
+          for (Object[] row : rows) {
+            String packName = (String) row[0];
+            String extension = (String) row[1];
+            long fileSize = ((Number) row[2]).longValue();
+            DfsPackDescription description =
+                descriptions.computeIfAbsent(
+                    packName,
+                    name ->
+                        new DfsPackDescription(
+                            getRepository().getDescription(), name, PackSource.INSERT));
+            for (PackExt packExtension : PackExt.values()) {
+              if (packExtension.getExtension().equals(extension)) {
+                description.addFileExt(packExtension);
+                description.setFileSize(packExtension, fileSize);
+                break;
+              }
+            }
+          }
+          return new ArrayList<>(descriptions.values());
+        });
   }
 
   @Override
