@@ -25,14 +25,15 @@ jobs:
         with: {distribution: temurin, java-version: '21', cache: maven}
       - name: Verify Docker for PostgreSQL integration tests
         run: docker info
-      - name: Parse release tooling
+      - name: Parse release and publication tooling
         run: |
           bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
-          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py .github/scripts/verify-security-policy.py
-      - name: Test release tooling
+          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py .github/scripts/verify-security-policy.py .github/scripts/publish-benchmark-history.py .github/scripts/test_publish_benchmark_history.py
+      - name: Test release and publication tooling
         run: |
           python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/test_prepare_public_repository.py
+          python3 .github/scripts/test_publish_benchmark_history.py
       - name: Verify release and security consistency
         run: |
           python3 .github/scripts/verify-release-consistency.py
@@ -66,13 +67,13 @@ jobs:
             docs/badges/tests.json
           if-no-files-found: error
 
-  update-badge-data:
-    name: Update badge data
+  publish-build-badges:
+    name: Publish build badges
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     concurrency:
-      group: repository-badge-publication-${{ github.repository }}-${{ github.ref }}
+      group: repository-pages-publication-${{ github.repository }}
       cancel-in-progress: false
     permissions:
       contents: write
@@ -85,7 +86,7 @@ jobs:
         with:
           name: badge-metrics
           path: ${{ runner.temp }}/build-badge-metrics
-      - name: Commit changed badge data without racing other publishers
+      - name: Publish generated badges to gh-pages
         shell: bash
         run: |
           set -euo pipefail
@@ -95,29 +96,37 @@ jobs:
           test -s "$coverage_source"
           test -s "$tests_source"
 
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            empty_tree="$(git mktree </dev/null)"
+            initial_commit="$(printf '%s\n' 'Initialize generated project pages' | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$empty_tree")"
+            git push origin "$initial_commit:refs/heads/gh-pages"
+          fi
 
+          pages_dir="${RUNNER_TEMP}/generated-pages-build"
           for attempt in 1 2 3; do
-            git fetch origin main
-            git checkout -B main origin/main
-            cp "$coverage_source" docs/badges/coverage.json
-            cp "$tests_source" docs/badges/tests.json
+            git fetch origin gh-pages
+            git worktree remove --force "$pages_dir" >/dev/null 2>&1 || true
+            git worktree prune
+            git worktree add --detach "$pages_dir" origin/gh-pages
 
-            if git diff --quiet -- docs/badges/coverage.json docs/badges/tests.json; then
+            mkdir -p "$pages_dir/badges"
+            cp "$coverage_source" "$pages_dir/badges/coverage.json"
+            cp "$tests_source" "$pages_dir/badges/tests.json"
+            git -C "$pages_dir" add badges/coverage.json badges/tests.json
+
+            if git -C "$pages_dir" diff --cached --quiet; then
               echo 'Build badge data unchanged'
               exit 0
             fi
 
-            git add docs/badges/coverage.json docs/badges/tests.json
-            git commit -m 'Update build metric badges [skip ci]'
-            if git push origin HEAD:main; then
+            git -C "$pages_dir" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Update build metric badges'
+            if git -C "$pages_dir" push origin HEAD:gh-pages; then
               exit 0
             fi
             sleep $((attempt * 2))
           done
 
-          echo 'Could not publish build badge data after three attempts' >&2
+          echo 'Could not publish build badges after three attempts' >&2
           exit 1
 
   public-repository-contract:
