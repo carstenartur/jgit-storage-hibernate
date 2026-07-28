@@ -60,8 +60,9 @@ jobs:
       - name: Verify grouped dashboard template
         run: |
           test -s .github/benchmark-dashboard/index.html
+          test -s .github/benchmark-dashboard/dashboard.js
           grep -F "Each chart groups the same JGit operation" .github/benchmark-dashboard/index.html
-          grep -F "datasets" .github/benchmark-dashboard/index.html
+          grep -F "datasets" .github/benchmark-dashboard/dashboard.js
 
       - name: Generate JMH performance badge
         if: always()
@@ -149,9 +150,11 @@ jobs:
           benchmark_source="$(find "$artifact_root" -type f -name backend-comparison.json -print -quit)"
           badge_source="$(find "$artifact_root" -type f -name performance.json -print -quit)"
           dashboard_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/index.html"
+          dashboard_script_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/dashboard.js"
           test -s "$benchmark_source"
           test -s "$badge_source"
           test -s "$dashboard_source"
+          test -s "$dashboard_script_source"
 
           if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
             empty_tree="$(git mktree </dev/null)"
@@ -183,9 +186,11 @@ jobs:
 
             mkdir -p "$pages_dir/dev/bench" "$pages_dir/badges"
             cp "$dashboard_source" "$pages_dir/dev/bench/index.html"
+            cp "$dashboard_script_source" "$pages_dir/dev/bench/dashboard.js"
             cp "$badge_source" "$pages_dir/badges/performance.json"
             git -C "$pages_dir" add \
               dev/bench/index.html \
+              dev/bench/dashboard.js \
               dev/bench/data.js \
               badges/performance.json
 
