@@ -13,7 +13,7 @@ Use the familiar JGit `Repository` API while storing packs, refs, reftables and 
 - repository-scoped database locks coordinate independent `SessionFactory` instances;
 - writer tokens and renewable leases support safe abandoned-write cleanup;
 - public consumers do not import `org.eclipse.jgit.internal.*`;
-- versioned H2, HSQLDB and PostgreSQL migrations support production `migrate + validate` operation;
+- versioned H2, HSQLDB, PostgreSQL and Microsoft SQL Server migrations support production `migrate + validate` operation;
 - logical repositories have an explicit, idempotent and isolated deletion lifecycle.
 
 Git remains authoritative. This module changes where JGit stores repository data, not the Git semantics exposed to callers.
@@ -54,7 +54,7 @@ try (HibernateGitStorage storage =
 }
 ```
 
-Use `CoreSchemaMigrations.HSQLDB_LOCATION` for an embedded HSQLDB deployment. Fresh databases, shared schemas, existing 0.1.4 installations and the copied pre-library Taxonomy schema require different procedures. See the [consumer guide](../docs/consuming.md) and [Taxonomy adoption runbook](../docs/taxonomy-adoption.md) before provisioning a persistent database.
+Use `CoreSchemaMigrations.HSQLDB_LOCATION` for an embedded HSQLDB deployment or `CoreSchemaMigrations.SQL_SERVER_LOCATION` for Microsoft SQL Server. SQL Server applications must add Flyway's `flyway-sqlserver` database module and the Microsoft JDBC driver. Fresh databases, shared schemas, existing 0.1.4 installations and the copied pre-library Sandbox/Taxonomy schema require different procedures. See the [consumer guide](../docs/consuming.md) and [adoption runbook](../docs/taxonomy-adoption.md) before provisioning a persistent database.
 
 ## Chunked payload storage
 
@@ -148,6 +148,6 @@ Workflow, session, audit, outbox and other application-specific tables remain ow
 
 ## Verification
 
-H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10 and verifies fresh installation, 0.1.4 upgrades, pre-library adoption with unchanged BLOB checksums, Hibernate validation, chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
+H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. The suites verify fresh installation, 0.1.4 upgrades where applicable, pre-library adoption with unchanged BLOB checksums and reflog rows, Hibernate validation, adaptive inline/chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
 
 Contract tests cover early flush followed by further writes, random reads across chunk boundaries, writer ownership loss, group-safe leased cleanup, deletion isolation and rollback. The optional `pack-capacity` Maven profile verifies 1 MiB, 16 MiB and 128 MiB payloads and is run manually and weekly by the existing performance workflow.
