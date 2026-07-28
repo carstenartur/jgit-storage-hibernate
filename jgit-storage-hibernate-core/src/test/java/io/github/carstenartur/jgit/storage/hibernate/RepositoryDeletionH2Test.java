@@ -58,8 +58,8 @@ class RepositoryDeletionH2Test {
       try (HibernateGitStorage secondStorage = factory.open(secondName)) {
         secondCommit = commit(secondStorage.repository(), "second");
       }
-      assertTrue(countChunks(sessionFactory, firstName) > 0);
-      assertTrue(countChunks(sessionFactory, secondName) > 0);
+      assertTrue(countPacks(sessionFactory, firstName) > 0);
+      assertTrue(countPacks(sessionFactory, secondName) > 0);
 
       assertThrows(HibernateStorageException.class, () -> factory.deleteRepository(firstName));
       assertEquals(firstCommit, firstStorage.repository().exactRef("refs/heads/main").getObjectId());
@@ -70,8 +70,9 @@ class RepositoryDeletionH2Test {
       assertTrue(deleted.reflogRows() > 0);
       assertEquals(0, deleted.projectionRows());
       assertTrue(deleted.deletedAnything());
+      assertEquals(0, countPacks(sessionFactory, firstName));
       assertEquals(0, countChunks(sessionFactory, firstName));
-      assertTrue(countChunks(sessionFactory, secondName) > 0);
+      assertTrue(countPacks(sessionFactory, secondName) > 0);
 
       assertEquals(new RepositoryDeletionResult(0, 0, 0), factory.deleteRepository(firstName));
 
@@ -107,10 +108,12 @@ class RepositoryDeletionH2Test {
       try (HibernateGitStorage storage = factory.open(repositoryName)) {
         commitId = commit(storage.repository(), "must survive");
       }
+      long packsBefore = countPacks(sessionFactory, repositoryName);
       long chunksBefore = countChunks(sessionFactory, repositoryName);
-      assertTrue(chunksBefore > 0);
+      assertTrue(packsBefore > 0);
 
       assertThrows(HibernateStorageException.class, () -> factory.deleteRepository(repositoryName));
+      assertEquals(packsBefore, countPacks(sessionFactory, repositoryName));
       assertEquals(chunksBefore, countChunks(sessionFactory, repositoryName));
 
       try (HibernateGitStorage storage =
@@ -126,6 +129,16 @@ class RepositoryDeletionH2Test {
                 .getReverseEntries()
                 .size());
       }
+    }
+  }
+
+  private static long countPacks(SessionFactory sessionFactory, RepositoryName repositoryName) {
+    try (Session session = sessionFactory.openSession()) {
+      return session
+          .createQuery(
+              "SELECT COUNT(p) FROM GitPackEntity p WHERE p.repositoryName = :repo", Long.class)
+          .setParameter("repo", repositoryName.value())
+          .getSingleResult();
     }
   }
 
