@@ -15,12 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
 import io.github.carstenartur.jgit.storage.hibernate.schema.LegacyCoreSchemaAdoption;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.Random;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -148,11 +148,11 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
 
   private static ObjectId createCommit(Repository repository) throws Exception {
     try (ObjectInserter inserter = repository.newObjectInserter()) {
-      ObjectId blob =
-          inserter.insert(
-              Constants.OBJ_BLOB, "post-adoption payload".getBytes(StandardCharsets.UTF_8));
+      byte[] payload = new byte[1024 * 1024];
+      new Random(42).nextBytes(payload);
+      ObjectId blob = inserter.insert(Constants.OBJ_BLOB, payload);
       TreeFormatter tree = new TreeFormatter();
-      tree.append("post-adoption.txt", FileMode.REGULAR_FILE, blob);
+      tree.append("post-adoption.bin", FileMode.REGULAR_FILE, blob);
       CommitBuilder commit = new CommitBuilder();
       commit.setTreeId(inserter.insert(tree));
       PersonIdent actor = new PersonIdent("Adoption Test", "adoption@example.invalid");
