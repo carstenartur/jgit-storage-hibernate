@@ -68,7 +68,18 @@ Internal DFS/Reftable adapter and demonstration packages are excluded from the p
 
 JaCoCo line and branch floors are enforced independently for each runtime module. Benchmarks are excluded because benchmark harness code is exercised through JMH rather than unit-test coverage.
 
-The floors are deliberately below the current measured values. Their purpose is to stop unexplained regression, not to reward shallow tests written only to increase a percentage. Raising a floor is encouraged when meaningful tests increase sustained coverage; lowering one requires a documented reason in the pull request.
+| Module | Line floor | Branch floor | Measured when introduced |
+|---|---:|---:|---:|
+| Core | 84% | 64% | 84.4% / 64.7% |
+| Search | 85% | 75% | 85.6% / 76.0% |
+| Java Analysis | 81% | 64% | 81.7% / 64.7% |
+| Architecture | 92% | 65% | 92.4% / 65.5% |
+
+The Architecture figures exclude `architecture.entity`. Those classes are the explicitly incubating, application-owned persistence mapping made up primarily of accessor boilerplate; supported parsing, mapping, drift and semantic-diff code remains inside the gate.
+
+The floors are deliberately just below the measured values. Their purpose is to stop unexplained regression, not to reward shallow tests written only to increase a percentage. Raising a floor is encouraged when meaningful tests increase sustained coverage; lowering one requires a documented reason in the pull request.
+
+The Maven workflow uploads every module's `jacoco.xml` and `jacoco.csv`, including when a gate fails, so changes can be diagnosed from evidence rather than by repeatedly weakening a threshold.
 
 ## Local reproduction
 
