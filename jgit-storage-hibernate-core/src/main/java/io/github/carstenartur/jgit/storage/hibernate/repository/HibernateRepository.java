@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.repository;
 
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import io.github.carstenartur.jgit.storage.hibernate.objects.HibernateObjDatabase;
+import io.github.carstenartur.jgit.storage.hibernate.objects.ReadAheadHibernateObjDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
@@ -45,7 +46,7 @@ public class HibernateRepository extends DfsRepository {
     this.repositoryName = builder.getRepositoryName();
     this.transactionContext = new HibernateTransactionContext(sessionFactory);
     this.objectDatabase =
-        new HibernateObjDatabase(
+        new ReadAheadHibernateObjDatabase(
             this,
             builder.getReaderOptions(),
             sessionFactory,
