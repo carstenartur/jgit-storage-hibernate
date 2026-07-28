@@ -105,7 +105,7 @@ class IncrementalFetchH2Test {
       Ref localMain = client.exactRef(MAIN);
       assertNotNull(localMain);
       assertEquals(serverTip, localMain.getObjectId());
-      assertEquals(PAYLOAD_BYTES, client.open(serverTip).getSize() > 0 ? PAYLOAD_BYTES : 0);
+      assertEquals(Constants.OBJ_COMMIT, client.open(serverTip).getType());
     }
   }
 
