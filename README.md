@@ -3,9 +3,12 @@
 [![Java CI with Maven](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/coverage.json)](docs/badges/coverage.json)
 [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/tests.json)](docs/badges/tests.json)
-[![JMH Benchmarks](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
+[![JMH](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/main/docs/badges/performance.json)](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
+[![JMH Workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)](pom.xml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+
+📈 **[Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)** · ⚙️ **[Benchmark workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)**
 
 https://doi.org/10.5281/zenodo.21210132
 
@@ -209,6 +212,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 
 ## Documentation
 
+- [Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
 - [Consumer, migration and database matrix](docs/consuming.md)
 - [Change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md)
 - [Approval-workflow use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
