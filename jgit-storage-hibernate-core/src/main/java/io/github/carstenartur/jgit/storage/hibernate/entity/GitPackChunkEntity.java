@@ -16,6 +16,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -39,6 +41,10 @@ public class GitPackChunkEntity {
 
   @Column(name = "pack_id", nullable = false)
   private Long packId;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "pack_id", insertable = false, updatable = false)
+  private GitPackEntity pack;
 
   @Column(name = "chunk_index", nullable = false)
   private int chunkIndex;
@@ -65,6 +71,10 @@ public class GitPackChunkEntity {
 
   public void setPackId(Long packId) {
     this.packId = packId;
+  }
+
+  public GitPackEntity getPack() {
+    return pack;
   }
 
   public int getChunkIndex() {
