@@ -23,11 +23,11 @@ The storage benchmark runs the same public JGit workload against four repository
 
 The built-in PostgreSQL configuration is retained as a stable baseline. Hibernate documents that its built-in pool is not intended for production; the HikariCP variant shows whether a production-grade pool changes steady-state repository latency.
 
-The measured methods use the common public JGit `Repository` API. Backend-specific construction, schema creation and cleanup happen outside measured invocations.
+The measured methods use public JGit repository and transport APIs. Backend construction, schema creation, client preparation and result verification happen outside measured invocations.
 
 ## Measured workloads
 
-The comparison covers nine operations in three categories.
+The comparison covers thirteen operations in four categories.
 
 ### Fixed-cost probes
 
@@ -67,7 +67,26 @@ writeCommitSeries10AndUpdateMain
 
 `writeCommitSeries10AndUpdateMain` writes ten linked commits through one inserter, flushes once and publishes the final commit with one update of `refs/heads/main`. This approximates an imported, synchronized or server-side generated change set.
 
-All results use JMH average time in `ms/op`, so lower values are better. Batch operations report time per complete batch, not per individual blob or commit.
+### Real Git protocol workloads
+
+```text
+initialPushViaReceivePack
+incrementalPushViaReceivePack
+initialCloneViaUploadPack
+incrementalFetchViaUploadPack
+```
+
+These workloads use JGit's in-process `TestProtocol`, `ReceivePack`, `UploadPack` and normal `Transport` client implementation. The server repository uses the selected storage backend; clients use fresh in-memory repositories so client filesystem noise does not hide server storage behavior.
+
+`initialPushViaReceivePack` transfers an unrelated 24-commit history with non-compressible 32 KiB payloads and creates a new remote branch.
+
+`incrementalPushViaReceivePack` starts with a 20-commit base already present on the server and transfers four descendants plus the fast-forward ref update.
+
+`initialCloneViaUploadPack` fetches the complete 24-commit history into an empty bare client repository. It measures clone-style pack negotiation and transfer, but intentionally excludes working-tree checkout.
+
+`incrementalFetchViaUploadPack` prepares a client with the 20-commit base and then fetches only four descendants.
+
+All results use JMH average time in `ms/op`, so lower values are better. Batch and protocol operations report time per complete operation, not per individual object or commit.
 
 ## Adaptive pack persistence and read-ahead under test
 
@@ -89,7 +108,7 @@ Maven Failsafe runs `RepositoryBackendBenchmarkIT`. That JUnit integration test:
 2. obtains the dynamically mapped JDBC URL and credentials;
 3. launches JMH forks for filesystem, HSQLDB, PostgreSQL built-in pooling and PostgreSQL HikariCP;
 4. passes the Testcontainers connection properties to every PostgreSQL JMH fork;
-5. asserts that all nine operations were recorded for all four configurations;
+5. asserts that all thirteen operations were recorded for all four configurations;
 6. writes the raw JMH JSON and text output.
 
 GitHub Actions does not declare or manage a PostgreSQL service. The workflow only sets up Java and invokes Maven. The same Maven profile is therefore executable from a normal checkout on any machine with Java 21, Maven and Docker.
@@ -109,9 +128,9 @@ Pull requests execute the benchmark and upload the raw artifacts, but do not mod
 Each operation/configuration pair is stored as a separate time series, for example:
 
 ```text
-readLargeBlobSequentiallyAfterJGitCacheReset — JGit + PostgreSQL
-writeBatchOf100Blobs — JGit + filesystem
-writeBatchOf100Blobs — JGit + PostgreSQL + HikariCP
+initialPushViaReceivePack — JGit + PostgreSQL
+initialCloneViaUploadPack — JGit + filesystem
+readLargeBlobSequentiallyAfterJGitCacheReset — JGit + PostgreSQL + HikariCP
 ```
 
 The raw JMH output remains available as a workflow artifact beside the converted comparison JSON and Maven logs.
@@ -143,7 +162,7 @@ target/benchmarks/jmh-output.txt
 jgit-storage-hibernate-benchmarks/target/failsafe-reports/
 ```
 
-The JUnit integration test fails if JMH does not return exactly nine operations for each of the four configured backends.
+The JUnit integration test fails if JMH does not return exactly thirteen operations for each of the four configured backends.
 
 ### Convert local JMH output to chart input
 
@@ -177,19 +196,19 @@ This comparison is a controlled regression and architecture benchmark, not a com
 - host and container performance vary, especially for I/O-heavy measurements;
 - HikariCP cannot remove transaction, locking, WAL or ORM costs and is primarily expected to help concurrent or connection-heavy use;
 - the single-operation probes exaggerate fixed durable-publication cost, while the batch workloads show amortized throughput;
-- the large sequential-read benchmark measures decompression and JGit streaming in addition to database chunk access.
+- the large sequential-read benchmark measures decompression and JGit streaming in addition to database chunk access;
+- protocol benchmarks use an in-process transport and therefore exclude network latency, TLS and HTTP/SSH server overhead.
 
 The workflow therefore uses a conservative 150% regression alert threshold and keeps the raw JMH JSON for deeper investigation.
 
 ## Next benchmark slices
 
-The next high-value storage measurements are full protocol and concurrency scenarios:
+The next high-value storage measurements are instrumentation and concurrency scenarios:
 
-- initial and incremental push through JGit `ReceivePack`;
-- clone and incremental fetch through `UploadPack`;
+- record SQL statement counts, transaction counts, connection acquisitions, transferred bytes and repository-lock wait time per workload;
 - compare one-, four- and sixteen-chunk read-ahead windows with query counts and transferred bytes;
-- concurrent readers and writers using independent `SessionFactory` instances;
-- p50, p95 and p99 latency plus SQL statement, transaction and lock-wait counts;
-- repository-open cost with 1, 100 and 10,000 packs or refs.
+- add concurrent readers and writers using independent `SessionFactory` instances;
+- report p50, p95 and p99 latency for contended workloads;
+- measure repository-open cost with 1, 100 and 10,000 packs or refs.
 
 The Java analysis module also exposes semantic-history queries based on `JavaProjectAnalyzer`, `JavaSemanticDiff` and `SemanticHistoryQuery`. Symbol extraction, semantic diff and moved-symbol query latency should remain a separate benchmark suite so storage and analysis regressions are not conflated.
