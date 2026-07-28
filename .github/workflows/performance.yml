@@ -72,6 +72,7 @@ jobs:
           path: |
             target/benchmarks/*
             docs/badges/performance.json
+          if-no-files-found: error
 
       - name: Report benchmark dashboard
         if: always()
@@ -124,11 +125,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download benchmark results
+      - name: Download benchmark results outside the worktree
         uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
         with:
           name: jmh-backend-comparison-results
-          path: .
+          path: ${{ runner.temp }}/jmh-benchmark-artifact
 
       - name: Initialize benchmark history branch
         run: |
@@ -148,7 +149,7 @@ jobs:
         with:
           name: Repository backend comparison
           tool: customSmallerIsBetter
-          output-file-path: target/benchmarks/backend-comparison.json
+          output-file-path: ${{ runner.temp }}/jmh-benchmark-artifact/target/benchmarks/backend-comparison.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           gh-pages-branch: gh-pages
@@ -160,14 +161,52 @@ jobs:
           summary-always: true
           max-items-in-chart: 100
 
-      - name: Update performance badge data
+  update-performance-badge:
+    name: Update JMH performance badge
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: jmh
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download generated badge outside the worktree
+        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
+        with:
+          name: jmh-backend-comparison-results
+          path: ${{ runner.temp }}/jmh-benchmark-artifact
+
+      - name: Commit performance badge without racing other badge jobs
+        shell: bash
         run: |
-          if git diff --quiet -- docs/badges/performance.json; then
-            echo "Performance badge data unchanged"
+          set -euo pipefail
+          source_badge="${RUNNER_TEMP}/jmh-benchmark-artifact/docs/badges/performance.json"
+          test -s "$source_badge"
+
+          git fetch origin main
+          git checkout -B main origin/main
+          if cmp -s "$source_badge" docs/badges/performance.json; then
+            echo 'Performance badge data unchanged'
             exit 0
           fi
+
+          cp "$source_badge" docs/badges/performance.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add docs/badges/performance.json
-          git commit -m "Update JMH performance badge [skip ci]"
-          git push
+          git commit -m 'Update JMH performance badge [skip ci]'
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo 'Could not publish performance badge after three attempts' >&2
+          exit 1
