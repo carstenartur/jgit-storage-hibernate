@@ -36,7 +36,10 @@ import org.hibernate.type.SqlTypes;
     indexes = {
       @Index(name = "idx_pack_repo", columnList = "repository_name"),
       @Index(name = "idx_pack_repo_name", columnList = "repository_name, pack_name"),
-      @Index(name = "idx_pack_repo_committed", columnList = "repository_name, committed")
+      @Index(name = "idx_pack_repo_committed", columnList = "repository_name, committed"),
+      @Index(
+          name = "idx_pack_repo_lease",
+          columnList = "repository_name, committed, write_lease_until")
     },
     uniqueConstraints = {
       @UniqueConstraint(
@@ -81,6 +84,12 @@ public class GitPackEntity {
 
   @Column(name = "committed", nullable = false)
   private boolean committed;
+
+  @Column(name = "write_token", length = 36)
+  private String writeToken;
+
+  @Column(name = "write_lease_until")
+  private Instant writeLeaseUntil;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
@@ -146,6 +155,22 @@ public class GitPackEntity {
 
   public void setCommitted(boolean committed) {
     this.committed = committed;
+  }
+
+  public String getWriteToken() {
+    return writeToken;
+  }
+
+  public void setWriteToken(String writeToken) {
+    this.writeToken = writeToken;
+  }
+
+  public Instant getWriteLeaseUntil() {
+    return writeLeaseUntil;
+  }
+
+  public void setWriteLeaseUntil(Instant writeLeaseUntil) {
+    this.writeLeaseUntil = writeLeaseUntil;
   }
 
   public Instant getCreatedAt() {
