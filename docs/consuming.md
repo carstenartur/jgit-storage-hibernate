@@ -47,7 +47,7 @@ Configure the static public release repository:
     <id>jgit-storage-hibernate-public</id>
     <url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</url>
     <releases><enabled>true</enabled></releases>
-    <snapshots><enabled>false</enabled></snapshots>
+    <snapshots><enabled>false</snapshots>
   </repository>
 </repositories>
 ```
@@ -80,10 +80,12 @@ Optional generic history search:
 
 | Module | Owned tables | Flyway history table |
 |---|---|---|
-| Core | `git_packs`, `git_reflog` | `jgit_storage_hibernate_core_schema_history` |
+| Core | `git_packs`, `git_pack_chunks`, `git_repository_lock`, `git_reflog` | `jgit_storage_hibernate_core_schema_history` |
 | Search | `git_commit_index` | `jgit_storage_hibernate_search_schema_history` |
 
-Reftable-related files are stored in `git_packs`. Core and Search have separate history tables because both publish artifact-aligned versions such as 0.1.4 and 0.1.5.
+`git_packs` stores publication metadata and legacy inline payloads. New pack, index, bitmap and Reftable payloads are stored as ordered 1 MiB rows in `git_pack_chunks`. `git_repository_lock` coordinates ref updates, pack publication, repository deletion and pack cleanup across independent `SessionFactory` instances.
+
+Core and Search have separate history tables because both publish artifact-aligned versions such as 0.1.4 and 0.1.5.
 
 Application workflow, session, audit, outbox and domain-projection tables are outside these migration locations. The consuming application owns and migrates them even when all entities share one `SessionFactory` and database schema. The same rule currently applies to any experimental Java Analysis or Architecture entity persistence.
 
@@ -153,7 +155,7 @@ Search is installed after Core with the equivalent `SearchSchemaMigrations` cons
 
 Before using this runbook, assert that:
 
-- Core: `git_packs`, `git_reflog` and the Core history table are absent;
+- Core: `git_packs`, `git_pack_chunks`, `git_repository_lock`, `git_reflog` and the Core history table are absent;
 - Search: `git_commit_index` and the Search history table are absent.
 
 If any of those objects already exists, stop and classify the schema before proceeding.
@@ -188,7 +190,7 @@ For Search, repeat the operation using `SearchSchemaMigrations` and its history 
 
 Do not baseline an unknown, partially created or manually modified schema. Baselining records that the existing structure is already the trusted 0.1.4 baseline; it does not verify or repair that structure.
 
-The repository's upgrade tests create the legacy state from immutable H2, HSQLDB and PostgreSQL 0.1.4 DDL fixtures where the corresponding adoption path is supported. They do not generate the old schema from current entity mappings.
+The repository's upgrade tests create the legacy state from immutable H2, HSQLDB and PostgreSQL 0.1.4 DDL fixtures where the corresponding adoption path is supported. They do not generate the old schema from current entity mappings. Existing inline BLOBs are not rewritten to chunks during migration; they remain readable and are naturally replaced by later JGit repacks.
 
 ## Hibernate startup
 
@@ -223,6 +225,35 @@ try (HibernateSessionFactoryProvider provider =
 ```
 
 Framework-managed applications may construct the `SessionFactory` or Jakarta `EntityManagerFactory` themselves and pass the native Hibernate `SessionFactory` to `DefaultHibernateRepositoryFactory`. Use one `DataSource`, keep transaction ownership in the application and register the public module entities with application mappings.
+
+## Chunked payload and temporary-disk operation
+
+New payloads are written to a temporary file while JGit constructs them, then persisted as bounded chunks. The JVM no longer needs a complete pack-related file in one byte array, but the host must provide enough temporary-disk space for all concurrent open writers.
+
+Each persisted uncommitted extension has a UUID writer token and renewable lease. A writer verifies ownership on flush and close. Pack flush, publication, ref publication, repository deletion and cleanup share the same repository-scoped pessimistic lock.
+
+The optional capacity profile exercises 1 MiB, 16 MiB and 128 MiB payloads:
+
+```bash
+mvn -B -pl jgit-storage-hibernate-core -Ppack-capacity verify
+```
+
+See [Pack capacity and recovery](operations/capacity-and-recovery.md) for the memory/disk envelope and monitoring requirements.
+
+## Recovering abandoned writes
+
+A crash can leave invisible uncommitted rows. Clean them through the public service rather than direct SQL:
+
+```java
+PackCleanupResult result =
+    new PackStorageMaintenance(sessionFactory)
+        .deleteExpiredUncommittedPacks(
+            new RepositoryName("demo"),
+            Instant.now().minus(Duration.ofHours(24)),
+            Instant.now());
+```
+
+The service deletes a pack name only if every persisted extension is old, uncommitted and lacks a current lease. Published, recent or partly active extension groups are skipped. Choose the age cutoff as an explicit deployment policy.
 
 ## Search setup
 
@@ -296,8 +327,9 @@ Before migration:
 
 - confirm a restorable backup and record its identifier;
 - capture the current application/library version and Flyway history;
-- record row counts for module-owned tables;
-- ensure no concurrent application instance can write during an incompatible migration.
+- record row counts for Core metadata and chunk tables;
+- ensure no concurrent application instance can write during an incompatible migration;
+- confirm the temporary filesystem can absorb the expected concurrent in-progress pack extensions.
 
 After migration:
 
@@ -305,8 +337,17 @@ After migration:
 - verify Hibernate starts with `validate`;
 - open a repository and traverse its main ref/history;
 - read recent reflog entries;
+- verify new pack rows use `git_pack_chunks` while legacy inline rows remain readable;
 - verify Search queries or schedule reindexing when Search is enabled;
 - compare row counts and domain-specific smoke-test results.
+
+Operational monitoring should include:
+
+- temporary-disk free space;
+- counts and bytes of `committed=false` rows;
+- expired writer leases;
+- chunk-row growth and average chunk count per pack extension;
+- transaction latency during repack and cleanup.
 
 ## Running integration tests locally
 
@@ -323,7 +364,9 @@ The Core and Search suites exercise:
 - adoption of immutable 0.1.4 fixtures;
 - Flyway history versions;
 - Hibernate `validate`;
-- repository commits, refs and reflogs;
+- chunked repository commits, refs and reflogs;
+- legacy inline payload compatibility;
+- leased abandoned-write cleanup and repository deletion;
 - Search projection persistence;
 - `SessionFactory` restart.
 
