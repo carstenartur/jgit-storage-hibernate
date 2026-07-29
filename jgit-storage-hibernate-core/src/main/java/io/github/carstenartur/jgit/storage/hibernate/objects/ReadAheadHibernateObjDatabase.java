@@ -146,8 +146,16 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   protected void commitPackImpl(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
-    stagedExtensions.commit(descriptions, replaces);
-    clearCache();
+    try {
+      stagedExtensions.commit(descriptions, replaces);
+      clearCache();
+    } catch (IOException | RuntimeException publicationFailure) {
+      // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit paths
+      // such as Reftable publication may propagate commitPack failure directly. Clean local staging
+      // here as well; rollback() is idempotent and retains the legacy database cleanup fallback.
+      stagedExtensions.rollback(descriptions);
+      throw publicationFailure;
+    }
   }
 
   @Override
