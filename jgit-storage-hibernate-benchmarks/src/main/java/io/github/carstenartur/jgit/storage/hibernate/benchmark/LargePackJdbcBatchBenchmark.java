@@ -37,7 +37,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
-/** Compares portable Hibernate JDBC batching for one non-compressible multi-chunk pack publication. */
+/** Compares portable and PostgreSQL-rewritten JDBC batching for one multi-chunk pack. */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 1)
@@ -49,11 +49,12 @@ public class LargePackJdbcBatchBenchmark {
 
   static final String DISABLED = "disabled";
   static final String ENABLED = "enabled";
+  static final String ENABLED_REWRITE = "enabled-rewrite";
   private static final int PAYLOAD_SIZE = 12 * 1024 * 1024 + 257;
 
   private final AtomicInteger invocationCounter = new AtomicInteger();
 
-  @Param({DISABLED, ENABLED})
+  @Param({DISABLED, ENABLED, ENABLED_REWRITE})
   public String batchingMode;
 
   private HibernateSessionFactoryProvider provider;
@@ -64,9 +65,11 @@ public class LargePackJdbcBatchBenchmark {
   @Setup(Level.Trial)
   public void setupTrial() {
     Properties properties = new Properties();
-    properties.put(
-        "hibernate.connection.url",
-        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY));
+    String jdbcUrl = requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY);
+    if (ENABLED_REWRITE.equals(batchingMode)) {
+      jdbcUrl = appendJdbcParameter(jdbcUrl, "reWriteBatchedInserts", "true");
+    }
+    properties.put("hibernate.connection.url", jdbcUrl);
     properties.put(
         "hibernate.connection.username",
         requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY));
@@ -144,6 +147,10 @@ public class LargePackJdbcBatchBenchmark {
     counters.chunkEntityInserts =
         statistics.getEntityStatistics(GitPackChunkEntity.class.getName()).getInsertCount();
     return objectId;
+  }
+
+  private static String appendJdbcParameter(String jdbcUrl, String name, String value) {
+    return jdbcUrl + (jdbcUrl.contains("?") ? "&" : "?") + name + "=" + value;
   }
 
   private static String requiredSystemProperty(String name) {
