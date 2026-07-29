@@ -179,7 +179,7 @@ jobs:
   publish-history:
     name: Publish benchmark history and badge
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: jmh
+    needs: [jmh, jdbc-batching]
     runs-on: ubuntu-latest
     concurrency:
       group: repository-pages-publication-${{ github.repository }}
@@ -192,21 +192,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download benchmark results outside the worktree
+      - name: Download standard benchmark results outside the worktree
         uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
         with:
           name: jmh-backend-comparison-results
           path: ${{ runner.temp }}/jmh-benchmark-artifact
 
+      - name: Download focused JDBC batch results outside the worktree
+        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
+        with:
+          name: jdbc-batch-comparison-results
+          path: ${{ runner.temp }}/jdbc-batch-benchmark-artifact
+
       - name: Publish generated benchmark pages
         shell: bash
         run: |
           set -euo pipefail
-          artifact_root="${RUNNER_TEMP}/jmh-benchmark-artifact"
-          benchmark_source="$(find "$artifact_root" -type f -name backend-comparison.json -print -quit)"
-          badge_source="$(find "$artifact_root" -type f -name performance.json -print -quit)"
+          standard_artifact_root="${RUNNER_TEMP}/jmh-benchmark-artifact"
+          batch_artifact_root="${RUNNER_TEMP}/jdbc-batch-benchmark-artifact"
+          standard_result_source="$(find "$standard_artifact_root" -type f -name jmh-result.json -print -quit)"
+          batch_result_source="$(find "$batch_artifact_root" -type f -name jmh-result.json -print -quit)"
+          benchmark_source="${RUNNER_TEMP}/combined-benchmark-comparison.json"
+          badge_source="$(find "$standard_artifact_root" -type f -name performance.json -print -quit)"
           dashboard_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/index.html"
           dashboard_script_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/dashboard.js"
+          test -s "$standard_result_source"
+          test -s "$batch_result_source"
+          python3 .github/scripts/convert-jmh-backend-comparison.py \
+            "$standard_result_source" \
+            "$batch_result_source" \
+            "$benchmark_source"
           test -s "$benchmark_source"
           test -s "$badge_source"
           test -s "$dashboard_source"
