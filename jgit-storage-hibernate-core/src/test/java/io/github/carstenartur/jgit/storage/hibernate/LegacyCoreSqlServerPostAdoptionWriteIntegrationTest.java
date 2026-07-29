@@ -73,7 +73,7 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
             .baselineDescription("adopted pre-library core schema")
             .load();
     flyway.migrate();
-    assertEquals("0.1.14.2", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.1.17", flyway.info().current().getVersion().getVersion());
 
     ObjectId commitId;
     try (HibernateSessionFactoryProvider provider = provider();
@@ -91,7 +91,8 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
       assertEquals(1, repository.getReflogReader("refs/heads/main").getReverseEntries().size());
     }
 
-    try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
+    try (Connection connection = openConnection();
+        Statement statement = connection.createStatement()) {
       assertTrue(count(statement, "select count(*) from git_pack_chunks") > 0);
       assertTrue(
           count(
@@ -109,7 +110,8 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
   }
 
   private static void createEmptyLegacySchema() throws Exception {
-    try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
+    try (Connection connection = openConnection();
+        Statement statement = connection.createStatement()) {
       statement.execute(
           """
           create table git_packs (
@@ -177,7 +179,8 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
     properties.put("hibernate.connection.url", SQL_SERVER.getJdbcUrl());
     properties.put("hibernate.connection.username", SQL_SERVER.getUsername());
     properties.put("hibernate.connection.password", SQL_SERVER.getPassword());
-    properties.put("hibernate.connection.driver_class", "com.microsoft.sqlserver.jdbc.SQLServerDriver");
+    properties.put(
+        "hibernate.connection.driver_class", "com.microsoft.sqlserver.jdbc.SQLServerDriver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.SQLServerDialect");
     properties.put("hibernate.hbm2ddl.auto", "validate");
     properties.put("hibernate.show_sql", "false");
