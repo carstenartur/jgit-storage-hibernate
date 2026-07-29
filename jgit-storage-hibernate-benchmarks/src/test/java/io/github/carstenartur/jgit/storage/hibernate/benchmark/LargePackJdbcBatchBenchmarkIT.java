@@ -26,76 +26,65 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Runs the established repository-backend comparison through Maven, JUnit and Testcontainers. */
+/** Runs only the focused large-pack JDBC batching comparison. */
 @Testcontainers(disabledWithoutDocker = true)
-class RepositoryBackendBenchmarkIT {
+class LargePackJdbcBatchBenchmarkIT {
 
-  private static final int EXPECTED_OPERATION_COUNT = 13;
-  private static final Set<String> EXPECTED_BACKENDS =
+  private static final Set<String> EXPECTED_MODES =
       Set.of(
-          HibernateRepositoryBenchmark.FILESYSTEM,
-          HibernateRepositoryBenchmark.HSQLDB,
-          HibernateRepositoryBenchmark.POSTGRESQL,
-          HibernateRepositoryBenchmark.POSTGRESQL_HIKARI);
+          LargePackJdbcBatchBenchmark.DISABLED,
+          LargePackJdbcBatchBenchmark.ENABLED,
+          LargePackJdbcBatchBenchmark.ENABLED_REWRITE);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
       new PostgreSQLContainer<>("postgres:17.10-alpine")
-          .withDatabaseName("jgit_storage_benchmark")
+          .withDatabaseName("jgit_storage_batch_benchmark")
           .withUsername("benchmark")
           .withPassword("benchmark");
 
   @Test
-  void recordsEveryOperationForEveryBackend() throws Exception {
+  void recordsPortableAndDriverRewrittenBatchingModes() throws Exception {
     Path resultFile =
         Path.of(
                 System.getProperty(
-                    "benchmark.resultFile", "target/benchmarks/jmh-result.json"))
+                    "benchmark.resultFile", "target/benchmarks/jdbc-batch-jmh-result.json"))
             .toAbsolutePath();
     Files.createDirectories(resultFile.getParent());
-    Path outputFile = resultFile.resolveSibling("jmh-output.txt");
+    Path outputFile = resultFile.resolveSibling("jdbc-batch-jmh-output.txt");
 
     Options options =
         new OptionsBuilder()
-            .include(HibernateRepositoryBenchmark.class.getName())
-            .include(GitProtocolBenchmark.class.getName())
+            .include(LargePackJdbcBatchBenchmark.class.getName())
             .param(
-                "backend",
-                HibernateRepositoryBenchmark.FILESYSTEM,
-                HibernateRepositoryBenchmark.HSQLDB,
-                HibernateRepositoryBenchmark.POSTGRESQL,
-                HibernateRepositoryBenchmark.POSTGRESQL_HIKARI)
+                "batchingMode",
+                LargePackJdbcBatchBenchmark.DISABLED,
+                LargePackJdbcBatchBenchmark.ENABLED,
+                LargePackJdbcBatchBenchmark.ENABLED_REWRITE)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
             .result(resultFile.toString())
             .output(outputFile.toString())
             .jvmArgsAppend(
-                systemProperty(
+                RepositoryBackendBenchmarkIT.systemProperty(
                     HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
                     POSTGRESQL.getJdbcUrl()),
-                systemProperty(
+                RepositoryBackendBenchmarkIT.systemProperty(
                     HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
                     POSTGRESQL.getUsername()),
-                systemProperty(
+                RepositoryBackendBenchmarkIT.systemProperty(
                     HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
                     POSTGRESQL.getPassword()))
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
+    assertEquals(3, results.size(), "The focused benchmark must produce exactly three results");
     assertEquals(
-        EXPECTED_OPERATION_COUNT * EXPECTED_BACKENDS.size(),
-        results.size(),
-        "Every standard benchmark operation must run for every storage backend");
-    assertEquals(
-        EXPECTED_BACKENDS,
+        EXPECTED_MODES,
         results.stream()
-            .map(result -> result.getParams().getParam("backend"))
+            .map(result -> result.getParams().getParam("batchingMode"))
             .collect(Collectors.toSet()));
     assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
-  }
-
-  static String systemProperty(String name, String value) {
-    return "-D" + name + "=" + value;
   }
 }

@@ -29,8 +29,15 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
     Objects.requireNonNull(properties, "properties");
     Objects.requireNonNull(additionalAnnotatedClasses, "additionalAnnotatedClasses");
 
+    Properties effectiveProperties = new Properties();
+    effectiveProperties.putAll(properties);
+    effectiveProperties.putIfAbsent(
+        HibernateStorageSettings.JDBC_BATCH_SIZE,
+        Integer.toString(HibernateStorageSettings.DEFAULT_JDBC_BATCH_SIZE));
+    effectiveProperties.putIfAbsent(HibernateStorageSettings.ORDER_INSERTS, Boolean.TRUE.toString());
+
     Configuration configuration = new Configuration();
-    configuration.addProperties(properties);
+    configuration.addProperties(effectiveProperties);
     for (Class<?> annotatedClass : CoreEntities.annotatedClasses()) {
       configuration.addAnnotatedClass(annotatedClass);
     }

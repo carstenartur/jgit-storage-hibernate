@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert JMH JSON into the dashboard's custom smaller-is-better format."""
+"""Convert one or more JMH JSON files into the dashboard's smaller-is-better format."""
 
 from __future__ import annotations
 
@@ -7,13 +7,19 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 BACKEND_LABELS = {
     "filesystem": "JGit + filesystem",
     "hsqldb": "JGit + HSQLDB (in-memory)",
     "postgresql": "JGit + PostgreSQL",
     "postgresql-hikari": "JGit + PostgreSQL + HikariCP",
+}
+
+BATCHING_MODE_LABELS = {
+    "disabled": "JGit + PostgreSQL (JDBC batching off)",
+    "enabled": "JGit + PostgreSQL (JDBC batching on)",
+    "enabled-rewrite": "JGit + PostgreSQL (JDBC batching + rewrite)",
 }
 
 
@@ -24,13 +30,37 @@ def _finite_number(value: Any, field: str) -> float:
     return number
 
 
+def _series_label(result: dict[str, Any]) -> str:
+    params = result.get("params", {})
+    backend = params.get("backend")
+    if backend is not None:
+        if backend not in BACKEND_LABELS:
+            raise ValueError(f"Unsupported JMH backend parameter: {backend!r}")
+        return BACKEND_LABELS[backend]
+
+    batching_mode = params.get("batchingMode")
+    if batching_mode is not None:
+        if batching_mode not in BATCHING_MODE_LABELS:
+            raise ValueError(f"Unsupported JMH batching mode: {batching_mode!r}")
+        return BATCHING_MODE_LABELS[batching_mode]
+
+    raise ValueError("JMH result has neither a backend nor a batchingMode parameter")
+
+
+def load_results(sources: Iterable[Path]) -> list[dict[str, Any]]:
+    combined: list[dict[str, Any]] = []
+    for source in sources:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            raise ValueError(f"JMH result must be a JSON array: {source}")
+        combined.extend(raw)
+    return combined
+
+
 def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     converted: list[dict[str, Any]] = []
     for result in results:
-        backend = result.get("params", {}).get("backend")
-        if backend not in BACKEND_LABELS:
-            raise ValueError(f"Missing or unsupported JMH backend parameter: {backend!r}")
-
+        series_label = _series_label(result)
         benchmark = str(result["benchmark"])
         operation = benchmark.rsplit(".", 1)[-1]
         metric = result["primaryMetric"]
@@ -40,13 +70,13 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         converted.append(
             {
-                "name": f"{operation} — {BACKEND_LABELS[backend]}",
+                "name": f"{operation} — {series_label}",
                 "unit": unit,
                 "value": score,
                 "range": score_error,
                 "extra": "\n".join(
                     (
-                        f"Backend: {BACKEND_LABELS[backend]}",
+                        f"Backend: {series_label}",
                         f"JDK: {result.get('jdkVersion', 'unknown')}",
                         f"Mode: {result.get('mode', 'unknown')}",
                         f"Forks: {result.get('forks', 'unknown')}",
@@ -59,20 +89,17 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         raise SystemExit(
-            "usage: convert-jmh-backend-comparison.py <jmh-result.json> <comparison.json>"
+            "usage: convert-jmh-backend-comparison.py "
+            "<jmh-result.json> [<additional-result.json> ...] <comparison.json>"
         )
 
-    source = Path(sys.argv[1])
-    target = Path(sys.argv[2])
-    raw = json.loads(source.read_text(encoding="utf-8"))
-    if not isinstance(raw, list):
-        raise ValueError("JMH result must be a JSON array")
-
+    sources = [Path(argument) for argument in sys.argv[1:-1]]
+    target = Path(sys.argv[-1])
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
-        json.dumps(convert(raw), indent=2, ensure_ascii=False) + "\n",
+        json.dumps(convert(load_results(sources)), indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
 

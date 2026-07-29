@@ -67,7 +67,7 @@ jobs:
       - name: Generate JMH performance badge
         if: always()
         run: |
-          if [ -f target/benchmarks/jmh-result.json ]; then
+          if [ -s target/benchmarks/jmh-result.json ]; then
             python3 .github/scripts/write-performance-badge.py target/benchmarks/jmh-result.json
           fi
 
@@ -91,6 +91,88 @@ jobs:
           echo 'PostgreSQL is provided by the JUnit Testcontainers extension; the workflow only invokes Maven.' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
+
+  jdbc-batching:
+    name: PostgreSQL JDBC batching comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p target/jdbc-batching
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/jdbc-batching/maven-build.log
+
+      - name: Compare large-pack publication with batching off and on
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pjdbc-batch-comparison \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/jdbc-batching/jmh-result.json" 2>&1 \
+            | tee target/jdbc-batching/maven-benchmark.log
+
+          result_source="$(find jgit-storage-hibernate-benchmarks/target target \
+            -type f \( -name 'jdbc-batch-jmh-result.json' -o -name 'jmh-result.json' \) \
+            ! -path 'target/jdbc-batching/jmh-result.json' -print -quit)"
+          output_source="$(find jgit-storage-hibernate-benchmarks/target target \
+            -type f -name 'jdbc-batch-jmh-output.txt' \
+            ! -path 'target/jdbc-batching/jmh-output.txt' -print -quit)"
+
+          if [ -z "$result_source" ] && [ -s target/jdbc-batching/jmh-result.json ]; then
+            result_source=target/jdbc-batching/jmh-result.json
+          fi
+          if [ -z "$output_source" ] && [ -s target/jdbc-batching/jmh-output.txt ]; then
+            output_source=target/jdbc-batching/jmh-output.txt
+          fi
+
+          test -n "$result_source"
+          test -s "$result_source"
+          test -n "$output_source"
+          test -s "$output_source"
+
+          if [ "$(realpath "$result_source")" != "$(realpath -m target/jdbc-batching/jmh-result.json)" ]; then
+            cp "$result_source" target/jdbc-batching/jmh-result.json
+          fi
+          if [ "$(realpath "$output_source")" != "$(realpath -m target/jdbc-batching/jmh-output.txt)" ]; then
+            cp "$output_source" target/jdbc-batching/jmh-output.txt
+          fi
+
+      - name: Convert focused batch comparison
+        run: |
+          python3 .github/scripts/convert-jmh-backend-comparison.py \
+            target/jdbc-batching/jmh-result.json \
+            target/jdbc-batching/comparison.json
+          cat target/jdbc-batching/comparison.json
+
+      - name: Upload focused batch results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jdbc-batch-comparison-results
+          path: target/jdbc-batching/*
+          if-no-files-found: error
+
+      - name: Report JDBC batch comparison
+        if: always()
+        run: |
+          echo '### PostgreSQL JDBC batching' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A focused twelve-MiB non-compressible pack is measured with Hibernate JDBC batching disabled and enabled.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The artifact includes elapsed time, prepared statements, entity inserts, flushes and real JDBC batch-execution events.' >> "$GITHUB_STEP_SUMMARY"
 
   pack-capacity:
     name: Chunked pack capacity 1/16/128 MiB
@@ -123,7 +205,7 @@ jobs:
   publish-history:
     name: Publish benchmark history and badge
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: jmh
+    needs: [jmh, jdbc-batching]
     runs-on: ubuntu-latest
     concurrency:
       group: repository-pages-publication-${{ github.repository }}
@@ -136,21 +218,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download benchmark results outside the worktree
+      - name: Download standard benchmark results outside the worktree
         uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
         with:
           name: jmh-backend-comparison-results
           path: ${{ runner.temp }}/jmh-benchmark-artifact
 
+      - name: Download focused JDBC batch results outside the worktree
+        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
+        with:
+          name: jdbc-batch-comparison-results
+          path: ${{ runner.temp }}/jdbc-batch-benchmark-artifact
+
       - name: Publish generated benchmark pages
         shell: bash
         run: |
           set -euo pipefail
-          artifact_root="${RUNNER_TEMP}/jmh-benchmark-artifact"
-          benchmark_source="$(find "$artifact_root" -type f -name backend-comparison.json -print -quit)"
-          badge_source="$(find "$artifact_root" -type f -name performance.json -print -quit)"
+          standard_artifact_root="${RUNNER_TEMP}/jmh-benchmark-artifact"
+          batch_artifact_root="${RUNNER_TEMP}/jdbc-batch-benchmark-artifact"
+          standard_result_source="$(find "$standard_artifact_root" -type f -name jmh-result.json -print -quit)"
+          batch_result_source="$(find "$batch_artifact_root" -type f -name jmh-result.json -print -quit)"
+          benchmark_source="${RUNNER_TEMP}/combined-benchmark-comparison.json"
+          badge_source="$(find "$standard_artifact_root" -type f -name performance.json -print -quit)"
           dashboard_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/index.html"
           dashboard_script_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/dashboard.js"
+          test -s "$standard_result_source"
+          test -s "$batch_result_source"
+          python3 .github/scripts/convert-jmh-backend-comparison.py \
+            "$standard_result_source" \
+            "$batch_result_source" \
+            "$benchmark_source"
           test -s "$benchmark_source"
           test -s "$badge_source"
           test -s "$dashboard_source"

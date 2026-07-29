@@ -9,7 +9,8 @@ Use the familiar JGit `Repository` API while storing packs, refs, reftables and 
 - pack-related payloads are constructed in bounded temporary files instead of complete heap byte arrays;
 - completed PACK/IDX/Reftable extensions are persisted and published atomically per logical pack;
 - small committed extensions may remain inline while large extensions use ordered 1 MiB chunks;
-- existing inline BLOB and legacy uncommitted rows remain readable after upgrade;
+- chunk inserts use portable Hibernate JDBC batching without generated-key round trips per chunk;
+- existing inline BLOB, generated chunk-ID and legacy uncommitted rows remain readable after upgrade;
 - packs remain hidden until transactionally published, avoiding partially visible writes;
 - normal JGit ref updates publish Reftable state and queryable reflogs atomically;
 - repository-scoped database locks coordinate independent `SessionFactory` instances;
@@ -37,10 +38,11 @@ A concrete example is the [auditable approval-workflow service](../docs/use-case
 1. Apply the packaged Core Flyway migration for the selected database.
 2. Start Hibernate with `hibernate.hbm2ddl.auto=validate`.
 3. Register `CoreEntities.annotatedClasses()` in the application-managed persistence context.
-4. Construct `DefaultHibernateRepositoryFactory` from the native Hibernate `SessionFactory`.
-5. Open repositories through `RepositoryName` and use normal public JGit APIs.
-6. Monitor JVM temporary-disk capacity for concurrent pack construction.
-7. Retain an operator policy for legacy durable uncommitted rows and stale staging files after abnormal process termination.
+4. Configure JDBC batching when the application owns the `SessionFactory`; the bundled provider applies conservative non-overriding defaults.
+5. Construct `DefaultHibernateRepositoryFactory` from the native Hibernate `SessionFactory`.
+6. Open repositories through `RepositoryName` and use normal public JGit APIs.
+7. Monitor JVM temporary-disk capacity for concurrent pack construction.
+8. Retain an operator policy for legacy durable uncommitted rows and stale staging files after abnormal process termination.
 
 ```java
 Flyway.configure()
@@ -78,6 +80,19 @@ The reader opens either:
 The migration does not rewrite existing published BLOBs. A later JGit repack can replace them naturally. Legacy uncommitted rows produced by the previous/base writer contract remain publishable or removable through the compatibility path.
 
 Temporary-disk capacity must cover concurrent open extensions and completed extensions waiting for their logical pack's publication callback. The detailed capacity envelope, optional 1/16/128 MiB profile, crash model and Sandbox predecessor review are documented in [Pack capacity and recovery](../docs/operations/capacity-and-recovery.md).
+
+## JDBC batching and keys
+
+`HibernateSessionFactoryProvider` applies these values only when the caller did not set them:
+
+```properties
+hibernate.jdbc.batch_size=8
+hibernate.order_inserts=true
+```
+
+The eight-row batch matches the bounded eight-chunk persistence window. `GitPackChunkEntity` uses `(pack_id, chunk_index)` as its Hibernate identity, so every identifier is known before SQL execution and chunk inserts can be sent through real JDBC batches. Existing Flyway-managed schemas may retain their generated `git_pack_chunks.id` column; it remains read-only compatibility data and published payloads are not rewritten. The provider deliberately does not change update ordering for unrelated application entities.
+
+Applications constructing a framework-managed `SessionFactory` must configure batching themselves. PostgreSQL `reWriteBatchedInserts` and SQL Server `useBulkCopyForBatchInsert` are optional deployment-level experiments, not forced library defaults. See [JDBC batching and pack-chunk keys](../docs/operations/jdbc-batching.md).
 
 ## Transaction guarantees
 
@@ -162,4 +177,4 @@ Workflow, session, audit, outbox and other application-specific tables remain ow
 
 H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. The suites verify fresh installation, 0.1.4 upgrades where applicable, pre-library adoption with unchanged BLOB checksums and reflog rows, Hibernate validation, adaptive inline/chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
 
-Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion and legacy lease-aware cleanup. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. The optional `pack-capacity` Maven profile verifies 1 MiB, 16 MiB and 128 MiB payloads and is run manually and weekly by the existing performance workflow.
+Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion, legacy lease-aware cleanup and real JDBC batch execution. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. The optional `pack-capacity` Maven profile verifies 1 MiB, 16 MiB and 128 MiB payloads and is run manually and weekly by the existing performance workflow. A dedicated JMH comparison measures a twelve-MiB PostgreSQL pack with batching disabled and enabled.
