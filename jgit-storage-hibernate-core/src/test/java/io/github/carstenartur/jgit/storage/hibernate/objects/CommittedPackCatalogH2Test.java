@@ -45,8 +45,9 @@ class CommittedPackCatalogH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      PersistedPack persisted = persistCommittedPack(provider, repositoryName, "pack-catalog");
       ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      int bootstrapExtensions = catalogSizeAfterScan(database);
+      PersistedPack persisted = persistCommittedPack(provider, repositoryName, "pack-catalog");
       Statistics statistics = provider.getSessionFactory().getStatistics();
       statistics.clear();
       StorageOperationBreakdown before = repository.getStorageOperationBreakdown();
@@ -54,7 +55,7 @@ class CommittedPackCatalogH2Test {
       List<DfsPackDescription> descriptions = database.listPacks();
       DfsPackDescription description = description(descriptions, persisted.packName());
 
-      assertEquals(2, database.committedExtensionCatalogSize());
+      assertEquals(bootstrapExtensions + 2, database.committedExtensionCatalogSize());
       assertEquals(1L, statistics.getQueryExecutionCount());
       StorageOperationBreakdown afterCatalog =
           repository.getStorageOperationBreakdown().minus(before);
@@ -107,11 +108,12 @@ class CommittedPackCatalogH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      persistCommittedPack(provider, repositoryName, "pack-existing");
       ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      int bootstrapExtensions = catalogSizeAfterScan(database);
+      persistCommittedPack(provider, repositoryName, "pack-existing");
 
       database.listPacks();
-      assertEquals(2, database.committedExtensionCatalogSize());
+      assertEquals(bootstrapExtensions + 2, database.committedExtensionCatalogSize());
 
       DfsPackDescription staged = database.newPack(PackSource.RECEIVE);
       write(database, staged, PackExt.PACK, new byte[] {9, 8, 7, 6});
@@ -126,8 +128,9 @@ class CommittedPackCatalogH2Test {
       statistics.clear();
       List<DfsPackDescription> rebuilt = database.listPacks();
       assertEquals(1L, statistics.getQueryExecutionCount());
-      assertEquals(3, database.committedExtensionCatalogSize());
-      assertEquals(2, rebuilt.size());
+      assertEquals(bootstrapExtensions + 3, database.committedExtensionCatalogSize());
+      description(rebuilt, "pack-existing");
+      description(rebuilt, baseName(staged));
     }
   }
 
@@ -138,10 +141,11 @@ class CommittedPackCatalogH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      PersistedPack persisted = persistCommittedPack(provider, repositoryName, "pack-stable");
       ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      int bootstrapExtensions = catalogSizeAfterScan(database);
+      PersistedPack persisted = persistCommittedPack(provider, repositoryName, "pack-stable");
       DfsPackDescription stable = description(database.listPacks(), persisted.packName());
-      assertEquals(2, database.committedExtensionCatalogSize());
+      assertEquals(bootstrapExtensions + 2, database.committedExtensionCatalogSize());
 
       DfsPackDescription failing = database.newPack(PackSource.RECEIVE);
       write(database, failing, PackExt.PACK, new byte[] {1, 2, 3});
@@ -151,7 +155,7 @@ class CommittedPackCatalogH2Test {
 
       assertThrows(IOException.class, () -> database.commitPackImpl(List.of(failing), null));
       assertEquals(
-          2,
+          bootstrapExtensions + 2,
           database.committedExtensionCatalogSize(),
           "A rolled-back publication must not replace the last complete catalog snapshot");
 
@@ -163,6 +167,11 @@ class CommittedPackCatalogH2Test {
       }
       assertEquals(1L, statistics.getQueryExecutionCount());
     }
+  }
+
+  private static int catalogSizeAfterScan(ReadAheadHibernateObjDatabase database) throws IOException {
+    database.listPacks();
+    return database.committedExtensionCatalogSize();
   }
 
   private static ReadAheadHibernateObjDatabase objectDatabase(HibernateRepository repository) {
