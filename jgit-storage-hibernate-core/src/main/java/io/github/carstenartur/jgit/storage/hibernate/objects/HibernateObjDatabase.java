@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -18,15 +19,16 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
@@ -41,17 +43,20 @@ import org.hibernate.SessionFactory;
 /**
  * {@link DfsObjDatabase} backed by Hibernate-managed relational database rows.
  *
- * <p>Pack extensions are first written as uncommitted rows and become visible only when JGit calls
- * {@link #commitPackImpl(Collection, Collection)}. This mirrors the DFS contract more closely than
- * immediately exposing partially written pack files.
+ * <p>Pack extensions are written to bounded temporary files that support JGit's required random
+ * read-back while the stream remains open. Closing an extension stages that file in the repository
+ * instance; no database row is created until JGit calls {@link #commitPackImpl(Collection,
+ * Collection)}. All staged extensions for one logical pack are persisted and made visible in the
+ * same repository-locked Hibernate transaction.
  *
  * <p>Small payloads are stored in the existing inline column to avoid an additional chunk row and
- * ORM round trip. Larger payloads are written through a temporary file and persisted as bounded
- * chunks. Existing inline and chunked rows remain readable without a destructive data migration.
+ * ORM round trip. Larger payloads are persisted as bounded one MiB chunks. Existing inline and
+ * chunked rows, including uncommitted rows created by earlier releases, remain compatible.
  *
- * <p>Every uncommitted row has a writer token and renewable lease. Pack persistence, publication,
- * rollback and abandoned-write cleanup use the same repository lock so a maintenance operation
- * cannot race a live writer.
+ * <p>A failed publication removes the JVM-local staged files. Legacy abandoned uncommitted database
+ * rows remain recoverable through {@code PackStorageMaintenance}. A process crash may leave ordinary
+ * operating-system temporary files, but cannot leave a new partially persisted database pack under
+ * this staging model.
  *
  * <p>Shallow repositories are not supported. A non-empty shallow boundary is rejected explicitly
  * instead of being retained only in memory and silently lost on restart.
@@ -60,13 +65,15 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
   static final int PACK_CHUNK_SIZE = 1024 * 1024;
   static final int INLINE_PAYLOAD_THRESHOLD = 256 * 1024;
-  static final Duration PACK_WRITE_LEASE = Duration.ofMinutes(30);
-  static final Duration PACK_LEASE_RENEWAL_INTERVAL = Duration.ofMinutes(5);
   private static final int CHUNK_BATCH_SIZE = 8;
+  private static final System.Logger LOGGER =
+      System.getLogger(HibernateObjDatabase.class.getName());
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
+  private final Map<StagedExtensionKey, StagedPackExtension> stagedExtensions =
+      new ConcurrentHashMap<>();
 
   /**
    * Create an object database.
@@ -89,7 +96,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     this.transactionContext = transactionContext;
   }
 
-  private static String baseName(DfsPackDescription description) {
+  protected static String baseName(DfsPackDescription description) {
     String fileName = description.getFileName(PackExt.PACK);
     int dot = fileName.lastIndexOf('.');
     return dot > 0 ? fileName.substring(0, dot) : fileName;
@@ -98,6 +105,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
     return transactionContext.execute(
+        StorageOperationKind.PACK_METADATA_READ,
         session -> {
           List<Object[]> rows =
               session
@@ -138,41 +146,109 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   protected void commitPackImpl(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
-    transactionContext.executeWithRepositoryLock(
-        repositoryName,
-        session -> {
-          if (replaces != null) {
-            for (DfsPackDescription replace : replaces) {
-              deletePackRows(session, repositoryName, baseName(replace));
+    try {
+      transactionContext.executeWithRepositoryLock(
+          StorageOperationKind.PACK_PUBLICATION,
+          repositoryName,
+          session -> {
+            if (replaces != null) {
+              for (DfsPackDescription replace : replaces) {
+                deletePackRows(session, repositoryName, baseName(replace));
+              }
             }
-          }
-          Instant committedAt = Instant.now();
-          for (DfsPackDescription description : descriptions) {
-            int updated =
-                session
-                    .createMutationQuery(
-                        "UPDATE GitPackEntity p SET p.committed = true, "
-                            + "p.committedAt = :committedAt, p.writeToken = null, "
-                            + "p.writeLeaseUntil = null WHERE p.repositoryName = :repo "
-                            + "AND p.packName = :name AND p.committed = false")
-                    .setParameter("committedAt", committedAt)
-                    .setParameter("repo", repositoryName)
-                    .setParameter("name", baseName(description))
-                    .executeUpdate();
-            if (updated == 0) {
-              throw new IOException(
-                  "Cannot publish missing or already committed pack " + baseName(description));
+            Instant committedAt = Instant.now();
+            for (DfsPackDescription description : descriptions) {
+              publishDescription(session, description, committedAt);
             }
-          }
-          return null;
-        });
+            return null;
+          });
+    } catch (IOException | RuntimeException failure) {
+      discardStagedExtensions(descriptions);
+      throw failure;
+    }
+    discardStagedExtensions(descriptions);
     clearCache();
+  }
+
+  private void publishDescription(
+      Session session, DfsPackDescription description, Instant committedAt) throws IOException {
+    String packName = baseName(description);
+    Map<String, StagedPackExtension> staged = stagedForPack(packName);
+    if (staged.isEmpty()) {
+      publishLegacyUncommittedRows(session, packName, committedAt);
+      return;
+    }
+
+    List<String> expectedExtensions = new ArrayList<>();
+    for (PackExt extension : PackExt.values()) {
+      if (description.hasFileExt(extension)) {
+        String extensionName = extension.getExtension();
+        expectedExtensions.add(extensionName);
+        StagedPackExtension payload = staged.get(extensionName);
+        if (payload == null) {
+          throw new IOException(
+              "Missing staged extension " + packName + "." + extensionName);
+        }
+        persistCommittedExtension(session, payload, committedAt);
+      }
+    }
+    if (expectedExtensions.size() != staged.size()) {
+      throw new IOException(
+          "Staged extensions do not match JGit pack description for "
+              + packName
+              + ": expected="
+              + expectedExtensions
+              + ", staged="
+              + staged.keySet());
+    }
+  }
+
+  private void publishLegacyUncommittedRows(Session session, String packName, Instant committedAt)
+      throws IOException {
+    int updated =
+        session
+            .createMutationQuery(
+                "UPDATE GitPackEntity p SET p.committed = true, "
+                    + "p.committedAt = :committedAt, p.writeToken = null, "
+                    + "p.writeLeaseUntil = null WHERE p.repositoryName = :repo "
+                    + "AND p.packName = :name AND p.committed = false")
+            .setParameter("committedAt", committedAt)
+            .setParameter("repo", repositoryName)
+            .setParameter("name", packName)
+            .executeUpdate();
+    if (updated == 0) {
+      throw new IOException("Cannot publish missing or already committed pack " + packName);
+    }
+  }
+
+  private void persistCommittedExtension(
+      Session session, StagedPackExtension staged, Instant committedAt) throws IOException {
+    GitPackEntity entity = new GitPackEntity();
+    entity.setRepositoryName(repositoryName);
+    entity.setPackName(staged.packName());
+    entity.setPackExtension(staged.packExtension());
+    entity.setFileSize(staged.fileSize());
+    entity.setCreatedAt(staged.createdAt());
+    entity.setCommitted(true);
+    entity.setCommittedAt(committedAt);
+    entity.setWriteToken(null);
+    entity.setWriteLeaseUntil(null);
+
+    boolean inlinePayload = staged.fileSize() <= INLINE_PAYLOAD_THRESHOLD;
+    entity.setData(inlinePayload ? staged.readInlinePayload() : null);
+    session.persist(entity);
+    session.flush();
+    if (!inlinePayload) {
+      staged.persistChunks(session, entity.getId());
+    }
   }
 
   @Override
   protected void rollbackPack(Collection<DfsPackDescription> descriptions) {
+    discardStagedExtensions(descriptions);
     try {
       transactionContext.executeWithRepositoryLock(
+          StorageOperationKind.PACK_ROLLBACK,
           repositoryName,
           session -> {
             for (DfsPackDescription description : descriptions) {
@@ -211,6 +287,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   protected ReadableChannel openFile(DfsPackDescription description, PackExt extension)
       throws FileNotFoundException, IOException {
     return transactionContext.execute(
+        StorageOperationKind.PACK_FILE_READ,
         session -> {
           Object[] row =
               session
@@ -240,7 +317,41 @@ public class HibernateObjDatabase extends DfsObjDatabase {
   protected DfsOutputStream writeFile(DfsPackDescription description, PackExt extension)
       throws IOException {
     return new HibernatePackOutputStream(
-        transactionContext, repositoryName, baseName(description), extension.getExtension());
+        baseName(description), extension.getExtension(), this::stageExtension);
+  }
+
+  private void stageExtension(StagedPackExtension staged) throws IOException {
+    StagedExtensionKey key = new StagedExtensionKey(staged.packName(), staged.packExtension());
+    StagedPackExtension existing = stagedExtensions.putIfAbsent(key, staged);
+    if (existing != null) {
+      staged.deleteBestEffort();
+      throw new IOException(
+          "Pack extension is already staged: " + staged.packName() + "." + staged.packExtension());
+    }
+  }
+
+  private Map<String, StagedPackExtension> stagedForPack(String packName) {
+    Map<String, StagedPackExtension> result = new LinkedHashMap<>();
+    stagedExtensions.forEach(
+        (key, value) -> {
+          if (key.packName().equals(packName)) {
+            result.put(key.packExtension(), value);
+          }
+        });
+    return result;
+  }
+
+  private void discardStagedExtensions(Collection<DfsPackDescription> descriptions) {
+    for (DfsPackDescription description : descriptions) {
+      String packName = baseName(description);
+      for (PackExt extension : PackExt.values()) {
+        StagedExtensionKey key = new StagedExtensionKey(packName, extension.getExtension());
+        StagedPackExtension staged = stagedExtensions.remove(key);
+        if (staged != null) {
+          staged.deleteBestEffort();
+        }
+      }
+    }
   }
 
   @Override
@@ -262,31 +373,126 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     return 0L;
   }
 
-  static final class HibernatePackOutputStream extends DfsOutputStream {
-    private final HibernateTransactionContext transactionContext;
-    private final String repositoryName;
+  private record StagedExtensionKey(String packName, String packExtension) {}
+
+  @FunctionalInterface
+  interface ExtensionStager {
+    void stage(StagedPackExtension staged) throws IOException;
+  }
+
+  static final class StagedPackExtension {
     private final String packName;
     private final String packExtension;
-    private final String writeToken = UUID.randomUUID().toString();
+    private final Path temporaryFile;
+    private final long fileSize;
+    private final Instant createdAt;
+
+    StagedPackExtension(
+        String packName,
+        String packExtension,
+        Path temporaryFile,
+        long fileSize,
+        Instant createdAt) {
+      this.packName = packName;
+      this.packExtension = packExtension;
+      this.temporaryFile = temporaryFile;
+      this.fileSize = fileSize;
+      this.createdAt = createdAt;
+    }
+
+    String packName() {
+      return packName;
+    }
+
+    String packExtension() {
+      return packExtension;
+    }
+
+    long fileSize() {
+      return fileSize;
+    }
+
+    Instant createdAt() {
+      return createdAt;
+    }
+
+    byte[] readInlinePayload() throws IOException {
+      return Files.readAllBytes(temporaryFile);
+    }
+
+    void persistChunks(Session session, Long packId) throws IOException {
+      try (FileChannel channel = FileChannel.open(temporaryFile, StandardOpenOption.READ)) {
+        byte[] chunkBuffer = new byte[PACK_CHUNK_SIZE];
+        long position = 0;
+        int chunkIndex = 0;
+        int pendingChunks = 0;
+        while (position < fileSize) {
+          int chunkLength = (int) Math.min(PACK_CHUNK_SIZE, fileSize - position);
+          ByteBuffer destination = ByteBuffer.wrap(chunkBuffer, 0, chunkLength);
+          long chunkPosition = position;
+          while (destination.hasRemaining()) {
+            int count = channel.read(destination, chunkPosition);
+            if (count <= 0) {
+              throw new IOException(
+                  "Temporary pack file ended before declared size " + fileSize);
+            }
+            chunkPosition += count;
+          }
+
+          GitPackChunkEntity chunk = new GitPackChunkEntity();
+          chunk.setPackId(packId);
+          chunk.setChunkIndex(chunkIndex);
+          chunk.setChunkSize(chunkLength);
+          chunk.setData(
+              chunkLength == PACK_CHUNK_SIZE
+                  ? chunkBuffer.clone()
+                  : Arrays.copyOf(chunkBuffer, chunkLength));
+          session.persist(chunk);
+
+          position += chunkLength;
+          chunkIndex++;
+          pendingChunks++;
+          if (pendingChunks == CHUNK_BATCH_SIZE) {
+            session.flush();
+            session.clear();
+            pendingChunks = 0;
+          }
+        }
+        if (pendingChunks > 0) {
+          session.flush();
+        }
+      }
+    }
+
+    void deleteBestEffort() {
+      try {
+        Files.deleteIfExists(temporaryFile);
+      } catch (IOException failure) {
+        LOGGER.log(
+            System.Logger.Level.WARNING,
+            "Could not delete staged pack extension " + temporaryFile,
+            failure);
+      }
+    }
+  }
+
+  static final class HibernatePackOutputStream extends DfsOutputStream {
+    private final String packName;
+    private final String packExtension;
+    private final ExtensionStager stager;
     private final Path temporaryFile;
     private final FileChannel fileChannel;
+    private final Instant createdAt = Instant.now();
     private long fileSize;
-    private int modificationVersion;
-    private int persistedVersion = -1;
-    private Instant renewLeaseAfter = Instant.MIN;
     private boolean closed;
 
     HibernatePackOutputStream(
-        HibernateTransactionContext transactionContext,
-        String repositoryName,
-        String packName,
-        String packExtension)
-        throws IOException {
-      this.transactionContext = transactionContext;
-      this.repositoryName = repositoryName;
+        String packName, String packExtension, ExtensionStager stager) throws IOException {
       this.packName = packName;
       this.packExtension = packExtension;
+      this.stager = stager;
       temporaryFile = Files.createTempFile("jgit-storage-pack-", ".tmp");
+      temporaryFile.toFile().deleteOnExit();
       fileChannel =
           FileChannel.open(
               temporaryFile,
@@ -301,7 +507,6 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       if (offset < 0 || length < 0 || offset > source.length - length) {
         throw new IndexOutOfBoundsException();
       }
-      renewLeaseIfDue();
       ByteBuffer buffer = ByteBuffer.wrap(source, offset, length);
       long writePosition = fileSize;
       while (buffer.hasRemaining()) {
@@ -312,7 +517,6 @@ public class HibernateObjDatabase extends DfsObjDatabase {
         writePosition += count;
       }
       fileSize = writePosition;
-      modificationVersion++;
     }
 
     @Override
@@ -347,146 +551,8 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
     @Override
     public void flush() throws IOException {
-      flush(false);
-    }
-
-    private void flush(boolean forceOwnershipCheck) throws IOException {
       ensureOpen();
-      Instant now = Instant.now();
-      boolean payloadChanged = persistedVersion != modificationVersion;
-      boolean previouslyPersisted = persistedVersion >= 0;
-      boolean leaseDue = !now.isBefore(renewLeaseAfter);
-      if (!payloadChanged && !leaseDue && !forceOwnershipCheck) {
-        return;
-      }
-      long sizeAtFlush = fileSize;
-      transactionContext.executeWithRepositoryLock(
-          repositoryName,
-          session -> {
-            GitPackEntity entity =
-                session
-                    .createQuery(
-                        "FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                            + "AND p.packName = :name AND p.packExtension = :ext",
-                        GitPackEntity.class)
-                    .setParameter("repo", repositoryName)
-                    .setParameter("name", packName)
-                    .setParameter("ext", packExtension)
-                    .uniqueResult();
-
-            boolean newEntity = entity == null;
-            if (newEntity && previouslyPersisted) {
-              throw new IOException(
-                  "Pack writer ownership was lost for " + packName + "." + packExtension);
-            }
-            boolean rewritePayload = payloadChanged || newEntity;
-            if (!newEntity) {
-              if (entity.isCommitted()) {
-                throw new IOException("Pack is already committed: " + packName + "." + packExtension);
-              }
-              String owner = entity.getWriteToken();
-              if (owner != null && !writeToken.equals(owner)) {
-                throw new IOException(
-                    "Pack writer ownership was lost for " + packName + "." + packExtension);
-              }
-            } else {
-              entity = new GitPackEntity();
-              entity.setRepositoryName(repositoryName);
-              entity.setPackName(packName);
-              entity.setPackExtension(packExtension);
-              entity.setCreatedAt(now);
-              session.persist(entity);
-            }
-
-            boolean inlinePayload = sizeAtFlush <= INLINE_PAYLOAD_THRESHOLD;
-            if (rewritePayload) {
-              entity.setData(inlinePayload ? readInlinePayload(sizeAtFlush) : null);
-            }
-            entity.setFileSize(sizeAtFlush);
-            entity.setCommitted(false);
-            entity.setCommittedAt(null);
-            entity.setWriteToken(writeToken);
-            entity.setWriteLeaseUntil(now.plus(PACK_WRITE_LEASE));
-            session.flush();
-
-            if (rewritePayload && !inlinePayload) {
-              Long packId = entity.getId();
-              if (!newEntity) {
-                session
-                    .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId = :packId")
-                    .setParameter("packId", packId)
-                    .executeUpdate();
-                session.flush();
-              }
-              persistChunks(session, packId, sizeAtFlush);
-            }
-            return null;
-          });
-      persistedVersion = modificationVersion;
-      renewLeaseAfter = now.plus(PACK_LEASE_RENEWAL_INTERVAL);
-    }
-
-    private byte[] readInlinePayload(long sizeAtFlush) throws IOException {
-      byte[] data = new byte[Math.toIntExact(sizeAtFlush)];
-      ByteBuffer destination = ByteBuffer.wrap(data);
-      long position = 0;
-      while (destination.hasRemaining()) {
-        int count = fileChannel.read(destination, position);
-        if (count <= 0) {
-          throw new IOException(
-              "Temporary pack file ended before declared size " + sizeAtFlush);
-        }
-        position += count;
-      }
-      return data;
-    }
-
-    private void renewLeaseIfDue() throws IOException {
-      if (persistedVersion >= 0 && !Instant.now().isBefore(renewLeaseAfter)) {
-        flush(false);
-      }
-    }
-
-    private void persistChunks(Session session, Long packId, long sizeAtFlush) throws IOException {
-      byte[] chunkBuffer = new byte[PACK_CHUNK_SIZE];
-      long position = 0;
-      int chunkIndex = 0;
-      int pendingChunks = 0;
-      while (position < sizeAtFlush) {
-        int chunkLength = (int) Math.min(PACK_CHUNK_SIZE, sizeAtFlush - position);
-        ByteBuffer destination = ByteBuffer.wrap(chunkBuffer, 0, chunkLength);
-        long chunkPosition = position;
-        while (destination.hasRemaining()) {
-          int count = fileChannel.read(destination, chunkPosition);
-          if (count <= 0) {
-            throw new IOException(
-                "Temporary pack file ended before declared size " + sizeAtFlush);
-          }
-          chunkPosition += count;
-        }
-
-        GitPackChunkEntity chunk = new GitPackChunkEntity();
-        chunk.setPackId(packId);
-        chunk.setChunkIndex(chunkIndex);
-        chunk.setChunkSize(chunkLength);
-        chunk.setData(
-            chunkLength == PACK_CHUNK_SIZE
-                ? chunkBuffer.clone()
-                : Arrays.copyOf(chunkBuffer, chunkLength));
-        session.persist(chunk);
-
-        position += chunkLength;
-        chunkIndex++;
-        pendingChunks++;
-        if (pendingChunks == CHUNK_BATCH_SIZE) {
-          session.flush();
-          session.clear();
-          pendingChunks = 0;
-        }
-      }
-      if (pendingChunks > 0) {
-        session.flush();
-      }
+      fileChannel.force(false);
     }
 
     @Override
@@ -494,38 +560,29 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       if (closed) {
         return;
       }
-      IOException failure = null;
-      try {
-        flush(true);
-      } catch (IOException exception) {
-        failure = exception;
-      }
       closed = true;
+      IOException failure = null;
       try {
         fileChannel.close();
       } catch (IOException exception) {
-        failure = combine(failure, exception);
+        failure = exception;
+      }
+      if (failure == null) {
+        try {
+          stager.stage(
+              new StagedPackExtension(
+                  packName, packExtension, temporaryFile, fileSize, createdAt));
+          return;
+        } catch (IOException exception) {
+          failure = exception;
+        }
       }
       try {
         Files.deleteIfExists(temporaryFile);
       } catch (IOException exception) {
-        failure = combine(failure, exception);
+        failure.addSuppressed(exception);
       }
-      if (failure != null) {
-        throw failure;
-      }
-    }
-
-    String writeToken() {
-      return writeToken;
-    }
-
-    private static IOException combine(IOException primary, IOException additional) {
-      if (primary == null) {
-        return additional;
-      }
-      primary.addSuppressed(additional);
-      return primary;
+      throw failure;
     }
 
     private void ensureOpen() throws IOException {
@@ -651,7 +708,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
     @Override
     public void setReadAheadBytes(int readAheadBytes) {
-      // The channel caches one complete bounded chunk and does not prefetch additional rows.
+      // Base implementation loads one chunk at a time.
     }
 
     private void ensureOpen() throws IOException {
@@ -671,7 +728,8 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     }
 
     @Override
-    public int read(ByteBuffer destination) {
+    public int read(ByteBuffer destination) throws IOException {
+      ensureOpen();
       int count = Math.min(destination.remaining(), data.length - position);
       if (count <= 0) {
         return -1;
@@ -698,6 +756,10 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
     @Override
     public void position(long newPosition) {
+      if (newPosition < 0 || newPosition > data.length) {
+        throw new IllegalArgumentException(
+            "position must be between 0 and " + data.length + ": " + newPosition);
+      }
       position = Math.toIntExact(newPosition);
     }
 
@@ -708,12 +770,18 @@ public class HibernateObjDatabase extends DfsObjDatabase {
 
     @Override
     public int blockSize() {
-      return 0;
+      return PACK_CHUNK_SIZE;
     }
 
     @Override
     public void setReadAheadBytes(int readAheadBytes) {
-      // Byte array backed channel does not need read-ahead configuration.
+      // Inline payload is already fully loaded.
+    }
+
+    private void ensureOpen() throws IOException {
+      if (!open) {
+        throw new IOException("Pack channel is closed");
+      }
     }
   }
 }
