@@ -66,8 +66,9 @@ import org.hibernate.SessionFactory;
  * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
  * the previous catalog and the returned publication metadata are both complete, exact committed row
  * metadata is merged into a one-shot local scan result before the cache is cleared. Newly staged
- * inline PACK and Reftable payloads may additionally be retained within the hard per-publication
- * budget and are atomically removed at their first matching open. An incomplete catalog, legacy
+ * inline PACK and Reftable payloads may additionally remain available until their first matching open
+ * within one hard repository-instance budget. New payloads are preferred and the oldest unconsumed
+ * payloads are discarded first when the budget is exceeded. An incomplete catalog, legacy
  * publication or authoritative database scan contains no local payload state.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
@@ -330,8 +331,10 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
             PackSource source = packSources.getOrDefault(committed.packName(), PackSource.INSERT);
             LocalInlinePayload localInlinePayload =
                 commitResult.completeMetadata() ? committed.localInlinePayload() : null;
+            ExtensionKey key = new ExtensionKey(committed.packName(), committed.extension());
+            extensions.remove(key);
             extensions.put(
-                new ExtensionKey(committed.packName(), committed.extension()),
+                key,
                 new ExtensionSnapshot(
                     committed.packId(),
                     committed.fileSize(),
@@ -339,8 +342,34 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                     source,
                     localInlinePayload));
           }
+          enforceLocalInlinePayloadBudget(extensions);
           return current.completeMutation(extensions, commitResult.completeMetadata());
         });
+  }
+
+  private static void enforceLocalInlinePayloadBudget(
+      LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions) {
+    int retainedBytes =
+        extensions.values().stream()
+            .map(ExtensionSnapshot::localInlinePayload)
+            .filter(payload -> payload != null)
+            .mapToInt(LocalInlinePayload::size)
+            .sum();
+    if (retainedBytes <= StagedPackExtensionStore.LOCAL_INLINE_HANDOFF_BUDGET_BYTES) {
+      return;
+    }
+    for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry :
+        List.copyOf(extensions.entrySet())) {
+      LocalInlinePayload payload = entry.getValue().localInlinePayload();
+      if (payload == null) {
+        continue;
+      }
+      extensions.put(entry.getKey(), entry.getValue().withoutLocalInlinePayload());
+      retainedBytes -= payload.size();
+      if (retainedBytes <= StagedPackExtensionStore.LOCAL_INLINE_HANDOFF_BUDGET_BYTES) {
+        return;
+      }
+    }
   }
 
   private void restoreCatalogAfterFailedMutation(CatalogState previousCatalog) {
@@ -391,7 +420,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       LinkedHashMap<ExtensionKey, ExtensionSnapshot> retained = new LinkedHashMap<>();
       for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry : extensions.entrySet()) {
         if (!replacedPackNames.contains(entry.getKey().packName())) {
-          retained.put(entry.getKey(), entry.getValue().withoutLocalInlinePayload());
+          retained.put(entry.getKey(), entry.getValue());
         }
       }
       return new CatalogState(generation + 1, complete, false, retained);
