@@ -79,8 +79,10 @@ class HibernateRepositoryMetricsH2Test {
       StorageOperationBreakdown breakdown =
           repository.getStorageOperationBreakdown().minus(breakdownBefore);
       assertEquals(aggregate, breakdown.total());
-      assertTrue(
-          breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE).transactionsStarted() > 0);
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE),
+          "Staged extension bytes are persisted by the owning publication transaction");
       assertTrue(
           breakdown.metrics(StorageOperationKind.PACK_PUBLICATION).transactionsStarted() > 0);
       assertTrue(breakdown.metrics(StorageOperationKind.REF_PUBLICATION).transactionsStarted() > 0);
