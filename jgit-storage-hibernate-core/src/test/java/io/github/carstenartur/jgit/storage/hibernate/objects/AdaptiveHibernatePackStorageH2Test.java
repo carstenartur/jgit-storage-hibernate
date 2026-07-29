@@ -15,10 +15,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
+import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
+import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
+import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -54,28 +61,42 @@ class AdaptiveHibernatePackStorageH2Test {
   }
 
   @Test
-  void ownershipOnlyClosePreservesAlreadyFlushedInlinePayload() throws Exception {
-    String repositoryName = "inline-close-" + UUID.randomUUID();
+  void keepsClosedInlinePayloadLocalUntilPackPublication() throws Exception {
+    String repositoryName = "inline-stage-" + UUID.randomUUID();
     try (HibernateSessionFactoryProvider provider = provider(repositoryName);
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      byte[] payload = "inline payload survives close".getBytes(StandardCharsets.UTF_8);
-      HibernateObjDatabase.HibernatePackOutputStream stream =
-          new HibernateObjDatabase.HibernatePackOutputStream(
-              new HibernateTransactionContext(provider.getSessionFactory()),
-              repositoryName,
-              "manual-pack",
-              "pack");
+      HibernateObjDatabase objectDatabase = repository.getObjectDatabase();
+      DfsPackDescription description =
+          new DfsPackDescription(repository.getDescription(), "manual-pack", PackSource.INSERT);
+      byte[] payload = "inline payload is published atomically".getBytes(StandardCharsets.UTF_8);
+      StorageOperationBreakdown before = repository.getStorageOperationBreakdown();
 
-      stream.write(payload, 0, payload.length);
-      stream.flush();
+      try (DfsOutputStream stream = objectDatabase.writeFile(description, PackExt.PACK)) {
+        stream.write(payload, 0, payload.length);
+        stream.flush();
+        assertEquals(0L, countPackRows(provider, repositoryName, "manual-pack"));
+      }
+      assertEquals(
+          0L,
+          countPackRows(provider, repositoryName, "manual-pack"),
+          "Closing an unpublished extension must not create a database row");
+
+      description.addFileExt(PackExt.PACK);
+      description.setFileSize(PackExt.PACK, payload.length);
+      objectDatabase.commitPackImpl(List.of(description), null);
+
       assertArrayEquals(payload, inlinePayload(provider, repositoryName, "manual-pack"));
       assertEquals(0L, countChunkRows(provider, repositoryName));
-
-      stream.close();
-      assertArrayEquals(payload, inlinePayload(provider, repositoryName, "manual-pack"));
-      assertEquals(0L, countChunkRows(provider, repositoryName));
+      StorageOperationBreakdown delta =
+          repository.getStorageOperationBreakdown().minus(before);
+      assertEquals(
+          0L,
+          delta.metrics(StorageOperationKind.PACK_EXTENSION_WRITE).transactionsStarted());
+      assertEquals(
+          1L, delta.metrics(StorageOperationKind.PACK_PUBLICATION).transactionsStarted());
+      assertEquals(1L, delta.metrics(StorageOperationKind.PACK_PUBLICATION).repositoryLocksAcquired());
     }
   }
 
@@ -119,6 +140,20 @@ class AdaptiveHibernatePackStorageH2Test {
               "SELECT p.data FROM GitPackEntity p WHERE p.repositoryName = :repo "
                   + "AND p.packName = :name AND p.packExtension = 'pack'",
               byte[].class)
+          .setParameter("repo", repositoryName)
+          .setParameter("name", packName)
+          .getSingleResult();
+    }
+  }
+
+  private static long countPackRows(
+      HibernateSessionFactoryProvider provider, String repositoryName, String packName) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      return session
+          .createQuery(
+              "SELECT count(p.id) FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                  + "AND p.packName = :name",
+              Long.class)
           .setParameter("repo", repositoryName)
           .setParameter("name", packName)
           .getSingleResult();
@@ -173,6 +208,7 @@ class AdaptiveHibernatePackStorageH2Test {
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.format_sql", "false");
     properties.put("hibernate.connection.pool_size", "2");
+    properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
     return new HibernateSessionFactoryProvider(properties);
   }
 }
