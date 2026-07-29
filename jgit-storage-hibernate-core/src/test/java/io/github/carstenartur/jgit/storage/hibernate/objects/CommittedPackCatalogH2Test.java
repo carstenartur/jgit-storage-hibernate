@@ -10,7 +10,9 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
@@ -31,6 +33,10 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.stat.Statistics;
@@ -102,8 +108,8 @@ class CommittedPackCatalogH2Test {
   }
 
   @Test
-  void successfulPublicationInvalidatesAndRebuildsCatalog() throws Exception {
-    String repositoryName = "catalog-invalidation";
+  void successfulPublicationHandsOffCompleteCatalogWithoutDatabaseQuery() throws Exception {
+    String repositoryName = "catalog-handoff";
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
@@ -119,18 +125,92 @@ class CommittedPackCatalogH2Test {
       write(database, staged, PackExt.PACK, new byte[] {9, 8, 7, 6});
       database.commitPackImpl(List.of(staged), null);
 
-      assertEquals(
-          0,
-          database.committedExtensionCatalogSize(),
-          "A successful publication must invalidate metadata and DFS caches together");
+      assertEquals(bootstrapExtensions + 3, database.committedExtensionCatalogSize());
+      assertTrue(database.localPackListScanAvailable());
 
       Statistics statistics = provider.getSessionFactory().getStatistics();
       statistics.clear();
-      List<DfsPackDescription> rebuilt = database.listPacks();
-      assertEquals(1L, statistics.getQueryExecutionCount());
-      assertEquals(bootstrapExtensions + 3, database.committedExtensionCatalogSize());
-      description(rebuilt, "pack-existing");
-      description(rebuilt, baseName(staged));
+      StorageOperationBreakdown before = repository.getStorageOperationBreakdown();
+      List<DfsPackDescription> handedOff = database.listPacks();
+
+      assertEquals(0L, statistics.getQueryExecutionCount());
+      assertFalse(database.localPackListScanAvailable());
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          repository
+              .getStorageOperationBreakdown()
+              .minus(before)
+              .metrics(StorageOperationKind.PACK_METADATA_READ));
+      description(handedOff, "pack-existing");
+      description(handedOff, baseName(staged));
+    }
+  }
+
+  @Test
+  void objectInserterAddPackConsumesHandoffWithoutMetadataTransaction() throws Exception {
+    String repositoryName = "catalog-add-pack";
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      database.getPackList();
+      int existingPacks = database.getCurrentPacks().length;
+      StorageOperationBreakdown before = repository.getStorageOperationBreakdown();
+      byte[] payload = deterministicBytes(512 * 1024, 41);
+      ObjectId objectId;
+
+      try (ObjectInserter inserter = repository.newObjectInserter()) {
+        objectId = inserter.insert(Constants.OBJ_BLOB, payload);
+        inserter.flush();
+      }
+
+      StorageOperationBreakdown delta =
+          repository.getStorageOperationBreakdown().minus(before);
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          delta.metrics(StorageOperationKind.PACK_METADATA_READ),
+          "DfsInserter.addPack must consume the local pack-list handoff without a DB scan");
+      assertFalse(database.localPackListScanAvailable());
+      assertEquals(existingPacks + 1, database.getCurrentPacks().length);
+      try (ObjectReader reader = repository.newObjectReader()) {
+        assertArrayEquals(payload, reader.open(objectId).getBytes());
+      }
+    }
+  }
+
+  @Test
+  void replacementPrunesOldCatalogBeforeLocalHandoff() throws Exception {
+    String repositoryName = "catalog-replacement";
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      int bootstrapExtensions = catalogSizeAfterScan(database);
+      persistCommittedPack(provider, repositoryName, "pack-replaced");
+      persistCommittedPack(provider, repositoryName, "pack-retained");
+      List<DfsPackDescription> beforeReplacement = database.listPacks();
+      DfsPackDescription replaced = description(beforeReplacement, "pack-replaced");
+
+      DfsPackDescription replacement = database.newPack(PackSource.COMPACT);
+      write(database, replacement, PackExt.PACK, new byte[] {3, 1, 4, 1, 5});
+      database.commitPackImpl(List.of(replacement), List.of(replaced));
+
+      assertEquals(
+          bootstrapExtensions + 3,
+          database.committedExtensionCatalogSize(),
+          "Two replaced extensions must be removed and one exact replacement added");
+      assertTrue(database.localPackListScanAvailable());
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
+      List<DfsPackDescription> handedOff = database.listPacks();
+      assertEquals(0L, statistics.getQueryExecutionCount());
+      assertThrows(
+          java.util.NoSuchElementException.class,
+          () -> description(handedOff, "pack-replaced"));
+      description(handedOff, "pack-retained");
+      description(handedOff, baseName(replacement));
     }
   }
 
