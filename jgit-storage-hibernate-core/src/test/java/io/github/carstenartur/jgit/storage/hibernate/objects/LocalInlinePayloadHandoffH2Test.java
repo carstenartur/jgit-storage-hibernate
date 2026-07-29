@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
@@ -21,6 +22,7 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperatio
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -30,6 +32,8 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 
@@ -176,8 +180,8 @@ class LocalInlinePayloadHandoffH2Test {
   }
 
   @Test
-  void authoritativeCatalogScanDropsRetainedPayloads() throws Exception {
-    try (Fixture fixture = fixture("inline-authoritative-scan")) {
+  void authoritativeCatalogScanPreservesExactlyMatchingLocalPayload() throws Exception {
+    try (Fixture fixture = fixture("inline-authoritative-match")) {
       DfsPackDescription description = fixture.database.newPack(PackSource.INSERT);
       byte[] payload = deterministicBytes(89, 41);
       write(fixture.database, description, PackExt.REFTABLE, payload);
@@ -185,15 +189,74 @@ class LocalInlinePayloadHandoffH2Test {
       assertEquals(payload.length, fixture.database.localInlinePayloadBytes());
 
       fixture.database.listPacks();
+      fixture.database.listPacks();
+
       assertEquals(payload.length, fixture.database.localInlinePayloadBytes());
+      PackFileReadMetrics before = fixture.repository.getPackFileReadMetrics();
+      assertArrayEquals(payload, open(fixture.database, description, PackExt.REFTABLE));
+      assertArrayEquals(payload, open(fixture.database, description, PackExt.REFTABLE));
+      assertEquals(
+          PackFileReadMetrics.ZERO,
+          fixture.repository.getPackFileReadMetrics().minus(before));
+    }
+  }
+
+  @Test
+  void authoritativeCatalogScanDropsPayloadWhenCommittedRowIdentityChanges() throws Exception {
+    String repositoryName = "inline-authoritative-mismatch";
+    try (Fixture fixture = fixture(repositoryName)) {
+      DfsPackDescription description = fixture.database.newPack(PackSource.INSERT);
+      byte[] original = deterministicBytes(97, 47);
+      byte[] replacement = deterministicBytes(original.length, 53);
+      write(fixture.database, description, PackExt.REFTABLE, original);
+      fixture.database.commitPackImpl(List.of(description), null);
+      fixture.database.listPacks();
+      assertEquals(original.length, fixture.database.localInlinePayloadBytes());
+
+      replaceCommittedInlineRow(
+          fixture.provider,
+          repositoryName,
+          baseName(description),
+          PackExt.REFTABLE,
+          replacement);
       fixture.database.listPacks();
 
       assertEquals(0, fixture.database.localInlinePayloadBytes());
       PackFileReadMetrics before = fixture.repository.getPackFileReadMetrics();
-      assertArrayEquals(payload, open(fixture.database, description, PackExt.REFTABLE));
+      assertArrayEquals(replacement, open(fixture.database, description, PackExt.REFTABLE));
       assertEquals(
           new PackFileReadMetrics(0, 0, 0, 0, 1, 0, 0, 0, 0),
           fixture.repository.getPackFileReadMetrics().minus(before));
+    }
+  }
+
+  private static void replaceCommittedInlineRow(
+      HibernateSessionFactoryProvider provider,
+      String repositoryName,
+      String packName,
+      PackExt extension,
+      byte[] replacement) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      Transaction transaction = session.beginTransaction();
+      session
+          .createMutationQuery(
+              "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                  + "AND p.packName = :name AND p.packExtension = :ext")
+          .setParameter("repo", repositoryName)
+          .setParameter("name", packName)
+          .setParameter("ext", extension.getExtension())
+          .executeUpdate();
+      GitPackEntity entity = new GitPackEntity();
+      entity.setRepositoryName(repositoryName);
+      entity.setPackName(packName);
+      entity.setPackExtension(extension.getExtension());
+      entity.setData(replacement);
+      entity.setFileSize(replacement.length);
+      entity.setCommitted(true);
+      entity.setCreatedAt(Instant.now());
+      entity.setCommittedAt(Instant.now());
+      session.persist(entity);
+      transaction.commit();
     }
   }
 
@@ -236,6 +299,12 @@ class LocalInlinePayloadHandoffH2Test {
       }
       return destination.array();
     }
+  }
+
+  private static String baseName(DfsPackDescription description) {
+    String fileName = description.getFileName(PackExt.PACK);
+    int dot = fileName.lastIndexOf('.');
+    return dot > 0 ? fileName.substring(0, dot) : fileName;
   }
 
   private static byte[] deterministicBytes(int length, int seed) {
