@@ -31,7 +31,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class LargePackJdbcBatchBenchmarkIT {
 
   private static final Set<String> EXPECTED_MODES =
-      Set.of(LargePackJdbcBatchBenchmark.DISABLED, LargePackJdbcBatchBenchmark.ENABLED);
+      Set.of(
+          LargePackJdbcBatchBenchmark.DISABLED,
+          LargePackJdbcBatchBenchmark.ENABLED,
+          LargePackJdbcBatchBenchmark.ENABLED_REWRITE);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -41,7 +44,7 @@ class LargePackJdbcBatchBenchmarkIT {
           .withPassword("benchmark");
 
   @Test
-  void recordsDisabledAndEnabledBatchingModes() throws Exception {
+  void recordsPortableAndDriverRewrittenBatchingModes() throws Exception {
     Path resultFile =
         Path.of(
                 System.getProperty(
@@ -56,7 +59,8 @@ class LargePackJdbcBatchBenchmarkIT {
             .param(
                 "batchingMode",
                 LargePackJdbcBatchBenchmark.DISABLED,
-                LargePackJdbcBatchBenchmark.ENABLED)
+                LargePackJdbcBatchBenchmark.ENABLED,
+                LargePackJdbcBatchBenchmark.ENABLED_REWRITE)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
             .result(resultFile.toString())
@@ -74,7 +78,7 @@ class LargePackJdbcBatchBenchmarkIT {
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
-    assertEquals(2, results.size(), "The focused benchmark must produce exactly two results");
+    assertEquals(3, results.size(), "The focused benchmark must produce exactly three results");
     assertEquals(
         EXPECTED_MODES,
         results.stream()
