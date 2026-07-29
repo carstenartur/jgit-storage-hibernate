@@ -88,10 +88,9 @@ Temporary-disk capacity must cover concurrent open extensions and completed exte
 ```properties
 hibernate.jdbc.batch_size=8
 hibernate.order_inserts=true
-hibernate.order_updates=true
 ```
 
-The eight-row batch matches the bounded eight-chunk persistence window. `GitPackChunkEntity` uses `(pack_id, chunk_index)` as its Hibernate identity, so every identifier is known before SQL execution and chunk inserts can be sent through real JDBC batches. Existing Flyway-managed schemas may retain their generated `git_pack_chunks.id` column; it remains read-only compatibility data and published payloads are not rewritten.
+The eight-row batch matches the bounded eight-chunk persistence window. `GitPackChunkEntity` uses `(pack_id, chunk_index)` as its Hibernate identity, so every identifier is known before SQL execution and chunk inserts can be sent through real JDBC batches. Existing Flyway-managed schemas may retain their generated `git_pack_chunks.id` column; it remains read-only compatibility data and published payloads are not rewritten. The provider deliberately does not change update ordering for unrelated application entities.
 
 Applications constructing a framework-managed `SessionFactory` must configure batching themselves. PostgreSQL `reWriteBatchedInserts` and SQL Server `useBulkCopyForBatchInsert` are optional deployment-level experiments, not forced library defaults. See [JDBC batching and pack-chunk keys](../docs/operations/jdbc-batching.md).
 
