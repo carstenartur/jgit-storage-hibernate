@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
@@ -52,9 +54,11 @@ import org.hibernate.SessionFactory;
  * <p>Each successful pack-list scan publishes an immutable catalog of committed extension row
  * identifiers, sizes and storage modes. Publication uses an atomic generation check, so a scan that
  * started before a successful pack mutation cannot overwrite the subsequent invalidation or return a
- * stale list after that mutation. Chunked files can then open without repeating the metadata query.
- * Inline payload bytes are deliberately not retained in the catalog; they continue to use the bounded
- * database fallback so repository memory does not grow with the number of historical packs.
+ * stale list after that mutation. A fair repository-instance-local read/write lock prevents scans
+ * from reading the database while this instance has an uncommitted pack replacement in progress.
+ * Chunked files can then open without repeating the metadata query. Inline payload bytes are
+ * deliberately not retained in the catalog; they continue to use the bounded database fallback so
+ * repository memory does not grow with the number of historical packs.
  *
  * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
  * the previous catalog was complete, the exact committed row metadata is merged into a one-shot local
@@ -70,6 +74,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private final StagedPackExtensionStore stagedExtensions;
   private final AtomicReference<CatalogState> committedExtensionCatalog =
       new AtomicReference<>(CatalogState.empty());
+  private final ReentrantReadWriteLock catalogLifecycleLock = new ReentrantReadWriteLock(true);
 
   public ReadAheadHibernateObjDatabase(
       DfsRepository repository,
@@ -94,29 +99,35 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
    */
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
-    while (true) {
-      CatalogState observedCatalog = committedExtensionCatalog.get();
-      if (observedCatalog.localScanAvailable()) {
-        CatalogState consumed = observedCatalog.consumeLocalScan();
-        if (committedExtensionCatalog.compareAndSet(observedCatalog, consumed)) {
-          return descriptionsFrom(observedCatalog.extensions());
+    Lock readLock = catalogLifecycleLock.readLock();
+    readLock.lock();
+    try {
+      while (true) {
+        CatalogState observedCatalog = committedExtensionCatalog.get();
+        if (observedCatalog.localScanAvailable()) {
+          CatalogState consumed = observedCatalog.consumeLocalScan();
+          if (committedExtensionCatalog.compareAndSet(observedCatalog, consumed)) {
+            return descriptionsFrom(observedCatalog.extensions());
+          }
+          continue;
         }
-        continue;
-      }
 
-      PackCatalog loaded = loadPackCatalog();
-      CatalogState loadedCatalog =
-          new CatalogState(observedCatalog.generation(), true, false, loaded.extensions());
-      if (committedExtensionCatalog.compareAndSet(observedCatalog, loadedCatalog)) {
-        return loaded.descriptions();
+        PackCatalog loaded = loadPackCatalog();
+        CatalogState loadedCatalog =
+            new CatalogState(observedCatalog.generation(), true, false, loaded.extensions());
+        if (committedExtensionCatalog.compareAndSet(observedCatalog, loadedCatalog)) {
+          return loaded.descriptions();
+        }
+        if (committedExtensionCatalog.get().generation() == observedCatalog.generation()) {
+          // Another scan published the same committed generation first. Both query results describe
+          // the same mutation-free generation, so this result is equally valid for JGit's pack list.
+          return loaded.descriptions();
+        }
+        // A pack mutation crossed this scan. Re-read so neither the optimization catalog nor JGit's
+        // pack-list cache can be populated from the older committed generation.
       }
-      if (committedExtensionCatalog.get().generation() == observedCatalog.generation()) {
-        // Another scan published the same committed generation first. Both query results describe
-        // the same mutation-free generation, so this result is equally valid for JGit's pack list.
-        return loaded.descriptions();
-      }
-      // A pack mutation crossed this scan. Re-read so neither the optimization catalog nor JGit's
-      // pack-list cache can be populated from the older committed generation.
+    } finally {
+      readLock.unlock();
     }
   }
 
@@ -145,8 +156,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                 new ExtensionSnapshot(packId, fileSize, inline, PackSource.INSERT));
           }
           Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
-          return new PackCatalog(
-              descriptionsFrom(immutableExtensions), immutableExtensions);
+          return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
         });
   }
 
@@ -223,20 +233,26 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   protected void commitPackImpl(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
-    CatalogState previousCatalog = beginCatalogMutation(replaces);
-    List<CommittedExtension> committedExtensions;
+    Lock writeLock = catalogLifecycleLock.writeLock();
+    writeLock.lock();
     try {
-      committedExtensions = stagedExtensions.commit(descriptions, replaces);
-    } catch (IOException | RuntimeException publicationFailure) {
-      // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit paths
-      // such as Reftable publication may propagate commitPack failure directly. Clean local staging
-      // here as well; rollback() is idempotent and retains the legacy database cleanup fallback.
-      stagedExtensions.rollback(descriptions);
-      restoreCatalogAfterFailedMutation(previousCatalog);
-      throw publicationFailure;
+      CatalogState previousCatalog = beginCatalogMutation(replaces);
+      List<CommittedExtension> committedExtensions;
+      try {
+        committedExtensions = stagedExtensions.commit(descriptions, replaces);
+      } catch (IOException | RuntimeException publicationFailure) {
+        // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit
+        // paths such as Reftable publication may propagate commitPack failure directly. Clean local
+        // staging here as well; rollback() is idempotent and retains the legacy database fallback.
+        stagedExtensions.rollback(descriptions);
+        restoreCatalogAfterFailedMutation(previousCatalog);
+        throw publicationFailure;
+      }
+      completeCatalogMutation(descriptions, committedExtensions);
+      clearCache();
+    } finally {
+      writeLock.unlock();
     }
-    completeCatalogMutation(descriptions, committedExtensions);
-    clearCache();
   }
 
   @Override
@@ -279,8 +295,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
           LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions =
               new LinkedHashMap<>(current.extensions());
           for (CommittedExtension committed : committedExtensions) {
-            PackSource source =
-                packSources.getOrDefault(committed.packName(), PackSource.INSERT);
+            PackSource source = packSources.getOrDefault(committed.packName(), PackSource.INSERT);
             extensions.put(
                 new ExtensionKey(committed.packName(), committed.extension()),
                 new ExtensionSnapshot(
