@@ -65,11 +65,11 @@ import org.hibernate.SessionFactory;
  *
  * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
  * the previous catalog and the returned publication metadata are both complete, exact committed row
- * metadata is merged into a one-shot local scan result before the cache is cleared. Newly staged
- * inline PACK and Reftable payloads may additionally remain available until their first matching open
- * within one hard repository-instance budget. New payloads are preferred and the oldest unconsumed
- * payloads are discarded first when the budget is exceeded. An incomplete catalog, legacy
- * publication or authoritative database scan contains no local payload state.
+ * metadata is merged into a local scan result before the cache is cleared. Newly staged inline PACK
+ * and Reftable payloads may additionally remain available for repeated read-only opens within one
+ * hard repository-instance budget. New payloads are preferred and the oldest retained payloads are
+ * discarded first when the budget is exceeded. An incomplete catalog, legacy publication or
+ * authoritative database scan contains no local payload state.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -183,32 +183,16 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       throws FileNotFoundException, IOException {
     ExtensionKey key = new ExtensionKey(baseName(description), extension.getExtension());
     ExtensionSnapshot snapshot = committedExtensionCatalog.get().extensions().get(key);
-    if (snapshot != null && !snapshot.inline()) {
-      return new ReadAheadChunkedReadableChannel(
-          sessionFactory, snapshot.packId(), snapshot.fileSize());
-    }
-    LocalInlinePayload localInlinePayload = consumeLocalInlinePayload(key);
-    if (localInlinePayload != null) {
-      return new InlineReadableChannel(localInlinePayload.transfer());
+    if (snapshot != null) {
+      if (!snapshot.inline()) {
+        return new ReadAheadChunkedReadableChannel(
+            sessionFactory, snapshot.packId(), snapshot.fileSize());
+      }
+      if (snapshot.localInlinePayload() != null) {
+        return new InlineReadableChannel(snapshot.localInlinePayload().transfer());
+      }
     }
     return openFileFromDatabase(description, extension);
-  }
-
-  private LocalInlinePayload consumeLocalInlinePayload(ExtensionKey key) {
-    while (true) {
-      CatalogState current = committedExtensionCatalog.get();
-      ExtensionSnapshot snapshot = current.extensions().get(key);
-      if (snapshot == null || snapshot.localInlinePayload() == null) {
-        return null;
-      }
-      LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions =
-          new LinkedHashMap<>(current.extensions());
-      extensions.put(key, snapshot.withoutLocalInlinePayload());
-      CatalogState consumed = current.withExtensions(extensions);
-      if (committedExtensionCatalog.compareAndSet(current, consumed)) {
-        return snapshot.localInlinePayload();
-      }
-    }
   }
 
   private ReadableChannel openFileFromDatabase(
@@ -435,10 +419,6 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
     private CatalogState withGeneration(long newGeneration) {
       return new CatalogState(newGeneration, complete, localScanAvailable, extensions);
-    }
-
-    private CatalogState withExtensions(Map<ExtensionKey, ExtensionSnapshot> newExtensions) {
-      return new CatalogState(generation, complete, localScanAvailable, newExtensions);
     }
   }
 
