@@ -36,7 +36,9 @@ import org.hibernate.SessionFactory;
  * <p>The writable channel reports the same one MiB alignment used by persisted chunks and readable
  * channels. This keeps JGit's write-time DFS block cache aligned with later reads after pack-list
  * invalidation and prevents stale blocks with a different alignment from being reused by copy-as-is
- * protocol transfers.
+ * protocol transfers. Intermediate {@code flush()} calls keep data in the temporary file; JGit
+ * closes each extension before publishing the pack, so the complete payload is persisted once on
+ * close instead of rewriting every partial PACK/IDX state.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -163,8 +165,9 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     }
 
     @Override
-    public void flush() throws IOException {
-      delegate.flush();
+    public void flush() {
+      // The delegate writes directly to a local FileChannel, so read-back is already current.
+      // Persisting every partial state is both unnecessary for the DFS contract and expensive.
     }
 
     @Override
