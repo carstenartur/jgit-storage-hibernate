@@ -30,13 +30,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class RepositoryBackendBenchmarkIT {
 
-  private static final int EXPECTED_OPERATION_COUNT = 13;
+  private static final int EXPECTED_STANDARD_OPERATION_COUNT = 13;
+  private static final int EXPECTED_LARGE_PACK_OPERATION_COUNT = 1;
   private static final Set<String> EXPECTED_BACKENDS =
       Set.of(
           HibernateRepositoryBenchmark.FILESYSTEM,
           HibernateRepositoryBenchmark.HSQLDB,
           HibernateRepositoryBenchmark.POSTGRESQL,
           HibernateRepositoryBenchmark.POSTGRESQL_HIKARI);
+  private static final Set<String> EXPECTED_BATCHING_MODES =
+      Set.of(LargePackJdbcBatchBenchmark.DISABLED, LargePackJdbcBatchBenchmark.ENABLED);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -46,7 +49,7 @@ class RepositoryBackendBenchmarkIT {
           .withPassword("benchmark");
 
   @Test
-  void recordsEveryOperationForEveryBackend() throws Exception {
+  void recordsEveryOperationForEveryBackendAndBatchingMode() throws Exception {
     Path resultFile =
         Path.of(
                 System.getProperty(
@@ -59,6 +62,7 @@ class RepositoryBackendBenchmarkIT {
         new OptionsBuilder()
             .include(HibernateRepositoryBenchmark.class.getName())
             .include(GitProtocolBenchmark.class.getName())
+            .include(LargePackJdbcBatchBenchmark.class.getName())
             .param(
                 "backend",
                 HibernateRepositoryBenchmark.FILESYSTEM,
@@ -82,15 +86,35 @@ class RepositoryBackendBenchmarkIT {
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
+    Collection<RunResult> largePackResults =
+        results.stream()
+            .filter(
+                result ->
+                    result
+                        .getParams()
+                        .getBenchmark()
+                        .startsWith(LargePackJdbcBatchBenchmark.class.getName()))
+            .toList();
+    Collection<RunResult> standardResults =
+        results.stream().filter(result -> !largePackResults.contains(result)).toList();
 
     assertEquals(
-        EXPECTED_OPERATION_COUNT * EXPECTED_BACKENDS.size(),
-        results.size(),
-        "Every benchmark operation must run for every storage backend");
+        EXPECTED_STANDARD_OPERATION_COUNT * EXPECTED_BACKENDS.size(),
+        standardResults.size(),
+        "Every standard benchmark operation must run for every storage backend");
+    assertEquals(
+        EXPECTED_LARGE_PACK_OPERATION_COUNT * EXPECTED_BATCHING_MODES.size(),
+        largePackResults.size(),
+        "The large-pack operation must run with JDBC batching disabled and enabled");
     assertEquals(
         EXPECTED_BACKENDS,
-        results.stream()
+        standardResults.stream()
             .map(result -> result.getParams().getParam("backend"))
+            .collect(Collectors.toSet()));
+    assertEquals(
+        EXPECTED_BATCHING_MODES,
+        largePackResults.stream()
+            .map(result -> result.getParams().getParam("batchingMode"))
             .collect(Collectors.toSet()));
     assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
