@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up JDK 21
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        uses: actions/setup-java@03ad4de0992f5dab136590ce7c4a0ac95 # v5.6.0
         with:
           distribution: temurin
           java-version: '21'
@@ -67,7 +67,7 @@ jobs:
       - name: Generate JMH performance badge
         if: always()
         run: |
-          if [ -f target/benchmarks/jmh-result.json ]; then
+          if [ -s target/benchmarks/jmh-result.json ]; then
             python3 .github/scripts/write-performance-badge.py target/benchmarks/jmh-result.json
           fi
 
@@ -91,6 +91,62 @@ jobs:
           echo 'PostgreSQL is provided by the JUnit Testcontainers extension; the workflow only invokes Maven.' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
+
+  jdbc-batching:
+    name: PostgreSQL JDBC batching comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p target/jdbc-batching
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/jdbc-batching/maven-build.log
+
+      - name: Compare large-pack publication with batching off and on
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pjdbc-batch-comparison \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/jdbc-batching/jmh-result.json" 2>&1 \
+            | tee target/jdbc-batching/maven-benchmark.log
+
+      - name: Convert focused batch comparison
+        run: |
+          python3 .github/scripts/convert-jmh-backend-comparison.py \
+            target/jdbc-batching/jmh-result.json \
+            target/jdbc-batching/comparison.json
+          cat target/jdbc-batching/comparison.json
+
+      - name: Upload focused batch results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jdbc-batch-comparison-results
+          path: target/jdbc-batching/*
+          if-no-files-found: error
+
+      - name: Report JDBC batch comparison
+        if: always()
+        run: |
+          echo '### PostgreSQL JDBC batching' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A focused twelve-MiB non-compressible pack is measured with Hibernate JDBC batching disabled and enabled.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The artifact includes elapsed time, prepared statements, entity inserts, flushes and real JDBC batch-execution events.' >> "$GITHUB_STEP_SUMMARY"
 
   pack-capacity:
     name: Chunked pack capacity 1/16/128 MiB
