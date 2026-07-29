@@ -68,9 +68,9 @@ public final class CoreSchemaMigrations {
       "jgit-storage-hibernate-core 0.1.4";
 
   /**
-   * Physical version produced by the legacy-adoption normalization before ordinary migrations resume.
+   * Schema version produced by legacy adoption before ordinary migrations create later structures.
    */
-  public static final String CURRENT_SCHEMA_VERSION = "0.1.14.2";
+  public static final String CURRENT_SCHEMA_VERSION = "0.1.5";
 
   /** Latest version of the pre-library/Sandbox/Taxonomy adoption migration stream. */
   public static final String LEGACY_ADOPTION_VERSION = "2";
