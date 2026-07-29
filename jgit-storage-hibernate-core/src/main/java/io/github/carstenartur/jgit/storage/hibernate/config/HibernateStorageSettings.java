@@ -17,9 +17,6 @@ public final class HibernateStorageSettings {
   /** Hibernate's insert-ordering setting. */
   public static final String ORDER_INSERTS = "hibernate.order_inserts";
 
-  /** Hibernate's update-ordering setting. */
-  public static final String ORDER_UPDATES = "hibernate.order_updates";
-
   /**
    * Conservative default aligned with the pack writer's bounded eight-chunk persistence window.
    * With one MiB chunks, one pending ORM batch retains at most roughly eight MiB of payload data.
