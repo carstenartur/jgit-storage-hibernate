@@ -1,37 +1,30 @@
 # Consuming jgit-storage-hibernate
 
-This guide covers the two storage-facing artifacts:
+This guide covers the storage-facing artifacts:
 
 ```text
 io.github.carstenartur:jgit-storage-hibernate-core
 io.github.carstenartur:jgit-storage-hibernate-search
 ```
 
-Core provides database-backed JGit repositories. Search is optional and adds generic Hibernate
-Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this
-foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their
-module guides before registering those entities.
+Core provides database-backed JGit repositories. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
 
-The documented release line is **0.1.15**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate
-Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and
-tested deployment stack instead of overriding only one side of the stack.
+The documented released line is **0.1.15**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and tested deployment stack instead of overriding only one side of the stack.
+
+SQL Server Search is introduced in **0.1.16**. Do not configure released Search 0.1.15 against SQL Server.
 
 ## Supported databases and operating model
 
 | Database | Core | Search | Tested version and intended use |
 |---|---|---|---|
 | PostgreSQL | Supported | Supported | PostgreSQL 17.10 through Testcontainers; persistent development, staging and production |
-| Microsoft SQL Server | Supported | Not currently shipped | SQL Server 2022 through Testcontainers; persistent Core deployments and copied-Sandbox adoption |
-| HSQLDB | Supported | Not currently shipped | HSQLDB 2.7.4; embedded persistent Core deployments and restart tests |
+| Microsoft SQL Server | Supported | Supported from 0.1.16 | SQL Server 2022 through Testcontainers; persistent deployments, copied-Sandbox Core adoption and Search rebuild cut-over |
+| HSQLDB | Supported | Not shipped | HSQLDB 2.7.4; embedded persistent Core deployments and restart tests |
 | H2 | Supported | Supported | H2 2.4.x; tests, demos and lightweight/disposable development |
 
-Support means that the artifact ships dialect-specific Flyway migrations and automated integration
-coverage for the listed module. SQL Server support applies to Core only; do not configure the Search
-module against SQL Server until it publishes its own SQL Server migrations and integration evidence.
-Java Analysis and Architecture do not yet ship module-owned migrations for any database.
+Support means that the artifact ships dialect-specific Flyway migrations and automated integration coverage for the listed module. Core support does not imply Search support unless both columns explicitly say so. Java Analysis and Architecture do not yet ship module-owned migrations for any database.
 
-Migration SQL is dialect-specific. Never run H2, HSQLDB, PostgreSQL or SQL Server resources against a
-different database.
+Migration SQL is dialect-specific. Never run H2, HSQLDB, PostgreSQL or SQL Server resources against a different database.
 
 Production sequence:
 
@@ -44,8 +37,7 @@ Production sequence:
 `update` and `create-drop` are not production schema-management mechanisms:
 
 - use `create-drop` for isolated tests and disposable databases;
-- `update` may be useful for a disposable local database, but its changes are not a versioned
-  deployment contract;
+- `update` may be useful for a disposable local database, but its changes are not a versioned deployment contract;
 - use packaged migrations plus `validate` for persistent development, staging and production.
 
 ## Anonymous public Maven repository
@@ -63,8 +55,7 @@ Configure the static public release repository:
 </repositories>
 ```
 
-No GitHub username, token or Maven `settings.xml` server entry is required. Development snapshots may
-still be published to GitHub Packages, but released versions use the anonymous repository above.
+No GitHub username, token or Maven `settings.xml` server entry is required. Development snapshots may still be published to GitHub Packages, but released versions use the anonymous repository above.
 
 ## Dependencies
 
@@ -88,6 +79,8 @@ Optional generic history search:
 </dependency>
 ```
 
+Use Search 0.1.16 or later for SQL Server. The release procedure updates the examples when that release is published.
+
 ## Schema ownership
 
 | Module | Owned tables | Flyway history table |
@@ -95,14 +88,9 @@ Optional generic history search:
 | Core | `git_packs`, `git_pack_chunks`, `git_repository_lock`, `git_reflog` | `jgit_storage_hibernate_core_schema_history` |
 | Search | `git_commit_index` | `jgit_storage_hibernate_search_schema_history` |
 
-`git_packs` stores publication metadata and compatibility inline payloads. Adaptive storage keeps
-small pack extensions inline and stores sufficiently large payloads as ordered 1 MiB rows in
-`git_pack_chunks`. `git_repository_lock` coordinates ref updates, pack publication, repository
-deletion and pack cleanup across independent `SessionFactory` instances.
+`git_packs` stores publication metadata and compatibility inline payloads. Adaptive storage keeps small pack extensions inline and stores sufficiently large payloads as ordered 1 MiB rows in `git_pack_chunks`. `git_repository_lock` coordinates ref updates, pack publication, repository deletion and pack cleanup across independent `SessionFactory` instances.
 
-Application workflow, session, audit, outbox and domain-projection tables are outside these migration
-locations. The consuming application owns and migrates them even when all entities share one
-`SessionFactory` and database schema.
+Application workflow, session, audit, outbox and domain-projection tables are outside these migration locations. The consuming application owns and migrates them even when all entities share one `SessionFactory` and database schema.
 
 ## Packaged migration locations
 
@@ -114,13 +102,11 @@ locations. The consuming application owns and migrates them even when all entiti
 | Core | Microsoft SQL Server | `classpath:db/migration/jgit-storage-hibernate/core/sqlserver` |
 | Search | H2 | `classpath:db/migration/jgit-storage-hibernate/search/h2` |
 | Search | PostgreSQL | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` |
+| Search | Microsoft SQL Server | `classpath:db/migration/jgit-storage-hibernate/search/sqlserver` |
 
-The public constants in `CoreSchemaMigrations` and `SearchSchemaMigrations` avoid copying these
-strings or history-table names into consumer code.
+The public constants in `CoreSchemaMigrations` and `SearchSchemaMigrations` avoid copying these strings or history-table names into consumer code.
 
-Flyway is a deployment concern and is intentionally not a runtime dependency of the published storage
-artifacts. Add `flyway-core` and the matching database module to the application, migration module or
-deployment tool:
+Flyway is a deployment concern and is intentionally not a runtime dependency of the published storage artifacts. Add `flyway-core` and the matching database module to the application, migration module or deployment tool:
 
 ```xml
 <dependency>
@@ -153,20 +139,24 @@ Flyway.configure()
     .migrate();
 ```
 
-Use `CoreSchemaMigrations.HSQLDB_LOCATION` or `CoreSchemaMigrations.SQL_SERVER_LOCATION` for the
-corresponding database. Flyway applies every Core migration in version order. Start Hibernate with
-`validate` only after migration succeeds.
+Use `CoreSchemaMigrations.HSQLDB_LOCATION` or `CoreSchemaMigrations.SQL_SERVER_LOCATION` for the corresponding database. Flyway applies every Core migration in version order. Start Hibernate with `validate` only after migration succeeds.
 
-The SQL Server stream uses `datetimeoffset(7)` for `Instant`, `varbinary(max)` for payloads, `bit` for
-boolean state and `nvarchar` for fields mapped with `@Nationalized`. The long Reflog ref name is an
-included index column because the complete nationalized key exceeds SQL Server's nonclustered-index
-key limit.
+When Search is enabled, apply its matching location after Core:
+
+```java
+Flyway.configure()
+    .dataSource(dataSource)
+    .locations(SearchSchemaMigrations.SQL_SERVER_LOCATION)
+    .table(SearchSchemaMigrations.SCHEMA_HISTORY_TABLE)
+    .load()
+    .migrate();
+```
+
+The SQL Server streams use `datetimeoffset(7)` for `Instant`, `varbinary(max)` for Core payloads, `bit` for boolean state and `nvarchar` for fields mapped with `@Nationalized`. Index definitions keep SQL Server key widths within platform limits.
 
 ## Provisioning runbook B: shared schema without JGit tables
 
-A schema may already contain unrelated application tables while Core or Search has never been
-installed. Flyway treats that schema as non-empty, so use the module's pre-migration baseline version
-`0` exactly once after verifying that its owned tables and history table are absent:
+A schema may already contain unrelated application tables while Core or Search has never been installed. Flyway treats that schema as non-empty, so use the module's pre-migration baseline version `0` exactly once after verifying that its owned tables and history table are absent:
 
 ```java
 Flyway.configure()
@@ -180,18 +170,13 @@ Flyway.configure()
     .migrate();
 ```
 
-After the first successful installation, remove `baselineOnMigrate(true)` from normal deployment
-configuration.
+After the first successful installation, remove `baselineOnMigrate(true)` from normal deployment configuration.
 
-Before using this runbook, assert that Core's tables and history table are absent. When Search is
-used, assert separately that `git_commit_index` and the Search history table are absent. If any owned
-object already exists, stop and classify the schema before proceeding.
+Before using this runbook, assert that Core's tables and history table are absent. When Search is used, assert separately that `git_commit_index` and the Search history table are absent. If any owned object already exists, stop and classify the schema before proceeding.
 
 ## Provisioning runbook C: adopt an existing 0.1.4 installation
 
-Version 0.1.4 predates published Flyway history. Its Hibernate-generated Core and optional Search
-tables correspond to migration version 0.1.4. Adoption is a one-time trust decision, not a generic
-repair mechanism.
+Version 0.1.4 predates published Flyway history. Its Hibernate-generated Core and optional Search tables correspond to migration version 0.1.4. Adoption is a one-time trust decision, not a generic repair mechanism.
 
 Preconditions:
 
@@ -215,18 +200,13 @@ Flyway.configure()
     .migrate();
 ```
 
-Select the matching Core location for HSQLDB or SQL Server. For Search, repeat the operation only on a
-supported Search database using `SearchSchemaMigrations` and its separate history table. Disable
-`baselineOnMigrate` after the one-time adoption.
+Select the matching Core location for HSQLDB or SQL Server. For Search, repeat the operation only on a supported Search database using `SearchSchemaMigrations` and its separate history table. Disable `baselineOnMigrate` after the one-time adoption.
 
-Do not baseline an unknown, partially created or manually modified schema. Baselining records that the
-existing structure is trusted; it does not verify or repair it. Existing inline BLOBs are not
-rewritten to chunks during migration and remain readable.
+Do not baseline an unknown, partially created or manually modified schema. Baselining records that the existing structure is trusted; it does not verify or repair it. Existing inline BLOBs are not rewritten to chunks during migration and remain readable.
 
 ## Provisioning runbook D: adopt the copied pre-library Sandbox/Taxonomy schema
 
-The copied schema predates the Core contract and requires a dedicated read-only preflight plus the
-matching legacy-adoption stream. Use one of:
+The copied Core schema predates the library contract and requires a dedicated read-only preflight plus the matching legacy-adoption stream. Use one of:
 
 ```java
 CoreSchemaMigrations.HSQLDB_LEGACY_ADOPTION_LOCATION
@@ -234,9 +214,9 @@ CoreSchemaMigrations.POSTGRESQL_LEGACY_ADOPTION_LOCATION
 CoreSchemaMigrations.SQL_SERVER_LEGACY_ADOPTION_LOCATION
 ```
 
-The procedure, checksum evidence, SQL Server temporal normalization and rollback boundary are
-documented in [Pre-library Core adoption](taxonomy-adoption.md). Do not point Hibernate with
-`hbm2ddl.auto=update` at the legacy database as a substitute for that process.
+The procedure, checksum evidence, SQL Server temporal normalization and rollback boundary are documented in [Pre-library Core adoption](taxonomy-adoption.md). Do not point Hibernate with `hbm2ddl.auto=update` at the legacy database as a substitute for that process.
+
+Copied Search rows and Lucene files are handled differently: they are derived state. Verify Core traversal, archive or remove the copied projection, apply the released Search migration and rebuild through `CommitProjectionRebuilder`. See [SQL Server Search operations](operations/sql-server-search.md).
 
 ## Hibernate startup
 
@@ -246,8 +226,7 @@ Set:
 hibernate.hbm2ddl.auto=validate
 ```
 
-`HibernateSessionFactoryProvider` registers the Core entities and can register additional application
-or supported projection entities:
+`HibernateSessionFactoryProvider` registers the Core entities and can register additional application or supported projection entities:
 
 ```java
 Properties properties = new Properties();
@@ -268,20 +247,51 @@ try (HibernateSessionFactoryProvider provider =
 }
 ```
 
-For SQL Server, use the Microsoft JDBC driver and `org.hibernate.dialect.SQLServerDialect`.
-Framework-managed applications may construct the persistence context themselves and pass the native
-Hibernate `SessionFactory` to `DefaultHibernateRepositoryFactory`.
+For SQL Server, use the Microsoft JDBC driver and `org.hibernate.dialect.SQLServerDialect`. Framework-managed applications may construct the persistence context themselves and pass the native Hibernate `SessionFactory` to `DefaultHibernateRepositoryFactory`.
 
-## Chunked payload and temporary-disk operation
+## Search setup
 
-Pack extensions are first written to a temporary file while JGit performs random reads and writes.
-Small extensions may then be stored inline; sufficiently large extensions are persisted as bounded
-chunks. The JVM does not need a complete large pack-related file in one byte array, but the host must
-provide enough temporary-disk space for all concurrent writers.
+Apply Core migrations first, then Search migrations. Register Search entities:
 
-Each uncommitted extension has a UUID writer token and renewable lease. A writer verifies ownership on
-flush and close. Pack flush, publication, ref publication, repository deletion and cleanup share the
-same repository-scoped pessimistic lock.
+```java
+List<Class<?>> annotatedClasses = new ArrayList<>();
+annotatedClasses.addAll(SearchEntities.annotatedClasses());
+annotatedClasses.add(MyApplicationEntity.class);
+```
+
+Search is derived state. Back up Core/Git data as authoritative state and maintain a repeatable rebuild procedure.
+
+For persistent Lucene storage:
+
+```properties
+hibernate.search.backend.type=lucene
+hibernate.search.backend.directory.type=local-filesystem
+hibernate.search.backend.directory.root=/srv/jgit-storage-hibernate/lucene
+```
+
+The application owns this directory. Do not let multiple uncoordinated JVMs write it. After analyzer or mapping changes, remove or archive the incompatible derived directory and rebuild.
+
+A compound query can filter author and committer identities separately and apply deterministic structured pagination:
+
+```java
+CommitHistoryQuery query =
+    CommitHistoryQuery.forRepository("demo")
+        .authoredBy("alice@example.org")
+        .committedBy("build@example.org")
+        .touchingPath("workflow.dsl")
+        .committedBetween(from, to)
+        .offset(0)
+        .limit(100)
+        .build();
+```
+
+Register `SearchRepositoryDeletionParticipant` when repository deletion must remove Core and Search state in the same deletion transaction.
+
+## Pack payload and temporary-disk operation
+
+Pack extensions are first written to a temporary file while JGit performs random reads and writes. Small extensions may then be stored inline; sufficiently large extensions are persisted as bounded chunks. The JVM does not need a complete large pack-related file in one byte array, but the host must provide enough temporary-disk space for all concurrent writers.
+
+Each uncommitted extension has a UUID writer token and renewable lease. A writer verifies ownership on flush and close. Pack flush, publication, ref publication, repository deletion and cleanup share the same repository-scoped pessimistic lock.
 
 The optional capacity profile exercises 1 MiB, 16 MiB and 128 MiB payloads:
 
@@ -289,13 +299,11 @@ The optional capacity profile exercises 1 MiB, 16 MiB and 128 MiB payloads:
 mvn -B -pl jgit-storage-hibernate-core -Ppack-capacity verify
 ```
 
-See [Pack capacity and recovery](operations/capacity-and-recovery.md) for the memory/disk envelope and
-monitoring requirements.
+See [Pack capacity and recovery](operations/capacity-and-recovery.md) for the memory/disk envelope and monitoring requirements.
 
 ## Recovering abandoned writes
 
-A crash can leave invisible uncommitted rows. Clean them through the public service rather than direct
-SQL:
+A crash can leave invisible uncommitted rows. Clean them through the public service rather than direct SQL:
 
 ```java
 PackCleanupResult result =
@@ -306,28 +314,11 @@ PackCleanupResult result =
             Instant.now());
 ```
 
-The service deletes a pack name only if every persisted extension is old, uncommitted and lacks a
-current lease. Published, recent or partly active groups are skipped.
-
-## Search setup
-
-Apply Core migrations first, then Search migrations. Register Search entities only on a database for
-which Search publishes migrations:
-
-```java
-List<Class<?>> annotatedClasses = new ArrayList<>();
-annotatedClasses.addAll(SearchEntities.annotatedClasses());
-annotatedClasses.add(MyApplicationEntity.class);
-```
-
-Search is derived state. Back up Core/Git data as authoritative state and maintain a repeatable reindex
-procedure. SQL Server Core support does not imply SQL Server Search support.
+The service deletes a pack name only if every persisted extension is old, uncommitted and lacks a current lease. Published, recent or partly active groups are skipped.
 
 ## Upgrade policy across multiple versions
 
-Flyway applies every pending migration in version order. A consumer may cross several artifact
-versions in one deployment only when all intermediate migrations are present and release notes do not
-require an application-level intermediate step.
+Flyway applies every pending migration in version order. A consumer may cross several artifact versions in one deployment only when all intermediate migrations are present and release notes do not require an application-level intermediate step.
 
 Recommended procedure:
 
@@ -350,21 +341,17 @@ If migration fails:
 4. restore from backup when state is uncertain;
 5. fix the migration in a new version rather than editing an already published successful migration.
 
-A checksum mismatch means that the classpath resource differs from the migration recorded in the
-database. Verify the deployed artifact and database history before taking action. Do not run
-`flyway repair` merely to suppress the error.
+A checksum mismatch means that the classpath resource differs from the migration recorded in the database. Verify the deployed artifact and database history before taking action. Do not run `flyway repair` merely to suppress the error.
 
-Published migrations are forward-only. The default recovery for an unsafe rollback is restore from a
-known backup followed by redeployment of the previous application and artifact versions.
+Published migrations are forward-only. The default recovery for an unsafe rollback is restore from a known backup followed by redeployment of the previous application and artifact versions.
+
+Search indexing failure is separate from Core publication failure. A failed Search update is reported and retried or rebuilt; it does not invalidate a successfully published Git commit or ref.
 
 ## Schemas, catalogs and tenants
 
-Set the JDBC current schema/catalog, Hibernate default schema and Flyway schema consistently. Do not
-let Hibernate validate one schema while Flyway migrated another. Each independently managed tenant
-schema needs its own Core and optional Search history tables.
+Set the JDBC current schema/catalog, Hibernate default schema and Flyway schema consistently. Do not let Hibernate validate one schema while Flyway migrated another. Each independently managed tenant schema needs its own Core and optional Search history tables.
 
-Database roles should separate migration privileges from runtime privileges where practical. The
-runtime role normally needs DML access; the deployment role owns DDL migration.
+Database roles should separate migration privileges from runtime privileges where practical. The runtime role normally needs DML access; the deployment role owns DDL migration.
 
 ## Backup and observability checklist
 
@@ -373,8 +360,10 @@ Before migration:
 - confirm a restorable backup and record its identifier;
 - capture the current application/library version and Flyway history;
 - record Core row counts and ordered checksums for authoritative inline BLOBs;
+- record Search row and repository coverage when replacing an existing projection;
 - ensure no concurrent application instance can write during an incompatible migration;
-- confirm temporary-disk capacity for concurrent pack writers.
+- confirm temporary-disk capacity for concurrent pack writers;
+- record the Lucene directory and analyzer profile when Search is enabled.
 
 After migration:
 
@@ -383,16 +372,15 @@ After migration:
 - open a repository and traverse its main ref/history;
 - read recent reflog entries;
 - verify large new payloads can use `git_pack_chunks` while legacy inline rows remain readable;
-- verify Search or schedule reindexing when Search is enabled;
+- rebuild and verify Search when Search is enabled;
+- close and reopen the `SessionFactory` and verify persistent Lucene queries;
 - compare recorded row counts and domain-specific smoke-test results.
 
-Operational monitoring should include temporary-disk free space, counts and bytes of uncommitted rows,
-expired writer leases, chunk-row growth and transaction latency during repack and cleanup.
+Operational monitoring should include temporary-disk free space, counts and bytes of uncommitted rows, expired writer leases, chunk-row growth, rebuild progress and transaction latency during repack and cleanup.
 
 ## Running integration tests locally
 
-With Docker available, the normal build starts PostgreSQL 17.10 and SQL Server 2022 through
-Testcontainers:
+With Docker available, the normal build starts PostgreSQL 17.10 and SQL Server 2022 through Testcontainers:
 
 ```bash
 mvn verify
@@ -403,17 +391,18 @@ The Core and Search suites exercise:
 - fresh installation on H2, PostgreSQL and SQL Server where supported;
 - Core installation and restart behavior on HSQLDB;
 - adoption of immutable 0.1.4 fixtures;
-- copied pre-library adoption on HSQLDB, PostgreSQL and SQL Server;
+- copied pre-library Core adoption on HSQLDB, PostgreSQL and SQL Server;
 - Flyway history versions and Hibernate `validate`;
 - adaptive inline and chunked repository storage;
 - refs, reflogs and legacy inline compatibility;
 - leased abandoned-write cleanup and repository deletion;
-- Search projection persistence on supported Search databases;
-- `SessionFactory` restart.
+- Search Unicode indexing, first-parent add/modify/delete and merge semantics;
+- author, committer, path, time, compound and paginated Search queries;
+- two-repository rebuild, interruption/retry and deletion isolation;
+- projection-failure isolation from successful Git publication;
+- persistent Lucene `SessionFactory` restart.
 
-When Docker is unavailable, Testcontainers disables the PostgreSQL and SQL Server classes; H2 and
-HSQLDB tests still run. CI runners provide Docker and execute the real-database paths on every pull
-request.
+When Docker is unavailable, Testcontainers disables the PostgreSQL and SQL Server classes; H2 and HSQLDB tests still run. CI runners provide Docker and execute the real-database paths on every pull request.
 
 ## Recommended integration in audio-analyzer
 
@@ -431,6 +420,4 @@ audio-analyzer
   -> reopen the repository and read the workflow back
 ```
 
-Add Search only for generic Git-history indexing on a supported Search database. Audio Analyzer should
-contribute only workflow-specific projection fields that are not already supplied by the generic
-commit/path/message/full-text projection.
+Add Search only for generic Git-history indexing on a supported Search database. Audio Analyzer should contribute only workflow-specific projection fields that are not already supplied by the generic commit/path/message/full-text projection.

@@ -24,6 +24,10 @@ public final class SearchSchemaMigrations {
   public static final String POSTGRESQL_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/search/postgresql";
 
+  /** Flyway location for Microsoft SQL Server migrations. */
+  public static final String SQL_SERVER_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/search/sqlserver";
+
   /** Dedicated Flyway schema history table for generic search projections. */
   public static final String SCHEMA_HISTORY_TABLE =
       "jgit_storage_hibernate_search_schema_history";
