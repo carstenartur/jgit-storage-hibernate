@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
@@ -82,7 +83,8 @@ import org.openjdk.jmh.infra.BenchmarkParams;
  * <p>For Hibernate backends, JMH secondary results expose query, statement, transaction, connection
  * and repository-lock costs for the same measured operation. Aggregate storage counters are also
  * reconciled with a fixed per-operation breakdown so every measured top-level transaction and lock
- * is attributed exactly once. Counters are reset after fixture preparation and therefore exclude
+ * is attributed exactly once. Pack-file fallback reads are additionally attributed by extension and
+ * inline/chunked storage mode. Counters are reset after fixture preparation and therefore exclude
  * schema creation and baseline history construction.
  */
 @BenchmarkMode(Mode.SingleShotTime)
@@ -128,6 +130,7 @@ public class GitProtocolBenchmark {
   private Statistics hibernateStatistics;
   private StorageOperationMetrics storageMetricsBaseline = StorageOperationMetrics.ZERO;
   private StorageOperationBreakdown storageBreakdownBaseline = StorageOperationBreakdown.ZERO;
+  private PackFileReadMetrics packFileReadMetricsBaseline = PackFileReadMetrics.ZERO;
 
   @Setup(Level.Trial)
   public void setupTrial() {
@@ -200,6 +203,7 @@ public class GitProtocolBenchmark {
       hibernateStatistics.clear();
       storageMetricsBaseline = hibernateRepository.getStorageOperationMetrics();
       storageBreakdownBaseline = hibernateRepository.getStorageOperationBreakdown();
+      packFileReadMetricsBaseline = hibernateRepository.getPackFileReadMetrics();
     }
   }
 
@@ -218,6 +222,7 @@ public class GitProtocolBenchmark {
     expectedTip = null;
     storageMetricsBaseline = StorageOperationMetrics.ZERO;
     storageBreakdownBaseline = StorageOperationBreakdown.ZERO;
+    packFileReadMetricsBaseline = PackFileReadMetrics.ZERO;
     deleteRecursively(serverDirectory);
     serverDirectory = null;
   }
@@ -271,12 +276,29 @@ public class GitProtocolBenchmark {
         hibernateRepository.getStorageOperationMetrics().minus(storageMetricsBaseline);
     StorageOperationBreakdown breakdownDelta =
         hibernateRepository.getStorageOperationBreakdown().minus(storageBreakdownBaseline);
+    PackFileReadMetrics packFileReadDelta =
+        hibernateRepository.getPackFileReadMetrics().minus(packFileReadMetricsBaseline);
     if (!storageDelta.equals(breakdownDelta.total())) {
       throw new IllegalStateException(
           "Storage category counters do not reconcile: aggregate="
               + storageDelta
               + ", breakdown="
               + breakdownDelta);
+    }
+
+    long packFileReadTransactions =
+        transactions(breakdownDelta, StorageOperationKind.PACK_FILE_READ);
+    if (packFileReadDelta.missingReads() != 0) {
+      throw new IllegalStateException(
+          "Successful protocol invocation performed missing pack-file lookups: "
+              + packFileReadDelta);
+    }
+    if (packFileReadDelta.successfulReads() != packFileReadTransactions) {
+      throw new IllegalStateException(
+          "Pack-file read attribution does not reconcile: reads="
+              + packFileReadDelta
+              + ", transactions="
+              + packFileReadTransactions);
     }
 
     counters.hibernateQueries = hibernateStatistics.getQueryExecutionCount();
@@ -294,8 +316,7 @@ public class GitProtocolBenchmark {
         transactions(breakdownDelta, StorageOperationKind.REPOSITORY_INITIALIZATION);
     counters.packMetadataReadTransactions =
         transactions(breakdownDelta, StorageOperationKind.PACK_METADATA_READ);
-    counters.packFileReadTransactions =
-        transactions(breakdownDelta, StorageOperationKind.PACK_FILE_READ);
+    counters.packFileReadTransactions = packFileReadTransactions;
     counters.packExtensionWriteTransactions =
         transactions(breakdownDelta, StorageOperationKind.PACK_EXTENSION_WRITE);
     counters.packPublicationTransactions =
@@ -311,6 +332,16 @@ public class GitProtocolBenchmark {
     counters.reflogWriteTransactions =
         transactions(breakdownDelta, StorageOperationKind.REFLOG_WRITE);
     counters.otherStorageTransactions = transactions(breakdownDelta, StorageOperationKind.OTHER);
+
+    counters.packInlineReads = packFileReadDelta.packInlineReads();
+    counters.packChunkedReads = packFileReadDelta.packChunkedReads();
+    counters.indexInlineReads = packFileReadDelta.indexInlineReads();
+    counters.indexChunkedReads = packFileReadDelta.indexChunkedReads();
+    counters.reftableInlineReads = packFileReadDelta.reftableInlineReads();
+    counters.reftableChunkedReads = packFileReadDelta.reftableChunkedReads();
+    counters.otherInlineReads = packFileReadDelta.otherInlineReads();
+    counters.otherChunkedReads = packFileReadDelta.otherChunkedReads();
+    counters.missingPackFileReads = packFileReadDelta.missingReads();
 
     counters.packExtensionWriteLocks =
         locks(breakdownDelta, StorageOperationKind.PACK_EXTENSION_WRITE);
@@ -590,6 +621,15 @@ public class GitProtocolBenchmark {
     public long reflogReadTransactions;
     public long reflogWriteTransactions;
     public long otherStorageTransactions;
+    public long packInlineReads;
+    public long packChunkedReads;
+    public long indexInlineReads;
+    public long indexChunkedReads;
+    public long reftableInlineReads;
+    public long reftableChunkedReads;
+    public long otherInlineReads;
+    public long otherChunkedReads;
+    public long missingPackFileReads;
     public long packExtensionWriteLocks;
     public long packPublicationLocks;
     public long packRollbackLocks;
@@ -619,6 +659,15 @@ public class GitProtocolBenchmark {
       reflogReadTransactions = 0;
       reflogWriteTransactions = 0;
       otherStorageTransactions = 0;
+      packInlineReads = 0;
+      packChunkedReads = 0;
+      indexInlineReads = 0;
+      indexChunkedReads = 0;
+      reftableInlineReads = 0;
+      reftableChunkedReads = 0;
+      otherInlineReads = 0;
+      otherChunkedReads = 0;
+      missingPackFileReads = 0;
       packExtensionWriteLocks = 0;
       packPublicationLocks = 0;
       packRollbackLocks = 0;
