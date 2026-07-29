@@ -37,11 +37,12 @@ public class GitHistorySearchService {
   }
 
   /**
-   * Find commits matching all supplied full-text, author, changed-path, time and candidate predicates.
+   * Find commits matching all supplied full-text, identity, changed-path, time and candidate
+   * predicates.
    *
    * <p>Results are relevance-ranked when full text is present and newest-first otherwise. The
    * chronological dimension is selected by {@link CommitHistoryQuery#timestampField()} and defaults
-   * to committer time.
+   * to committer time. Offset and limit are always applied after ordering.
    */
   public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
     Objects.requireNonNull(query, "query");
@@ -79,6 +80,10 @@ public class GitHistorySearchService {
                 if (query.authorEmail() != null) {
                   predicate.filter(f.match().field("authorEmail").matching(query.authorEmail()));
                 }
+                if (query.committerEmail() != null) {
+                  predicate.filter(
+                      f.match().field("committerEmail").matching(query.committerEmail()));
+                }
                 if (query.pathFragment() != null) {
                   predicate.filter(
                       f.simpleQueryString()
@@ -94,7 +99,7 @@ public class GitHistorySearchService {
                 }
                 return predicate;
               })
-          .fetchHits(query.limit());
+          .fetchHits(query.offset(), query.limit());
     }
   }
 
@@ -106,7 +111,10 @@ public class GitHistorySearchService {
       hql.append(" AND c.objectId IN :objectIds");
     }
     if (query.authorEmail() != null) {
-      hql.append(" AND c.authorEmail = :email");
+      hql.append(" AND c.authorEmail = :authorEmail");
+    }
+    if (query.committerEmail() != null) {
+      hql.append(" AND c.committerEmail = :committerEmail");
     }
     if (query.pathFragment() != null) {
       hql.append(" AND c.changedPaths ILIKE :path ESCAPE '!'");
@@ -117,19 +125,23 @@ public class GitHistorySearchService {
     if (query.to() != null) {
       hql.append(" AND c.").append(timeProperty).append(" <= :to");
     }
-    hql.append(" ORDER BY c.").append(timeProperty).append(" DESC");
+    hql.append(" ORDER BY c.").append(timeProperty).append(" DESC, c.objectId ASC");
 
     try (Session session = sessionFactory.openSession()) {
       var selection =
           session
               .createQuery(hql.toString(), GitCommitIndex.class)
               .setParameter("repo", query.repositoryName())
+              .setFirstResult(query.offset())
               .setMaxResults(query.limit());
       if (query.hasObjectIdRestriction()) {
         selection.setParameter("objectIds", query.objectIds());
       }
       if (query.authorEmail() != null) {
-        selection.setParameter("email", query.authorEmail());
+        selection.setParameter("authorEmail", query.authorEmail());
+      }
+      if (query.committerEmail() != null) {
+        selection.setParameter("committerEmail", query.committerEmail());
       }
       if (query.pathFragment() != null) {
         selection.setParameter(
@@ -168,6 +180,15 @@ public class GitHistorySearchService {
     return findChanges(
         CommitHistoryQuery.forRepository(repositoryName)
             .authoredBy(authorEmail)
+            .limit(limit)
+            .build());
+  }
+
+  public List<GitCommitIndex> findByCommitterEmail(
+      String repositoryName, String committerEmail, int limit) {
+    return findChanges(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .committedBy(committerEmail)
             .limit(limit)
             .build());
   }
