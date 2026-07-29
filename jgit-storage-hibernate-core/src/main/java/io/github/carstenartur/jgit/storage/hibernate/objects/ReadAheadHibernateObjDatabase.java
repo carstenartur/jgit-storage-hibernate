@@ -134,7 +134,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return new AlignedDfsOutputStream(super.writeFile(description, extension));
   }
 
-  private static String baseName(DfsPackDescription description) {
+  protected static String baseName(DfsPackDescription description) {
     String fileName = description.getFileName(PackExt.PACK);
     int dot = fileName.lastIndexOf('.');
     return dot > 0 ? fileName.substring(0, dot) : fileName;
