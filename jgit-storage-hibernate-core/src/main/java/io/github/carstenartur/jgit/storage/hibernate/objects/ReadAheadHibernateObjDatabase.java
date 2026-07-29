@@ -59,9 +59,10 @@ import org.hibernate.SessionFactory;
  * started before a successful pack mutation cannot overwrite the subsequent invalidation or return a
  * stale list after that mutation. A fair repository-instance-local read/write lock prevents scans
  * from reading the database while this instance has an uncommitted pack replacement in progress.
- * Chunked files can then open without repeating the metadata query. Inline payload bytes are
- * deliberately not retained in the catalog; they continue to use the bounded database fallback so
- * repository memory does not grow with the number of historical packs.
+ * Chunked files can then open without repeating the metadata query. Inline bytes remain outside the
+ * generation catalog and are retained only in a separately bounded row-ID-keyed LRU. Newly published
+ * inline payloads are handed off directly; historical payloads enter that cache only after a
+ * successful authoritative database read.
  *
  * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
  * the previous catalog and the returned publication metadata are both complete, the exact committed
@@ -78,6 +79,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private final HibernateTransactionContext transactionContext;
   private final StagedPackExtensionStore stagedExtensions;
   private final PackFileReadCounters packFileReadCounters;
+  private final BoundedInlinePayloadCache inlinePayloadCache;
   private final AtomicReference<CatalogState> committedExtensionCatalog =
       new AtomicReference<>(CatalogState.empty());
   private final ReentrantReadWriteLock catalogLifecycleLock = new ReentrantReadWriteLock(true);
@@ -94,6 +96,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.transactionContext = transactionContext;
     this.stagedExtensions = new StagedPackExtensionStore(repositoryName, transactionContext);
     this.packFileReadCounters = PackFileReadCounters.from(sessionFactory);
+    this.inlinePayloadCache = BoundedInlinePayloadCache.from(sessionFactory);
   }
 
   /**
@@ -195,9 +198,15 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       throws FileNotFoundException, IOException {
     ExtensionKey key = new ExtensionKey(baseName(description), extension.getExtension());
     ExtensionSnapshot snapshot = committedExtensionCatalog.get().extensions().get(key);
-    if (snapshot != null && !snapshot.inline()) {
-      return new ReadAheadChunkedReadableChannel(
-          sessionFactory, snapshot.packId(), snapshot.fileSize());
+    if (snapshot != null) {
+      if (!snapshot.inline()) {
+        return new ReadAheadChunkedReadableChannel(
+            sessionFactory, snapshot.packId(), snapshot.fileSize());
+      }
+      byte[] cached = inlinePayloadCache.get(snapshot.packId());
+      if (cached != null) {
+        return new InlineReadableChannel(cached);
+      }
     }
     return openFileFromDatabase(description, extension);
   }
@@ -222,17 +231,16 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                 if (row == null) {
                   throw new FileNotFoundException(description.getFileName(extension));
                 }
-                Long packId = (Long) row[0];
-                long fileSize = ((Number) row[1]).longValue();
-                byte[] inlineData = (byte[]) row[2];
-                if (inlineData != null) {
-                  return new DatabaseOpenResult(new InlineReadableChannel(inlineData), true);
-                }
                 return new DatabaseOpenResult(
-                    new ReadAheadChunkedReadableChannel(sessionFactory, packId, fileSize), false);
+                    (Long) row[0], ((Number) row[1]).longValue(), (byte[]) row[2]);
               });
       packFileReadCounters.record(extension, result.inline());
-      return result.channel();
+      if (result.inline()) {
+        inlinePayloadCache.put(result.packId(), result.inlineData());
+        return new InlineReadableChannel(result.inlineData());
+      }
+      return new ReadAheadChunkedReadableChannel(
+          sessionFactory, result.packId(), result.fileSize());
     } catch (FileNotFoundException missing) {
       packFileReadCounters.recordMissing();
       throw missing;
@@ -264,6 +272,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         restoreCatalogAfterFailedMutation(previousCatalog);
         throw publicationFailure;
       }
+      removeReplacedPayloads(previousCatalog, replaces);
       completeCatalogMutation(descriptions, commitResult);
       clearCache();
     } finally {
@@ -288,6 +297,14 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return committedExtensionCatalog.get().localScanAvailable();
   }
 
+  int inlinePayloadCacheEntryCount() {
+    return inlinePayloadCache.entryCount();
+  }
+
+  long inlinePayloadCacheRetainedBytes() {
+    return inlinePayloadCache.retainedBytes();
+  }
+
   /**
    * Return monotone database fallback read attribution for this repository instance.
    *
@@ -298,14 +315,36 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   }
 
   private CatalogState beginCatalogMutation(Collection<DfsPackDescription> replaces) {
-    Set<String> replacedPackNames = new HashSet<>();
-    if (replaces != null) {
-      for (DfsPackDescription replaced : replaces) {
-        replacedPackNames.add(baseName(replaced));
-      }
-    }
+    Set<String> replacedPackNames = packNames(replaces);
     return committedExtensionCatalog.getAndUpdate(
         current -> current.beginMutation(replacedPackNames));
+  }
+
+  private void removeReplacedPayloads(
+      CatalogState previousCatalog, Collection<DfsPackDescription> replaces) {
+    Set<String> replacedPackNames = packNames(replaces);
+    if (replacedPackNames.isEmpty()) {
+      return;
+    }
+    List<Long> replacedRowIds = new ArrayList<>();
+    for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry :
+        previousCatalog.extensions().entrySet()) {
+      if (entry.getValue().inline()
+          && replacedPackNames.contains(entry.getKey().packName())) {
+        replacedRowIds.add(entry.getValue().packId());
+      }
+    }
+    inlinePayloadCache.removeAll(replacedRowIds);
+  }
+
+  private static Set<String> packNames(Collection<DfsPackDescription> descriptions) {
+    Set<String> names = new HashSet<>();
+    if (descriptions != null) {
+      for (DfsPackDescription description : descriptions) {
+        names.add(baseName(description));
+      }
+    }
+    return names;
   }
 
   private void completeCatalogMutation(
@@ -324,6 +363,9 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                 new ExtensionKey(committed.packName(), committed.extension()),
                 new ExtensionSnapshot(
                     committed.packId(), committed.fileSize(), committed.inline(), source));
+            if (committed.inline()) {
+              inlinePayloadCache.put(committed.packId(), committed.inlineData());
+            }
           }
           return current.completeMutation(extensions, commitResult.completeMetadata());
         });
@@ -388,7 +430,11 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private record PackCatalog(
       List<DfsPackDescription> descriptions, Map<ExtensionKey, ExtensionSnapshot> extensions) {}
 
-  private record DatabaseOpenResult(ReadableChannel channel, boolean inline) {}
+  private record DatabaseOpenResult(Long packId, long fileSize, byte[] inlineData) {
+    private boolean inline() {
+      return inlineData != null;
+    }
+  }
 
   private static final class PackFileReadCounters {
     private static final int PACK_INLINE = 0;
