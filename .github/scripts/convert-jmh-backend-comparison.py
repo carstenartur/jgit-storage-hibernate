@@ -14,6 +14,7 @@ BACKEND_LABELS = {
     "hsqldb": "JGit + HSQLDB (in-memory)",
     "postgresql": "JGit + PostgreSQL",
     "postgresql-hikari": "JGit + PostgreSQL + HikariCP",
+    "postgresql-no-jdbc-batch": "JGit + PostgreSQL (JDBC batching off)",
 }
 
 
