@@ -19,18 +19,24 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 
-/** Coordinates one Hibernate transaction across pack/reftable persistence and queryable reflogs. */
+/**
+ * Coordinates one Hibernate transaction across pack/reftable persistence and queryable reflogs.
+ *
+ * <p>The context is deliberately scoped to one repository instance. Nested storage operations on
+ * the same thread join the active session; unrelated repository operations keep independent
+ * transactions. When metrics are enabled, nested work inherits the operation category of the owning
+ * top-level transaction so every transaction and lock is attributed exactly once.
+ */
 public final class HibernateTransactionContext {
 
+  /** Enable lightweight repository transaction and lock acquisition counters. */
   public static final String METRICS_ENABLED_PROPERTY = "jgit.storage.hibernate.metrics.enabled";
 
-  private static final StackWalker STACK_WALKER =
-      StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+  private static final StackWalker STACK_WALKER = StackWalker.getInstance();
 
   private final SessionFactory sessionFactory;
   private final ThreadLocal<Session> activeSession = new ThreadLocal<>();
   private final ThreadLocal<StorageOperationKind> activeOperation = new ThreadLocal<>();
-  private final ThreadLocal<StorageOperationKind> requestedOperation = new ThreadLocal<>();
   private final boolean metricsEnabled;
   private final LongAdder transactionsStarted = new LongAdder();
   private final LongAdder transactionsCommitted = new LongAdder();
@@ -39,6 +45,11 @@ public final class HibernateTransactionContext {
   private final LongAdder repositoryLockAcquisitionNanos = new LongAdder();
   private final CategoryCounters[] categoryCounters;
 
+  /**
+   * Create a transaction context.
+   *
+   * @param sessionFactory application-managed Hibernate session factory
+   */
   public HibernateTransactionContext(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     Object configured = sessionFactory.getProperties().get(METRICS_ENABLED_PROPERTY);
@@ -54,10 +65,30 @@ public final class HibernateTransactionContext {
     }
   }
 
+  /**
+   * Execute uncategorized work in the current repository transaction, starting one when necessary.
+   *
+   * @param work storage work
+   * @param <T> result type
+   * @return work result
+   * @throws IOException when storage work fails
+   */
   public <T> T execute(Work<T> work) throws IOException {
     return execute(StorageOperationKind.OTHER, work);
   }
 
+  /**
+   * Execute categorized work in the current repository transaction, starting one when necessary.
+   *
+   * <p>Nested work joins the active session and inherits the category of the owning top-level
+   * transaction.
+   *
+   * @param operation stable diagnostic category for the owning top-level transaction
+   * @param work storage work
+   * @param <T> result type
+   * @return work result
+   * @throws IOException when storage work fails
+   */
   public <T> T execute(StorageOperationKind operation, Work<T> work) throws IOException {
     Objects.requireNonNull(operation, "operation");
     Objects.requireNonNull(work, "work");
@@ -100,36 +131,34 @@ public final class HibernateTransactionContext {
     }
   }
 
-  /** Attribute uncategorized transactions started by a delegated DFS callback to one operation. */
-  public <T> T withinOperation(StorageOperationKind operation, IoWork<T> work) throws IOException {
-    Objects.requireNonNull(operation, "operation");
-    Objects.requireNonNull(work, "work");
-    StorageOperationKind previous = requestedOperation.get();
-    if (previous == null) {
-      requestedOperation.set(operation);
-    }
-    try {
-      return work.execute();
-    } finally {
-      if (previous == null) {
-        requestedOperation.remove();
-      }
-    }
-  }
-
-  public void withinOperation(StorageOperationKind operation, IoAction action) throws IOException {
-    withinOperation(
-        operation,
-        () -> {
-          action.execute();
-          return null;
-        });
-  }
-
+  /**
+   * Execute uncategorized storage work while holding the cross-SessionFactory lock for one logical
+   * repository.
+   *
+   * @param repositoryName logical repository name
+   * @param work storage work
+   * @param <T> result type
+   * @return work result
+   * @throws IOException if the lock row is missing or storage work fails
+   */
   public <T> T executeWithRepositoryLock(String repositoryName, Work<T> work) throws IOException {
     return executeWithRepositoryLock(StorageOperationKind.OTHER, repositoryName, work);
   }
 
+  /**
+   * Execute categorized storage work while holding the cross-SessionFactory lock for one logical
+   * repository.
+   *
+   * <p>Pack publication, lease renewal, abandoned-write cleanup and ref publication use the same
+   * row lock so maintenance cannot race a writer between its ownership check and mutation.
+   *
+   * @param operation stable diagnostic category for the owning top-level transaction
+   * @param repositoryName logical repository name
+   * @param work storage work
+   * @param <T> result type
+   * @return work result
+   * @throws IOException if the lock row is missing or storage work fails
+   */
   public <T> T executeWithRepositoryLock(
       StorageOperationKind operation, String repositoryName, Work<T> work) throws IOException {
     Objects.requireNonNull(repositoryName, "repositoryName");
@@ -142,6 +171,16 @@ public final class HibernateTransactionContext {
         });
   }
 
+  /**
+   * Acquire the pessimistic row lock for a repository inside the caller's active transaction.
+   *
+   * <p>The measured duration includes both database round-trip latency and any contention wait. It
+   * is therefore an end-to-end acquisition metric rather than a database-specific lock-wait value.
+   *
+   * @param session active Hibernate session and transaction
+   * @param repositoryName logical repository name
+   * @throws IOException if the lock row does not exist
+   */
   public void acquireRepositoryLock(Session session, String repositoryName) throws IOException {
     Objects.requireNonNull(session, "session");
     Objects.requireNonNull(repositoryName, "repositoryName");
@@ -165,6 +204,11 @@ public final class HibernateTransactionContext {
     }
   }
 
+  /**
+   * Return a monotone aggregate metrics snapshot for this repository transaction context.
+   *
+   * @return current counters, or {@link StorageOperationMetrics#ZERO} when metrics are disabled
+   */
   public StorageOperationMetrics metricsSnapshot() {
     if (!metricsEnabled) {
       return StorageOperationMetrics.ZERO;
@@ -177,6 +221,11 @@ public final class HibernateTransactionContext {
         repositoryLockAcquisitionNanos.sum());
   }
 
+  /**
+   * Return the same monotone counters grouped by stable operation category.
+   *
+   * @return immutable breakdown, or {@link StorageOperationBreakdown#ZERO} when metrics are disabled
+   */
   public StorageOperationBreakdown operationBreakdownSnapshot() {
     if (!metricsEnabled) {
       return StorageOperationBreakdown.ZERO;
@@ -196,13 +245,13 @@ public final class HibernateTransactionContext {
     if (requested != StorageOperationKind.OTHER) {
       return requested;
     }
-    StorageOperationKind scoped = requestedOperation.get();
-    if (scoped != null) {
-      return scoped;
-    }
     return metricsEnabled ? inferInternalOperation() : StorageOperationKind.OTHER;
   }
 
+  /**
+   * Classify legacy internal call sites only in opt-in diagnostic mode. Explicit operation categories
+   * always take precedence and applications with metrics disabled never inspect the call stack.
+   */
   private static StorageOperationKind inferInternalOperation() {
     return STACK_WALKER.walk(
         frames ->
@@ -273,18 +322,9 @@ public final class HibernateTransactionContext {
     }
   }
 
+  /** Unit of repository persistence work that may report an I/O failure to JGit. */
   @FunctionalInterface
   public interface Work<T> {
     T execute(Session session) throws IOException;
-  }
-
-  @FunctionalInterface
-  public interface IoWork<T> {
-    T execute() throws IOException;
-  }
-
-  @FunctionalInterface
-  public interface IoAction {
-    void execute() throws IOException;
   }
 }
