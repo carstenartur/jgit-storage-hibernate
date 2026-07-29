@@ -51,6 +51,8 @@ import org.hibernate.exception.ConstraintViolationException;
 final class StagedPackExtensionStore {
 
   private static final int CHUNK_BATCH_SIZE = 8;
+  static final int LOCAL_INLINE_HANDOFF_BUDGET_BYTES =
+      2 * HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
   private static final String PACK_EXTENSION_UNIQUE_CONSTRAINT = "uk_pack_repo_name_ext";
 
   private final String repositoryName;
@@ -88,11 +90,22 @@ final class StagedPackExtensionStore {
 
               List<CommittedExtension> committed = new ArrayList<>();
               boolean completeMetadata = true;
+              int remainingInlinePayloadBytes = LOCAL_INLINE_HANDOFF_BUDGET_BYTES;
               Instant committedAt = Instant.now();
               for (Publication publication : publications) {
                 for (ExpectedExtension expected : publication.extensions()) {
                   if (expected.staged() != null) {
-                    committed.add(persistCommitted(session, expected.staged(), committedAt));
+                    boolean captureInlinePayload =
+                        isLocalInlineHandoffCandidate(
+                            expected.staged(), remainingInlinePayloadBytes);
+                    CommittedExtension committedExtension =
+                        persistCommitted(
+                            session, expected.staged(), committedAt, captureInlinePayload);
+                    committed.add(committedExtension);
+                    if (committedExtension.localInlinePayload() != null) {
+                      remainingInlinePayloadBytes -=
+                          committedExtension.localInlinePayload().size();
+                    }
                   } else {
                     publishLegacyExtension(
                         session,
@@ -200,8 +213,23 @@ final class StagedPackExtensionStore {
     return result;
   }
 
+  private static boolean isLocalInlineHandoffCandidate(
+      StagedExtension stagedExtension, int remainingInlinePayloadBytes) {
+    if (stagedExtension.fileSize() > remainingInlinePayloadBytes
+        || stagedExtension.fileSize() > HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD) {
+      return false;
+    }
+    String extension = stagedExtension.key().extension();
+    return PackExt.PACK.getExtension().equals(extension)
+        || PackExt.REFTABLE.getExtension().equals(extension);
+  }
+
   private CommittedExtension persistCommitted(
-      Session session, StagedExtension stagedExtension, Instant committedAt) throws IOException {
+      Session session,
+      StagedExtension stagedExtension,
+      Instant committedAt,
+      boolean captureInlinePayload)
+      throws IOException {
     GitPackEntity entity = new GitPackEntity();
     entity.setRepositoryName(repositoryName);
     entity.setPackName(stagedExtension.key().packName());
@@ -214,9 +242,14 @@ final class StagedPackExtensionStore {
     entity.setWriteLeaseUntil(null);
 
     boolean inline = stagedExtension.fileSize() <= HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
+    LocalInlinePayload localInlinePayload = null;
     try (FileChannel channel =
         FileChannel.open(stagedExtension.temporaryFile(), StandardOpenOption.READ)) {
-      entity.setData(inline ? readInline(channel, stagedExtension.fileSize()) : null);
+      byte[] inlineData = inline ? readInline(channel, stagedExtension.fileSize()) : null;
+      entity.setData(inlineData);
+      if (captureInlinePayload && inlineData != null) {
+        localInlinePayload = new LocalInlinePayload(inlineData);
+      }
       try {
         session.persist(entity);
         session.flush();
@@ -236,7 +269,8 @@ final class StagedPackExtensionStore {
         stagedExtension.key().extension(),
         entity.getId(),
         stagedExtension.fileSize(),
-        inline);
+        inline,
+        localInlinePayload);
   }
 
   private static boolean isDuplicatePackExtension(Throwable failure) {
@@ -393,7 +427,28 @@ final class StagedPackExtensionStore {
   }
 
   record CommittedExtension(
-      String packName, String extension, Long packId, long fileSize, boolean inline) {}
+      String packName,
+      String extension,
+      Long packId,
+      long fileSize,
+      boolean inline,
+      LocalInlinePayload localInlinePayload) {}
+
+  static final class LocalInlinePayload {
+    private final byte[] data;
+
+    private LocalInlinePayload(byte[] data) {
+      this.data = data.clone();
+    }
+
+    int size() {
+      return data.length;
+    }
+
+    byte[] transfer() {
+      return data;
+    }
+  }
 
   private record ExtensionKey(String packName, String extension) {
     private String displayName() {
