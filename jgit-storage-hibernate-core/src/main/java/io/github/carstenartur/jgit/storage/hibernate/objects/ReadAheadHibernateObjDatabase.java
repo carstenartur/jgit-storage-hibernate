@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
@@ -43,6 +44,11 @@ import org.hibernate.SessionFactory;
  * every extension before it invokes {@code commitPack}; that callback persists all expected
  * extensions and makes them visible through one repository-locked Hibernate transaction. The base
  * implementation remains available for compatibility tests and legacy uncommitted rows.
+ *
+ * <p>Each successful pack-list scan also publishes an immutable catalog of committed extension row
+ * identifiers, sizes and storage modes. Chunked files can then open without repeating the metadata
+ * query. Inline payload bytes are deliberately not retained in the catalog; they continue to use the
+ * bounded database fallback so repository memory does not grow with the number of historical packs.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -50,6 +56,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
   private final StagedPackExtensionStore stagedExtensions;
+  private volatile Map<ExtensionKey, ExtensionSnapshot> committedExtensionCatalog = Map.of();
 
   public ReadAheadHibernateObjDatabase(
       DfsRepository repository,
@@ -74,42 +81,65 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
    */
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
-    return transactionContext.execute(
-        session -> {
-          List<Object[]> rows =
-              session
-                  .createQuery(
-                      "SELECT p.packName, p.packExtension, p.fileSize FROM GitPackEntity p "
-                          + "WHERE p.repositoryName = :repo AND p.committed = true",
-                      Object[].class)
-                  .setParameter("repo", repositoryName)
-                  .getResultList();
-          LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
-          for (Object[] row : rows) {
-            String packName = (String) row[0];
-            String extension = (String) row[1];
-            long fileSize = ((Number) row[2]).longValue();
-            DfsPackDescription description =
-                descriptions.computeIfAbsent(
-                    packName,
-                    name ->
-                        new DfsPackDescription(
-                            getRepository().getDescription(), name, PackSource.INSERT));
-            for (PackExt packExtension : PackExt.values()) {
-              if (packExtension.getExtension().equals(extension)) {
-                description.addFileExt(packExtension);
-                description.setFileSize(packExtension, fileSize);
-                break;
+    PackCatalog loaded =
+        transactionContext.execute(
+            session -> {
+              List<Object[]> rows =
+                  session
+                      .createQuery(
+                          "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
+                              + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END "
+                              + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                              + "AND p.committed = true",
+                          Object[].class)
+                      .setParameter("repo", repositoryName)
+                      .getResultList();
+              LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
+              LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
+              for (Object[] row : rows) {
+                Long packId = (Long) row[0];
+                String packName = (String) row[1];
+                String extension = (String) row[2];
+                long fileSize = ((Number) row[3]).longValue();
+                boolean inline = ((Number) row[4]).intValue() != 0;
+                extensions.put(
+                    new ExtensionKey(packName, extension),
+                    new ExtensionSnapshot(packId, fileSize, inline));
+                DfsPackDescription description =
+                    descriptions.computeIfAbsent(
+                        packName,
+                        name ->
+                            new DfsPackDescription(
+                                getRepository().getDescription(), name, PackSource.INSERT));
+                for (PackExt packExtension : PackExt.values()) {
+                  if (packExtension.getExtension().equals(extension)) {
+                    description.addFileExt(packExtension);
+                    description.setFileSize(packExtension, fileSize);
+                    break;
+                  }
+                }
               }
-            }
-          }
-          return new ArrayList<>(descriptions.values());
-        });
+              return new PackCatalog(
+                  List.copyOf(new ArrayList<>(descriptions.values())), Map.copyOf(extensions));
+            });
+    committedExtensionCatalog = loaded.extensions();
+    return loaded.descriptions();
   }
 
   @Override
   protected ReadableChannel openFile(DfsPackDescription description, PackExt extension)
       throws FileNotFoundException, IOException {
+    ExtensionKey key = new ExtensionKey(baseName(description), extension.getExtension());
+    ExtensionSnapshot snapshot = committedExtensionCatalog.get(key);
+    if (snapshot != null && !snapshot.inline()) {
+      return new ReadAheadChunkedReadableChannel(
+          sessionFactory, snapshot.packId(), snapshot.fileSize());
+    }
+    return openFileFromDatabase(description, extension);
+  }
+
+  private ReadableChannel openFileFromDatabase(
+      DfsPackDescription description, PackExt extension) throws IOException {
     return transactionContext.execute(
         session -> {
           Object[] row =
@@ -148,6 +178,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       throws IOException {
     try {
       stagedExtensions.commit(descriptions, replaces);
+      invalidateCommittedExtensionCatalog();
       clearCache();
     } catch (IOException | RuntimeException publicationFailure) {
       // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit paths
@@ -167,11 +198,26 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return stagedExtensions.stagedExtensionCount();
   }
 
+  int committedExtensionCatalogSize() {
+    return committedExtensionCatalog.size();
+  }
+
+  private void invalidateCommittedExtensionCatalog() {
+    committedExtensionCatalog = Map.of();
+  }
+
   private static String baseName(DfsPackDescription description) {
     String fileName = description.getFileName(PackExt.PACK);
     int dot = fileName.lastIndexOf('.');
     return dot > 0 ? fileName.substring(0, dot) : fileName;
   }
+
+  private record ExtensionKey(String packName, String extension) {}
+
+  private record ExtensionSnapshot(Long packId, long fileSize, boolean inline) {}
+
+  private record PackCatalog(
+      List<DfsPackDescription> descriptions, Map<ExtensionKey, ExtensionSnapshot> extensions) {}
 
   private static final class AlignedDfsOutputStream extends DfsOutputStream {
     private final DfsOutputStream delegate;
