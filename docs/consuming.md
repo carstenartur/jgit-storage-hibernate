@@ -9,9 +9,9 @@ io.github.carstenartur:jgit-storage-hibernate-search
 
 Core provides database-backed JGit repositories. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
 
-The documented released line is **0.1.15**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and tested deployment stack instead of overriding only one side of the stack.
+The documented released line is **0.1.16**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and tested deployment stack instead of overriding only one side of the stack.
 
-SQL Server Search is introduced in **0.1.16**. Do not configure released Search 0.1.15 against SQL Server.
+SQL Server Search was introduced in **0.1.16**. Do not configure released Search 0.1.15 against SQL Server.
 
 ## Supported databases and operating model
 
@@ -79,7 +79,7 @@ Optional generic history search:
 </dependency>
 ```
 
-Use Search 0.1.16 or later for SQL Server. The release procedure updates the examples when that release is published.
+Use Search 0.1.16 or later for SQL Server.
 
 ## Schema ownership
 
@@ -88,7 +88,7 @@ Use Search 0.1.16 or later for SQL Server. The release procedure updates the exa
 | Core | `git_packs`, `git_pack_chunks`, `git_repository_lock`, `git_reflog` | `jgit_storage_hibernate_core_schema_history` |
 | Search | `git_commit_index` | `jgit_storage_hibernate_search_schema_history` |
 
-`git_packs` stores publication metadata and compatibility inline payloads. Adaptive storage keeps small pack extensions inline and stores sufficiently large payloads as ordered 1 MiB rows in `git_pack_chunks`. `git_repository_lock` coordinates ref updates, pack publication, repository deletion and pack cleanup across independent `SessionFactory` instances.
+`git_packs` stores committed publication metadata, compatibility inline payloads and fields retained for legacy durable uncommitted rows. Small pack extensions may remain inline; sufficiently large extensions use ordered 1 MiB rows in `git_pack_chunks`. `git_repository_lock` coordinates ref updates, logical-pack publication, repository deletion and legacy cleanup across independent `SessionFactory` instances.
 
 Application workflow, session, audit, outbox and domain-projection tables are outside these migration locations. The consuming application owns and migrates them even when all entities share one `SessionFactory` and database schema.
 
@@ -289,9 +289,13 @@ Register `SearchRepositoryDeletionParticipant` when repository deletion must rem
 
 ## Pack payload and temporary-disk operation
 
-Pack extensions are first written to a temporary file while JGit performs random reads and writes. Small extensions may then be stored inline; sufficiently large extensions are persisted as bounded chunks. The JVM does not need a complete large pack-related file in one byte array, but the host must provide enough temporary-disk space for all concurrent writers.
+The normal Core writer builds each pack-related extension in a temporary file so JGit can perform random reads while constructing or resolving it. Closing an extension creates no database row. Completed PACK, IDX, object-size-index, bitmap and Reftable files remain JVM-local until JGit calls `commitPack()` for the logical pack.
 
-Each uncommitted extension has a UUID writer token and renewable lease. A writer verifies ownership on flush and close. Pack flush, publication, ref publication, repository deletion and cleanup share the same repository-scoped pessimistic lock.
+`commitPack()` acquires the repository lock once, validates every expected extension, persists small files inline or large files as bounded 1 MiB chunks, and makes the complete logical pack visible in the same Hibernate transaction. A reader therefore never sees a subset of newly published extensions.
+
+Temporary-disk capacity must cover both open writers and completed extensions waiting for publication. Normal publication and rollback delete the files explicitly. A hard JVM termination or operating-system deletion failure can leave stale files with the `jgit-storage-pack-` prefix in the JVM temporary directory; they have no committed database row and must not be imported as durable Git state.
+
+Writer tokens and renewable leases remain relevant to legacy durable uncommitted rows produced by older/base writer paths. Those rows are compatible with the new publication and maintenance code, but they are not the normal staging representation.
 
 The optional capacity profile exercises 1 MiB, 16 MiB and 128 MiB payloads:
 
@@ -299,11 +303,17 @@ The optional capacity profile exercises 1 MiB, 16 MiB and 128 MiB payloads:
 mvn -B -pl jgit-storage-hibernate-core -Ppack-capacity verify
 ```
 
-See [Pack capacity and recovery](operations/capacity-and-recovery.md) for the memory/disk envelope and monitoring requirements.
+See [Pack capacity and recovery](operations/capacity-and-recovery.md) for the memory/disk envelope, crash model and monitoring requirements.
 
-## Recovering abandoned writes
+## Recovering abandoned state
 
-A crash can leave invisible uncommitted rows. Clean them through the public service rather than direct SQL:
+### Local staging files
+
+A hard JVM termination can leave stale `jgit-storage-pack-` files in the configured JVM temporary directory. They are unpublished derived state and have no complete association with JGit's lost in-memory `DfsPackDescription`. Remove them only after confirming that the owning process is no longer active. Do not attempt to publish or import them.
+
+### Legacy durable uncommitted rows
+
+A crash of an older/base writer can leave invisible `committed=false` rows. Clean those rows through the public service rather than direct SQL:
 
 ```java
 PackCleanupResult result =
@@ -362,7 +372,7 @@ Before migration:
 - record Core row counts and ordered checksums for authoritative inline BLOBs;
 - record Search row and repository coverage when replacing an existing projection;
 - ensure no concurrent application instance can write during an incompatible migration;
-- confirm temporary-disk capacity for concurrent pack writers;
+- confirm temporary-disk capacity for open and completed-but-unpublished pack extensions;
 - record the Lucene directory and analyzer profile when Search is enabled.
 
 After migration:
@@ -376,7 +386,7 @@ After migration:
 - close and reopen the `SessionFactory` and verify persistent Lucene queries;
 - compare recorded row counts and domain-specific smoke-test results.
 
-Operational monitoring should include temporary-disk free space, counts and bytes of uncommitted rows, expired writer leases, chunk-row growth, rebuild progress and transaction latency during repack and cleanup.
+Operational monitoring should include temporary-disk free space and stale staging-file counts, legacy uncommitted row counts/bytes and expired leases, chunk-row growth, rebuild progress and transaction latency during publication, repack and cleanup.
 
 ## Running integration tests locally
 
@@ -393,9 +403,10 @@ The Core and Search suites exercise:
 - adoption of immutable 0.1.4 fixtures;
 - copied pre-library Core adoption on HSQLDB, PostgreSQL and SQL Server;
 - Flyway history versions and Hibernate `validate`;
-- adaptive inline and chunked repository storage;
-- refs, reflogs and legacy inline compatibility;
-- leased abandoned-write cleanup and repository deletion;
+- staged atomic inline/chunked publication and bounded read-ahead;
+- refs, reflogs, replacement and legacy inline/uncommitted compatibility;
+- local, mixed and legacy rollback plus lease-aware abandoned-write cleanup;
+- repository deletion;
 - Search Unicode indexing, first-parent add/modify/delete and merge semantics;
 - author, committer, path, time, compound and paginated Search queries;
 - two-repository rebuild, interruption/retry and deletion isolation;
