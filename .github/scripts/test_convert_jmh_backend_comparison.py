@@ -18,7 +18,7 @@ SPEC.loader.exec_module(MODULE)
 
 class ConvertJmhBackendComparisonTest(unittest.TestCase):
     def test_converts_all_supported_backends_with_readable_labels(self) -> None:
-        raw = [self._result(backend, index + 1.0) for index, backend in enumerate(MODULE.BACKEND_LABELS)]
+        raw = [self._backend_result(backend, index + 1.0) for index, backend in enumerate(MODULE.BACKEND_LABELS)]
 
         converted = MODULE.convert(raw)
 
@@ -31,15 +31,47 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
           self.assertTrue(math.isfinite(entry["value"]))
           self.assertIn("JDK: 21", entry["extra"])
 
+    def test_converts_large_pack_batching_modes(self) -> None:
+        converted = MODULE.convert(
+            [
+                self._batching_result("disabled", 12.0),
+                self._batching_result("enabled", 9.0),
+            ]
+        )
+
+        names = {entry["name"] for entry in converted}
+        self.assertEqual(2, len(converted))
+        self.assertIn("publishTwelveMiBPack — JGit + PostgreSQL (JDBC batching off)", names)
+        self.assertIn("publishTwelveMiBPack — JGit + PostgreSQL (JDBC batching on)", names)
+
     def test_rejects_unknown_backends(self) -> None:
-        with self.assertRaisesRegex(ValueError, "unsupported JMH backend"):
-            MODULE.convert([self._result("unknown", 1.0)])
+        with self.assertRaisesRegex(ValueError, "Unsupported JMH backend"):
+            MODULE.convert([self._backend_result("unknown", 1.0)])
+
+    def test_rejects_results_without_series_parameter(self) -> None:
+        result = self._backend_result("postgresql", 1.0)
+        result["params"] = {}
+        with self.assertRaisesRegex(ValueError, "neither a backend nor a batchingMode"):
+            MODULE.convert([result])
 
     @staticmethod
-    def _result(backend: str, score: float) -> dict:
+    def _backend_result(backend: str, score: float) -> dict:
+        result = ConvertJmhBackendComparisonTest._result(score)
+        result["params"] = {"backend": backend}
+        return result
+
+    @staticmethod
+    def _batching_result(batching_mode: str, score: float) -> dict:
+        result = ConvertJmhBackendComparisonTest._result(score)
+        result["benchmark"] = "example.LargePackJdbcBatchBenchmark.publishTwelveMiBPack"
+        result["params"] = {"batchingMode": batching_mode}
+        return result
+
+    @staticmethod
+    def _result(score: float) -> dict:
         return {
             "benchmark": "example.Benchmark.operation",
-            "params": {"backend": backend},
+            "params": {},
             "primaryMetric": {
                 "score": score,
                 "scoreError": score / 10,
