@@ -10,7 +10,9 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
@@ -21,7 +23,6 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperatio
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -54,13 +55,16 @@ class StagedPackExtensionStoreH2Test {
 
       StorageOperationMetrics aggregateBefore = repository.getStorageOperationMetrics();
       StorageOperationBreakdown breakdownBefore = repository.getStorageOperationBreakdown();
-      database.commitPack(List.of(description), null);
+      database.commitPackImpl(List.of(description), null);
 
       StorageOperationMetrics aggregate =
           repository.getStorageOperationMetrics().minus(aggregateBefore);
       StorageOperationBreakdown breakdown =
           repository.getStorageOperationBreakdown().minus(breakdownBefore);
-      assertEquals(new StorageOperationMetrics(1, 1, 0, 1, aggregate.repositoryLockAcquisitionNanos()), aggregate);
+      assertEquals(
+          new StorageOperationMetrics(
+              1, 1, 0, 1, aggregate.repositoryLockAcquisitionNanos()),
+          aggregate);
       assertEquals(aggregate, breakdown.total());
       assertEquals(aggregate, breakdown.metrics(StorageOperationKind.PACK_PUBLICATION));
       assertEquals(
@@ -107,7 +111,7 @@ class StagedPackExtensionStoreH2Test {
       write(database, description, PackExt.INDEX, deterministicBytes(40, 5));
       persistConflictingIndex(provider, "atomic-failure", baseName(description));
 
-      assertThrows(IOException.class, () -> database.commitPack(List.of(description), null));
+      assertThrows(IOException.class, () -> database.commitPackImpl(List.of(description), null));
       assertEquals(
           1L,
           rowCount(provider, "atomic-failure"),
@@ -174,9 +178,9 @@ class StagedPackExtensionStoreH2Test {
               .setParameter("repo", repositoryName)
               .setParameter("ext", extension)
               .getSingleResult();
-      assertEquals(true, entity.isCommitted());
-      assertEquals(null, entity.getWriteToken());
-      assertEquals(null, entity.getWriteLeaseUntil());
+      assertTrue(entity.isCommitted());
+      assertNull(entity.getWriteToken());
+      assertNull(entity.getWriteLeaseUntil());
       return entity.getData();
     }
   }
