@@ -11,6 +11,7 @@ Use the familiar JGit `Repository` API while storing packs, refs, reftables and 
 - small committed extensions may remain inline while large extensions use ordered 1 MiB chunks;
 - chunk inserts use portable Hibernate JDBC batching without generated-key round trips per chunk;
 - committed chunked extensions reuse an immutable pack-list metadata catalog instead of repeating the same open-time lookup;
+- local publication hands the exact committed pack list to JGit's post-commit scan without another database transaction;
 - existing inline BLOB, generated chunk-ID and legacy uncommitted rows remain readable after upgrade;
 - packs remain hidden until transactionally published, avoiding partially visible writes;
 - normal JGit ref updates publish Reftable state and queryable reflogs atomically;
@@ -78,7 +79,9 @@ The reader opens either:
 - an inline channel for a committed `git_packs.data` BLOB; or
 - a chunked channel with bounded multi-chunk read-ahead.
 
-A successful pack-list scan publishes an immutable metadata catalog for committed extensions. Chunked files opened from that generation do not repeat the `git_packs` metadata query; inline payload bytes remain outside the catalog and use the bounded database fallback. See [Committed pack metadata catalog](../docs/operations/committed-pack-catalog.md).
+A successful pack-list scan publishes an immutable metadata catalog for committed extensions. Chunked files opened from that generation do not repeat the `git_packs` metadata query; inline payload bytes remain outside the catalog and use the bounded database fallback.
+
+After a successful local pack or Reftable publication, Core keeps JGit's normal `clearCache()` and packs-changed event ordering. The publication transaction returns the exact generated row IDs, file sizes and storage modes, and the first post-invalidation `listPacks()` call consumes that complete snapshot without opening a Hibernate transaction. An incomplete catalog or an independent repository instance still uses the authoritative database scan. A publication containing a legacy durable-uncommitted extension likewise disables the handoff rather than adding another metadata query; the next scan refreshes once from the database. See [Committed pack metadata catalog](../docs/operations/committed-pack-catalog.md).
 
 The migration does not rewrite existing published BLOBs. A later JGit repack can replace them naturally. Legacy uncommitted rows produced by the previous/base writer contract remain publishable or removable through the compatibility path.
 
@@ -180,4 +183,4 @@ Workflow, session, audit, outbox and other application-specific tables remain ow
 
 H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. The suites verify fresh installation, 0.1.4 upgrades where applicable, pre-library adoption with unchanged BLOB checksums and reflog rows, Hibernate validation, adaptive inline/chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
 
-Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion, legacy lease-aware cleanup, real JDBC batch execution and committed-pack catalog lifecycle. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. The optional `pack-capacity` Maven profile verifies 1 MiB, 16 MiB and 128 MiB payloads and is run manually and weekly by the existing performance workflow. A dedicated JMH comparison measures a twelve-MiB PostgreSQL pack with batching disabled and enabled.
+Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion, legacy lease-aware cleanup, real JDBC batch execution, committed-pack catalog lifecycle, zero-query local pack-list handoff through normal `ObjectInserter.addPack()` and authoritative refresh after legacy publication. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. The optional `pack-capacity` Maven profile verifies 1 MiB, 16 MiB and 128 MiB payloads and is run manually and weekly by the existing performance workflow. A dedicated JMH comparison measures a twelve-MiB PostgreSQL pack with batching disabled and enabled.

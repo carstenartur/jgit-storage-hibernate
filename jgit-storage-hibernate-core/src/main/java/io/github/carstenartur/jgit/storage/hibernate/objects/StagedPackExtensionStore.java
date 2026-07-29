@@ -72,35 +72,39 @@ final class StagedPackExtensionStore {
     return new StagedOutputStream(key, this::register);
   }
 
-  void commit(
+  CommitResult commit(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
     List<Publication> publications = publications(descriptions);
-    transactionContext.executeWithRepositoryLock(
-        repositoryName,
-        session -> {
-          if (replaces != null) {
-            for (DfsPackDescription replace : replaces) {
-              deletePackRows(session, baseName(replace));
-            }
-          }
-
-          Instant committedAt = Instant.now();
-          for (Publication publication : publications) {
-            for (ExpectedExtension expected : publication.extensions()) {
-              if (expected.staged() != null) {
-                persistCommitted(session, expected.staged(), committedAt);
-              } else {
-                publishLegacyExtension(
-                    session,
-                    publication.packName(),
-                    expected.extension(),
-                    committedAt);
+    CommitResult commitResult =
+        transactionContext.executeWithRepositoryLock(
+            repositoryName,
+            session -> {
+              if (replaces != null) {
+                for (DfsPackDescription replace : replaces) {
+                  deletePackRows(session, baseName(replace));
+                }
               }
-            }
-          }
-          return null;
-        });
+
+              List<CommittedExtension> committed = new ArrayList<>();
+              boolean completeMetadata = true;
+              Instant committedAt = Instant.now();
+              for (Publication publication : publications) {
+                for (ExpectedExtension expected : publication.extensions()) {
+                  if (expected.staged() != null) {
+                    committed.add(persistCommitted(session, expected.staged(), committedAt));
+                  } else {
+                    publishLegacyExtension(
+                        session,
+                        publication.packName(),
+                        expected.extension(),
+                        committedAt);
+                    completeMetadata = false;
+                  }
+                }
+              }
+              return new CommitResult(List.copyOf(committed), completeMetadata);
+            });
 
     for (Publication publication : publications) {
       for (ExpectedExtension expected : publication.extensions()) {
@@ -111,6 +115,7 @@ final class StagedPackExtensionStore {
         }
       }
     }
+    return commitResult;
   }
 
   void rollback(Collection<DfsPackDescription> descriptions) {
@@ -195,8 +200,8 @@ final class StagedPackExtensionStore {
     return result;
   }
 
-  private void persistCommitted(Session session, StagedExtension stagedExtension, Instant committedAt)
-      throws IOException {
+  private CommittedExtension persistCommitted(
+      Session session, StagedExtension stagedExtension, Instant committedAt) throws IOException {
     GitPackEntity entity = new GitPackEntity();
     entity.setRepositoryName(repositoryName);
     entity.setPackName(stagedExtension.key().packName());
@@ -226,6 +231,12 @@ final class StagedPackExtensionStore {
         throw exception;
       }
     }
+    return new CommittedExtension(
+        stagedExtension.key().packName(),
+        stagedExtension.key().extension(),
+        entity.getId(),
+        stagedExtension.fileSize(),
+        inline);
   }
 
   private static boolean isDuplicatePackExtension(Throwable failure) {
@@ -252,7 +263,9 @@ final class StagedPackExtensionStore {
   private static boolean isDuplicateSqlException(SQLException exception) {
     for (SQLException current = exception; current != null; current = current.getNextException()) {
       String sqlState = current.getSQLState();
-      if ("23505".equals(sqlState) || current.getErrorCode() == 2601 || current.getErrorCode() == 2627) {
+      if ("23505".equals(sqlState)
+          || current.getErrorCode() == 2601
+          || current.getErrorCode() == 2627) {
         return true;
       }
       String message = current.getMessage();
@@ -372,6 +385,15 @@ final class StagedPackExtensionStore {
     int dot = fileName.lastIndexOf('.');
     return dot > 0 ? fileName.substring(0, dot) : fileName;
   }
+
+  record CommitResult(List<CommittedExtension> committedExtensions, boolean completeMetadata) {
+    CommitResult {
+      committedExtensions = List.copyOf(committedExtensions);
+    }
+  }
+
+  record CommittedExtension(
+      String packName, String extension, Long packId, long fileSize, boolean inline) {}
 
   private record ExtensionKey(String packName, String extension) {
     private String displayName() {

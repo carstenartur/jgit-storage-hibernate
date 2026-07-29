@@ -10,7 +10,9 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
@@ -31,6 +33,10 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.stat.Statistics;
@@ -102,8 +108,8 @@ class CommittedPackCatalogH2Test {
   }
 
   @Test
-  void successfulPublicationInvalidatesAndRebuildsCatalog() throws Exception {
-    String repositoryName = "catalog-invalidation";
+  void successfulPublicationHandsOffCompleteCatalogWithoutDatabaseQuery() throws Exception {
+    String repositoryName = "catalog-handoff";
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
@@ -119,18 +125,125 @@ class CommittedPackCatalogH2Test {
       write(database, staged, PackExt.PACK, new byte[] {9, 8, 7, 6});
       database.commitPackImpl(List.of(staged), null);
 
-      assertEquals(
-          0,
-          database.committedExtensionCatalogSize(),
-          "A successful publication must invalidate metadata and DFS caches together");
+      assertEquals(bootstrapExtensions + 3, database.committedExtensionCatalogSize());
+      assertTrue(database.localPackListScanAvailable());
 
       Statistics statistics = provider.getSessionFactory().getStatistics();
       statistics.clear();
-      List<DfsPackDescription> rebuilt = database.listPacks();
+      StorageOperationBreakdown before = repository.getStorageOperationBreakdown();
+      List<DfsPackDescription> handedOff = database.listPacks();
+
+      assertEquals(0L, statistics.getQueryExecutionCount());
+      assertFalse(database.localPackListScanAvailable());
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          repository
+              .getStorageOperationBreakdown()
+              .minus(before)
+              .metrics(StorageOperationKind.PACK_METADATA_READ));
+      description(handedOff, "pack-existing");
+      description(handedOff, baseName(staged));
+    }
+  }
+
+  @Test
+  void objectInserterAddPackConsumesHandoffWithoutMetadataTransaction() throws Exception {
+    String repositoryName = "catalog-add-pack";
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      database.getPackList();
+      int existingPacks = database.getCurrentPacks().length;
+      StorageOperationBreakdown before = repository.getStorageOperationBreakdown();
+      byte[] payload = deterministicBytes(512 * 1024, 41);
+      ObjectId objectId;
+
+      try (ObjectInserter inserter = repository.newObjectInserter()) {
+        objectId = inserter.insert(Constants.OBJ_BLOB, payload);
+        inserter.flush();
+      }
+
+      StorageOperationBreakdown delta =
+          repository.getStorageOperationBreakdown().minus(before);
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          delta.metrics(StorageOperationKind.PACK_METADATA_READ),
+          "DfsInserter.addPack must consume the local pack-list handoff without a DB scan");
+      assertFalse(database.localPackListScanAvailable());
+      assertEquals(existingPacks + 1, database.getCurrentPacks().length);
+      try (ObjectReader reader = repository.newObjectReader()) {
+        assertArrayEquals(payload, reader.open(objectId).getBytes());
+      }
+    }
+  }
+
+  @Test
+  void legacyPublicationDisablesHandoffAndUsesOneAuthoritativeScan() throws Exception {
+    String repositoryName = "catalog-legacy";
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      int bootstrapExtensions = catalogSizeAfterScan(database);
+      DfsPackDescription legacy = database.newPack(PackSource.RECEIVE);
+      byte[] legacyData = new byte[] {7, 5, 3, 1};
+      persistLegacyUncommittedExtension(
+          provider, repositoryName, baseName(legacy), PackExt.PACK.getExtension(), legacyData);
+      legacy.addFileExt(PackExt.PACK);
+      legacy.setFileSize(PackExt.PACK, legacyData.length);
+
+      database.commitPackImpl(List.of(legacy), null);
+
+      assertFalse(
+          database.localPackListScanAvailable(),
+          "Legacy publication has no exact returned row metadata and must not claim completeness");
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
+      List<DfsPackDescription> refreshed = database.listPacks();
       assertEquals(1L, statistics.getQueryExecutionCount());
-      assertEquals(bootstrapExtensions + 3, database.committedExtensionCatalogSize());
-      description(rebuilt, "pack-existing");
-      description(rebuilt, baseName(staged));
+      assertEquals(bootstrapExtensions + 1, database.committedExtensionCatalogSize());
+      DfsPackDescription committed = description(refreshed, baseName(legacy));
+      try (ReadableChannel channel = database.openFile(committed, PackExt.PACK)) {
+        assertArrayEquals(legacyData, readFully(channel));
+      }
+    }
+  }
+
+  @Test
+  void replacementPrunesOldCatalogBeforeLocalHandoff() throws Exception {
+    String repositoryName = "catalog-replacement";
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      int bootstrapExtensions = catalogSizeAfterScan(database);
+      persistCommittedPack(provider, repositoryName, "pack-replaced");
+      persistCommittedPack(provider, repositoryName, "pack-retained");
+      List<DfsPackDescription> beforeReplacement = database.listPacks();
+      DfsPackDescription replaced = description(beforeReplacement, "pack-replaced");
+
+      DfsPackDescription replacement = database.newPack(PackSource.COMPACT);
+      write(database, replacement, PackExt.PACK, new byte[] {3, 1, 4, 1, 5});
+      database.commitPackImpl(List.of(replacement), List.of(replaced));
+
+      assertEquals(
+          bootstrapExtensions + 3,
+          database.committedExtensionCatalogSize(),
+          "Two replaced extensions must be removed and one exact replacement added");
+      assertTrue(database.localPackListScanAvailable());
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
+      List<DfsPackDescription> handedOff = database.listPacks();
+      assertEquals(0L, statistics.getQueryExecutionCount());
+      assertThrows(
+          java.util.NoSuchElementException.class,
+          () -> description(handedOff, "pack-replaced"));
+      description(handedOff, "pack-retained");
+      description(handedOff, baseName(replacement));
     }
   }
 
@@ -185,7 +298,7 @@ class CommittedPackCatalogH2Test {
     try (Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
       GitPackEntity pack =
-          persistPackEntity(session, repositoryName, packName, "pack", null, packData.length);
+          persistPackEntity(session, repositoryName, packName, "pack", null, packData.length, true);
       session.flush();
 
       GitPackChunkEntity chunk = new GitPackChunkEntity();
@@ -196,7 +309,13 @@ class CommittedPackCatalogH2Test {
       session.persist(chunk);
 
       persistPackEntity(
-          session, repositoryName, packName, PackExt.INDEX.getExtension(), indexData, indexData.length);
+          session,
+          repositoryName,
+          packName,
+          PackExt.INDEX.getExtension(),
+          indexData,
+          indexData.length,
+          true);
       transaction.commit();
     }
     return new PersistedPack(packName, packData, indexData);
@@ -210,7 +329,20 @@ class CommittedPackCatalogH2Test {
       byte[] data) {
     try (Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
-      persistPackEntity(session, repositoryName, packName, extension, data, data.length);
+      persistPackEntity(session, repositoryName, packName, extension, data, data.length, true);
+      transaction.commit();
+    }
+  }
+
+  private static void persistLegacyUncommittedExtension(
+      HibernateSessionFactoryProvider provider,
+      String repositoryName,
+      String packName,
+      String extension,
+      byte[] data) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      Transaction transaction = session.beginTransaction();
+      persistPackEntity(session, repositoryName, packName, extension, data, data.length, false);
       transaction.commit();
     }
   }
@@ -221,16 +353,19 @@ class CommittedPackCatalogH2Test {
       String packName,
       String extension,
       byte[] data,
-      long fileSize) {
+      long fileSize,
+      boolean committed) {
     GitPackEntity entity = new GitPackEntity();
     entity.setRepositoryName(repositoryName);
     entity.setPackName(packName);
     entity.setPackExtension(extension);
     entity.setData(data);
     entity.setFileSize(fileSize);
-    entity.setCommitted(true);
+    entity.setCommitted(committed);
     entity.setCreatedAt(Instant.now());
-    entity.setCommittedAt(Instant.now());
+    entity.setCommittedAt(committed ? Instant.now() : null);
+    entity.setWriteToken(committed ? null : UUID.randomUUID().toString());
+    entity.setWriteLeaseUntil(null);
     session.persist(entity);
     return entity;
   }
