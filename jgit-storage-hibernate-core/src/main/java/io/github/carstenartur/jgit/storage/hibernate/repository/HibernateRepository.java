@@ -15,6 +15,7 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
@@ -34,7 +35,7 @@ import org.hibernate.SessionFactory;
  */
 public class HibernateRepository extends DfsRepository {
 
-  private final HibernateObjDatabase objectDatabase;
+  private final ReadAheadHibernateObjDatabase objectDatabase;
   private final HibernateRefDatabase refDatabase;
   private final HibernateReflogWriter reflogWriter;
   private final HibernateTransactionContext transactionContext;
@@ -104,6 +105,18 @@ public class HibernateRepository extends DfsRepository {
    */
   public StorageOperationBreakdown getStorageOperationBreakdown() {
     return transactionContext.operationBreakdownSnapshot();
+  }
+
+  /**
+   * Return committed pack-extension database fallback reads grouped by extension and storage mode.
+   *
+   * <p>Catalogued chunked extensions are absent because they open without a pack-file transaction.
+   * The snapshot is zero when repository diagnostics are disabled.
+   *
+   * @return monotone pack-file read attribution
+   */
+  public PackFileReadMetrics getPackFileReadMetrics() {
+    return objectDatabase.packFileReadMetricsSnapshot();
   }
 
   /** Execute repository storage work in one shared transaction. */

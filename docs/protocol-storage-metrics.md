@@ -35,16 +35,16 @@ Filesystem runs publish zero for database-specific counters.
 
 `ProtocolStorageCounters` uses JMH `@AuxCounters(AuxCounters.Type.EVENTS)`. For event counters, the displayed secondary-metric **score is the sum across all measured invocations**, not the cost of one invocation. This suite performs five measured single-shot invocations, so a displayed score of `50` storage transactions represents five raw values of `10`.
 
-Use `secondaryMetrics.<counter>.rawData` in `jmh-result.json` when interpreting one push, clone or fetch. The first complete categorized PostgreSQL run produced these stable raw values:
+Use `secondaryMetrics.<counter>.rawData` in `jmh-result.json` when interpreting one push, clone or fetch. After the pack-list catalog and local post-publication handoff, PostgreSQL produces these stable raw values:
 
-| Workload, per invocation | Transactions | Locks | Category distribution |
-|---|---:|---:|---|
-| Initial push | 9 | 5 | 3 extension writes, 2 pack publications, 2 file reads, 2 metadata reads |
-| Incremental push | 10 | 5 | 3 extension writes, 2 pack publications, 3 file reads, 2 metadata reads |
-| Initial clone | 2 | 0 | 2 file reads |
-| Incremental fetch | 3 | 0 | 3 file reads |
+| Workload, per invocation | Transactions | Locks | Prepared statements | Category distribution |
+|---|---:|---:|---:|---|
+| Initial push | 4 | 2 | 11 | 2 pack publications, 2 file reads |
+| Incremental push | 4 | 2 | 11 | 2 pack publications, 2 file reads |
+| Initial clone | 1 | 0 | 2 | 1 file read |
+| Incremental fetch | 2 | 0 | 3 | 2 file reads |
 
-For PostgreSQL incremental push, the corresponding raw values are also 11 connection acquisitions, 25 prepared statements and roughly 4.2 ms cumulative end-to-end lock acquisition time per invocation. Scores shown by JMH for those event counters are five times the raw per-invocation values.
+The benchmark publishes both aggregate and categorized storage counters. Scores shown by JMH for event counters are five times the raw per-invocation values.
 
 ## Per-operation breakdown
 
@@ -54,7 +54,7 @@ Every top-level repository transaction receives exactly one stable `StorageOpera
 |---|---|
 | `REPOSITORY_INITIALIZATION` | creation or verification of repository coordination state |
 | `PACK_METADATA_READ` | reconstruction of committed DFS pack descriptions |
-| `PACK_FILE_READ` | opening one committed pack extension |
+| `PACK_FILE_READ` | opening one committed pack extension through the database fallback |
 | `PACK_EXTENSION_WRITE` | persistence or lease renewal of a temporary PACK/IDX/REFTABLE extension |
 | `PACK_PUBLICATION` | making complete extensions visible as one committed pack |
 | `PACK_ROLLBACK` | removal of an unpublished pack after failure |
@@ -81,17 +81,46 @@ otherRepositoryLocks
 
 For the four protocol workloads, `otherStorageTransactions` and `otherRepositoryLocks` must be zero. A non-zero value is treated as a diagnostic gap rather than silently folded into a misleading category.
 
+## Pack-file read attribution
+
+`PACK_FILE_READ` identifies the transaction boundary but not which extension caused it. `PackFileReadMetrics` therefore classifies every successful committed database fallback after its transaction commits:
+
+```text
+packInlineReads
+packChunkedReads
+indexInlineReads
+indexChunkedReads
+reftableInlineReads
+reftableChunkedReads
+otherInlineReads
+otherChunkedReads
+missingPackFileReads
+```
+
+Catalogued chunked extensions are intentionally absent because they open without the database metadata fallback. Missing lookups are separate and must be zero for a successful protocol invocation. The benchmark fails if the sum of successful attributed reads differs from `PACK_FILE_READ` transactions.
+
+The first complete PostgreSQL attribution produced this per-invocation result:
+
+| Workload | PACK inline | PACK chunked | IDX inline/chunked | Reftable inline | Other | Missing |
+|---|---:|---:|---:|---:|---:|---:|
+| Initial push | 0 | 0 | 0 | 2 | 0 | 0 |
+| Incremental push | 0 | 0 | 0 | 2 | 0 | 0 |
+| Initial clone | 0 | 0 | 0 | 1 | 0 | 0 |
+| Incremental fetch | 1 | 0 | 0 | 1 | 0 | 0 |
+
+The evidence rules out IDX caching as a useful standard-protocol optimization. It supports only a bounded, one-shot handoff for newly and locally published inline Reftable payloads and small inline PACK payloads. Historical inline payloads must remain outside the generation catalog.
+
 The public performance dashboard continues to chart primary latency only. Secondary metrics remain in the raw `jmh-result.json` workflow artifact for architecture analysis.
 
 ## Enabling repository counters
 
-Repository transaction and lock counters are opt-in:
+Repository transaction, lock and pack-file attribution counters are opt-in:
 
 ```properties
 jgit.storage.hibernate.metrics.enabled=true
 ```
 
-The default is `false`. Applications that do not enable the property do not allocate category-counter arrays, do not inspect internal call stacks and receive zero aggregate and breakdown snapshots.
+The default is `false`. Applications that do not enable the property do not allocate category-counter arrays, do not inspect internal call stacks and receive zero aggregate, breakdown and pack-file snapshots.
 
 Hibernate's own counters remain controlled independently:
 
@@ -122,7 +151,19 @@ StorageOperationMetrics packWrites =
     delta.metrics(StorageOperationKind.PACK_EXTENSION_WRITE);
 ```
 
-`StorageOperationBreakdown.total()` must equal the aggregate delta for the same interval. Snapshots are immutable and monotone; `minus(...)` rejects an earlier/newer ordering that would produce negative counters.
+Pack-file fallback attribution:
+
+```java
+PackFileReadMetrics before = repository.getPackFileReadMetrics();
+// execute JGit operation
+PackFileReadMetrics delta =
+    repository.getPackFileReadMetrics().minus(before);
+
+long successfulFallbacks = delta.successfulReads();
+long allLookups = delta.totalLookups();
+```
+
+`StorageOperationBreakdown.total()` must equal the aggregate delta for the same interval. Pack-file successful reads must equal `PACK_FILE_READ` transactions for successful benchmark operations. Snapshots are immutable and monotone; `minus(...)` rejects an earlier/newer ordering that would produce negative counters.
 
 ## Interpretation
 
@@ -131,13 +172,12 @@ The metrics are intended to choose the next optimization using evidence:
 - many `PACK_EXTENSION_WRITE` transactions or locks suggest temporary-extension persistence or lease-boundary work;
 - many `PACK_PUBLICATION` transactions suggest pack publication is fragmented;
 - many `REF_PUBLICATION` transactions or locks suggest ref/reftable coordination is the dominant fixed cost;
-- many `PACK_METADATA_READ` or `PACK_FILE_READ` transactions suggest pack-list reconstruction or read-channel opening should be examined;
+- many `PACK_METADATA_READ` transactions suggest pack-list reconstruction should be examined;
+- `PACK_FILE_READ` must be interpreted through extension/storage attribution before introducing payload caching;
 - many prepared statements within a small number of pack-write transactions suggest JDBC batching or incremental chunk persistence;
 - substantial repository-lock acquisition time under concurrency suggests lock-granularity work;
 - low database activity with high elapsed time suggests JGit pack generation, compression or client-side work rather than Hibernate storage.
 
 PR #130 tested and rejected one plausible-looking hypothesis: suppressing intermediate flush delegation did not change the raw per-invocation transaction, statement, connection or lock counts. The patch was not merged. The categorized breakdown exists specifically so the next implementation targets a measured operation boundary rather than another guess.
 
-The first categorized result points to the five locked write/publication transactions per push, not to HikariCP or read-path work. A follow-up optimization must still prove any improvement through the same raw counters and latency benchmark.
-
-No Hibernate second-level payload cache should be introduced solely from elapsed-time comparisons. JGit already maintains its specialized DFS block cache, so duplicate payload caching requires explicit evidence.
+No Hibernate second-level payload cache should be introduced solely from elapsed-time comparisons. JGit already maintains its specialized DFS block cache. Any payload handoff must be locally scoped, bounded, one-shot and justified by extension-level evidence.

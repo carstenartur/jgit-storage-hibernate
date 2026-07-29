@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommitResult;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
@@ -75,6 +77,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
   private final StagedPackExtensionStore stagedExtensions;
+  private final PackFileReadCounters packFileReadCounters;
   private final AtomicReference<CatalogState> committedExtensionCatalog =
       new AtomicReference<>(CatalogState.empty());
   private final ReentrantReadWriteLock catalogLifecycleLock = new ReentrantReadWriteLock(true);
@@ -90,6 +93,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.repositoryName = repositoryName;
     this.transactionContext = transactionContext;
     this.stagedExtensions = new StagedPackExtensionStore(repositoryName, transactionContext);
+    this.packFileReadCounters = PackFileReadCounters.from(sessionFactory);
   }
 
   /**
@@ -200,30 +204,39 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
   private ReadableChannel openFileFromDatabase(
       DfsPackDescription description, PackExt extension) throws IOException {
-    return transactionContext.execute(
-        session -> {
-          Object[] row =
-              session
-                  .createQuery(
-                      "SELECT p.id, p.fileSize, p.data FROM GitPackEntity p "
-                          + "WHERE p.repositoryName = :repo AND p.packName = :name "
-                          + "AND p.packExtension = :ext AND p.committed = true",
-                      Object[].class)
-                  .setParameter("repo", repositoryName)
-                  .setParameter("name", baseName(description))
-                  .setParameter("ext", extension.getExtension())
-                  .uniqueResult();
-          if (row == null) {
-            throw new FileNotFoundException(description.getFileName(extension));
-          }
-          Long packId = (Long) row[0];
-          long fileSize = ((Number) row[1]).longValue();
-          byte[] inlineData = (byte[]) row[2];
-          if (inlineData != null) {
-            return new InlineReadableChannel(inlineData);
-          }
-          return new ReadAheadChunkedReadableChannel(sessionFactory, packId, fileSize);
-        });
+    try {
+      DatabaseOpenResult result =
+          transactionContext.execute(
+              session -> {
+                Object[] row =
+                    session
+                        .createQuery(
+                            "SELECT p.id, p.fileSize, p.data FROM GitPackEntity p "
+                                + "WHERE p.repositoryName = :repo AND p.packName = :name "
+                                + "AND p.packExtension = :ext AND p.committed = true",
+                            Object[].class)
+                        .setParameter("repo", repositoryName)
+                        .setParameter("name", baseName(description))
+                        .setParameter("ext", extension.getExtension())
+                        .uniqueResult();
+                if (row == null) {
+                  throw new FileNotFoundException(description.getFileName(extension));
+                }
+                Long packId = (Long) row[0];
+                long fileSize = ((Number) row[1]).longValue();
+                byte[] inlineData = (byte[]) row[2];
+                if (inlineData != null) {
+                  return new DatabaseOpenResult(new InlineReadableChannel(inlineData), true);
+                }
+                return new DatabaseOpenResult(
+                    new ReadAheadChunkedReadableChannel(sessionFactory, packId, fileSize), false);
+              });
+      packFileReadCounters.record(extension, result.inline());
+      return result.channel();
+    } catch (FileNotFoundException missing) {
+      packFileReadCounters.recordMissing();
+      throw missing;
+    }
   }
 
   @Override
@@ -273,6 +286,15 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
   boolean localPackListScanAvailable() {
     return committedExtensionCatalog.get().localScanAvailable();
+  }
+
+  /**
+   * Return monotone database fallback read attribution for this repository instance.
+   *
+   * @return current counters, or {@link PackFileReadMetrics#ZERO} when metrics are disabled
+   */
+  public PackFileReadMetrics packFileReadMetricsSnapshot() {
+    return packFileReadCounters.snapshot();
   }
 
   private CatalogState beginCatalogMutation(Collection<DfsPackDescription> replaces) {
@@ -365,6 +387,82 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
   private record PackCatalog(
       List<DfsPackDescription> descriptions, Map<ExtensionKey, ExtensionSnapshot> extensions) {}
+
+  private record DatabaseOpenResult(ReadableChannel channel, boolean inline) {}
+
+  private static final class PackFileReadCounters {
+    private static final int PACK_INLINE = 0;
+    private static final int PACK_CHUNKED = 1;
+    private static final int INDEX_INLINE = 2;
+    private static final int INDEX_CHUNKED = 3;
+    private static final int REFTABLE_INLINE = 4;
+    private static final int REFTABLE_CHUNKED = 5;
+    private static final int OTHER_INLINE = 6;
+    private static final int OTHER_CHUNKED = 7;
+    private static final int MISSING = 8;
+    private static final int COUNTER_COUNT = 9;
+
+    private final LongAdder[] counters;
+
+    private PackFileReadCounters(boolean enabled) {
+      if (!enabled) {
+        counters = null;
+        return;
+      }
+      counters = new LongAdder[COUNTER_COUNT];
+      for (int index = 0; index < counters.length; index++) {
+        counters[index] = new LongAdder();
+      }
+    }
+
+    private static PackFileReadCounters from(SessionFactory sessionFactory) {
+      Object configured =
+          sessionFactory
+              .getProperties()
+              .get(HibernateTransactionContext.METRICS_ENABLED_PROPERTY);
+      boolean enabled = configured != null && Boolean.parseBoolean(configured.toString());
+      return new PackFileReadCounters(enabled);
+    }
+
+    private void record(PackExt extension, boolean inline) {
+      if (counters == null) {
+        return;
+      }
+      int counter;
+      if (extension == PackExt.PACK) {
+        counter = inline ? PACK_INLINE : PACK_CHUNKED;
+      } else if (extension == PackExt.INDEX) {
+        counter = inline ? INDEX_INLINE : INDEX_CHUNKED;
+      } else if (extension == PackExt.REFTABLE) {
+        counter = inline ? REFTABLE_INLINE : REFTABLE_CHUNKED;
+      } else {
+        counter = inline ? OTHER_INLINE : OTHER_CHUNKED;
+      }
+      counters[counter].increment();
+    }
+
+    private void recordMissing() {
+      if (counters != null) {
+        counters[MISSING].increment();
+      }
+    }
+
+    private PackFileReadMetrics snapshot() {
+      if (counters == null) {
+        return PackFileReadMetrics.ZERO;
+      }
+      return new PackFileReadMetrics(
+          counters[PACK_INLINE].sum(),
+          counters[PACK_CHUNKED].sum(),
+          counters[INDEX_INLINE].sum(),
+          counters[INDEX_CHUNKED].sum(),
+          counters[REFTABLE_INLINE].sum(),
+          counters[REFTABLE_CHUNKED].sum(),
+          counters[OTHER_INLINE].sum(),
+          counters[OTHER_CHUNKED].sum(),
+          counters[MISSING].sum());
+    }
+  }
 
   private static final class AlignedDfsOutputStream extends DfsOutputStream {
     private final DfsOutputStream delegate;
