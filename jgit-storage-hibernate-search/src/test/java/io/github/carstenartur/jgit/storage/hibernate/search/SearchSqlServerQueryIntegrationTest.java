@@ -98,17 +98,17 @@ class SearchSqlServerQueryIntegrationTest {
               .size());
 
       CommitHistoryQuery compound =
-          CommitHistoryQuery.builder(REPOSITORY_NAME)
-              .text("Update")
-              .authorEmail("alice@example.org")
-              .changedPath("src/Main.java")
+          CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+              .matchingText("Update")
+              .authoredBy("alice@example.org")
+              .touchingPath("src/Main.java")
               .committedBetween(
                   Instant.parse("2026-01-02T00:00:00Z"),
                   Instant.parse("2026-01-03T00:00:00Z"))
               .limit(10)
               .build();
-      assertEquals(1, search.search(compound).size());
-      assertEquals(second.name(), search.search(compound).getFirst().objectId());
+      assertEquals(1, search.findChanges(compound).size());
+      assertEquals(second.name(), search.findChanges(compound).getFirst().objectId());
     }
   }
 
