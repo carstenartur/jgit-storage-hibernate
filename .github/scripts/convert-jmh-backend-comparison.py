@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert JMH JSON into the dashboard's custom smaller-is-better format."""
+"""Convert one or more JMH JSON files into the dashboard's smaller-is-better format."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 BACKEND_LABELS = {
     "filesystem": "JGit + filesystem",
@@ -46,6 +46,16 @@ def _series_label(result: dict[str, Any]) -> str:
     raise ValueError("JMH result has neither a backend nor a batchingMode parameter")
 
 
+def load_results(sources: Iterable[Path]) -> list[dict[str, Any]]:
+    combined: list[dict[str, Any]] = []
+    for source in sources:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            raise ValueError(f"JMH result must be a JSON array: {source}")
+        combined.extend(raw)
+    return combined
+
+
 def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     converted: list[dict[str, Any]] = []
     for result in results:
@@ -78,20 +88,17 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         raise SystemExit(
-            "usage: convert-jmh-backend-comparison.py <jmh-result.json> <comparison.json>"
+            "usage: convert-jmh-backend-comparison.py "
+            "<jmh-result.json> [<additional-result.json> ...] <comparison.json>"
         )
 
-    source = Path(sys.argv[1])
-    target = Path(sys.argv[2])
-    raw = json.loads(source.read_text(encoding="utf-8"))
-    if not isinstance(raw, list):
-        raise ValueError("JMH result must be a JSON array")
-
+    sources = [Path(argument) for argument in sys.argv[1:-1]]
+    target = Path(sys.argv[-1])
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
-        json.dumps(convert(raw), indent=2, ensure_ascii=False) + "\n",
+        json.dumps(convert(load_results(sources)), indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
 
