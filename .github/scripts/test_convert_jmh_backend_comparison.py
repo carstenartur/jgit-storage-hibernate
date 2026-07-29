@@ -41,13 +41,17 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
             [
                 self._batching_result("disabled", 12.0),
                 self._batching_result("enabled", 9.0),
+                self._batching_result("enabled-rewrite", 8.0),
             ]
         )
 
         names = {entry["name"] for entry in converted}
-        self.assertEqual(2, len(converted))
+        self.assertEqual(3, len(converted))
         self.assertIn("publishTwelveMiBPack — JGit + PostgreSQL (JDBC batching off)", names)
         self.assertIn("publishTwelveMiBPack — JGit + PostgreSQL (JDBC batching on)", names)
+        self.assertIn(
+            "publishTwelveMiBPack — JGit + PostgreSQL (JDBC batching + rewrite)", names
+        )
 
     def test_loads_and_combines_multiple_result_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
