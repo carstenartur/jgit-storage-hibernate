@@ -67,6 +67,35 @@
         position: relative;
         min-height: 420px;
       }
+      .chart-note {
+        margin: 12px 0 8px;
+        font-size: 0.9rem;
+        color: color-mix(in srgb, CanvasText 72%, transparent);
+      }
+      .latest-values-wrapper {
+        overflow-x: auto;
+      }
+      .latest-values {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      .latest-values th,
+      .latest-values td {
+        padding: 8px 10px;
+        border-top: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
+        text-align: left;
+        white-space: nowrap;
+      }
+      .latest-values thead th {
+        border-top: 0;
+        border-bottom: 2px solid color-mix(in srgb, CanvasText 24%, transparent);
+      }
+      .latest-values td:nth-child(2),
+      .latest-values td:nth-child(3) {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
       footer {
         display: flex;
         align-items: center;
@@ -92,7 +121,7 @@
           <option value="linear">Linear</option>
           <option value="logarithmic">Logarithmic</option>
         </select>
-        <span>Each chart groups the same JGit operation across all storage backends.</span>
+        <span>Each chart groups the same JGit operation across all storage backends. Patterns, markers and the table expose overlapping measurements.</span>
       </div>
     </header>
 
