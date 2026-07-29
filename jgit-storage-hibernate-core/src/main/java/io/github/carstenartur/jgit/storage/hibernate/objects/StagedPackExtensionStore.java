@@ -29,7 +29,6 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
 
 /**
  * JVM-local staging for unpublished DFS pack extensions.
@@ -40,25 +39,22 @@ import org.hibernate.SessionFactory;
  * and no database row is created. Publication persists all expected extensions and marks them
  * committed in the same repository-locked Hibernate transaction.
  *
- * <p>The temporary files are derived, unpublished state. They are deleted on publication or rollback
- * and registered for best-effort JVM-exit cleanup. A process crash may leave files in the operating
- * system temporary directory; unlike the former uncommitted database rows, those files are never
- * interpreted as durable or resumable writes.
+ * <p>The temporary files are derived, unpublished state. Normal publication and rollback delete them
+ * explicitly without registering every file in the JVM-wide {@code deleteOnExit} registry. A process
+ * crash or operating-system deletion failure may leave files with the {@code jgit-storage-pack-}
+ * prefix in the configured temporary directory; unlike the former uncommitted database rows, those
+ * files are never interpreted as durable or resumable writes.
  */
 final class StagedPackExtensionStore {
 
   private static final int CHUNK_BATCH_SIZE = 8;
 
-  private final SessionFactory sessionFactory;
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
   private final Map<ExtensionKey, StagedExtension> staged = new ConcurrentHashMap<>();
 
   StagedPackExtensionStore(
-      SessionFactory sessionFactory,
-      String repositoryName,
-      HibernateTransactionContext transactionContext) {
-    this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
+      String repositoryName, HibernateTransactionContext transactionContext) {
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
     this.transactionContext = Objects.requireNonNull(transactionContext, "transactionContext");
   }
@@ -114,19 +110,39 @@ final class StagedPackExtensionStore {
   }
 
   void rollback(Collection<DfsPackDescription> descriptions) {
-    boolean removedStaging = false;
+    List<String> databasePackNames = new ArrayList<>();
     for (DfsPackDescription description : descriptions) {
       String packName = baseName(description);
+      int removedExtensions = 0;
+      boolean hasUnstagedExpectedExtension = false;
+      for (PackExt extension : PackExt.values()) {
+        if (!description.hasFileExt(extension)) {
+          continue;
+        }
+        ExtensionKey key = new ExtensionKey(packName, extension.getExtension());
+        StagedExtension removed = staged.remove(key);
+        if (removed == null) {
+          hasUnstagedExpectedExtension = true;
+        } else {
+          removedExtensions++;
+          removed.discard();
+        }
+      }
+
       for (Map.Entry<ExtensionKey, StagedExtension> entry : List.copyOf(staged.entrySet())) {
         if (entry.getKey().packName().equals(packName)
             && staged.remove(entry.getKey(), entry.getValue())) {
-          removedStaging = true;
+          removedExtensions++;
           entry.getValue().discard();
         }
       }
+
+      if (hasUnstagedExpectedExtension || removedExtensions == 0) {
+        databasePackNames.add(packName);
+      }
     }
 
-    if (removedStaging) {
+    if (databasePackNames.isEmpty()) {
       return;
     }
 
@@ -134,8 +150,8 @@ final class StagedPackExtensionStore {
       transactionContext.executeWithRepositoryLock(
           repositoryName,
           session -> {
-            for (DfsPackDescription description : descriptions) {
-              deletePackRows(session, baseName(description));
+            for (String packName : databasePackNames) {
+              deletePackRows(session, packName);
             }
             return null;
           });
@@ -373,7 +389,8 @@ final class StagedPackExtensionStore {
       try {
         Files.deleteIfExists(temporaryFile);
       } catch (IOException ignored) {
-        temporaryFile.toFile().deleteOnExit();
+        // The file is unpublished derived state. Operators may remove stale prefixed files from the
+        // configured temporary directory after verifying no matching process is active.
       }
     }
   }
@@ -392,7 +409,6 @@ final class StagedPackExtensionStore {
       this.key = key;
       this.stagingConsumer = stagingConsumer;
       temporaryFile = Files.createTempFile("jgit-storage-pack-", ".tmp");
-      temporaryFile.toFile().deleteOnExit();
       fileChannel =
           FileChannel.open(
               temporaryFile,
