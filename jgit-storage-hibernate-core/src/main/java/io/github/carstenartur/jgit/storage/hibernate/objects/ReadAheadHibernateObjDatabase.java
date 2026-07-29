@@ -61,8 +61,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
     this.transactionContext = transactionContext;
-    this.stagedExtensions =
-        new StagedPackExtensionStore(sessionFactory, repositoryName, transactionContext);
+    this.stagedExtensions = new StagedPackExtensionStore(repositoryName, transactionContext);
   }
 
   /**
