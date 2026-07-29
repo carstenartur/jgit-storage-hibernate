@@ -8,15 +8,18 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
@@ -46,12 +49,18 @@ import org.hibernate.SessionFactory;
  * extensions and makes them visible through one repository-locked Hibernate transaction. The base
  * implementation remains available for compatibility tests and legacy uncommitted rows.
  *
- * <p>Each successful pack-list scan may publish an immutable catalog of committed extension row
+ * <p>Each successful pack-list scan publishes an immutable catalog of committed extension row
  * identifiers, sizes and storage modes. Publication uses an atomic generation check, so a scan that
  * started before a successful pack mutation cannot overwrite the subsequent invalidation or return a
  * stale list after that mutation. Chunked files can then open without repeating the metadata query.
  * Inline payload bytes are deliberately not retained in the catalog; they continue to use the bounded
  * database fallback so repository memory does not grow with the number of historical packs.
+ *
+ * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
+ * the previous catalog was complete, the exact committed row metadata is merged into a one-shot local
+ * scan result before the cache is cleared. JGit's resulting scan consumes that snapshot without a
+ * database transaction, then continues with its native {@code addPack()} or {@code addReftable()}
+ * update. An incomplete catalog never claims authority and falls back to a full database scan.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -60,7 +69,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private final HibernateTransactionContext transactionContext;
   private final StagedPackExtensionStore stagedExtensions;
   private final AtomicReference<CatalogState> committedExtensionCatalog =
-      new AtomicReference<>(new CatalogState(0, Map.of()));
+      new AtomicReference<>(CatalogState.empty());
 
   public ReadAheadHibernateObjDatabase(
       DfsRepository repository,
@@ -87,9 +96,17 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   protected List<DfsPackDescription> listPacks() throws IOException {
     while (true) {
       CatalogState observedCatalog = committedExtensionCatalog.get();
+      if (observedCatalog.localScanAvailable()) {
+        CatalogState consumed = observedCatalog.consumeLocalScan();
+        if (committedExtensionCatalog.compareAndSet(observedCatalog, consumed)) {
+          return descriptionsFrom(observedCatalog.extensions());
+        }
+        continue;
+      }
+
       PackCatalog loaded = loadPackCatalog();
       CatalogState loadedCatalog =
-          new CatalogState(observedCatalog.generation(), loaded.extensions());
+          new CatalogState(observedCatalog.generation(), true, false, loaded.extensions());
       if (committedExtensionCatalog.compareAndSet(observedCatalog, loadedCatalog)) {
         return loaded.descriptions();
       }
@@ -116,7 +133,6 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                       Object[].class)
                   .setParameter("repo", repositoryName)
                   .getResultList();
-          LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
           LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
           for (Object[] row : rows) {
             Long packId = (Long) row[0];
@@ -126,24 +142,35 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
             boolean inline = ((Number) row[4]).intValue() != 0;
             extensions.put(
                 new ExtensionKey(packName, extension),
-                new ExtensionSnapshot(packId, fileSize, inline));
-            DfsPackDescription description =
-                descriptions.computeIfAbsent(
-                    packName,
-                    name ->
-                        new DfsPackDescription(
-                            getRepository().getDescription(), name, PackSource.INSERT));
-            for (PackExt packExtension : PackExt.values()) {
-              if (packExtension.getExtension().equals(extension)) {
-                description.addFileExt(packExtension);
-                description.setFileSize(packExtension, fileSize);
-                break;
-              }
-            }
+                new ExtensionSnapshot(packId, fileSize, inline, PackSource.INSERT));
           }
+          Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
           return new PackCatalog(
-              List.copyOf(new ArrayList<>(descriptions.values())), Map.copyOf(extensions));
+              descriptionsFrom(immutableExtensions), immutableExtensions);
         });
+  }
+
+  private List<DfsPackDescription> descriptionsFrom(
+      Map<ExtensionKey, ExtensionSnapshot> extensions) {
+    LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
+    for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry : extensions.entrySet()) {
+      ExtensionKey key = entry.getKey();
+      ExtensionSnapshot snapshot = entry.getValue();
+      DfsPackDescription description =
+          descriptions.computeIfAbsent(
+              key.packName(),
+              name ->
+                  new DfsPackDescription(
+                      getRepository().getDescription(), name, snapshot.packSource()));
+      for (PackExt packExtension : PackExt.values()) {
+        if (packExtension.getExtension().equals(key.extension())) {
+          description.addFileExt(packExtension);
+          description.setFileSize(packExtension, snapshot.fileSize());
+          break;
+        }
+      }
+    }
+    return List.copyOf(new ArrayList<>(descriptions.values()));
   }
 
   @Override
@@ -196,9 +223,10 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   protected void commitPackImpl(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
-    CatalogState previousCatalog = beginCatalogMutation();
+    CatalogState previousCatalog = beginCatalogMutation(replaces);
+    List<CommittedExtension> committedExtensions;
     try {
-      stagedExtensions.commit(descriptions, replaces);
+      committedExtensions = stagedExtensions.commit(descriptions, replaces);
     } catch (IOException | RuntimeException publicationFailure) {
       // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit paths
       // such as Reftable publication may propagate commitPack failure directly. Clean local staging
@@ -207,7 +235,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       restoreCatalogAfterFailedMutation(previousCatalog);
       throw publicationFailure;
     }
-    completeCatalogMutation();
+    completeCatalogMutation(descriptions, committedExtensions);
     clearCache();
   }
 
@@ -224,17 +252,47 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return committedExtensionCatalog.get().extensions().size();
   }
 
-  private CatalogState beginCatalogMutation() {
-    return committedExtensionCatalog.getAndUpdate(CatalogState::nextEmptyGeneration);
+  boolean localPackListScanAvailable() {
+    return committedExtensionCatalog.get().localScanAvailable();
   }
 
-  private void completeCatalogMutation() {
-    committedExtensionCatalog.updateAndGet(CatalogState::nextEmptyGeneration);
+  private CatalogState beginCatalogMutation(Collection<DfsPackDescription> replaces) {
+    Set<String> replacedPackNames = new HashSet<>();
+    if (replaces != null) {
+      for (DfsPackDescription replaced : replaces) {
+        replacedPackNames.add(baseName(replaced));
+      }
+    }
+    return committedExtensionCatalog.getAndUpdate(
+        current -> current.beginMutation(replacedPackNames));
+  }
+
+  private void completeCatalogMutation(
+      Collection<DfsPackDescription> descriptions,
+      Collection<CommittedExtension> committedExtensions) {
+    Map<String, PackSource> packSources = new LinkedHashMap<>();
+    for (DfsPackDescription description : descriptions) {
+      packSources.put(baseName(description), description.getPackSource());
+    }
+    committedExtensionCatalog.updateAndGet(
+        current -> {
+          LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions =
+              new LinkedHashMap<>(current.extensions());
+          for (CommittedExtension committed : committedExtensions) {
+            PackSource source =
+                packSources.getOrDefault(committed.packName(), PackSource.INSERT);
+            extensions.put(
+                new ExtensionKey(committed.packName(), committed.extension()),
+                new ExtensionSnapshot(
+                    committed.packId(), committed.fileSize(), committed.inline(), source));
+          }
+          return current.completeMutation(extensions);
+        });
   }
 
   private void restoreCatalogAfterFailedMutation(CatalogState previousCatalog) {
     committedExtensionCatalog.updateAndGet(
-        current -> new CatalogState(current.generation() + 1, previousCatalog.extensions()));
+        current -> previousCatalog.withGeneration(current.generation() + 1));
   }
 
   private static String baseName(DfsPackDescription description) {
@@ -245,15 +303,43 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
   private record ExtensionKey(String packName, String extension) {}
 
-  private record ExtensionSnapshot(Long packId, long fileSize, boolean inline) {}
+  private record ExtensionSnapshot(
+      Long packId, long fileSize, boolean inline, PackSource packSource) {}
 
-  private record CatalogState(long generation, Map<ExtensionKey, ExtensionSnapshot> extensions) {
+  private record CatalogState(
+      long generation,
+      boolean complete,
+      boolean localScanAvailable,
+      Map<ExtensionKey, ExtensionSnapshot> extensions) {
     private CatalogState {
       extensions = Map.copyOf(extensions);
+      localScanAvailable = complete && localScanAvailable;
     }
 
-    private CatalogState nextEmptyGeneration() {
-      return new CatalogState(generation + 1, Map.of());
+    private static CatalogState empty() {
+      return new CatalogState(0, false, false, Map.of());
+    }
+
+    private CatalogState consumeLocalScan() {
+      return new CatalogState(generation, complete, false, extensions);
+    }
+
+    private CatalogState beginMutation(Set<String> replacedPackNames) {
+      LinkedHashMap<ExtensionKey, ExtensionSnapshot> retained = new LinkedHashMap<>();
+      for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry : extensions.entrySet()) {
+        if (!replacedPackNames.contains(entry.getKey().packName())) {
+          retained.put(entry.getKey(), entry.getValue());
+        }
+      }
+      return new CatalogState(generation + 1, complete, false, retained);
+    }
+
+    private CatalogState completeMutation(Map<ExtensionKey, ExtensionSnapshot> updatedExtensions) {
+      return new CatalogState(generation + 1, complete, complete, updatedExtensions);
+    }
+
+    private CatalogState withGeneration(long newGeneration) {
+      return new CatalogState(newGeneration, complete, localScanAvailable, extensions);
     }
   }
 
