@@ -11,6 +11,8 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -78,8 +80,10 @@ import org.openjdk.jmh.infra.BenchmarkParams;
  * JMH thread; backend variants and forks remain isolated in their normal JMH processes.
  *
  * <p>For Hibernate backends, JMH secondary results expose query, statement, transaction, connection
- * and repository-lock costs for the same measured operation. Counters are reset after fixture
- * preparation and therefore exclude schema creation and baseline history construction.
+ * and repository-lock costs for the same measured operation. Aggregate storage counters are also
+ * reconciled with a fixed per-operation breakdown so every measured top-level transaction and lock
+ * is attributed exactly once. Counters are reset after fixture preparation and therefore exclude
+ * schema creation and baseline history construction.
  */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -123,6 +127,7 @@ public class GitProtocolBenchmark {
   private ObjectId expectedTip;
   private Statistics hibernateStatistics;
   private StorageOperationMetrics storageMetricsBaseline = StorageOperationMetrics.ZERO;
+  private StorageOperationBreakdown storageBreakdownBaseline = StorageOperationBreakdown.ZERO;
 
   @Setup(Level.Trial)
   public void setupTrial() {
@@ -194,6 +199,7 @@ public class GitProtocolBenchmark {
     if (server instanceof HibernateRepository hibernateRepository) {
       hibernateStatistics.clear();
       storageMetricsBaseline = hibernateRepository.getStorageOperationMetrics();
+      storageBreakdownBaseline = hibernateRepository.getStorageOperationBreakdown();
     }
   }
 
@@ -211,6 +217,7 @@ public class GitProtocolBenchmark {
     expectedOld = null;
     expectedTip = null;
     storageMetricsBaseline = StorageOperationMetrics.ZERO;
+    storageBreakdownBaseline = StorageOperationBreakdown.ZERO;
     deleteRecursively(serverDirectory);
     serverDirectory = null;
   }
@@ -262,6 +269,16 @@ public class GitProtocolBenchmark {
     }
     StorageOperationMetrics storageDelta =
         hibernateRepository.getStorageOperationMetrics().minus(storageMetricsBaseline);
+    StorageOperationBreakdown breakdownDelta =
+        hibernateRepository.getStorageOperationBreakdown().minus(storageBreakdownBaseline);
+    if (!storageDelta.equals(breakdownDelta.total())) {
+      throw new IllegalStateException(
+          "Storage category counters do not reconcile: aggregate="
+              + storageDelta
+              + ", breakdown="
+              + breakdownDelta);
+    }
+
     counters.hibernateQueries = hibernateStatistics.getQueryExecutionCount();
     counters.preparedStatements = hibernateStatistics.getPrepareStatementCount();
     counters.hibernateTransactions = hibernateStatistics.getTransactionCount();
@@ -272,6 +289,45 @@ public class GitProtocolBenchmark {
     counters.repositoryLocks = storageDelta.repositoryLocksAcquired();
     counters.repositoryLockAcquisitionMicros =
         TimeUnit.NANOSECONDS.toMicros(storageDelta.repositoryLockAcquisitionNanos());
+
+    counters.repositoryInitializationTransactions =
+        transactions(breakdownDelta, StorageOperationKind.REPOSITORY_INITIALIZATION);
+    counters.packMetadataReadTransactions =
+        transactions(breakdownDelta, StorageOperationKind.PACK_METADATA_READ);
+    counters.packFileReadTransactions =
+        transactions(breakdownDelta, StorageOperationKind.PACK_FILE_READ);
+    counters.packExtensionWriteTransactions =
+        transactions(breakdownDelta, StorageOperationKind.PACK_EXTENSION_WRITE);
+    counters.packPublicationTransactions =
+        transactions(breakdownDelta, StorageOperationKind.PACK_PUBLICATION);
+    counters.packRollbackTransactions =
+        transactions(breakdownDelta, StorageOperationKind.PACK_ROLLBACK);
+    counters.packMaintenanceTransactions =
+        transactions(breakdownDelta, StorageOperationKind.PACK_MAINTENANCE);
+    counters.refPublicationTransactions =
+        transactions(breakdownDelta, StorageOperationKind.REF_PUBLICATION);
+    counters.reflogReadTransactions =
+        transactions(breakdownDelta, StorageOperationKind.REFLOG_READ);
+    counters.reflogWriteTransactions =
+        transactions(breakdownDelta, StorageOperationKind.REFLOG_WRITE);
+    counters.otherStorageTransactions = transactions(breakdownDelta, StorageOperationKind.OTHER);
+
+    counters.packExtensionWriteLocks =
+        locks(breakdownDelta, StorageOperationKind.PACK_EXTENSION_WRITE);
+    counters.packPublicationLocks = locks(breakdownDelta, StorageOperationKind.PACK_PUBLICATION);
+    counters.packRollbackLocks = locks(breakdownDelta, StorageOperationKind.PACK_ROLLBACK);
+    counters.packMaintenanceLocks = locks(breakdownDelta, StorageOperationKind.PACK_MAINTENANCE);
+    counters.refPublicationLocks = locks(breakdownDelta, StorageOperationKind.REF_PUBLICATION);
+    counters.otherRepositoryLocks = locks(breakdownDelta, StorageOperationKind.OTHER);
+  }
+
+  private static long transactions(
+      StorageOperationBreakdown breakdown, StorageOperationKind operation) {
+    return breakdown.metrics(operation).transactionsStarted();
+  }
+
+  private static long locks(StorageOperationBreakdown breakdown, StorageOperationKind operation) {
+    return breakdown.metrics(operation).repositoryLocksAcquired();
   }
 
   private void prepareIncrementalPush() throws Exception {
@@ -523,6 +579,23 @@ public class GitProtocolBenchmark {
     public long storageRollbacks;
     public long repositoryLocks;
     public long repositoryLockAcquisitionMicros;
+    public long repositoryInitializationTransactions;
+    public long packMetadataReadTransactions;
+    public long packFileReadTransactions;
+    public long packExtensionWriteTransactions;
+    public long packPublicationTransactions;
+    public long packRollbackTransactions;
+    public long packMaintenanceTransactions;
+    public long refPublicationTransactions;
+    public long reflogReadTransactions;
+    public long reflogWriteTransactions;
+    public long otherStorageTransactions;
+    public long packExtensionWriteLocks;
+    public long packPublicationLocks;
+    public long packRollbackLocks;
+    public long packMaintenanceLocks;
+    public long refPublicationLocks;
+    public long otherRepositoryLocks;
 
     @Setup(Level.Invocation)
     public void reset() {
@@ -535,6 +608,23 @@ public class GitProtocolBenchmark {
       storageRollbacks = 0;
       repositoryLocks = 0;
       repositoryLockAcquisitionMicros = 0;
+      repositoryInitializationTransactions = 0;
+      packMetadataReadTransactions = 0;
+      packFileReadTransactions = 0;
+      packExtensionWriteTransactions = 0;
+      packPublicationTransactions = 0;
+      packRollbackTransactions = 0;
+      packMaintenanceTransactions = 0;
+      refPublicationTransactions = 0;
+      reflogReadTransactions = 0;
+      reflogWriteTransactions = 0;
+      otherStorageTransactions = 0;
+      packExtensionWriteLocks = 0;
+      packPublicationLocks = 0;
+      packRollbackLocks = 0;
+      packMaintenanceLocks = 0;
+      refPublicationLocks = 0;
+      otherRepositoryLocks = 0;
     }
   }
 }

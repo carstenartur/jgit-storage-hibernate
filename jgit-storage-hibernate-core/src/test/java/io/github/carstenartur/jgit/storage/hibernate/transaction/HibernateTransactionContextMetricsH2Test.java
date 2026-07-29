@@ -16,6 +16,7 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import org.hibernate.Session;
@@ -25,44 +26,65 @@ import org.junit.jupiter.api.Test;
 class HibernateTransactionContextMetricsH2Test {
 
   @Test
-  void countsOnlyTopLevelTransactionsAndRollbacks() throws Exception {
+  void attributesOnlyTopLevelTransactionsAndRollbacks() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider(true)) {
       HibernateTransactionContext context =
           new HibernateTransactionContext(provider.getSessionFactory());
 
       context.execute(
+          StorageOperationKind.PACK_PUBLICATION,
           session -> {
-            context.execute(nested -> null);
+            context.execute(StorageOperationKind.REFLOG_WRITE, nested -> null);
             return null;
           });
       assertThrows(
           IOException.class,
           () ->
               context.execute(
+                  StorageOperationKind.PACK_ROLLBACK,
                   session -> {
                     throw new IOException("rollback");
                   }));
 
-      assertEquals(new StorageOperationMetrics(2, 1, 1, 0, 0), context.metricsSnapshot());
+      StorageOperationMetrics aggregate = new StorageOperationMetrics(2, 1, 1, 0, 0);
+      assertEquals(aggregate, context.metricsSnapshot());
+      StorageOperationBreakdown breakdown = context.operationBreakdownSnapshot();
+      assertEquals(aggregate, breakdown.total());
+      assertEquals(
+          new StorageOperationMetrics(1, 1, 0, 0, 0),
+          breakdown.metrics(StorageOperationKind.PACK_PUBLICATION));
+      assertEquals(
+          new StorageOperationMetrics(1, 0, 1, 0, 0),
+          breakdown.metrics(StorageOperationKind.PACK_ROLLBACK));
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          breakdown.metrics(StorageOperationKind.REFLOG_WRITE),
+          "Nested work must inherit the owning top-level category");
     }
   }
 
   @Test
-  void countsRepositoryLockAcquisitionInsideTheOwningTransaction() throws Exception {
+  void attributesRepositoryLockToOwningTransaction() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider(true)) {
       persistLock(provider, "metrics-repo");
       HibernateTransactionContext context =
           new HibernateTransactionContext(provider.getSessionFactory());
       StorageOperationMetrics before = context.metricsSnapshot();
+      StorageOperationBreakdown breakdownBefore = context.operationBreakdownSnapshot();
 
-      context.executeWithRepositoryLock("metrics-repo", session -> null);
+      context.executeWithRepositoryLock(
+          StorageOperationKind.REF_PUBLICATION, "metrics-repo", session -> null);
 
       StorageOperationMetrics delta = context.metricsSnapshot().minus(before);
+      StorageOperationBreakdown breakdown =
+          context.operationBreakdownSnapshot().minus(breakdownBefore);
       assertEquals(1, delta.transactionsStarted());
       assertEquals(1, delta.transactionsCommitted());
       assertEquals(0, delta.transactionsRolledBack());
       assertEquals(1, delta.repositoryLocksAcquired());
       assertTrue(delta.repositoryLockAcquisitionNanos() >= 0);
+      assertEquals(delta, breakdown.total());
+      assertEquals(delta, breakdown.metrics(StorageOperationKind.REF_PUBLICATION));
     }
   }
 
@@ -71,8 +93,9 @@ class HibernateTransactionContextMetricsH2Test {
     try (HibernateSessionFactoryProvider provider = provider(false)) {
       HibernateTransactionContext context =
           new HibernateTransactionContext(provider.getSessionFactory());
-      context.execute(session -> null);
+      context.execute(StorageOperationKind.PACK_PUBLICATION, session -> null);
       assertEquals(StorageOperationMetrics.ZERO, context.metricsSnapshot());
+      assertEquals(StorageOperationBreakdown.ZERO, context.operationBreakdownSnapshot());
     }
   }
 
@@ -81,6 +104,13 @@ class HibernateTransactionContextMetricsH2Test {
     StorageOperationMetrics older = new StorageOperationMetrics(1, 1, 0, 0, 0);
     StorageOperationMetrics newer = new StorageOperationMetrics(2, 2, 0, 0, 0);
     assertThrows(IllegalArgumentException.class, () -> older.minus(newer));
+
+    StorageOperationBreakdown olderBreakdown =
+        new StorageOperationBreakdown(Map.of(StorageOperationKind.OTHER, older));
+    StorageOperationBreakdown newerBreakdown =
+        new StorageOperationBreakdown(Map.of(StorageOperationKind.OTHER, newer));
+    assertThrows(
+        IllegalArgumentException.class, () -> olderBreakdown.minus(newerBreakdown));
   }
 
   private static void persistLock(HibernateSessionFactoryProvider provider, String repositoryName) {

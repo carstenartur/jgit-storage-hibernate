@@ -15,6 +15,8 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.time.Instant;
@@ -86,10 +88,22 @@ public class HibernateRepository extends DfsRepository {
   /**
    * Return monotone transaction and repository-lock metrics for this repository instance.
    *
-   * @return current metrics snapshot, or zero counters when metrics are disabled
+   * @return current aggregate metrics snapshot, or zero counters when metrics are disabled
    */
   public StorageOperationMetrics getStorageOperationMetrics() {
     return transactionContext.metricsSnapshot();
+  }
+
+  /**
+   * Return the immutable per-operation view of the aggregate repository metrics.
+   *
+   * <p>The category total equals {@link #getStorageOperationMetrics()} for the same snapshot. The
+   * breakdown is empty when metrics are disabled.
+   *
+   * @return monotone metrics grouped by stable storage operation kind
+   */
+  public StorageOperationBreakdown getStorageOperationBreakdown() {
+    return transactionContext.operationBreakdownSnapshot();
   }
 
   /** Execute repository storage work in one shared transaction. */
@@ -112,6 +126,7 @@ public class HibernateRepository extends DfsRepository {
   public <T> T inRefTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
     try {
       return transactionContext.executeWithRepositoryLock(
+          StorageOperationKind.REF_PUBLICATION,
           repositoryName,
           session -> {
             objectDatabase.close();
@@ -127,6 +142,7 @@ public class HibernateRepository extends DfsRepository {
   private void ensureRepositoryLockRow() throws IOException {
     try {
       transactionContext.execute(
+          StorageOperationKind.REPOSITORY_INITIALIZATION,
           session -> {
             if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
               GitRepositoryLockEntity lock = new GitRepositoryLockEntity();
@@ -140,6 +156,7 @@ public class HibernateRepository extends DfsRepository {
     } catch (RuntimeException concurrentInsert) {
       try {
         transactionContext.execute(
+            StorageOperationKind.REPOSITORY_INITIALIZATION,
             session -> {
               if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
                 throw concurrentInsert;
