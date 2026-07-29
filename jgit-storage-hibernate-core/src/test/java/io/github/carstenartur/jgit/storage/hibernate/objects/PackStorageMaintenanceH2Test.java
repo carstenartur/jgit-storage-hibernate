@@ -10,7 +10,6 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.PackCleanupResult;
@@ -20,13 +19,15 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
-import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
+import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
+import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class PackStorageMaintenanceH2Test {
   private static final AtomicInteger TEST_COUNTER = new AtomicInteger();
 
   @Test
-  void deletesOnlyExpiredPackGroupsAndAllowsLeasedWriterToContinue() throws Exception {
+  void deletesOnlyExpiredLegacyPackGroupsAndPreservesActiveLease() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository ignored =
             HibernateRepository.create(provider.getSessionFactory(), "maintenance-repo")) {
@@ -44,18 +45,7 @@ class PackStorageMaintenanceH2Test {
       Instant old = now.minusSeconds(172_800);
       Instant cutoff = now.minusSeconds(86_400);
 
-      HibernateObjDatabase.HibernatePackOutputStream activeStream =
-          new HibernateObjDatabase.HibernatePackOutputStream(
-              new HibernateTransactionContext(provider.getSessionFactory()),
-              "maintenance-repo",
-              "active-pack",
-              "pack");
-      byte[] first = bytes(1_200_000, 11);
-      byte[] second = bytes(700_000, 29);
-      activeStream.write(first, 0, first.length);
-      activeStream.flush();
-      agePack(provider, "active-pack", old, now.plusSeconds(3_600));
-
+      persistPack(provider, "active-pack", "pack", old, now.plusSeconds(3_600), false, 11);
       // One expired sibling must not make a partially active multi-extension pack eligible.
       persistPack(provider, "active-pack", "idx", old, now.minusSeconds(1), false, 5);
       persistPack(provider, "expired-pack", "pack", old, now.minusSeconds(1), false, 7);
@@ -74,56 +64,48 @@ class PackStorageMaintenanceH2Test {
       assertEquals(0, countPackRows(provider, "expired-pack"));
       assertEquals(0, countPackRows(provider, "legacy-orphan"));
 
-      activeStream.write(second, 0, second.length);
-      activeStream.close();
-      assertArrayEquals(
-          concatenate(first, second), readChunks(provider, "active-pack", "pack"));
-
       agePack(provider, "active-pack", old, now.minusSeconds(1));
       PackCleanupResult secondCleanup =
           maintenance.deleteExpiredUncommittedPacks(
               new RepositoryName("maintenance-repo"), cutoff, now);
-      assertEquals(2, secondCleanup.packRows());
-      assertTrue(secondCleanup.chunkRows() > 1);
-      assertEquals(first.length + second.length + 5L, secondCleanup.payloadBytes());
+      assertEquals(new PackCleanupResult(2, 2, 16), secondCleanup);
       assertEquals(0, countPackRows(provider, "active-pack"));
       assertEquals(1, countPackRows(provider, "published-pack"));
     }
   }
 
   @Test
-  void reclaimedWriterCannotPersistOrRecreateItsExpiredPack() throws Exception {
+  void maintenanceCannotObserveOrReclaimCurrentJvmStaging() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider();
-        HibernateRepository ignored =
+        HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), "maintenance-repo")) {
       Instant now = Instant.parse("2026-07-28T03:00:00Z");
-      Instant old = now.minusSeconds(172_800);
       Instant cutoff = now.minusSeconds(86_400);
+      HibernateObjDatabase objectDatabase = repository.getObjectDatabase();
+      DfsPackDescription description =
+          new DfsPackDescription(repository.getDescription(), "staged-pack", PackSource.INSERT);
+      byte[] payload = bytes(1_200_000, 41);
 
-      HibernateObjDatabase.HibernatePackOutputStream stalled =
-          new HibernateObjDatabase.HibernatePackOutputStream(
-              new HibernateTransactionContext(provider.getSessionFactory()),
-              "maintenance-repo",
-              "stalled-pack",
-              "pack");
-      byte[] payload = bytes(128, 41);
-      stalled.write(payload, 0, payload.length);
-      stalled.flush();
-      agePack(provider, "stalled-pack", old, now.minusSeconds(1));
+      try (DfsOutputStream stream = objectDatabase.writeFile(description, PackExt.PACK)) {
+        stream.write(payload, 0, payload.length);
+        stream.flush();
+      }
+      assertEquals(0, countPackRows(provider, "staged-pack"));
 
       PackCleanupResult cleanup =
           new PackStorageMaintenance(provider.getSessionFactory())
               .deleteExpiredUncommittedPacks(
                   new RepositoryName("maintenance-repo"), cutoff, now);
-      assertEquals(new PackCleanupResult(1, 0, payload.length), cleanup);
-      assertEquals(0, countPackRows(provider, "stalled-pack"));
+      assertEquals(new PackCleanupResult(0, 0, 0), cleanup);
+      assertEquals(0, countPackRows(provider, "staged-pack"));
 
-      // A resumed process may still append to its local temporary file before touching the DB.
-      // The mandatory ownership check at close must reject persistence and must not recreate rows.
-      stalled.write(payload, 0, payload.length);
-      IOException closeFailure = assertThrows(IOException.class, stalled::close);
-      assertTrue(closeFailure.getMessage().contains("ownership was lost"));
-      assertEquals(0, countPackRows(provider, "stalled-pack"));
+      description.addFileExt(PackExt.PACK);
+      description.setFileSize(PackExt.PACK, payload.length);
+      objectDatabase.commitPackImpl(List.of(description), null);
+
+      assertEquals(1, countPackRows(provider, "staged-pack"));
+      assertArrayEquals(payload, readChunks(provider, "staged-pack", "pack"));
+      assertTrue(isCommitted(provider, "staged-pack"));
     }
   }
 
@@ -196,6 +178,20 @@ class PackStorageMaintenanceH2Test {
     }
   }
 
+  private static boolean isCommitted(
+      HibernateSessionFactoryProvider provider, String packName) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      return session
+          .createQuery(
+              "SELECT p.committed FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                  + "AND p.packName = :name",
+              Boolean.class)
+          .setParameter("repo", "maintenance-repo")
+          .setParameter("name", packName)
+          .getSingleResult();
+    }
+  }
+
   private static byte[] readChunks(
       HibernateSessionFactoryProvider provider, String packName, String extension)
       throws Exception {
@@ -225,13 +221,6 @@ class PackStorageMaintenanceH2Test {
         return output.toByteArray();
       }
     }
-  }
-
-  private static byte[] concatenate(byte[] first, byte[] second) {
-    byte[] result = new byte[first.length + second.length];
-    System.arraycopy(first, 0, result, 0, first.length);
-    System.arraycopy(second, 0, result, first.length, second.length);
-    return result;
   }
 
   private static byte[] bytes(int size, int seed) {
