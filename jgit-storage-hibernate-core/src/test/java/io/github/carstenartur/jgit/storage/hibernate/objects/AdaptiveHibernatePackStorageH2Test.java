@@ -156,7 +156,7 @@ class AdaptiveHibernatePackStorageH2Test {
     try (Session session = provider.getSessionFactory().openSession()) {
       return session
           .createQuery(
-              "SELECT count(c.id) FROM GitPackChunkEntity c, GitPackEntity p "
+              "SELECT count(c) FROM GitPackChunkEntity c, GitPackEntity p "
                   + "WHERE c.packId = p.id AND p.repositoryName = :repo",
               Long.class)
           .setParameter("repo", repositoryName)
