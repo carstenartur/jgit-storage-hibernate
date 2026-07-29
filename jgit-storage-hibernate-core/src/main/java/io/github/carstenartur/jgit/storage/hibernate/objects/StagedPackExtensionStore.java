@@ -214,9 +214,11 @@ final class StagedPackExtensionStore {
     entity.setWriteLeaseUntil(null);
 
     boolean inline = stagedExtension.fileSize() <= HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
+    byte[] inlineData;
     try (FileChannel channel =
         FileChannel.open(stagedExtension.temporaryFile(), StandardOpenOption.READ)) {
-      entity.setData(inline ? readInline(channel, stagedExtension.fileSize()) : null);
+      inlineData = inline ? readInline(channel, stagedExtension.fileSize()) : null;
+      entity.setData(inlineData);
       try {
         session.persist(entity);
         session.flush();
@@ -236,7 +238,8 @@ final class StagedPackExtensionStore {
         stagedExtension.key().extension(),
         entity.getId(),
         stagedExtension.fileSize(),
-        inline);
+        inline,
+        inlineData);
   }
 
   private static boolean isDuplicatePackExtension(Throwable failure) {
@@ -393,7 +396,18 @@ final class StagedPackExtensionStore {
   }
 
   record CommittedExtension(
-      String packName, String extension, Long packId, long fileSize, boolean inline) {}
+      String packName,
+      String extension,
+      Long packId,
+      long fileSize,
+      boolean inline,
+      byte[] inlineData) {
+    CommittedExtension {
+      if (inline != (inlineData != null)) {
+        throw new IllegalArgumentException("inline payload must be present exactly for inline rows");
+      }
+    }
+  }
 
   private record ExtensionKey(String packName, String extension) {
     private String displayName() {

@@ -38,6 +38,7 @@ class CorePostgreSqlSchemaMigrationIntegrationTest {
   void migratesEmptyPostgreSqlDatabaseAndRestartsWithValidation() throws Exception {
     try (TestDatabase database = postgresDatabase("empty")) {
       CoreSchemaMigrationIntegrationTest.verifyEmptyMigrationAndRestart(database);
+      assertIndexes(database);
     }
   }
 
@@ -45,6 +46,13 @@ class CorePostgreSqlSchemaMigrationIntegrationTest {
   void upgradesImmutableLegacyPostgreSqlFixtureWithoutDataLoss() throws Exception {
     try (TestDatabase database = postgresDatabase("upgrade")) {
       CoreSchemaMigrationIntegrationTest.verifyLegacyUpgrade(database);
+      assertIndexes(database);
+    }
+  }
+
+  private static void assertIndexes(TestDatabase database) throws Exception {
+    try (Connection connection = database.openConnection()) {
+      StorageIndexContract.assertPortableOptimizedIndexes(connection);
     }
   }
 

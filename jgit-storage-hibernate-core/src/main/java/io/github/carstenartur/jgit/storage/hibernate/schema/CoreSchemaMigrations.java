@@ -67,7 +67,9 @@ public final class CoreSchemaMigrations {
   public static final String LEGACY_BASELINE_DESCRIPTION =
       "jgit-storage-hibernate-core 0.1.4";
 
-  /** Current physical core schema version after the 0.1.5 schema-history migration. */
+  /**
+   * Schema version produced by legacy adoption before ordinary migrations create later structures.
+   */
   public static final String CURRENT_SCHEMA_VERSION = "0.1.5";
 
   /** Latest version of the pre-library/Sandbox/Taxonomy adoption migration stream. */

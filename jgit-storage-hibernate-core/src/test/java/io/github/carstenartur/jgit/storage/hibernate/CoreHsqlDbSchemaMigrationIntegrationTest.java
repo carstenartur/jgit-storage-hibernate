@@ -29,6 +29,7 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
   void migratesEmptyInMemoryDatabaseAndRestartsWithValidation() throws Exception {
     try (TestDatabase database = inMemoryDatabase("empty")) {
       CoreSchemaMigrationIntegrationTest.verifyEmptyMigrationAndRestart(database);
+      assertIndexes(database);
     }
   }
 
@@ -36,6 +37,7 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
   void upgradesImmutableLegacyInMemoryFixtureWithoutDataLoss() throws Exception {
     try (TestDatabase database = inMemoryDatabase("upgrade")) {
       CoreSchemaMigrationIntegrationTest.verifyLegacyUpgrade(database);
+      assertIndexes(database);
     }
   }
 
@@ -45,6 +47,13 @@ class CoreHsqlDbSchemaMigrationIntegrationTest {
       throws Exception {
     try (TestDatabase database = fileDatabase(directory, "restart")) {
       CoreSchemaMigrationIntegrationTest.verifyEmptyMigrationAndRestart(database);
+      assertIndexes(database);
+    }
+  }
+
+  private static void assertIndexes(TestDatabase database) throws Exception {
+    try (Connection connection = database.openConnection()) {
+      StorageIndexContract.assertPortableOptimizedIndexes(connection);
     }
   }
 

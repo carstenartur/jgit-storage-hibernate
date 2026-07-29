@@ -1,80 +1,95 @@
-# Committed pack metadata catalog
+# Committed pack metadata catalog and local payload handoff
 
 ## Purpose
 
-JGit first asks the object database to list committed packs and later opens individual PACK, IDX or Reftable extensions. The pack-list query already discovers the stable identity and size of every extension. Repeating the same metadata lookup in `openFile()` adds a read transaction, connection checkout and prepared statement for every opened chunked extension.
+JGit first asks the object database to list committed packs and later opens individual PACK, IDX or Reftable extensions. The pack-list query already discovers the stable identity and size of every extension. Repeating that metadata lookup adds a read transaction, connection checkout and prepared statement.
 
-`ReadAheadHibernateObjDatabase` therefore publishes an immutable metadata catalog after each successful `listPacks()` scan. A catalog entry contains only:
+`ReadAheadHibernateObjDatabase` therefore publishes an immutable catalog after each successful `listPacks()` scan. Each entry contains only the logical extension key, `git_packs.id`, persisted size, inline/chunked mode and the local JGit `PackSource` where known. It never retains Hibernate entities, sessions, JDBC connections or payload arrays.
 
-- pack name and extension;
-- the narrow `git_packs.id` value;
-- persisted file size;
-- whether the extension is inline or chunked;
-- the local JGit `PackSource` when the row was created by this repository instance.
+## Chunked reads
 
-It does not retain Hibernate entities, sessions, JDBC connections or payload byte arrays.
+A chunked extension found in the current catalog opens `ReadAheadChunkedReadableChannel` directly. Chunk bytes remain loaded lazily in bounded ordered windows. Opening the channel therefore needs no repeated metadata transaction and does not hold a database connection for the channel lifetime.
 
-## Read behavior
+## Local inline payload handoff
 
-A chunked extension found in the current catalog opens a `ReadAheadChunkedReadableChannel` directly. Chunk bytes remain loaded lazily in bounded ordered windows, so opening the channel requires no metadata transaction.
+Issue #143 attributed every remaining standard-protocol database file read. They were locally published small Reftables plus one locally published inline PACK in incremental fetch. No IDX, chunked, other or missing read dominated the workload.
 
-Inline extensions deliberately keep the existing database fallback. This prevents repository memory from growing with every historical inline PACK, IDX or Reftable payload. A catalog miss also uses the fallback so descriptions not produced by the current scan retain the previous behavior.
+Core therefore retains only bytes that are already available during successful local publication:
 
-## Local publication handoff
+- eligible extensions are inline PACK and Reftable only;
+- IDX and all other extensions always use the authoritative fallback;
+- arrays returned by Hibernate are never inserted;
+- repository reopen and independent instances begin without retained payloads;
+- the database remains the sole durable and cross-instance authority.
 
-JGit's normal post-commit lifecycle is preserved:
+The publication transaction already reads an inline payload from the temporary staging file in order to persist it. Its result returns the generated row ID, persisted size, storage mode and that same byte array. After the transaction commits, Core defensively copies eligible bytes into the local handoff without another file or database read.
 
-1. Core publishes all expected extensions in the repository-locked Hibernate transaction.
-2. `commitPack()` fires JGit's packs-changed event.
-3. Core still calls `clearCache()` so event listeners and JGit observe the normal invalidation boundary.
-4. `DfsInserter`, `DfsPackParser` or Reftable publication subsequently calls `addPack()` or `addReftable()`.
+## Hard memory bound
 
-Without a handoff, step 4 sees JGit's `NO_PACKS` marker and calls the backend `listPacks()` again. This repeated scan was responsible for the two remaining `PACK_METADATA_READ` transactions in each measured push.
+One repository instance may retain at most **512 KiB** across committed generations. The handoff evicts the oldest locally published payloads first. An individual payload must also satisfy the existing 256-KiB inline-storage threshold.
 
-When the pre-commit catalog is complete, the publication transaction now returns the exact generated row ID, persisted file size and storage mode for every newly staged extension. Core merges those rows into the immutable catalog, removes every replaced pack, and exposes the result as a one-shot local pack-list scan. The first JGit scan after `clearCache()` consumes the snapshot through compare-and-set without opening a Hibernate transaction. JGit then continues its native `addPack()` or `addReftable()` logic.
+The bound is deliberately fixed rather than application-configurable. This keeps the memory contract small, predictable and independent of repository history. Metadata catalog memory remains proportional to committed extension count; payload memory never grows beyond the hard limit.
 
-The snapshot is safe whether the first consumer is the normal writer path or a packs-changed event listener. A second consumer sees JGit's already reconstructed atomic pack list rather than reusing the one-shot marker.
+## Authoritative revalidation
 
-## Concurrency, legacy data and rollback
+A retained payload is keyed by its complete immutable committed identity:
 
-A fair repository-instance-local read/write lifecycle lock prevents `listPacks()` from querying the database while the same instance has an uncommitted pack replacement in progress. It does not replace the cross-instance repository row lock used for database writes.
+- pack name;
+- extension;
+- generated database row ID;
+- persisted file size.
 
-Pack replacements remove their old catalog entries before the transaction starts. Successful commit adds the exact new rows and enables one local scan. Failed commit restores the previous complete generation and leaves no local handoff for uncommitted data.
+Every authoritative database catalog scan keeps an entry only when that identity is still present and the row is still inline. Missing rows, replacements, changed IDs, changed sizes and changed storage modes remove the local payload immediately. The scan does not load replacement bytes.
 
-Legacy durable-uncommitted extensions are published through the compatibility `UPDATE` path. That path deliberately does not issue another query merely to obtain handoff metadata. If any extension in the publication lacks exact returned metadata, the resulting catalog is marked incomplete, the one-shot is disabled, and the next JGit scan loads the complete committed view once from the database.
+This also makes independent-instance behavior explicit: another instance may change the database, but the local bytes remain usable only until the owning repository reaches its established DFS refresh boundary and performs an authoritative scan.
 
-If the previous catalog was incomplete, Core likewise does not claim to know the complete pack set. Independent repository instances continue to observe each other's commits at their existing DFS cache refresh boundary; no cross-instance cache-coherence protocol is introduced.
+## Publication, replacement and rollback
 
-## Memory bound
+JGit's native lifecycle is preserved:
 
-Retained state is proportional to committed extension count, not payload size. Each entry contains two string keys, one `Long`, one `long`, one boolean and one enum reference plus immutable-map overhead. Inline and chunk payload arrays are not retained by the catalog.
+1. all expected extensions are published in the repository-locked Hibernate transaction;
+2. Core merges exact committed metadata into the immutable catalog;
+3. eligible local bytes enter the bounded handoff;
+4. `clearCache()` and the packs-changed event still form JGit's normal invalidation boundary;
+5. `DfsInserter`, `DfsPackParser` or Reftable publication continues through `addPack()` or `addReftable()`.
+
+When the previous catalog is complete, the first post-publication `listPacks()` consumes a one-shot local snapshot without a database transaction. A later authoritative scan revalidates retained payload identities.
+
+Replacement removes old catalog entries before the transaction starts, but removes their payload identities only after publication commits. Failed publication restores the previous complete generation and leaves its valid local payloads intact. Successful replacement cannot serve old bytes because the deleted row ID no longer matches.
+
+Legacy durable-uncommitted publication continues through its compatibility `UPDATE` path. It does not synthesize payload state or issue an additional metadata query. Incomplete metadata disables the one-shot and forces one authoritative refresh scan.
+
+## Database indexes
+
+The same performance review found no missing pack-read index. Existing keys already cover the hot paths:
+
+- unique `(repository_name, pack_name, pack_extension)` covers point and pack-name lookups;
+- `(repository_name, committed)` covers committed catalog scans;
+- `(repository_name, committed, write_lease_until)` covers lease cleanup;
+- chunk identity `(pack_id, chunk_index)` covers chunk range/order reads.
+
+Flyway migration 0.1.17 removes redundant secondary indexes that duplicate those leading keys. It also replaces two reflog append indexes with one newest-first access path:
+
+- H2, HSQLDB and PostgreSQL: `(repository_name, ref_name, id DESC)`;
+- SQL Server: `(repository_name, id DESC) INCLUDE (ref_name)`, because `nvarchar(1024)` cannot be a portable SQL Server key column.
+
+This lowers index maintenance on pack extensions, chunks and reflog appends while preserving the measured read paths.
+
+## Why not in-memory database tables
+
+Git objects, refs, reflogs and repository locks remain in durable ordinary tables. Database-specific memory-only, unlogged or memory-optimized tables would weaken restart recovery, complicate multi-instance correctness and fragment the supported H2, HSQLDB, PostgreSQL and SQL Server contract. The local handoff is safe precisely because it contains only reproducible bytes from already committed rows and is never authoritative.
 
 ## Verification
 
 Core tests prove that:
 
-- one database pack-list query builds a complete immutable catalog;
-- opening a catalogued chunked extension performs no repeated metadata query or `PACK_FILE_READ` transaction;
-- chunk data still uses the existing bounded read-ahead query;
-- inline payloads retain the database fallback;
-- direct successful publication exposes and consumes a zero-query local handoff;
-- `ObjectInserter.flush()` reaches JGit's `addPack()` without a `PACK_METADATA_READ` transaction;
-- replacement removes old catalog entries before the handoff;
-- legacy publication disables the handoff and performs exactly one authoritative refresh scan;
-- failed publication restores the prior complete generation;
-- H2, HSQLDB, PostgreSQL, SQL Server and every supported JGit line retain normal repository behavior.
+- catalogued chunked extensions avoid repeated metadata reads;
+- locally published inline PACK and Reftable payloads open repeatedly without `PACK_FILE_READ` transactions while retained;
+- an exact authoritative scan preserves matching local bytes;
+- historical database-loaded payloads and IDX bytes are never retained;
+- total retained bytes never exceed 512 KiB and oldest entries are evicted first;
+- replacement cannot serve a removed row's bytes and rollback preserves the prior generation;
+- fresh, legacy and adopted schemas contain the intended index set on all four databases;
+- every supported JGit line retains normal push, clone, fetch, restart and publication behavior.
 
-## Measured PostgreSQL effect
-
-Counters are per protocol invocation, comparing this handoff with the merged catalog implementation from PR #141.
-
-| Workload | Prepared statements | Connections | Storage transactions | `PACK_METADATA_READ` | `PACK_FILE_READ` | Publication transactions | Repository locks |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Initial push | 13 → 11 | 6 → 4 | 6 → 4 | 2 → 0 | 2 → 2 | 2 → 2 | 2 → 2 |
-| Incremental push | 13 → 11 | 7 → 5 | 6 → 4 | 2 → 0 | 2 → 2 | 2 → 2 | 2 → 2 |
-| Initial clone | 2 → 2 | 2 → 2 | 1 → 1 | 0 → 0 | 1 → 1 | 0 → 0 | 0 → 0 |
-| Incremental fetch | 3 → 3 | 3 → 3 | 2 → 2 | 0 → 0 | 2 → 2 | 0 → 0 | 0 → 0 |
-
-The focused twelve-MiB publication also loses its single post-commit metadata scan: batching-disabled statements/prepared statements decrease from 17/17 to 16/16, while portable batching decreases from 4/6 to 3/5. Chunk inserts, pack inserts, batch executions, flushes and publication locks remain unchanged.
-
-Elapsed JMH values moved in both directions but remained far inside the reported uncertainty ranges. The supported performance claim is therefore the deterministic removal of the metadata transactions and statements, not a latency percentage.
+The standard JMH benchmark reconciles attributed successful fallback reads with `PACK_FILE_READ` transactions. The final pull-request measurements are the source of truth for deterministic statement, connection and transaction reductions; latency percentages are claimed only when they exceed reported JMH uncertainty.

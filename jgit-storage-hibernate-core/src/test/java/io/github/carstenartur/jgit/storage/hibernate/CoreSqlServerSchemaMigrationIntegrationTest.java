@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,7 +61,7 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
 
     flyway.migrate();
 
-    assertEquals("0.1.14.2", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.1.17", flyway.info().current().getVersion().getVersion());
     try (Connection connection =
         DriverManager.getConnection(
             SQL_SERVER.getJdbcUrl(), SQL_SERVER.getUsername(), SQL_SERVER.getPassword())) {
@@ -68,6 +69,12 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
       assertTrue(tableExists(connection, "git_reflog"));
       assertTrue(tableExists(connection, "git_pack_chunks"));
       assertTrue(tableExists(connection, "git_repository_lock"));
+      assertTrue(indexExists(connection, "git_reflog", "idx_reflog_repo_id"));
+      assertFalse(indexExists(connection, "git_packs", "idx_pack_repo"));
+      assertFalse(indexExists(connection, "git_packs", "idx_pack_repo_name"));
+      assertFalse(indexExists(connection, "git_pack_chunks", "idx_pack_chunk_pack"));
+      assertFalse(indexExists(connection, "git_reflog", "idx_reflog_repo"));
+      assertFalse(indexExists(connection, "git_reflog", "idx_reflog_repo_ref"));
     }
 
     Properties properties = hibernateProperties("validate");
@@ -130,6 +137,20 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
         metadata.getTables(null, connection.getSchema(), "%", new String[] {"TABLE"})) {
       while (resultSet.next()) {
         if (tableName.equalsIgnoreCase(resultSet.getString("TABLE_NAME"))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static boolean indexExists(Connection connection, String tableName, String indexName)
+      throws Exception {
+    DatabaseMetaData metadata = connection.getMetaData();
+    try (ResultSet resultSet =
+        metadata.getIndexInfo(null, connection.getSchema(), tableName, false, false)) {
+      while (resultSet.next()) {
+        if (indexName.equalsIgnoreCase(resultSet.getString("INDEX_NAME"))) {
           return true;
         }
       }
