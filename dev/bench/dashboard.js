@@ -9,8 +9,19 @@
     ['JGit + PostgreSQL', '#d62728'],
     ['JGit + PostgreSQL + HikariCP', '#2ca02c'],
   ]);
+  const backendLineStyles = new Map([
+    ['JGit + filesystem', { borderDash: [], pointStyle: 'circle' }],
+    ['JGit + HSQLDB (in-memory)', { borderDash: [2, 3], pointStyle: 'rectRot' }],
+    ['JGit + PostgreSQL', { borderDash: [10, 5], pointStyle: 'triangle' }],
+    ['JGit + PostgreSQL + HikariCP', { borderDash: [10, 4, 2, 4], pointStyle: 'rect' }],
+  ]);
   const fallbackColors = [
     '#17becf', '#ff7f0e', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22'
+  ];
+  const fallbackLineStyles = [
+    { borderDash: [6, 3], pointStyle: 'cross' },
+    { borderDash: [2, 2], pointStyle: 'star' },
+    { borderDash: [12, 4, 2, 4], pointStyle: 'crossRot' },
   ];
 
   function splitBenchmarkName(name) {
@@ -50,6 +61,11 @@
     return backendColors.get(backend) || fallbackColors[index % fallbackColors.length];
   }
 
+  function lineStyleForBackend(backend, index) {
+    return backendLineStyles.get(backend)
+      || fallbackLineStyles[index % fallbackLineStyles.length];
+  }
+
   function commitAxis(backends) {
     const commits = new Map();
     for (const points of backends.values()) {
@@ -61,6 +77,94 @@
       }
     }
     return [...commits.values()].sort((left, right) => left.date - right.date);
+  }
+
+  function latestPoint(points) {
+    return points.reduce(
+      (latest, point) => latest === null || point.date > latest.date ? point : latest,
+      null
+    );
+  }
+
+  function formatValue(value) {
+    return Number(value).toLocaleString(undefined, { maximumSignificantDigits: 6 });
+  }
+
+  function relativeRatio(point, bestValue) {
+    if (bestValue === 0) {
+      return point.bench.value === 0 ? 1 : Number.POSITIVE_INFINITY;
+    }
+    return point.tool === 'customBiggerIsBetter'
+      ? bestValue / point.bench.value
+      : point.bench.value / bestValue;
+  }
+
+  function renderLatestValues(card, backends) {
+    const latest = [...backends.entries()]
+      .map(([backend, points]) => ({ backend, point: latestPoint(points) }))
+      .filter(item => item.point !== null);
+    if (latest.length === 0) {
+      return;
+    }
+
+    const smallerIsBetter = latest[0].point.tool !== 'customBiggerIsBetter';
+    const values = latest.map(item => Number(item.point.bench.value));
+    const bestValue = smallerIsBetter ? Math.min(...values) : Math.max(...values);
+
+    const note = document.createElement('p');
+    note.className = 'chart-note';
+    note.textContent = 'Near-identical measurements can overlap. Distinct line patterns and markers, the grouped tooltip, and the latest-value table keep every backend visible.';
+    card.appendChild(note);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'latest-values-wrapper';
+    card.appendChild(wrapper);
+
+    const table = document.createElement('table');
+    table.className = 'latest-values';
+    wrapper.appendChild(table);
+
+    const head = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    for (const label of ['Backend', 'Latest result', 'vs best', 'Commit']) {
+      const cell = document.createElement('th');
+      cell.scope = 'col';
+      cell.textContent = label;
+      headRow.appendChild(cell);
+    }
+    head.appendChild(headRow);
+    table.appendChild(head);
+
+    const body = document.createElement('tbody');
+    for (const { backend, point } of latest) {
+      const row = document.createElement('tr');
+
+      const backendCell = document.createElement('th');
+      backendCell.scope = 'row';
+      backendCell.textContent = backend;
+      row.appendChild(backendCell);
+
+      const valueCell = document.createElement('td');
+      valueCell.textContent = formatValue(point.bench.value) + ' ' + point.bench.unit;
+      row.appendChild(valueCell);
+
+      const ratioCell = document.createElement('td');
+      const ratio = relativeRatio(point, bestValue);
+      ratioCell.textContent = Number.isFinite(ratio) ? ratio.toFixed(2) + '×' : '∞';
+      row.appendChild(ratioCell);
+
+      const commitCell = document.createElement('td');
+      const commitLink = document.createElement('a');
+      commitLink.href = point.commit.url;
+      commitLink.target = '_blank';
+      commitLink.rel = 'noopener';
+      commitLink.textContent = point.commit.id.slice(0, 7);
+      commitCell.appendChild(commitLink);
+      row.appendChild(commitCell);
+
+      body.appendChild(row);
+    }
+    table.appendChild(body);
   }
 
   function renderOperation(parent, operation, backends) {
@@ -85,6 +189,7 @@
     const datasets = [...backends.entries()].map(([backend, points], index) => {
       const byCommit = new Map(points.map(point => [point.commit.id, point]));
       const color = colorForBackend(backend, index);
+      const lineStyle = lineStyleForBackend(backend, index);
       return {
         label: backend,
         data: commitIds.map(commitId => {
@@ -94,6 +199,13 @@
         pointMeta: commitIds.map(commitId => byCommit.get(commitId) || null),
         borderColor: color,
         backgroundColor: color,
+        borderDash: lineStyle.borderDash,
+        borderDashOffset: index * 1.5,
+        borderWidth: 2.5,
+        pointStyle: lineStyle.pointStyle,
+        pointRadius: 3.5,
+        pointHoverRadius: 6,
+        pointBorderWidth: 1.5,
         fill: false,
         lineTension: 0.1,
         spanGaps: true,
@@ -111,6 +223,11 @@
         legend: {
           display: true,
           position: 'bottom',
+          labels: { usePointStyle: true },
+        },
+        hover: {
+          mode: 'index',
+          intersect: false,
         },
         scales: {
           xAxes: [{
@@ -123,7 +240,7 @@
           }],
         },
         tooltips: {
-          mode: 'nearest',
+          mode: 'index',
           intersect: false,
           callbacks: {
             afterTitle: (items, data) => {
@@ -170,6 +287,7 @@
       },
     });
     charts.push(chart);
+    renderLatestValues(card, backends);
   }
 
   function renderSuite(main, suiteName, entries) {
