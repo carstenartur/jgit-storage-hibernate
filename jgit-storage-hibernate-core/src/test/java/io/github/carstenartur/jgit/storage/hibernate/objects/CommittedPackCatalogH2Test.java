@@ -180,6 +180,39 @@ class CommittedPackCatalogH2Test {
   }
 
   @Test
+  void legacyPublicationDisablesHandoffAndUsesOneAuthoritativeScan() throws Exception {
+    String repositoryName = "catalog-legacy";
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      int bootstrapExtensions = catalogSizeAfterScan(database);
+      DfsPackDescription legacy = database.newPack(PackSource.RECEIVE);
+      byte[] legacyData = new byte[] {7, 5, 3, 1};
+      persistLegacyUncommittedExtension(
+          provider, repositoryName, baseName(legacy), PackExt.PACK.getExtension(), legacyData);
+      legacy.addFileExt(PackExt.PACK);
+      legacy.setFileSize(PackExt.PACK, legacyData.length);
+
+      database.commitPackImpl(List.of(legacy), null);
+
+      assertFalse(
+          database.localPackListScanAvailable(),
+          "Legacy publication has no exact returned row metadata and must not claim completeness");
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
+      List<DfsPackDescription> refreshed = database.listPacks();
+      assertEquals(1L, statistics.getQueryExecutionCount());
+      assertEquals(bootstrapExtensions + 1, database.committedExtensionCatalogSize());
+      DfsPackDescription committed = description(refreshed, baseName(legacy));
+      try (ReadableChannel channel = database.openFile(committed, PackExt.PACK)) {
+        assertArrayEquals(legacyData, readFully(channel));
+      }
+    }
+  }
+
+  @Test
   void replacementPrunesOldCatalogBeforeLocalHandoff() throws Exception {
     String repositoryName = "catalog-replacement";
     try (HibernateSessionFactoryProvider provider = provider();
@@ -265,7 +298,7 @@ class CommittedPackCatalogH2Test {
     try (Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
       GitPackEntity pack =
-          persistPackEntity(session, repositoryName, packName, "pack", null, packData.length);
+          persistPackEntity(session, repositoryName, packName, "pack", null, packData.length, true);
       session.flush();
 
       GitPackChunkEntity chunk = new GitPackChunkEntity();
@@ -276,7 +309,13 @@ class CommittedPackCatalogH2Test {
       session.persist(chunk);
 
       persistPackEntity(
-          session, repositoryName, packName, PackExt.INDEX.getExtension(), indexData, indexData.length);
+          session,
+          repositoryName,
+          packName,
+          PackExt.INDEX.getExtension(),
+          indexData,
+          indexData.length,
+          true);
       transaction.commit();
     }
     return new PersistedPack(packName, packData, indexData);
@@ -290,7 +329,20 @@ class CommittedPackCatalogH2Test {
       byte[] data) {
     try (Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
-      persistPackEntity(session, repositoryName, packName, extension, data, data.length);
+      persistPackEntity(session, repositoryName, packName, extension, data, data.length, true);
+      transaction.commit();
+    }
+  }
+
+  private static void persistLegacyUncommittedExtension(
+      HibernateSessionFactoryProvider provider,
+      String repositoryName,
+      String packName,
+      String extension,
+      byte[] data) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      Transaction transaction = session.beginTransaction();
+      persistPackEntity(session, repositoryName, packName, extension, data, data.length, false);
       transaction.commit();
     }
   }
@@ -301,16 +353,19 @@ class CommittedPackCatalogH2Test {
       String packName,
       String extension,
       byte[] data,
-      long fileSize) {
+      long fileSize,
+      boolean committed) {
     GitPackEntity entity = new GitPackEntity();
     entity.setRepositoryName(repositoryName);
     entity.setPackName(packName);
     entity.setPackExtension(extension);
     entity.setData(data);
     entity.setFileSize(fileSize);
-    entity.setCommitted(true);
+    entity.setCommitted(committed);
     entity.setCreatedAt(Instant.now());
-    entity.setCommittedAt(Instant.now());
+    entity.setCommittedAt(committed ? Instant.now() : null);
+    entity.setWriteToken(committed ? null : UUID.randomUUID().toString());
+    entity.setWriteLeaseUntil(null);
     session.persist(entity);
     return entity;
   }
