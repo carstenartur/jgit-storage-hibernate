@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommitResult;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
+import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.LocalInlinePayload;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
 import java.io.FileNotFoundException;
@@ -59,17 +60,15 @@ import org.hibernate.SessionFactory;
  * started before a successful pack mutation cannot overwrite the subsequent invalidation or return a
  * stale list after that mutation. A fair repository-instance-local read/write lock prevents scans
  * from reading the database while this instance has an uncommitted pack replacement in progress.
- * Chunked files can then open without repeating the metadata query. Inline payload bytes are
- * deliberately not retained in the catalog; they continue to use the bounded database fallback so
- * repository memory does not grow with the number of historical packs.
+ * Chunked files can then open without repeating the metadata query. Historical inline payload bytes
+ * are deliberately not retained in the catalog.
  *
  * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
- * the previous catalog and the returned publication metadata are both complete, the exact committed
- * row metadata is merged into a one-shot local scan result before the cache is cleared. JGit's
- * resulting scan consumes that snapshot without a database transaction, then continues with its
- * native {@code addPack()} or {@code addReftable()} update. An incomplete catalog or a legacy
- * publication without exact row metadata never claims authority and falls back to a full database
- * scan.
+ * the previous catalog and the returned publication metadata are both complete, exact committed row
+ * metadata is merged into a one-shot local scan result before the cache is cleared. Newly staged
+ * inline PACK and Reftable payloads may additionally be retained within the hard per-publication
+ * budget and are atomically removed at their first matching open. An incomplete catalog, legacy
+ * publication or authoritative database scan contains no local payload state.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -96,14 +95,6 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.packFileReadCounters = PackFileReadCounters.from(sessionFactory);
   }
 
-  /**
-   * Reconstruct stored pack descriptions with the persisted size of every extension.
-   *
-   * <p>Ordinary object reads can discover an unknown size lazily from the readable channel. JGit's
-   * upload-pack copy-as-is path needs the extension sizes on {@link DfsPackDescription} before it
-   * copies compressed object representations. Omitting them can produce a malformed outgoing pack
-   * even though direct object reads remain successful.
-   */
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
     Lock readLock = catalogLifecycleLock.readLock();
@@ -126,12 +117,8 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
           return loaded.descriptions();
         }
         if (committedExtensionCatalog.get().generation() == observedCatalog.generation()) {
-          // Another scan published the same committed generation first. Both query results describe
-          // the same mutation-free generation, so this result is equally valid for JGit's pack list.
           return loaded.descriptions();
         }
-        // A pack mutation crossed this scan. Re-read so neither the optimization catalog nor JGit's
-        // pack-list cache can be populated from the older committed generation.
       }
     } finally {
       readLock.unlock();
@@ -160,7 +147,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
             boolean inline = ((Number) row[4]).intValue() != 0;
             extensions.put(
                 new ExtensionKey(packName, extension),
-                new ExtensionSnapshot(packId, fileSize, inline, PackSource.INSERT));
+                new ExtensionSnapshot(packId, fileSize, inline, PackSource.INSERT, null));
           }
           Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
           return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
@@ -199,7 +186,28 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       return new ReadAheadChunkedReadableChannel(
           sessionFactory, snapshot.packId(), snapshot.fileSize());
     }
+    LocalInlinePayload localInlinePayload = consumeLocalInlinePayload(key);
+    if (localInlinePayload != null) {
+      return new InlineReadableChannel(localInlinePayload.transfer());
+    }
     return openFileFromDatabase(description, extension);
+  }
+
+  private LocalInlinePayload consumeLocalInlinePayload(ExtensionKey key) {
+    while (true) {
+      CatalogState current = committedExtensionCatalog.get();
+      ExtensionSnapshot snapshot = current.extensions().get(key);
+      if (snapshot == null || snapshot.localInlinePayload() == null) {
+        return null;
+      }
+      LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions =
+          new LinkedHashMap<>(current.extensions());
+      extensions.put(key, snapshot.withoutLocalInlinePayload());
+      CatalogState consumed = current.withExtensions(extensions);
+      if (committedExtensionCatalog.compareAndSet(current, consumed)) {
+        return snapshot.localInlinePayload();
+      }
+    }
   }
 
   private ReadableChannel openFileFromDatabase(
@@ -257,9 +265,6 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       try {
         commitResult = stagedExtensions.commit(descriptions, replaces);
       } catch (IOException | RuntimeException publicationFailure) {
-        // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit
-        // paths such as Reftable publication may propagate commitPack failure directly. Clean local
-        // staging here as well; rollback() is idempotent and retains the legacy database fallback.
         stagedExtensions.rollback(descriptions);
         restoreCatalogAfterFailedMutation(previousCatalog);
         throw publicationFailure;
@@ -288,11 +293,14 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return committedExtensionCatalog.get().localScanAvailable();
   }
 
-  /**
-   * Return monotone database fallback read attribution for this repository instance.
-   *
-   * @return current counters, or {@link PackFileReadMetrics#ZERO} when metrics are disabled
-   */
+  int localInlinePayloadBytes() {
+    return committedExtensionCatalog.get().extensions().values().stream()
+        .map(ExtensionSnapshot::localInlinePayload)
+        .filter(payload -> payload != null)
+        .mapToInt(LocalInlinePayload::size)
+        .sum();
+  }
+
   public PackFileReadMetrics packFileReadMetricsSnapshot() {
     return packFileReadCounters.snapshot();
   }
@@ -320,10 +328,16 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
               new LinkedHashMap<>(current.extensions());
           for (CommittedExtension committed : commitResult.committedExtensions()) {
             PackSource source = packSources.getOrDefault(committed.packName(), PackSource.INSERT);
+            LocalInlinePayload localInlinePayload =
+                commitResult.completeMetadata() ? committed.localInlinePayload() : null;
             extensions.put(
                 new ExtensionKey(committed.packName(), committed.extension()),
                 new ExtensionSnapshot(
-                    committed.packId(), committed.fileSize(), committed.inline(), source));
+                    committed.packId(),
+                    committed.fileSize(),
+                    committed.inline(),
+                    source,
+                    localInlinePayload));
           }
           return current.completeMutation(extensions, commitResult.completeMetadata());
         });
@@ -343,7 +357,17 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private record ExtensionKey(String packName, String extension) {}
 
   private record ExtensionSnapshot(
-      Long packId, long fileSize, boolean inline, PackSource packSource) {}
+      Long packId,
+      long fileSize,
+      boolean inline,
+      PackSource packSource,
+      LocalInlinePayload localInlinePayload) {
+    private ExtensionSnapshot withoutLocalInlinePayload() {
+      return localInlinePayload == null
+          ? this
+          : new ExtensionSnapshot(packId, fileSize, inline, packSource, null);
+    }
+  }
 
   private record CatalogState(
       long generation,
@@ -367,7 +391,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       LinkedHashMap<ExtensionKey, ExtensionSnapshot> retained = new LinkedHashMap<>();
       for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry : extensions.entrySet()) {
         if (!replacedPackNames.contains(entry.getKey().packName())) {
-          retained.put(entry.getKey(), entry.getValue());
+          retained.put(entry.getKey(), entry.getValue().withoutLocalInlinePayload());
         }
       }
       return new CatalogState(generation + 1, complete, false, retained);
@@ -382,6 +406,10 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
     private CatalogState withGeneration(long newGeneration) {
       return new CatalogState(newGeneration, complete, localScanAvailable, extensions);
+    }
+
+    private CatalogState withExtensions(Map<ExtensionKey, ExtensionSnapshot> newExtensions) {
+      return new CatalogState(generation, complete, localScanAvailable, newExtensions);
     }
   }
 
