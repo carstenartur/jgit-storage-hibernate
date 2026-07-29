@@ -221,13 +221,18 @@ public final class HibernateTransactionContext {
     }
     if (className.endsWith("HibernateObjDatabase")
         || className.endsWith("ReadAheadHibernateObjDatabase")) {
-      return switch (method) {
-        case "listPacks" -> StorageOperationKind.PACK_METADATA_READ;
-        case "openFile" -> StorageOperationKind.PACK_FILE_READ;
-        case "commitPackImpl" -> StorageOperationKind.PACK_PUBLICATION;
-        case "rollbackPack" -> StorageOperationKind.PACK_ROLLBACK;
-        default -> null;
-      };
+      if (method.contains("listPacks")) {
+        return StorageOperationKind.PACK_METADATA_READ;
+      }
+      if (method.contains("openFile")) {
+        return StorageOperationKind.PACK_FILE_READ;
+      }
+      if (method.contains("commitPackImpl")) {
+        return StorageOperationKind.PACK_PUBLICATION;
+      }
+      if (method.contains("rollbackPack")) {
+        return StorageOperationKind.PACK_ROLLBACK;
+      }
     }
     if (className.endsWith("PackStorageMaintenance")) {
       return StorageOperationKind.PACK_MAINTENANCE;
