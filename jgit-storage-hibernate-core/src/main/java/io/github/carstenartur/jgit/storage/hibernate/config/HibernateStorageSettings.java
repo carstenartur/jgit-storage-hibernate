@@ -21,10 +21,10 @@ public final class HibernateStorageSettings {
   public static final String ORDER_UPDATES = "hibernate.order_updates";
 
   /**
-   * Conservative default that batches chunk rows while bounding one persistence-context window to
-   * roughly 16 MiB of payload data.
+   * Conservative default aligned with the pack writer's bounded eight-chunk persistence window.
+   * With one MiB chunks, one pending ORM batch retains at most roughly eight MiB of payload data.
    */
-  public static final int DEFAULT_JDBC_BATCH_SIZE = 16;
+  public static final int DEFAULT_JDBC_BATCH_SIZE = 8;
 
   private HibernateStorageSettings() {}
 }
