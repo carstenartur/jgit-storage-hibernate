@@ -17,24 +17,11 @@ public final class HibernateStorageSettings {
   /** Hibernate's insert-ordering setting. */
   public static final String ORDER_INSERTS = "hibernate.order_inserts";
 
-  /** Maximum bytes retained by each repository instance's inline payload cache. */
-  public static final String INLINE_PAYLOAD_CACHE_MAX_BYTES =
-      "jgit.storage.hibernate.inline_payload_cache.max_bytes";
-
   /**
    * Conservative default aligned with the pack writer's bounded eight-chunk persistence window.
    * With one MiB chunks, one pending ORM batch retains at most roughly eight MiB of payload data.
    */
   public static final int DEFAULT_JDBC_BATCH_SIZE = 8;
-
-  /**
-   * Default memory bound for recently used inline PACK, INDEX, Reftable and auxiliary payloads.
-   *
-   * <p>The cache is repository-instance-local, stores only already committed rows and is keyed by
-   * immutable database row identity. Setting {@link #INLINE_PAYLOAD_CACHE_MAX_BYTES} to {@code 0}
-   * disables it.
-   */
-  public static final long DEFAULT_INLINE_PAYLOAD_CACHE_MAX_BYTES = 8L * 1024 * 1024;
 
   private HibernateStorageSettings() {}
 }
