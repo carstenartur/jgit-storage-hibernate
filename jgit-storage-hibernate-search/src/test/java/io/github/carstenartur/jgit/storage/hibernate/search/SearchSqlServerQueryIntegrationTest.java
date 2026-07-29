@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
+import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistoryQuery;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitIndexer;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
@@ -20,6 +21,7 @@ import io.github.carstenartur.jgit.storage.hibernate.search.schema.SearchSchemaM
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Properties;
 import java.util.TimeZone;
 import org.eclipse.jgit.lib.CommitBuilder;
@@ -107,8 +109,9 @@ class SearchSqlServerQueryIntegrationTest {
                   Instant.parse("2026-01-03T00:00:00Z"))
               .limit(10)
               .build();
-      assertEquals(1, search.findChanges(compound).size());
-      assertEquals(second.name(), search.findChanges(compound).getFirst().objectId());
+      List<GitCommitIndex> matches = search.findChanges(compound);
+      assertEquals(1, matches.size());
+      assertEquals(second.name(), matches.getFirst().getObjectId());
     }
   }
 
