@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 class LocalInlinePayloadHandoffH2Test {
 
   @Test
-  void handsOffPackAndReftableOnceThenFallsBack() throws Exception {
+  void reusesPackAndReftableWhileTheyRemainWithinBudget() throws Exception {
     try (Fixture fixture = fixture("inline-handoff")) {
       byte[] pack = deterministicBytes(257, 11);
       byte[] reftable = deterministicBytes(193, 13);
@@ -45,16 +45,20 @@ class LocalInlinePayloadHandoffH2Test {
       write(fixture.database, description, PackExt.REFTABLE, reftable);
 
       fixture.database.commitPackImpl(List.of(description), null);
-      assertEquals(pack.length + reftable.length, fixture.database.localInlinePayloadBytes());
+      int retainedBytes = pack.length + reftable.length;
+      assertEquals(retainedBytes, fixture.database.localInlinePayloadBytes());
 
       Statistics statistics = fixture.provider.getSessionFactory().getStatistics();
       statistics.clear();
       StorageOperationBreakdown before = fixture.repository.getStorageOperationBreakdown();
       PackFileReadMetrics readBefore = fixture.repository.getPackFileReadMetrics();
 
-      assertArrayEquals(pack, open(fixture.database, description, PackExt.PACK));
-      assertArrayEquals(reftable, open(fixture.database, description, PackExt.REFTABLE));
-      assertEquals(0, fixture.database.localInlinePayloadBytes());
+      for (int repetition = 0; repetition < 2; repetition++) {
+        assertArrayEquals(pack, open(fixture.database, description, PackExt.PACK));
+        assertArrayEquals(reftable, open(fixture.database, description, PackExt.REFTABLE));
+      }
+
+      assertEquals(retainedBytes, fixture.database.localInlinePayloadBytes());
       assertEquals(0, statistics.getQueryExecutionCount());
       assertEquals(
           StorageOperationMetrics.ZERO,
@@ -64,13 +68,6 @@ class LocalInlinePayloadHandoffH2Test {
               .metrics(StorageOperationKind.PACK_FILE_READ));
       assertEquals(
           PackFileReadMetrics.ZERO,
-          fixture.repository.getPackFileReadMetrics().minus(readBefore));
-
-      assertArrayEquals(pack, open(fixture.database, description, PackExt.PACK));
-      assertArrayEquals(reftable, open(fixture.database, description, PackExt.REFTABLE));
-      assertEquals(2, statistics.getQueryExecutionCount());
-      assertEquals(
-          new PackFileReadMetrics(1, 0, 0, 0, 1, 0, 0, 0, 0),
           fixture.repository.getPackFileReadMetrics().minus(readBefore));
     }
   }
@@ -140,8 +137,10 @@ class LocalInlinePayloadHandoffH2Test {
 
       assertEquals(pack.length + reftable.length, fixture.database.localInlinePayloadBytes());
       PackFileReadMetrics before = fixture.repository.getPackFileReadMetrics();
-      assertArrayEquals(pack, open(fixture.database, packDescription, PackExt.PACK));
-      assertArrayEquals(reftable, open(fixture.database, refDescription, PackExt.REFTABLE));
+      for (int repetition = 0; repetition < 2; repetition++) {
+        assertArrayEquals(pack, open(fixture.database, packDescription, PackExt.PACK));
+        assertArrayEquals(reftable, open(fixture.database, refDescription, PackExt.REFTABLE));
+      }
       assertEquals(
           PackFileReadMetrics.ZERO,
           fixture.repository.getPackFileReadMetrics().minus(before));
@@ -177,7 +176,7 @@ class LocalInlinePayloadHandoffH2Test {
   }
 
   @Test
-  void authoritativeCatalogScanDropsUnconsumedPayloads() throws Exception {
+  void authoritativeCatalogScanDropsRetainedPayloads() throws Exception {
     try (Fixture fixture = fixture("inline-authoritative-scan")) {
       DfsPackDescription description = fixture.database.newPack(PackSource.INSERT);
       byte[] payload = deterministicBytes(89, 41);
