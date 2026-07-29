@@ -25,7 +25,8 @@ import org.hibernate.annotations.Nationalized;
     name = "git_reflog",
     indexes = {
       @Index(name = "idx_reflog_repo", columnList = "repository_name"),
-      @Index(name = "idx_reflog_repo_ref", columnList = "repository_name, ref_name")
+      @Index(name = "idx_reflog_repo_ref", columnList = "repository_name, ref_name"),
+      @Index(name = "idx_reflog_repo_id", columnList = "repository_name, id")
     })
 public class GitReflogEntity {
 
