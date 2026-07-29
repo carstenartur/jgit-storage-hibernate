@@ -42,6 +42,7 @@ class StagedPackExtensionStoreH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), "atomic-publication")) {
       repository.create(true);
+      long baselineRows = rowCount(provider, "atomic-publication");
       ReadAheadHibernateObjDatabase database =
           (ReadAheadHibernateObjDatabase) repository.getObjectDatabase();
       DfsPackDescription description = database.newPack(PackSource.RECEIVE);
@@ -51,7 +52,10 @@ class StagedPackExtensionStoreH2Test {
       write(database, description, PackExt.PACK, packBytes);
       write(database, description, PackExt.INDEX, indexBytes);
       assertEquals(2, database.stagedExtensionCount());
-      assertEquals(0L, rowCount(provider, "atomic-publication"));
+      assertEquals(
+          baselineRows,
+          rowCount(provider, "atomic-publication"),
+          "Closing unpublished extensions must not create database rows");
 
       StorageOperationMetrics aggregateBefore = repository.getStorageOperationMetrics();
       StorageOperationBreakdown breakdownBefore = repository.getStorageOperationBreakdown();
@@ -71,9 +75,11 @@ class StagedPackExtensionStoreH2Test {
           StorageOperationMetrics.ZERO,
           breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE));
       assertEquals(0, database.stagedExtensionCount());
-      assertEquals(2L, rowCount(provider, "atomic-publication"));
-      assertArrayEquals(packBytes, inlineData(provider, "atomic-publication", "pack"));
-      assertArrayEquals(indexBytes, inlineData(provider, "atomic-publication", "idx"));
+      assertEquals(baselineRows + 2, rowCount(provider, "atomic-publication"));
+      assertArrayEquals(
+          packBytes, inlineData(provider, "atomic-publication", baseName(description), "pack"));
+      assertArrayEquals(
+          indexBytes, inlineData(provider, "atomic-publication", baseName(description), "idx"));
     }
   }
 
@@ -83,6 +89,7 @@ class StagedPackExtensionStoreH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), "staging-rollback")) {
       repository.create(true);
+      long baselineRows = rowCount(provider, "staging-rollback");
       ReadAheadHibernateObjDatabase database =
           (ReadAheadHibernateObjDatabase) repository.getObjectDatabase();
       DfsPackDescription description = database.newPack(PackSource.RECEIVE);
@@ -94,7 +101,7 @@ class StagedPackExtensionStoreH2Test {
 
       assertEquals(before, repository.getStorageOperationMetrics());
       assertEquals(0, database.stagedExtensionCount());
-      assertEquals(0L, rowCount(provider, "staging-rollback"));
+      assertEquals(baselineRows, rowCount(provider, "staging-rollback"));
     }
   }
 
@@ -104,6 +111,7 @@ class StagedPackExtensionStoreH2Test {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), "atomic-failure")) {
       repository.create(true);
+      long baselineRows = rowCount(provider, "atomic-failure");
       ReadAheadHibernateObjDatabase database =
           (ReadAheadHibernateObjDatabase) repository.getObjectDatabase();
       DfsPackDescription description = database.newPack(PackSource.RECEIVE);
@@ -113,9 +121,9 @@ class StagedPackExtensionStoreH2Test {
 
       assertThrows(IOException.class, () -> database.commitPackImpl(List.of(description), null));
       assertEquals(
-          1L,
+          baselineRows + 1,
           rowCount(provider, "atomic-failure"),
-          "The pre-existing conflicting row is the only row after transaction rollback");
+          "Only the pre-existing conflicting row may remain after transaction rollback");
       assertEquals(2, database.stagedExtensionCount());
 
       database.rollbackPack(List.of(description));
@@ -167,15 +175,19 @@ class StagedPackExtensionStoreH2Test {
   }
 
   private static byte[] inlineData(
-      HibernateSessionFactoryProvider provider, String repositoryName, String extension) {
+      HibernateSessionFactoryProvider provider,
+      String repositoryName,
+      String packName,
+      String extension) {
     try (Session session = provider.getSessionFactory().openSession()) {
       GitPackEntity entity =
           session
               .createQuery(
                   "FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                      + "AND p.packExtension = :ext",
+                      + "AND p.packName = :name AND p.packExtension = :ext",
                   GitPackEntity.class)
               .setParameter("repo", repositoryName)
+              .setParameter("name", packName)
               .setParameter("ext", extension)
               .getSingleResult();
       assertTrue(entity.isCommitted());
