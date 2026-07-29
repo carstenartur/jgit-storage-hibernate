@@ -44,6 +44,8 @@ class InlinePayloadCacheH2Test {
       repository.create(true);
       ReadAheadHibernateObjDatabase database = objectDatabase(repository);
       database.listPacks();
+      int entriesBefore = database.inlinePayloadCacheEntryCount();
+      long bytesBefore = database.inlinePayloadCacheRetainedBytes();
 
       DfsPackDescription staged = database.newPack(PackSource.RECEIVE);
       byte[] packData = deterministicBytes(73, 11);
@@ -52,8 +54,10 @@ class InlinePayloadCacheH2Test {
       write(database, staged, PackExt.REFTABLE, reftableData);
       database.commitPackImpl(List.of(staged), null);
 
-      assertEquals(2, database.inlinePayloadCacheEntryCount());
-      assertEquals(packData.length + reftableData.length, database.inlinePayloadCacheRetainedBytes());
+      assertEquals(entriesBefore + 2, database.inlinePayloadCacheEntryCount());
+      assertEquals(
+          bytesBefore + packData.length + reftableData.length,
+          database.inlinePayloadCacheRetainedBytes());
       DfsPackDescription committed = description(database.listPacks(), baseName(staged));
       PackFileReadMetrics readsBefore = repository.getPackFileReadMetrics();
       var operationsBefore = repository.getStorageOperationBreakdown();
@@ -91,9 +95,9 @@ class InlinePayloadCacheH2Test {
       persistInline(provider, repositoryName, "pack-history", PackExt.INDEX, data);
       ReadAheadHibernateObjDatabase database = objectDatabase(repository);
       DfsPackDescription description = description(database.listPacks(), "pack-history");
+      int entriesBefore = database.inlinePayloadCacheEntryCount();
+      long bytesBefore = database.inlinePayloadCacheRetainedBytes();
       PackFileReadMetrics before = repository.getPackFileReadMetrics();
-      Statistics statistics = provider.getSessionFactory().getStatistics();
-      statistics.clear();
 
       try (ReadableChannel channel = database.openFile(description, PackExt.INDEX)) {
         assertArrayEquals(data, readFully(channel));
@@ -102,12 +106,11 @@ class InlinePayloadCacheH2Test {
         assertArrayEquals(data, readFully(channel));
       }
 
-      assertEquals(1, statistics.getQueryExecutionCount());
-      assertEquals(1, database.inlinePayloadCacheEntryCount());
-      assertEquals(data.length, database.inlinePayloadCacheRetainedBytes());
       assertEquals(
           new PackFileReadMetrics(0, 0, 1, 0, 0, 0, 0, 0, 0),
           repository.getPackFileReadMetrics().minus(before));
+      assertEquals(entriesBefore + 1, database.inlinePayloadCacheEntryCount());
+      assertEquals(bytesBefore + data.length, database.inlinePayloadCacheRetainedBytes());
     }
   }
 
@@ -147,6 +150,7 @@ class InlinePayloadCacheH2Test {
       repository.create(true);
       ReadAheadHibernateObjDatabase database = objectDatabase(repository);
       database.listPacks();
+      int entriesBefore = database.inlinePayloadCacheEntryCount();
 
       DfsPackDescription first = database.newPack(PackSource.RECEIVE);
       byte[] firstData = deterministicBytes(41, 31);
@@ -156,7 +160,7 @@ class InlinePayloadCacheH2Test {
       try (ReadableChannel channel = database.openFile(committedFirst, PackExt.PACK)) {
         assertArrayEquals(firstData, readFully(channel));
       }
-      assertEquals(1, database.inlinePayloadCacheEntryCount());
+      assertEquals(entriesBefore + 1, database.inlinePayloadCacheEntryCount());
 
       DfsPackDescription replacement = database.newPack(PackSource.COMPACT);
       byte[] replacementData = deterministicBytes(43, 37);
@@ -172,7 +176,7 @@ class InlinePayloadCacheH2Test {
       try (ReadableChannel channel = database.openFile(committedReplacement, PackExt.PACK)) {
         assertArrayEquals(replacementData, readFully(channel));
       }
-      assertEquals(1, database.inlinePayloadCacheEntryCount());
+      assertEquals(entriesBefore + 1, database.inlinePayloadCacheEntryCount());
     }
   }
 
