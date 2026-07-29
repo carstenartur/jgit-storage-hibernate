@@ -31,6 +31,21 @@ Filesystem runs publish zero for database-specific counters.
 
 `repositoryLockAcquisitionMicros` includes the database round trip and any contention wait. It is deliberately not labelled as pure lock-wait time because portable Hibernate timing cannot separate those components.
 
+### Event score versus one invocation
+
+`ProtocolStorageCounters` uses JMH `@AuxCounters(AuxCounters.Type.EVENTS)`. For event counters, the displayed secondary-metric **score is the sum across all measured invocations**, not the cost of one invocation. This suite performs five measured single-shot invocations, so a displayed score of `50` storage transactions represents five raw values of `10`.
+
+Use `secondaryMetrics.<counter>.rawData` in `jmh-result.json` when interpreting one push, clone or fetch. The first complete categorized PostgreSQL run produced these stable raw values:
+
+| Workload, per invocation | Transactions | Locks | Category distribution |
+|---|---:|---:|---|
+| Initial push | 9 | 5 | 3 extension writes, 2 pack publications, 2 file reads, 2 metadata reads |
+| Incremental push | 10 | 5 | 3 extension writes, 2 pack publications, 3 file reads, 2 metadata reads |
+| Initial clone | 2 | 0 | 2 file reads |
+| Incremental fetch | 3 | 0 | 3 file reads |
+
+For PostgreSQL incremental push, the corresponding raw values are also 11 connection acquisitions, 25 prepared statements and roughly 4.2 ms cumulative end-to-end lock acquisition time per invocation. Scores shown by JMH for those event counters are five times the raw per-invocation values.
+
 ## Per-operation breakdown
 
 Every top-level repository transaction receives exactly one stable `StorageOperationKind`. Nested work sharing the active Hibernate session inherits the category of the owning transaction. The benchmark fails immediately if the sum of category counters differs from the backward-compatible aggregate snapshot.
@@ -64,7 +79,7 @@ otherStorageTransactions
 otherRepositoryLocks
 ```
 
-For the four protocol workloads, `otherStorageTransactions` and `otherRepositoryLocks` should be zero. A non-zero value is treated as a diagnostic gap rather than silently folded into a misleading category.
+For the four protocol workloads, `otherStorageTransactions` and `otherRepositoryLocks` must be zero. A non-zero value is treated as a diagnostic gap rather than silently folded into a misleading category.
 
 The public performance dashboard continues to chart primary latency only. Secondary metrics remain in the raw `jmh-result.json` workflow artifact for architecture analysis.
 
@@ -121,6 +136,8 @@ The metrics are intended to choose the next optimization using evidence:
 - substantial repository-lock acquisition time under concurrency suggests lock-granularity work;
 - low database activity with high elapsed time suggests JGit pack generation, compression or client-side work rather than Hibernate storage.
 
-PR #130 tested and rejected one plausible-looking hypothesis: suppressing intermediate flush delegation did not change the transaction, statement, connection or lock counts. The patch was not merged. The categorized breakdown exists specifically so the next implementation targets a measured operation boundary rather than another guess.
+PR #130 tested and rejected one plausible-looking hypothesis: suppressing intermediate flush delegation did not change the raw per-invocation transaction, statement, connection or lock counts. The patch was not merged. The categorized breakdown exists specifically so the next implementation targets a measured operation boundary rather than another guess.
+
+The first categorized result points to the five locked write/publication transactions per push, not to HikariCP or read-path work. A follow-up optimization must still prove any improvement through the same raw counters and latency benchmark.
 
 No Hibernate second-level payload cache should be introduced solely from elapsed-time comparisons. JGit already maintains its specialized DFS block cache, so duplicate payload caching requires explicit evidence.
