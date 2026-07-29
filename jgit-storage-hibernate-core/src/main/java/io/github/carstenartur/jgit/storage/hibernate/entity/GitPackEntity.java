@@ -34,8 +34,6 @@ import org.hibernate.type.SqlTypes;
 @Table(
     name = "git_packs",
     indexes = {
-      @Index(name = "idx_pack_repo", columnList = "repository_name"),
-      @Index(name = "idx_pack_repo_name", columnList = "repository_name, pack_name"),
       @Index(name = "idx_pack_repo_committed", columnList = "repository_name, committed"),
       @Index(
           name = "idx_pack_repo_lease",
