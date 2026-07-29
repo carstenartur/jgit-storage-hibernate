@@ -126,23 +126,50 @@ class LocalInlinePayloadHandoffH2Test {
   }
 
   @Test
-  void nextMutationDropsUnconsumedPayloads() throws Exception {
-    try (Fixture fixture = fixture("inline-next-mutation")) {
-      DfsPackDescription first = fixture.database.newPack(PackSource.INSERT);
-      byte[] firstPayload = deterministicBytes(101, 31);
-      write(fixture.database, first, PackExt.REFTABLE, firstPayload);
-      fixture.database.commitPackImpl(List.of(first), null);
-      assertEquals(firstPayload.length, fixture.database.localInlinePayloadBytes());
+  void retainsConsecutivePackAndReftableWithinBudget() throws Exception {
+    try (Fixture fixture = fixture("inline-consecutive-mutations")) {
+      DfsPackDescription packDescription = fixture.database.newPack(PackSource.INSERT);
+      byte[] pack = deterministicBytes(128 * 1024, 31);
+      write(fixture.database, packDescription, PackExt.PACK, pack);
+      fixture.database.commitPackImpl(List.of(packDescription), null);
 
-      DfsPackDescription second = fixture.database.newPack(PackSource.INSERT);
-      byte[] secondPayload = deterministicBytes(103, 37);
-      write(fixture.database, second, PackExt.REFTABLE, secondPayload);
-      fixture.database.commitPackImpl(List.of(second), null);
+      DfsPackDescription refDescription = fixture.database.newPack(PackSource.INSERT);
+      byte[] reftable = deterministicBytes(1024, 37);
+      write(fixture.database, refDescription, PackExt.REFTABLE, reftable);
+      fixture.database.commitPackImpl(List.of(refDescription), null);
 
-      assertEquals(secondPayload.length, fixture.database.localInlinePayloadBytes());
+      assertEquals(pack.length + reftable.length, fixture.database.localInlinePayloadBytes());
       PackFileReadMetrics before = fixture.repository.getPackFileReadMetrics();
-      assertArrayEquals(firstPayload, open(fixture.database, first, PackExt.REFTABLE));
-      assertArrayEquals(secondPayload, open(fixture.database, second, PackExt.REFTABLE));
+      assertArrayEquals(pack, open(fixture.database, packDescription, PackExt.PACK));
+      assertArrayEquals(reftable, open(fixture.database, refDescription, PackExt.REFTABLE));
+      assertEquals(
+          PackFileReadMetrics.ZERO,
+          fixture.repository.getPackFileReadMetrics().minus(before));
+    }
+  }
+
+  @Test
+  void evictsOldestPayloadAcrossMutationsWhenBudgetIsExceeded() throws Exception {
+    try (Fixture fixture = fixture("inline-cross-mutation-eviction")) {
+      int payloadSize = 200 * 1024;
+      List<DfsPackDescription> descriptions = new ArrayList<>();
+      List<byte[]> payloads = new ArrayList<>();
+      for (int index = 0; index < 3; index++) {
+        DfsPackDescription description = fixture.database.newPack(PackSource.INSERT);
+        byte[] payload = deterministicBytes(payloadSize, 43 + index);
+        write(fixture.database, description, PackExt.REFTABLE, payload);
+        fixture.database.commitPackImpl(List.of(description), null);
+        descriptions.add(description);
+        payloads.add(payload);
+      }
+
+      assertEquals(2 * payloadSize, fixture.database.localInlinePayloadBytes());
+      PackFileReadMetrics before = fixture.repository.getPackFileReadMetrics();
+      for (int index = 0; index < descriptions.size(); index++) {
+        assertArrayEquals(
+            payloads.get(index),
+            open(fixture.database, descriptions.get(index), PackExt.REFTABLE));
+      }
       assertEquals(
           new PackFileReadMetrics(0, 0, 0, 0, 1, 0, 0, 0, 0),
           fixture.repository.getPackFileReadMetrics().minus(before));
@@ -158,9 +185,9 @@ class LocalInlinePayloadHandoffH2Test {
       fixture.database.commitPackImpl(List.of(description), null);
       assertEquals(payload.length, fixture.database.localInlinePayloadBytes());
 
-      fixture.database.listPacks(); // consume local list handoff, retaining payload
+      fixture.database.listPacks();
       assertEquals(payload.length, fixture.database.localInlinePayloadBytes());
-      fixture.database.listPacks(); // authoritative database scan
+      fixture.database.listPacks();
 
       assertEquals(0, fixture.database.localInlinePayloadBytes());
       PackFileReadMetrics before = fixture.repository.getPackFileReadMetrics();
@@ -178,7 +205,7 @@ class LocalInlinePayloadHandoffH2Test {
     repository.create(true);
     ReadAheadHibernateObjDatabase database =
         (ReadAheadHibernateObjDatabase) repository.getObjectDatabase();
-    database.listPacks(); // establish a complete generation before local publication
+    database.listPacks();
     return new Fixture(provider, repository, database);
   }
 
