@@ -33,9 +33,23 @@ Disposable `create-drop` schemas use the composite ORM key directly. Migration-b
 
 The pack key still uses `GenerationType.IDENTITY`, so Hibernate must insert and flush the parent pack row before it can persist chunk rows. The expensive repeated generated-key lookup was removed from the chunk rows, where one large pack can create many inserts. A cross-database pooled sequence for the parent key should be considered only if benchmark evidence shows that the remaining single parent-key round trip is material.
 
+## Measured behavior
+
+The focused JMH test publishes one non-compressible twelve-MiB blob to PostgreSQL. Every invocation creates exactly 13 chunk rows and 2 pack rows, uses 2 connections and performs 5 Hibernate flushes.
+
+| Mode | Time | JDBC batch executions | JDBC statement executions | Prepared statements |
+|---|---:|---:|---:|---:|
+| Batching disabled | 476.6 ms | 0 | 19 | 19 |
+| Portable Hibernate batching | 474.9 ms | 2 | 6 | 8 |
+| Batching plus PostgreSQL rewrite | 480.3 ms | 2 | 6 | 8 |
+
+Portable batching therefore reduces JDBC statement executions from 19 to 6 and prepared statements from 19 to 8 while persisting identical data. End-to-end latency is neutral in this local Testcontainers workload because pack creation, compression and transfer of the twelve-MiB payload dominate the remaining time.
+
+The standard protocol suite also remains stable: PostgreSQL incremental push measured 44.10 ms before and 44.07 ms after the batching change. Initial push improved by roughly three percent in that run, clone was unchanged and incremental fetch was slightly faster. These variations are consistent with normal run noise and show no small-workload regression.
+
 ## Driver-specific options
 
-Portable Hibernate batching works without JDBC-URL extensions. Deployments may benchmark additional driver features separately:
+Portable Hibernate batching works without JDBC-URL extensions. Deployments may benchmark additional driver features separately.
 
 ### PostgreSQL
 
@@ -43,7 +57,7 @@ Portable Hibernate batching works without JDBC-URL extensions. Deployments may b
 reWriteBatchedInserts=true
 ```
 
-The PostgreSQL JDBC driver may rewrite compatible batches into multi-value inserts. Validate this with the real binary chunk workload and the deployed driver version before enabling it globally.
+The focused binary-chunk benchmark found no benefit from this option: 480.3 ms with rewrite versus 474.9 ms with portable batching alone, with identical Hibernate/JDBC counters. The library therefore does not enable it. A deployment with different network latency, pack size or database placement may still test it explicitly.
 
 ### Microsoft SQL Server
 
@@ -65,6 +79,4 @@ The normal Core tests verify that:
 - chunks remain addressable by `(pack_id, chunk_index)`;
 - create-drop and migration-backed schemas remain valid.
 
-The JMH suite also compares a non-compressible twelve-MiB PostgreSQL pack with batching disabled and enabled. It reports elapsed time, real JDBC batch executions, statement executions, prepared statements, flushes, pack-row inserts and chunk-row inserts.
-
-Run the complete comparison through the existing benchmark profile or workflow so PostgreSQL is provided by Testcontainers and the result is published with the normal dashboard data.
+The performance workflow runs the established backend/protocol matrix and a separate focused PostgreSQL job for batching disabled, portable batching and batching plus driver rewrite. On `main`, both raw JMH artifacts are combined into the published dashboard history without changing the standard performance badge contract.
