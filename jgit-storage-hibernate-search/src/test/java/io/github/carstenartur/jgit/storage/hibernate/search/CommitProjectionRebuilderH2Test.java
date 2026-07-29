@@ -9,6 +9,8 @@
 package io.github.carstenartur.jgit.storage.hibernate.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
@@ -16,9 +18,13 @@ import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateReposit
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitIndexer;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitProjectionRebuilder;
+import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitProjectionRebuilder.RebuildProgress;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitProjectionRebuilder.RebuildResult;
+import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitProjectionRebuilder.RebuildState;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,7 +37,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TreeFormatter;
 import org.hibernate.Session;
 import org.junit.jupiter.api.AfterEach;
@@ -59,6 +64,7 @@ class CommitProjectionRebuilderH2Test {
 
   @AfterEach
   void tearDown() {
+    Thread.interrupted();
     if (repository != null) {
       repository.close();
     }
@@ -75,21 +81,26 @@ class CommitProjectionRebuilderH2Test {
     updateRef("refs/heads/main", second);
     updateRef("refs/heads/old", first);
 
-    new CommitIndexer(provider.getSessionFactory(), repositoryName)
-        .indexCommit(repository, stale);
+    new CommitIndexer(provider.getSessionFactory(), repositoryName).indexCommit(repository, stale);
     assertEquals(List.of(stale.name()), projectedObjectIds());
 
     CommitProjectionRebuilder rebuilder =
         new CommitProjectionRebuilder(provider.getSessionFactory());
+    List<RebuildProgress> progress = new ArrayList<>();
     RebuildResult firstResult =
-        rebuilder.rebuild(repository, new RepositoryName(repositoryName));
+        rebuilder.rebuild(repository, new RepositoryName(repositoryName), progress::add);
 
     assertEquals(repositoryName, firstResult.repositoryName());
+    assertEquals(RebuildState.COMPLETED, firstResult.state());
     assertEquals(2, firstResult.refTips());
     assertEquals(2, firstResult.visitedCommits());
     assertEquals(2, firstResult.indexedCommits());
+    assertEquals(0, firstResult.skippedCommits());
     assertEquals(1, firstResult.removedProjections());
-    assertEquals(List.of(first.name(), second.name()).stream().sorted().toList(), projectedObjectIds());
+    assertEquals(RebuildState.CLEARING, progress.getFirst().state());
+    assertEquals(RebuildState.COMPLETED, progress.getLast().state());
+    assertEquals(
+        List.of(first.name(), second.name()).stream().sorted().toList(), projectedObjectIds());
 
     GitHistorySearchService search =
         new GitHistorySearchService(provider.getSessionFactory());
@@ -100,7 +111,50 @@ class CommitProjectionRebuilderH2Test {
         rebuilder.rebuild(repository, new RepositoryName(repositoryName));
     assertEquals(2, secondResult.removedProjections());
     assertEquals(2, secondResult.indexedCommits());
-    assertEquals(List.of(first.name(), second.name()).stream().sorted().toList(), projectedObjectIds());
+    assertEquals(
+        List.of(first.name(), second.name()).stream().sorted().toList(), projectedObjectIds());
+  }
+
+  @Test
+  void reportsInterruptionAndClearsPartialProjectionOnRetry() throws Exception {
+    ObjectId first = createCommit("First rebuild step", "first.txt", "one", null);
+    ObjectId second = createCommit("Second rebuild step", "second.txt", "two", first);
+    ObjectId third = createCommit("Third rebuild step", "third.txt", "three", second);
+    updateRef("refs/heads/main", third);
+
+    CommitProjectionRebuilder rebuilder =
+        new CommitProjectionRebuilder(provider.getSessionFactory());
+    List<RebuildProgress> progress = new ArrayList<>();
+
+    assertThrows(
+        InterruptedIOException.class,
+        () ->
+            rebuilder.rebuild(
+                repository,
+                new RepositoryName(repositoryName),
+                event -> {
+                  progress.add(event);
+                  if (event.state() == RebuildState.INDEXING && event.indexedCommits() == 1) {
+                    Thread.currentThread().interrupt();
+                  }
+                }));
+
+    assertTrue(Thread.interrupted(), "The interrupted status must be observable and then cleared");
+    RebuildProgress interrupted = progress.getLast();
+    assertEquals(RebuildState.INTERRUPTED, interrupted.state());
+    assertEquals(1, interrupted.indexedCommits());
+    assertEquals(InterruptedIOException.class.getName(), interrupted.failureType());
+    assertTrue(interrupted.failureMessage().contains("interrupted"));
+    assertEquals(1, projectedObjectIds().size());
+
+    RebuildResult retry =
+        rebuilder.rebuild(repository, new RepositoryName(repositoryName));
+    assertEquals(RebuildState.COMPLETED, retry.state());
+    assertEquals(1, retry.removedProjections());
+    assertEquals(3, retry.indexedCommits());
+    assertEquals(
+        List.of(first.name(), second.name(), third.name()).stream().sorted().toList(),
+        projectedObjectIds());
   }
 
   private ObjectId createCommit(
