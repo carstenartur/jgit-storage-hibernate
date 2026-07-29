@@ -15,10 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
-import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
+import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
+import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.Session;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,21 +38,23 @@ class ChunkedPackStorageCapacityIT {
   void persistsAndRandomReadsCapacityEnvelope(int mebibytes) throws Exception {
     String repositoryName = "capacity-" + mebibytes + "-" + TEST_COUNTER.incrementAndGet();
     try (HibernateSessionFactoryProvider provider = provider(repositoryName);
-        HibernateRepository ignored =
+        HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
-      HibernateObjDatabase.HibernatePackOutputStream output =
-          new HibernateObjDatabase.HibernatePackOutputStream(
-              new HibernateTransactionContext(provider.getSessionFactory()),
-              repositoryName,
-              "pack-capacity",
-              "pack");
+      HibernateObjDatabase objectDatabase = repository.getObjectDatabase();
+      DfsPackDescription description =
+          new DfsPackDescription(repository.getDescription(), "pack-capacity", PackSource.INSERT);
       byte[] block = deterministicBlock();
-      for (int index = 0; index < mebibytes; index++) {
-        output.write(block, 0, block.length);
+      try (DfsOutputStream output = objectDatabase.writeFile(description, PackExt.PACK)) {
+        for (int index = 0; index < mebibytes; index++) {
+          output.write(block, 0, block.length);
+        }
       }
-      output.close();
 
       long expectedSize = (long) mebibytes * HibernateObjDatabase.PACK_CHUNK_SIZE;
+      description.addFileExt(PackExt.PACK);
+      description.setFileSize(PackExt.PACK, expectedSize);
+      objectDatabase.commitPackImpl(List.of(description), null);
+
       Long packId;
       try (Session session = provider.getSessionFactory().openSession()) {
         GitPackEntity pack =
@@ -61,6 +67,7 @@ class ChunkedPackStorageCapacityIT {
                 .setParameter("name", "pack-capacity")
                 .getSingleResult();
         packId = pack.getId();
+        assertTrue(pack.isCommitted());
         assertEquals(expectedSize, pack.getFileSize());
         Long chunks =
             session
