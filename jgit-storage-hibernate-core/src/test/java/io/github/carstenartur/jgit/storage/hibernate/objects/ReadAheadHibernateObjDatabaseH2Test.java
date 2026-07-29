@@ -193,7 +193,8 @@ class ReadAheadHibernateObjDatabaseH2Test {
   }
 
   @Test
-  void alignedOutputStreamUsesChunkAlignmentAndDelegatesAllOperations() throws Exception {
+  void alignedOutputStreamUsesChunkAlignmentDefersFlushAndDelegatesOtherOperations()
+      throws Exception {
     TrackingOutputStream delegate = new TrackingOutputStream();
     DfsOutputStream aligned = alignedOutput(delegate);
 
@@ -205,7 +206,7 @@ class ReadAheadHibernateObjDatabaseH2Test {
 
     aligned.flush();
     aligned.close();
-    assertTrue(delegate.flushed);
+    assertFalse(delegate.flushed);
     assertTrue(delegate.closed);
   }
 
