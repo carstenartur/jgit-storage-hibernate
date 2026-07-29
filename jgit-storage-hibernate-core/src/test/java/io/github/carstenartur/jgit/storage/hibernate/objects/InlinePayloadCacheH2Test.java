@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
-import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
@@ -30,15 +29,14 @@ import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
-import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 
 class InlinePayloadCacheH2Test {
 
   @Test
-  void localPublicationHandsInlinePayloadsToReadersWithoutDatabaseFallback() throws Exception {
-    String repositoryName = "inline-cache-publication";
-    try (HibernateSessionFactoryProvider provider = provider(null);
+  void localPublicationSurvivesAuthoritativeScanWithoutDatabaseFallback() throws Exception {
+    String repositoryName = "inline-handoff-publication";
+    try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
@@ -59,10 +57,11 @@ class InlinePayloadCacheH2Test {
           bytesBefore + packData.length + reftableData.length,
           database.inlinePayloadCacheRetainedBytes());
       DfsPackDescription committed = description(database.listPacks(), baseName(staged));
+      // The local one-shot above is followed by a real database catalog scan. Exact committed
+      // identities must preserve the locally captured payloads.
+      description(database.listPacks(), baseName(staged));
       PackFileReadMetrics readsBefore = repository.getPackFileReadMetrics();
       var operationsBefore = repository.getStorageOperationBreakdown();
-      Statistics statistics = provider.getSessionFactory().getStatistics();
-      statistics.clear();
 
       try (ReadableChannel channel = database.openFile(committed, PackExt.PACK)) {
         assertArrayEquals(packData, readFully(channel));
@@ -71,7 +70,6 @@ class InlinePayloadCacheH2Test {
         assertArrayEquals(reftableData, readFully(channel));
       }
 
-      assertEquals(0, statistics.getQueryExecutionCount());
       assertEquals(
           PackFileReadMetrics.ZERO,
           repository.getPackFileReadMetrics().minus(readsBefore));
@@ -85,10 +83,10 @@ class InlinePayloadCacheH2Test {
   }
 
   @Test
-  void historicalInlinePayloadReadsOnceThenUsesRowIdCache() throws Exception {
-    String repositoryName = "inline-cache-historical";
+  void historicalInlinePayloadIsNeverRetained() throws Exception {
+    String repositoryName = "inline-handoff-historical";
     byte[] data = deterministicBytes(59, 23);
-    try (HibernateSessionFactoryProvider provider = provider(null);
+    try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
@@ -106,45 +104,47 @@ class InlinePayloadCacheH2Test {
         assertArrayEquals(data, readFully(channel));
       }
 
+      assertEquals(entriesBefore, database.inlinePayloadCacheEntryCount());
+      assertEquals(bytesBefore, database.inlinePayloadCacheRetainedBytes());
       assertEquals(
-          new PackFileReadMetrics(0, 0, 1, 0, 0, 0, 0, 0, 0),
+          new PackFileReadMetrics(0, 0, 2, 0, 0, 0, 0, 0, 0),
           repository.getPackFileReadMetrics().minus(before));
-      assertEquals(entriesBefore + 1, database.inlinePayloadCacheEntryCount());
-      assertEquals(bytesBefore + data.length, database.inlinePayloadCacheRetainedBytes());
     }
   }
 
   @Test
-  void zeroCapacityKeepsAuthoritativeDatabaseFallback() throws Exception {
-    String repositoryName = "inline-cache-disabled";
-    byte[] data = deterministicBytes(31, 29);
-    try (HibernateSessionFactoryProvider provider = provider(0L);
+  void localIdxPayloadIsNotRetained() throws Exception {
+    String repositoryName = "inline-handoff-index";
+    try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      persistInline(provider, repositoryName, "pack-disabled", PackExt.REFTABLE, data);
       ReadAheadHibernateObjDatabase database = objectDatabase(repository);
-      DfsPackDescription description = description(database.listPacks(), "pack-disabled");
+      database.listPacks();
+      int entriesBefore = database.inlinePayloadCacheEntryCount();
+
+      DfsPackDescription staged = database.newPack(PackSource.RECEIVE);
+      byte[] indexData = deterministicBytes(37, 29);
+      write(database, staged, PackExt.INDEX, indexData);
+      database.commitPackImpl(List.of(staged), null);
+      DfsPackDescription committed = description(database.listPacks(), baseName(staged));
       PackFileReadMetrics before = repository.getPackFileReadMetrics();
 
-      try (ReadableChannel channel = database.openFile(description, PackExt.REFTABLE)) {
-        assertArrayEquals(data, readFully(channel));
-      }
-      try (ReadableChannel channel = database.openFile(description, PackExt.REFTABLE)) {
-        assertArrayEquals(data, readFully(channel));
+      try (ReadableChannel channel = database.openFile(committed, PackExt.INDEX)) {
+        assertArrayEquals(indexData, readFully(channel));
       }
 
-      assertEquals(0, database.inlinePayloadCacheEntryCount());
+      assertEquals(entriesBefore, database.inlinePayloadCacheEntryCount());
       assertEquals(
-          new PackFileReadMetrics(0, 0, 0, 0, 2, 0, 0, 0, 0),
+          new PackFileReadMetrics(0, 0, 1, 0, 0, 0, 0, 0, 0),
           repository.getPackFileReadMetrics().minus(before));
     }
   }
 
   @Test
   void successfulReplacementCannotServeRemovedRowBytes() throws Exception {
-    String repositoryName = "inline-cache-replacement";
-    try (HibernateSessionFactoryProvider provider = provider(null);
+    String repositoryName = "inline-handoff-replacement";
+    try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
@@ -170,7 +170,7 @@ class InlinePayloadCacheH2Test {
       assertThrows(
           FileNotFoundException.class,
           () -> database.openFile(committedFirst, PackExt.PACK),
-          "The removed logical pack must not be served from the old row-id cache entry");
+          "The removed logical pack must not be served from the old committed identity");
       DfsPackDescription committedReplacement =
           description(database.listPacks(), baseName(replacement));
       try (ReadableChannel channel = database.openFile(committedReplacement, PackExt.PACK)) {
@@ -180,21 +180,17 @@ class InlinePayloadCacheH2Test {
     }
   }
 
-  private static HibernateSessionFactoryProvider provider(Long cacheMaxBytes) {
+  private static HibernateSessionFactoryProvider provider() {
     Properties properties = new Properties();
     properties.put(
         "hibernate.connection.url",
-        "jdbc:h2:mem:inline-cache-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        "jdbc:h2:mem:inline-handoff-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
     properties.put("hibernate.connection.driver_class", "org.h2.Driver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
     properties.put("hibernate.hbm2ddl.auto", "create-drop");
     properties.put("hibernate.show_sql", "false");
-    properties.put("hibernate.generate_statistics", "true");
     properties.put("hibernate.connection.pool_size", "2");
     properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
-    if (cacheMaxBytes != null) {
-      properties.put(HibernateStorageSettings.INLINE_PAYLOAD_CACHE_MAX_BYTES, cacheMaxBytes);
-    }
     return new HibernateSessionFactoryProvider(properties);
   }
 
