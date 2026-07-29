@@ -11,7 +11,6 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,19 +19,20 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
-import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
+import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
+import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.ObjectId;
 import org.hibernate.Session;
-import org.hibernate.Transaction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,14 +58,13 @@ class HibernateObjDatabaseContractH2Test {
   }
 
   @Test
-  void persistsBoundedChunksAfterEarlyFlushAndSupportsRandomReads() throws Exception {
-    try (HibernateRepository ignored =
+  void stagesBoundedChunksAfterEarlyFlushAndPublishesAtomically() throws Exception {
+    try (HibernateRepository repository =
         HibernateRepository.create(provider.getSessionFactory(), "repo")) {
-      HibernateTransactionContext transactionContext =
-          new HibernateTransactionContext(provider.getSessionFactory());
-      HibernateObjDatabase.HibernatePackOutputStream stream =
-          new HibernateObjDatabase.HibernatePackOutputStream(
-              transactionContext, "repo", "pack-test", "pack");
+      HibernateObjDatabase objectDatabase = repository.getObjectDatabase();
+      DfsPackDescription description =
+          new DfsPackDescription(repository.getDescription(), "pack-test", PackSource.INSERT);
+      DfsOutputStream stream = objectDatabase.writeFile(description, PackExt.PACK);
 
       byte[] first = deterministicBytes(HibernateObjDatabase.PACK_CHUNK_SIZE + 97, 3);
       byte[] second = deterministicBytes(HibernateObjDatabase.PACK_CHUNK_SIZE + 31, 97);
@@ -82,11 +81,19 @@ class HibernateObjDatabaseContractH2Test {
           beforeFlush.array());
 
       stream.flush();
-      assertWriterLease(stream);
       stream.flush();
+      assertEquals(0L, countPackRows("repo", "pack-test"));
       stream.write(second, 0, second.length);
       stream.close();
       stream.close();
+      assertEquals(
+          0L,
+          countPackRows("repo", "pack-test"),
+          "A closed extension must remain outside the database until pack publication");
+
+      description.addFileExt(PackExt.PACK);
+      description.setFileSize(PackExt.PACK, expected.length);
+      objectDatabase.commitPackImpl(List.of(description), null);
 
       Long packId;
       try (Session session = provider.getSessionFactory().openSession()) {
@@ -103,9 +110,9 @@ class HibernateObjDatabaseContractH2Test {
         packId = entity.getId();
         assertNull(entity.getData());
         assertEquals(expected.length, entity.getFileSize());
-        assertFalse(entity.isCommitted());
-        assertEquals(stream.writeToken(), entity.getWriteToken());
-        assertTrue(entity.getWriteLeaseUntil().isAfter(Instant.now()));
+        assertTrue(entity.isCommitted());
+        assertNull(entity.getWriteToken());
+        assertNull(entity.getWriteLeaseUntil());
 
         List<GitPackChunkEntity> chunks =
             session
@@ -142,50 +149,26 @@ class HibernateObjDatabaseContractH2Test {
   }
 
   @Test
-  void refusesToOverwriteAnUncommittedPackOwnedByAnotherWriter() throws Exception {
-    try (HibernateRepository ignored =
+  void refusesToStageTheSamePackExtensionTwice() throws Exception {
+    try (HibernateRepository repository =
         HibernateRepository.create(provider.getSessionFactory(), "owned-repo")) {
-      HibernateObjDatabase.HibernatePackOutputStream stream =
-          new HibernateObjDatabase.HibernatePackOutputStream(
-              new HibernateTransactionContext(provider.getSessionFactory()),
-              "owned-repo",
-              "pack-owned",
-              "pack");
+      HibernateObjDatabase objectDatabase = repository.getObjectDatabase();
+      DfsPackDescription description =
+          new DfsPackDescription(repository.getDescription(), "pack-owned", PackSource.INSERT);
       byte[] bytes = deterministicBytes(64, 7);
-      stream.write(bytes, 0, bytes.length);
-      stream.flush();
 
-      try (Session session = provider.getSessionFactory().openSession()) {
-        Transaction transaction = session.beginTransaction();
-        session
-            .createMutationQuery(
-                "UPDATE GitPackEntity p SET p.writeToken = :token "
-                    + "WHERE p.repositoryName = :repo AND p.packName = :name")
-            .setParameter("token", "00000000-0000-0000-0000-000000000000")
-            .setParameter("repo", "owned-repo")
-            .setParameter("name", "pack-owned")
-            .executeUpdate();
-        transaction.commit();
-      }
+      DfsOutputStream first = objectDatabase.writeFile(description, PackExt.PACK);
+      first.write(bytes, 0, bytes.length);
+      first.close();
 
-      IOException exception = assertThrows(IOException.class, stream::close);
-      assertTrue(exception.getMessage().contains("ownership was lost"));
-    }
-  }
+      DfsOutputStream duplicate = objectDatabase.writeFile(description, PackExt.PACK);
+      duplicate.write(bytes, 0, bytes.length);
+      IOException exception = assertThrows(IOException.class, duplicate::close);
+      assertTrue(exception.getMessage().contains("already staged"));
+      assertEquals(0L, countPackRows("owned-repo", "pack-owned"));
 
-  private void assertWriterLease(HibernateObjDatabase.HibernatePackOutputStream stream) {
-    try (Session session = provider.getSessionFactory().openSession()) {
-      GitPackEntity entity =
-          session
-              .createQuery(
-                  "FROM GitPackEntity p WHERE p.repositoryName = :repo AND p.packName = :name",
-                  GitPackEntity.class)
-              .setParameter("repo", "repo")
-              .setParameter("name", "pack-test")
-              .getSingleResult();
-      assertEquals(stream.writeToken(), entity.getWriteToken());
-      assertNotNull(entity.getWriteLeaseUntil());
-      assertTrue(entity.getWriteLeaseUntil().isAfter(Instant.now()));
+      objectDatabase.rollbackPack(List.of(description));
+      assertEquals(0L, countPackRows("owned-repo", "pack-owned"));
     }
   }
 
@@ -203,6 +186,19 @@ class HibernateObjDatabaseContractH2Test {
               UnsupportedOperationException.class,
               () -> repository.getObjectDatabase().setShallowCommits(Set.of(boundary)));
       assertTrue(exception.getMessage().contains("Shallow repositories are not supported"));
+    }
+  }
+
+  private long countPackRows(String repositoryName, String packName) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      return session
+          .createQuery(
+              "SELECT COUNT(p) FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                  + "AND p.packName = :name",
+              Long.class)
+          .setParameter("repo", repositoryName)
+          .setParameter("name", packName)
+          .getSingleResult();
     }
   }
 
