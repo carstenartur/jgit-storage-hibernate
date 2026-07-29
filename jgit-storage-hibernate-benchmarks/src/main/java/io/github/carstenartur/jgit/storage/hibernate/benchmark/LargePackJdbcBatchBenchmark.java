@@ -92,7 +92,7 @@ public class LargePackJdbcBatchBenchmark {
   }
 
   @Setup(Level.Invocation)
-  public void setupInvocation(LargePackCounters counters) throws Exception {
+  public void setupInvocation() throws Exception {
     String repositoryName =
         "jmh-large-pack-"
             + backend
@@ -104,7 +104,6 @@ public class LargePackJdbcBatchBenchmark {
     repository.create(true);
     statistics.clear();
     JdbcBatchMetricsSessionEventListener.resetCurrentThread();
-    counters.reset();
   }
 
   @TearDown(Level.Invocation)
