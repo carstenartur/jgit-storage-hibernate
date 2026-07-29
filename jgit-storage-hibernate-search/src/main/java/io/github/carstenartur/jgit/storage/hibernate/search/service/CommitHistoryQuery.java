@@ -43,26 +43,33 @@ public final class CommitHistoryQuery {
   private final String repositoryName;
   private final String text;
   private final String authorEmail;
+  private final String committerEmail;
   private final String pathFragment;
   private final Instant from;
   private final Instant to;
   private final TimestampField timestampField;
   private final boolean objectIdRestriction;
   private final List<String> objectIds;
+  private final int offset;
   private final int limit;
 
   private CommitHistoryQuery(Builder builder) {
     repositoryName = requireText(builder.repositoryName, "repositoryName");
     text = normalize(builder.text);
     authorEmail = normalize(builder.authorEmail);
+    committerEmail = normalize(builder.committerEmail);
     pathFragment = normalize(builder.pathFragment);
     from = builder.from;
     to = builder.to;
     timestampField = Objects.requireNonNull(builder.timestampField, "timestampField");
     objectIdRestriction = builder.objectIds != null;
     objectIds = builder.objectIds == null ? List.of() : builder.objectIds;
+    offset = builder.offset;
     limit = builder.limit;
 
+    if (offset < 0) {
+      throw new IllegalArgumentException("offset must not be negative");
+    }
     if (limit < 0) {
       throw new IllegalArgumentException("limit must not be negative");
     }
@@ -86,6 +93,10 @@ public final class CommitHistoryQuery {
 
   public String authorEmail() {
     return authorEmail;
+  }
+
+  public String committerEmail() {
+    return committerEmail;
   }
 
   public String pathFragment() {
@@ -112,6 +123,10 @@ public final class CommitHistoryQuery {
     return objectIds;
   }
 
+  public int offset() {
+    return offset;
+  }
+
   public int limit() {
     return limit;
   }
@@ -122,11 +137,13 @@ public final class CommitHistoryQuery {
     private final String repositoryName;
     private String text;
     private String authorEmail;
+    private String committerEmail;
     private String pathFragment;
     private Instant from;
     private Instant to;
     private TimestampField timestampField = TimestampField.COMMITTER;
     private List<String> objectIds;
+    private int offset;
     private int limit = DEFAULT_LIMIT;
 
     private Builder(String repositoryName) {
@@ -140,6 +157,12 @@ public final class CommitHistoryQuery {
 
     public Builder authoredBy(String authorEmail) {
       this.authorEmail = authorEmail;
+      return this;
+    }
+
+    /** Restrict results to commits recorded by this committer identity. */
+    public Builder committedBy(String committerEmail) {
+      this.committerEmail = committerEmail;
       return this;
     }
 
@@ -195,6 +218,12 @@ public final class CommitHistoryQuery {
     /** Restrict committer time to an inclusive interval. */
     public Builder committedBetween(Instant from, Instant to) {
       return usingCommitterTime().between(from, to);
+    }
+
+    /** Skip the first {@code offset} matching results after deterministic ordering. */
+    public Builder offset(int offset) {
+      this.offset = offset;
+      return this;
     }
 
     public Builder limit(int limit) {
