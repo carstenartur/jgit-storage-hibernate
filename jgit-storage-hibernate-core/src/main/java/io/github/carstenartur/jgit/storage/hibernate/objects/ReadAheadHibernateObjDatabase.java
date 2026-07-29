@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommitResult;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.FileNotFoundException;
@@ -61,10 +62,12 @@ import org.hibernate.SessionFactory;
  * repository memory does not grow with the number of historical packs.
  *
  * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
- * the previous catalog was complete, the exact committed row metadata is merged into a one-shot local
- * scan result before the cache is cleared. JGit's resulting scan consumes that snapshot without a
- * database transaction, then continues with its native {@code addPack()} or {@code addReftable()}
- * update. An incomplete catalog never claims authority and falls back to a full database scan.
+ * the previous catalog and the returned publication metadata are both complete, the exact committed
+ * row metadata is merged into a one-shot local scan result before the cache is cleared. JGit's
+ * resulting scan consumes that snapshot without a database transaction, then continues with its
+ * native {@code addPack()} or {@code addReftable()} update. An incomplete catalog or a legacy
+ * publication without exact row metadata never claims authority and falls back to a full database
+ * scan.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -237,9 +240,9 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     writeLock.lock();
     try {
       CatalogState previousCatalog = beginCatalogMutation(replaces);
-      List<CommittedExtension> committedExtensions;
+      CommitResult commitResult;
       try {
-        committedExtensions = stagedExtensions.commit(descriptions, replaces);
+        commitResult = stagedExtensions.commit(descriptions, replaces);
       } catch (IOException | RuntimeException publicationFailure) {
         // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit
         // paths such as Reftable publication may propagate commitPack failure directly. Clean local
@@ -248,7 +251,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         restoreCatalogAfterFailedMutation(previousCatalog);
         throw publicationFailure;
       }
-      completeCatalogMutation(descriptions, committedExtensions);
+      completeCatalogMutation(descriptions, commitResult);
       clearCache();
     } finally {
       writeLock.unlock();
@@ -284,8 +287,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   }
 
   private void completeCatalogMutation(
-      Collection<DfsPackDescription> descriptions,
-      Collection<CommittedExtension> committedExtensions) {
+      Collection<DfsPackDescription> descriptions, CommitResult commitResult) {
     Map<String, PackSource> packSources = new LinkedHashMap<>();
     for (DfsPackDescription description : descriptions) {
       packSources.put(baseName(description), description.getPackSource());
@@ -294,14 +296,14 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         current -> {
           LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions =
               new LinkedHashMap<>(current.extensions());
-          for (CommittedExtension committed : committedExtensions) {
+          for (CommittedExtension committed : commitResult.committedExtensions()) {
             PackSource source = packSources.getOrDefault(committed.packName(), PackSource.INSERT);
             extensions.put(
                 new ExtensionKey(committed.packName(), committed.extension()),
                 new ExtensionSnapshot(
                     committed.packId(), committed.fileSize(), committed.inline(), source));
           }
-          return current.completeMutation(extensions);
+          return current.completeMutation(extensions, commitResult.completeMetadata());
         });
   }
 
@@ -349,8 +351,11 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       return new CatalogState(generation + 1, complete, false, retained);
     }
 
-    private CatalogState completeMutation(Map<ExtensionKey, ExtensionSnapshot> updatedExtensions) {
-      return new CatalogState(generation + 1, complete, complete, updatedExtensions);
+    private CatalogState completeMutation(
+        Map<ExtensionKey, ExtensionSnapshot> updatedExtensions, boolean completeMetadata) {
+      boolean completedCatalog = complete && completeMetadata;
+      return new CatalogState(
+          generation + 1, completedCatalog, completedCatalog, updatedExtensions);
     }
 
     private CatalogState withGeneration(long newGeneration) {
