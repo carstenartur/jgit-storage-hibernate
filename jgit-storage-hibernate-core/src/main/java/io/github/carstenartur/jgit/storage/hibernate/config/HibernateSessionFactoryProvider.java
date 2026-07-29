@@ -35,7 +35,6 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
         HibernateStorageSettings.JDBC_BATCH_SIZE,
         Integer.toString(HibernateStorageSettings.DEFAULT_JDBC_BATCH_SIZE));
     effectiveProperties.putIfAbsent(HibernateStorageSettings.ORDER_INSERTS, Boolean.TRUE.toString());
-    effectiveProperties.putIfAbsent(HibernateStorageSettings.ORDER_UPDATES, Boolean.TRUE.toString());
 
     Configuration configuration = new Configuration();
     configuration.addProperties(effectiveProperties);
