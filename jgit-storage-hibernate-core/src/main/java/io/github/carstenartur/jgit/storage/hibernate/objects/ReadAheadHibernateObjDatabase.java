@@ -68,8 +68,9 @@ import org.hibernate.SessionFactory;
  * metadata is merged into a local scan result before the cache is cleared. Newly staged inline PACK
  * and Reftable payloads may additionally remain available for repeated read-only opens within one
  * hard repository-instance budget. New payloads are preferred and the oldest retained payloads are
- * discarded first when the budget is exceeded. An incomplete catalog, legacy publication or
- * authoritative database scan contains no local payload state.
+ * discarded first when the budget is exceeded. An authoritative database scan preserves local bytes
+ * only when key, row identifier, size and storage mode still match exactly. An incomplete catalog or
+ * legacy publication contains no local payload state.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -112,13 +113,15 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         }
 
         PackCatalog loaded = loadPackCatalog();
+        Map<ExtensionKey, ExtensionSnapshot> verifiedExtensions =
+            preserveVerifiedLocalPayloads(observedCatalog.extensions(), loaded.extensions());
         CatalogState loadedCatalog =
-            new CatalogState(observedCatalog.generation(), true, false, loaded.extensions());
+            new CatalogState(observedCatalog.generation(), true, false, verifiedExtensions);
         if (committedExtensionCatalog.compareAndSet(observedCatalog, loadedCatalog)) {
-          return loaded.descriptions();
+          return descriptionsFrom(verifiedExtensions);
         }
         if (committedExtensionCatalog.get().generation() == observedCatalog.generation()) {
-          return loaded.descriptions();
+          return descriptionsFrom(verifiedExtensions);
         }
       }
     } finally {
@@ -153,6 +156,29 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
           Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
           return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
         });
+  }
+
+  private static Map<ExtensionKey, ExtensionSnapshot> preserveVerifiedLocalPayloads(
+      Map<ExtensionKey, ExtensionSnapshot> previous,
+      Map<ExtensionKey, ExtensionSnapshot> loaded) {
+    LinkedHashMap<ExtensionKey, ExtensionSnapshot> verified = new LinkedHashMap<>();
+    for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry : previous.entrySet()) {
+      ExtensionSnapshot previousSnapshot = entry.getValue();
+      if (previousSnapshot.localInlinePayload() == null) {
+        continue;
+      }
+      ExtensionSnapshot loadedSnapshot = loaded.get(entry.getKey());
+      if (loadedSnapshot != null && loadedSnapshot.sameCommittedRow(previousSnapshot)) {
+        verified.put(
+            entry.getKey(),
+            loadedSnapshot.withLocalInlinePayload(
+                previousSnapshot.localInlinePayload(), previousSnapshot.packSource()));
+      }
+    }
+    for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry : loaded.entrySet()) {
+      verified.putIfAbsent(entry.getKey(), entry.getValue());
+    }
+    return Map.copyOf(verified);
   }
 
   private List<DfsPackDescription> descriptionsFrom(
@@ -375,6 +401,17 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       boolean inline,
       PackSource packSource,
       LocalInlinePayload localInlinePayload) {
+    private boolean sameCommittedRow(ExtensionSnapshot other) {
+      return packId.equals(other.packId)
+          && fileSize == other.fileSize
+          && inline == other.inline;
+    }
+
+    private ExtensionSnapshot withLocalInlinePayload(
+        LocalInlinePayload payload, PackSource source) {
+      return new ExtensionSnapshot(packId, fileSize, inline, source, payload);
+    }
+
     private ExtensionSnapshot withoutLocalInlinePayload() {
       return localInlinePayload == null
           ? this
