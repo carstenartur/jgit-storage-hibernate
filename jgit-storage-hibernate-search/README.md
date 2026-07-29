@@ -202,7 +202,7 @@ Deleted files remain represented by path. Large or non-blob content is intention
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.1.16</version>
+  <version>0.1.17</version>
 </dependency>
 ```
 
