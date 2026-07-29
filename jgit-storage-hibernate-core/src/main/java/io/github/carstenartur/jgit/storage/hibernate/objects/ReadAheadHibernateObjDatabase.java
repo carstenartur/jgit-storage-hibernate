@@ -13,6 +13,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
@@ -37,12 +38,18 @@ import org.hibernate.SessionFactory;
  * channels. This keeps JGit's write-time DFS block cache aligned with later reads after pack-list
  * invalidation and prevents stale blocks with a different alignment from being reused by copy-as-is
  * protocol transfers.
+ *
+ * <p>Completed unpublished extensions are retained in bounded JVM-local temporary files. JGit closes
+ * every extension before it invokes {@code commitPack}; that callback persists all expected
+ * extensions and makes them visible through one repository-locked Hibernate transaction. The base
+ * implementation remains available for compatibility tests and legacy uncommitted rows.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
+  private final StagedPackExtensionStore stagedExtensions;
 
   public ReadAheadHibernateObjDatabase(
       DfsRepository repository,
@@ -54,6 +61,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
     this.transactionContext = transactionContext;
+    this.stagedExtensions = new StagedPackExtensionStore(repositoryName, transactionContext);
   }
 
   /**
@@ -131,7 +139,32 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   @Override
   protected DfsOutputStream writeFile(DfsPackDescription description, PackExt extension)
       throws IOException {
-    return new AlignedDfsOutputStream(super.writeFile(description, extension));
+    return new AlignedDfsOutputStream(stagedExtensions.open(description, extension));
+  }
+
+  @Override
+  protected void commitPackImpl(
+      Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
+      throws IOException {
+    try {
+      stagedExtensions.commit(descriptions, replaces);
+      clearCache();
+    } catch (IOException | RuntimeException publicationFailure) {
+      // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit paths
+      // such as Reftable publication may propagate commitPack failure directly. Clean local staging
+      // here as well; rollback() is idempotent and retains the legacy database cleanup fallback.
+      stagedExtensions.rollback(descriptions);
+      throw publicationFailure;
+    }
+  }
+
+  @Override
+  protected void rollbackPack(Collection<DfsPackDescription> descriptions) {
+    stagedExtensions.rollback(descriptions);
+  }
+
+  int stagedExtensionCount() {
+    return stagedExtensions.stagedExtensionCount();
   }
 
   private static String baseName(DfsPackDescription description) {

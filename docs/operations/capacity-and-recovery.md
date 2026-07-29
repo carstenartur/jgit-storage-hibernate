@@ -1,46 +1,55 @@
 # Pack capacity and recovery
 
-## Payload model
+## Payload and publication model
 
-Core separates transactional publication metadata from binary payload storage:
+Core separates binary construction from transactional publication:
 
-- `git_packs` owns the repository, pack name, extension, declared size, publication state and writer lease;
-- `git_pack_chunks` stores new payloads in ordered **1 MiB chunks**;
-- existing rows with an inline `git_packs.data` value remain readable after migration;
-- new writes leave `git_packs.data` null and use the chunk table.
+- open JGit `PACK`, `IDX`, object-size-index, bitmap and Reftable writers use bounded temporary files;
+- JGit can perform random reads through the still-open `DfsOutputStream` while constructing or resolving an extension;
+- closing an extension stages the completed temporary file in the repository instance but creates no database row;
+- `commitPack()` acquires the repository lock once for the logical pack, persists every expected extension and marks all rows committed in the same Hibernate transaction;
+- `git_packs` owns repository, pack name, extension, declared size and committed publication metadata;
+- small committed extensions remain inline in `git_packs.data`;
+- larger committed extensions use ordered **1 MiB** rows in `git_pack_chunks`;
+- existing inline, chunked and legacy uncommitted rows remain compatible without a destructive migration.
 
-The writer no longer accumulates a complete pack-related file in a `ByteArrayOutputStream`. It writes to a temporary file, preserving the random-read behavior JGit needs while constructing packs, and transfers bounded chunks to Hibernate during flush. The reader loads at most one payload chunk at a time through the JGit `ReadableChannel`.
+No partially persisted staged extension is visible to readers. A database rollback removes every row and chunk inserted by that publication attempt while leaving the local staging files available for JGit's subsequent rollback callback.
 
-This removes the previous requirement that the largest individual `PACK`, `IDX`, bitmap or Reftable file fit into one Java byte array. It is still not a claim that repository size is unlimited: database throughput, transaction duration, temporary-disk capacity, JGit caches and concurrent work remain deployment constraints.
+This removes the requirement that the largest individual extension fit into one Java byte array. It is still not a claim that repository size is unlimited: database throughput, publication-transaction duration, temporary-disk capacity, JGit caches and concurrent work remain deployment constraints.
 
 ## Sandbox predecessor review
 
-The earlier implementation in the `carstenartur/sandbox` repository was reviewed before this design was added. It also buffers complete payloads in a `ByteArrayOutputStream`, loads them as a single `byte[]` and contains an explicit TODO for direct database streaming. There was therefore no more advanced implementation to copy. The current design was implemented independently in this repository and retains compatibility with H2, HSQLDB and PostgreSQL instead of depending on one database vendor's large-object API.
+The earlier implementation in `carstenartur/sandbox` buffered complete payloads in a `ByteArrayOutputStream`, loaded them as a single `byte[]` and contained an explicit TODO for direct database streaming. There was therefore no more advanced implementation to copy. The current design was implemented independently and retains database portability instead of depending on one vendor's large-object API.
 
 ## Memory and temporary-disk envelope
 
 The production path uses:
 
-- one temporary file per open pack-extension writer;
-- a 1 MiB transfer buffer;
+- one temporary file per open or completed-but-unpublished pack extension;
+- a 1 MiB transfer buffer while publishing chunked extensions;
 - a bounded Hibernate batch of payload chunks;
-- one cached 1 MiB chunk per open chunked reader.
+- a bounded multi-chunk read-ahead window per open chunked reader.
 
-Temporary files exist until the corresponding JGit output stream closes. The directory used by `Files.createTempFile(...)` must therefore have enough free space for concurrent in-progress pack extensions. Monitor both JVM memory and temporary-disk space.
+Temporary files remain until the corresponding logical pack is committed or rolled back, not merely until each extension stream closes. The directory used by `Files.createTempFile(...)` must therefore have enough free space for all concurrent open writers plus every completed extension waiting for its `commitPack()` callback.
 
-The chunk format uses a `long` declared file size and does not rely on Java array indexing for the complete payload. Individual chunk indexes are still Java integers; with 1 MiB chunks this limit is far beyond the capacity envelope currently exercised by the project.
+Normal publication and rollback delete temporary files explicitly. The implementation deliberately does not register every extension with the JVM-wide `deleteOnExit` registry, because that registry grows for the lifetime of a server process. A JVM crash or operating-system deletion failure can leave files with the `jgit-storage-pack-` prefix in the configured temporary directory. They are unpublished derived state and are never treated as durable or resumable Git data. Operators may remove stale prefixed files only after verifying that no matching JVM/process is active.
+
+The chunk format uses a `long` declared file size and does not rely on Java array indexing for the complete payload. Individual chunk indexes are Java integers; with 1 MiB chunks this remains far beyond the capacity envelope currently exercised by the project.
 
 ## Capacity verification
 
 Normal pull-request tests cover:
 
-- writes spanning several chunks;
-- write → flush → write → close behavior;
-- random reads across chunk boundaries;
+- no database row before logical-pack publication;
+- atomic multi-extension publication with one repository lock;
+- transaction rollback after a later extension fails;
+- database-free rollback of purely local staging;
+- random reads through an open staging stream;
+- inline and multi-chunk staged publication;
 - close/reopen and `SessionFactory` restart;
-- H2, file-backed/in-memory HSQLDB and PostgreSQL migrations;
-- legacy inline payload compatibility;
-- repository deletion and rollback of chunk rows.
+- H2, file-backed/in-memory HSQLDB, PostgreSQL and SQL Server behavior;
+- legacy inline and durable-uncommitted-row compatibility;
+- repository deletion, replacement and chunk-row rollback.
 
 A separate Maven profile verifies **1 MiB, 16 MiB and 128 MiB** payloads without making every pull request pay the 128 MiB test cost:
 
@@ -48,26 +57,33 @@ A separate Maven profile verifies **1 MiB, 16 MiB and 128 MiB** payloads without
 mvn -B -pl jgit-storage-hibernate-core -Ppack-capacity verify
 ```
 
-The existing performance workflow executes this profile for manual and weekly scheduled runs. These sizes demonstrate bounded chunk behavior and random access; they are not a universal maximum-pack certification.
+The performance workflow executes this profile for manual and weekly scheduled runs. These sizes demonstrate bounded chunk behavior and random access; they are not a universal maximum-pack certification.
 
-Before production use, also test an import or repack representative of the largest expected repository, concurrent readers and writers, backup/restore and the actual database connection-pool and disk configuration.
+Before production use, also test an import or repack representative of the largest expected repository, concurrent readers and writers, backup/restore and the actual database connection-pool and temporary-disk configuration.
 
-## Writer leases
+## Legacy durable writer leases
 
-Every persisted uncommitted pack extension has:
+The normal ReadAhead backend no longer creates durable uncommitted rows while an extension is being built. Writer tokens and leases remain part of the published schema and compatibility path for:
 
-- a UUID `write_token` identifying the writer;
-- a renewable `write_lease_until` timestamp.
+- databases containing uncommitted rows produced by an earlier library version;
+- direct use of the base `HibernateObjDatabase` contract;
+- safe maintenance and rollback of those durable rows.
 
-The lease is renewed while a persisted writer continues working. Flush and close verify that the row is still owned by the same token. Pack flush, publication, rollback, ref publication and cleanup use the same repository-scoped pessimistic database lock.
+Every persisted uncommitted extension has a UUID `write_token` and renewable `write_lease_until`. The base writer verifies ownership on persistence and close. Publication, rollback, ref publication and maintenance use the same repository-scoped pessimistic lock.
 
-A lease protects a slow active writer, but it is not a substitute for reasonable operational limits. A process paused longer than the lease duration can lose ownership after an operator cleanup. When it resumes, its next persistence attempt fails instead of silently overwriting another writer's state.
+The new staging path may publish a logical pack containing both local staged extensions and legacy durable uncommitted extensions. Both representations are validated and made committed in the same transaction. Rollback deletes local files without database work when every expected extension was staged locally, and falls back to locked database cleanup when a legacy extension is involved.
 
-## Recovering abandoned uncommitted packs
+## Recovering abandoned state
 
-Normal JGit rollback removes uncommitted rows. A process crash can prevent that callback and leave invisible storage behind. Readers continue to ignore those rows because `committed=false`.
+### Local staging files
 
-Use the public maintenance service rather than direct SQL:
+A hard JVM termination can prevent normal rollback and leave temporary files. They contain no authoritative state and have no corresponding committed row. Recover them through operating-system temporary-directory policy or an operator cleanup that selects stale `jgit-storage-pack-` files after confirming the owning process is gone.
+
+Do not attempt to import such files as packs. The association with JGit's in-memory `DfsPackDescription`, expected extensions and publication transaction was lost with the process.
+
+### Legacy uncommitted database rows
+
+A crash of an older/base writer can leave invisible `committed=false` rows. Readers ignore them. Use the public maintenance service rather than direct SQL:
 
 ```java
 PackCleanupResult result =
@@ -81,7 +97,7 @@ PackCleanupResult result =
 The operation:
 
 1. ensures the repository coordination row exists;
-2. obtains the same pessimistic repository lock used by writers and ref publication;
+2. obtains the same pessimistic repository lock used by publication and ref updates;
 3. considers only pack names for which **every persisted extension** is old, uncommitted and has no valid lease;
 4. excludes any group containing a published, recent or actively leased extension;
 5. deletes chunk rows and metadata in one transaction;
@@ -91,7 +107,7 @@ Choose `createdBefore` conservatively. It is an operator policy cutoff in additi
 
 ## Inspection queries
 
-Read-only inspection remains useful:
+Read-only inspection of legacy durable staging remains useful:
 
 ```sql
 select repository_name,
@@ -106,10 +122,8 @@ where committed = false
 order by repository_name, pack_name, pack_extension;
 ```
 
-Do not schedule a raw `DELETE FROM git_packs WHERE committed = false`. It bypasses the repository lock, pack-extension grouping and lease checks implemented by `PackStorageMaintenance`.
+A normal new publication should not appear in this query between extension close and `commitPack()`, because its bytes are still JVM-local. Do not schedule a raw `DELETE FROM git_packs WHERE committed = false`; it bypasses the repository lock, pack-extension grouping and lease checks implemented by `PackStorageMaintenance`.
 
 ## Legacy inline rows
 
-Migration intentionally does not rewrite already published inline BLOBs. This keeps upgrades short and avoids a large data rewrite inside schema migration. New writes are chunked; old rows are read through the compatibility channel until a future explicit repack replaces them.
-
-Repository deletion and pack replacement remove both inline rows and chunk rows. The Flyway schemas use foreign-key cascade, and the Hibernate mappings generate equivalent cascade behavior for disposable `create-drop` test schemas.
+Migration intentionally does not rewrite already published inline BLOBs. This keeps upgrades short and avoids a large data rewrite inside schema migration. New small extensions may also remain inline; larger extensions use chunks. Repository deletion and pack replacement remove both representations. Flyway schemas use foreign-key cascade, and disposable `create-drop` schemas generate equivalent behavior through the Hibernate mappings.
