@@ -1,6 +1,6 @@
 # Protocol storage metrics
 
-The real JGit protocol benchmarks expose database and repository coordination costs as JMH secondary metrics. This complements elapsed time with evidence about why an operation is expensive.
+The real JGit protocol benchmarks expose database and repository coordination costs as JMH secondary metrics. This complements elapsed time with evidence about why an operation is expensive and prevents optimization work from being selected only from timing noise.
 
 ## Scope
 
@@ -15,7 +15,7 @@ Fixture creation is completed before counters are reset. Schema creation, reposi
 
 Filesystem runs publish zero for database-specific counters.
 
-## JMH secondary metrics
+## Aggregate JMH secondary metrics
 
 | Counter | Meaning |
 |---|---|
@@ -31,7 +31,42 @@ Filesystem runs publish zero for database-specific counters.
 
 `repositoryLockAcquisitionMicros` includes the database round trip and any contention wait. It is deliberately not labelled as pure lock-wait time because portable Hibernate timing cannot separate those components.
 
-The public performance dashboard continues to chart primary latency only. The secondary metrics remain in the raw `jmh-result.json` workflow artifact for architecture analysis.
+## Per-operation breakdown
+
+Every top-level repository transaction receives exactly one stable `StorageOperationKind`. Nested work sharing the active Hibernate session inherits the category of the owning transaction. The benchmark fails immediately if the sum of category counters differs from the backward-compatible aggregate snapshot.
+
+| Operation kind | Diagnostic boundary |
+|---|---|
+| `REPOSITORY_INITIALIZATION` | creation or verification of repository coordination state |
+| `PACK_METADATA_READ` | reconstruction of committed DFS pack descriptions |
+| `PACK_FILE_READ` | opening one committed pack extension |
+| `PACK_EXTENSION_WRITE` | persistence or lease renewal of a temporary PACK/IDX/REFTABLE extension |
+| `PACK_PUBLICATION` | making complete extensions visible as one committed pack |
+| `PACK_ROLLBACK` | removal of an unpublished pack after failure |
+| `PACK_MAINTENANCE` | cleanup of expired uncommitted pack state |
+| `REF_PUBLICATION` | locked ref/reftable publication and its nested reflog work |
+| `REFLOG_READ` | standalone reflog retrieval |
+| `REFLOG_WRITE` | standalone reflog persistence outside a ref-publication transaction |
+| `OTHER` | explicit uncategorized application work or an internal call site still requiring classification |
+
+The raw JMH JSON publishes fixed transaction counters for every category and lock counters for the categories that can acquire the repository lock. High-value fields include:
+
+```text
+packExtensionWriteTransactions
+packPublicationTransactions
+refPublicationTransactions
+packMetadataReadTransactions
+packFileReadTransactions
+packExtensionWriteLocks
+packPublicationLocks
+refPublicationLocks
+otherStorageTransactions
+otherRepositoryLocks
+```
+
+For the four protocol workloads, `otherStorageTransactions` and `otherRepositoryLocks` should be zero. A non-zero value is treated as a diagnostic gap rather than silently folded into a misleading category.
+
+The public performance dashboard continues to chart primary latency only. Secondary metrics remain in the raw `jmh-result.json` workflow artifact for architecture analysis.
 
 ## Enabling repository counters
 
@@ -41,7 +76,7 @@ Repository transaction and lock counters are opt-in:
 jgit.storage.hibernate.metrics.enabled=true
 ```
 
-The default is `false`. Applications that do not enable the property do not update the `LongAdder` counters and receive a zero snapshot.
+The default is `false`. Applications that do not enable the property do not allocate category-counter arrays, do not inspect internal call stacks and receive zero aggregate and breakdown snapshots.
 
 Hibernate's own counters remain controlled independently:
 
@@ -49,9 +84,9 @@ Hibernate's own counters remain controlled independently:
 hibernate.generate_statistics=true
 ```
 
-## Programmatic snapshot
+## Programmatic snapshots
 
-Internal repository-level integration can read a monotone snapshot:
+Aggregate compatibility API:
 
 ```java
 StorageOperationMetrics before = repository.getStorageOperationMetrics();
@@ -60,15 +95,32 @@ StorageOperationMetrics delta =
     repository.getStorageOperationMetrics().minus(before);
 ```
 
-The snapshot records transaction starts, commits, rollbacks, repository-lock acquisitions and cumulative lock acquisition nanoseconds. Nested storage work sharing an active repository transaction is counted only once.
+Categorized diagnostic API:
+
+```java
+StorageOperationBreakdown before = repository.getStorageOperationBreakdown();
+// execute JGit operation
+StorageOperationBreakdown delta =
+    repository.getStorageOperationBreakdown().minus(before);
+
+StorageOperationMetrics packWrites =
+    delta.metrics(StorageOperationKind.PACK_EXTENSION_WRITE);
+```
+
+`StorageOperationBreakdown.total()` must equal the aggregate delta for the same interval. Snapshots are immutable and monotone; `minus(...)` rejects an earlier/newer ordering that would produce negative counters.
 
 ## Interpretation
 
 The metrics are intended to choose the next optimization using evidence:
 
-- many storage transactions or connections suggest transaction-boundary consolidation;
-- many prepared statements during pack ingestion suggest incremental chunk persistence or real JDBC batching;
+- many `PACK_EXTENSION_WRITE` transactions or locks suggest temporary-extension persistence or lease-boundary work;
+- many `PACK_PUBLICATION` transactions suggest pack publication is fragmented;
+- many `REF_PUBLICATION` transactions or locks suggest ref/reftable coordination is the dominant fixed cost;
+- many `PACK_METADATA_READ` or `PACK_FILE_READ` transactions suggest pack-list reconstruction or read-channel opening should be examined;
+- many prepared statements within a small number of pack-write transactions suggest JDBC batching or incremental chunk persistence;
 - substantial repository-lock acquisition time under concurrency suggests lock-granularity work;
 - low database activity with high elapsed time suggests JGit pack generation, compression or client-side work rather than Hibernate storage.
+
+PR #130 tested and rejected one plausible-looking hypothesis: suppressing intermediate flush delegation did not change the transaction, statement, connection or lock counts. The patch was not merged. The categorized breakdown exists specifically so the next implementation targets a measured operation boundary rather than another guess.
 
 No Hibernate second-level payload cache should be introduced solely from elapsed-time comparisons. JGit already maintains its specialized DFS block cache, so duplicate payload caching requires explicit evidence.
