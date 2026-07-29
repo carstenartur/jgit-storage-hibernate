@@ -72,11 +72,11 @@ final class StagedPackExtensionStore {
     return new StagedOutputStream(key, this::register);
   }
 
-  List<CommittedExtension> commit(
+  CommitResult commit(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
     List<Publication> publications = publications(descriptions);
-    List<CommittedExtension> committedExtensions =
+    CommitResult commitResult =
         transactionContext.executeWithRepositoryLock(
             repositoryName,
             session -> {
@@ -87,22 +87,23 @@ final class StagedPackExtensionStore {
               }
 
               List<CommittedExtension> committed = new ArrayList<>();
+              boolean completeMetadata = true;
               Instant committedAt = Instant.now();
               for (Publication publication : publications) {
                 for (ExpectedExtension expected : publication.extensions()) {
                   if (expected.staged() != null) {
                     committed.add(persistCommitted(session, expected.staged(), committedAt));
                   } else {
-                    committed.add(
-                        publishLegacyExtension(
-                            session,
-                            publication.packName(),
-                            expected.extension(),
-                            committedAt));
+                    publishLegacyExtension(
+                        session,
+                        publication.packName(),
+                        expected.extension(),
+                        committedAt);
+                    completeMetadata = false;
                   }
                 }
               }
-              return List.copyOf(committed);
+              return new CommitResult(List.copyOf(committed), completeMetadata);
             });
 
     for (Publication publication : publications) {
@@ -114,7 +115,7 @@ final class StagedPackExtensionStore {
         }
       }
     }
-    return committedExtensions;
+    return commitResult;
   }
 
   void rollback(Collection<DfsPackDescription> descriptions) {
@@ -276,7 +277,7 @@ final class StagedPackExtensionStore {
     return false;
   }
 
-  private CommittedExtension publishLegacyExtension(
+  private void publishLegacyExtension(
       Session session, String packName, String extension, Instant committedAt) throws IOException {
     int updated =
         session
@@ -298,23 +299,6 @@ final class StagedPackExtensionStore {
               + "."
               + extension);
     }
-    Object[] row =
-        session
-            .createQuery(
-                "SELECT p.id, p.fileSize, CASE WHEN p.data IS NULL THEN 0 ELSE 1 END "
-                    + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name AND p.packExtension = :ext",
-                Object[].class)
-            .setParameter("repo", repositoryName)
-            .setParameter("name", packName)
-            .setParameter("ext", extension)
-            .getSingleResult();
-    return new CommittedExtension(
-        packName,
-        extension,
-        (Long) row[0],
-        ((Number) row[1]).longValue(),
-        ((Number) row[2]).intValue() != 0);
   }
 
   private static byte[] readInline(FileChannel channel, long fileSize) throws IOException {
@@ -400,6 +384,12 @@ final class StagedPackExtensionStore {
     String fileName = description.getFileName(PackExt.PACK);
     int dot = fileName.lastIndexOf('.');
     return dot > 0 ? fileName.substring(0, dot) : fileName;
+  }
+
+  record CommitResult(List<CommittedExtension> committedExtensions, boolean completeMetadata) {
+    CommitResult {
+      committedExtensions = List.copyOf(committedExtensions);
+    }
   }
 
   record CommittedExtension(
