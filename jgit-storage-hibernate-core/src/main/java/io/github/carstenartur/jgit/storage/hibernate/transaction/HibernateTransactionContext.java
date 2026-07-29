@@ -24,6 +24,9 @@ public final class HibernateTransactionContext {
 
   public static final String METRICS_ENABLED_PROPERTY = "jgit.storage.hibernate.metrics.enabled";
 
+  private static final StackWalker STACK_WALKER =
+      StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+
   private final SessionFactory sessionFactory;
   private final ThreadLocal<Session> activeSession = new ThreadLocal<>();
   private final ThreadLocal<StorageOperationKind> activeOperation = new ThreadLocal<>();
@@ -97,10 +100,7 @@ public final class HibernateTransactionContext {
     }
   }
 
-  /**
-   * Attribute uncategorized transactions started by a delegated DFS callback to one operation kind.
-   * Nested scopes preserve the outer category.
-   */
+  /** Attribute uncategorized transactions started by a delegated DFS callback to one operation. */
   public <T> T withinOperation(StorageOperationKind operation, IoWork<T> work) throws IOException {
     Objects.requireNonNull(operation, "operation");
     Objects.requireNonNull(work, "work");
@@ -197,7 +197,48 @@ public final class HibernateTransactionContext {
       return requested;
     }
     StorageOperationKind scoped = requestedOperation.get();
-    return scoped == null ? StorageOperationKind.OTHER : scoped;
+    if (scoped != null) {
+      return scoped;
+    }
+    return metricsEnabled ? inferInternalOperation() : StorageOperationKind.OTHER;
+  }
+
+  private static StorageOperationKind inferInternalOperation() {
+    return STACK_WALKER.walk(
+        frames ->
+            frames
+                .map(HibernateTransactionContext::classify)
+                .filter(kind -> kind != null)
+                .findFirst()
+                .orElse(StorageOperationKind.OTHER));
+  }
+
+  private static StorageOperationKind classify(StackWalker.StackFrame frame) {
+    String className = frame.getClassName();
+    String method = frame.getMethodName();
+    if (className.endsWith("HibernateObjDatabase$HibernatePackOutputStream")) {
+      return StorageOperationKind.PACK_EXTENSION_WRITE;
+    }
+    if (className.endsWith("HibernateObjDatabase")
+        || className.endsWith("ReadAheadHibernateObjDatabase")) {
+      return switch (method) {
+        case "listPacks" -> StorageOperationKind.PACK_METADATA_READ;
+        case "openFile" -> StorageOperationKind.PACK_FILE_READ;
+        case "commitPackImpl" -> StorageOperationKind.PACK_PUBLICATION;
+        case "rollbackPack" -> StorageOperationKind.PACK_ROLLBACK;
+        default -> null;
+      };
+    }
+    if (className.endsWith("PackStorageMaintenance")) {
+      return StorageOperationKind.PACK_MAINTENANCE;
+    }
+    if (className.endsWith("HibernateReflogReader")) {
+      return StorageOperationKind.REFLOG_READ;
+    }
+    if (className.endsWith("HibernateReflogWriter")) {
+      return StorageOperationKind.REFLOG_WRITE;
+    }
+    return null;
   }
 
   private StorageOperationKind activeOperation() {
