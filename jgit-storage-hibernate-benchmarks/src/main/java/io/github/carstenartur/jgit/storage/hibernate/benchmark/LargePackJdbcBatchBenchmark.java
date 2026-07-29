@@ -47,13 +47,14 @@ import org.openjdk.jmh.annotations.Warmup;
 @State(Scope.Thread)
 public class LargePackJdbcBatchBenchmark {
 
-  static final String POSTGRESQL_NO_JDBC_BATCH = "postgresql-no-jdbc-batch";
+  static final String DISABLED = "disabled";
+  static final String ENABLED = "enabled";
   private static final int PAYLOAD_SIZE = 12 * 1024 * 1024 + 257;
 
   private final AtomicInteger invocationCounter = new AtomicInteger();
 
-  @Param({POSTGRESQL_NO_JDBC_BATCH, HibernateRepositoryBenchmark.POSTGRESQL})
-  public String backend;
+  @Param({DISABLED, ENABLED})
+  public String batchingMode;
 
   private HibernateSessionFactoryProvider provider;
   private HibernateRepository repository;
@@ -81,7 +82,7 @@ public class LargePackJdbcBatchBenchmark {
     properties.put("hibernate.generate_statistics", "true");
     properties.put(
         "hibernate.session.events.auto", JdbcBatchMetricsSessionEventListener.class.getName());
-    if (POSTGRESQL_NO_JDBC_BATCH.equals(backend)) {
+    if (DISABLED.equals(batchingMode)) {
       properties.put(HibernateStorageSettings.JDBC_BATCH_SIZE, "0");
     }
 
@@ -95,7 +96,7 @@ public class LargePackJdbcBatchBenchmark {
   public void setupInvocation() throws Exception {
     String repositoryName =
         "jmh-large-pack-"
-            + backend
+            + batchingMode
             + "-"
             + invocationCounter.incrementAndGet()
             + "-"
