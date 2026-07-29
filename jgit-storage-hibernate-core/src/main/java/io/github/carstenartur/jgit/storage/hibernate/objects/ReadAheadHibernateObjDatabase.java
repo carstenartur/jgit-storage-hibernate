@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import io.github.carstenartur.jgit.storage.hibernate.objects.BoundedInlinePayloadCache.Identity;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommitResult;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
@@ -59,10 +60,13 @@ import org.hibernate.SessionFactory;
  * started before a successful pack mutation cannot overwrite the subsequent invalidation or return a
  * stale list after that mutation. A fair repository-instance-local read/write lock prevents scans
  * from reading the database while this instance has an uncommitted pack replacement in progress.
- * Chunked files can then open without repeating the metadata query. Inline bytes remain outside the
- * generation catalog and are retained only in a separately bounded row-ID-keyed LRU. Newly published
- * inline payloads are handed off directly; historical payloads enter that cache only after a
- * successful authoritative database read.
+ * Chunked files can then open without repeating the metadata query.
+ *
+ * <p>Inline payload bytes remain outside the generation catalog. Only newly staged inline PACK and
+ * Reftable bytes may enter a hard-bounded 512-KiB repository-instance handoff after their database
+ * publication commits. Historical database-loaded arrays, IDX files and auxiliary extensions are
+ * never retained. An authoritative catalog scan preserves a local payload only when pack name,
+ * extension, generated row ID, persisted size and inline storage mode still match exactly.
  *
  * <p>Successful local publication keeps JGit's normal {@code clearCache()} and event semantics. When
  * the previous catalog and the returned publication metadata are both complete, the exact committed
@@ -79,7 +83,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private final HibernateTransactionContext transactionContext;
   private final StagedPackExtensionStore stagedExtensions;
   private final PackFileReadCounters packFileReadCounters;
-  private final BoundedInlinePayloadCache inlinePayloadCache;
+  private final BoundedInlinePayloadCache inlinePayloadCache = new BoundedInlinePayloadCache();
   private final AtomicReference<CatalogState> committedExtensionCatalog =
       new AtomicReference<>(CatalogState.empty());
   private final ReentrantReadWriteLock catalogLifecycleLock = new ReentrantReadWriteLock(true);
@@ -96,7 +100,6 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.transactionContext = transactionContext;
     this.stagedExtensions = new StagedPackExtensionStore(repositoryName, transactionContext);
     this.packFileReadCounters = PackFileReadCounters.from(sessionFactory);
-    this.inlinePayloadCache = BoundedInlinePayloadCache.from(sessionFactory);
   }
 
   /**
@@ -142,32 +145,35 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   }
 
   private PackCatalog loadPackCatalog() throws IOException {
-    return transactionContext.execute(
-        session -> {
-          List<Object[]> rows =
-              session
-                  .createQuery(
-                      "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
-                          + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END "
-                          + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                          + "AND p.committed = true",
-                      Object[].class)
-                  .setParameter("repo", repositoryName)
-                  .getResultList();
-          LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
-          for (Object[] row : rows) {
-            Long packId = (Long) row[0];
-            String packName = (String) row[1];
-            String extension = (String) row[2];
-            long fileSize = ((Number) row[3]).longValue();
-            boolean inline = ((Number) row[4]).intValue() != 0;
-            extensions.put(
-                new ExtensionKey(packName, extension),
-                new ExtensionSnapshot(packId, fileSize, inline, PackSource.INSERT));
-          }
-          Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
-          return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
-        });
+    PackCatalog catalog =
+        transactionContext.execute(
+            session -> {
+              List<Object[]> rows =
+                  session
+                      .createQuery(
+                          "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
+                              + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END "
+                              + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                              + "AND p.committed = true",
+                          Object[].class)
+                      .setParameter("repo", repositoryName)
+                      .getResultList();
+              LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
+              for (Object[] row : rows) {
+                Long packId = (Long) row[0];
+                String packName = (String) row[1];
+                String extension = (String) row[2];
+                long fileSize = ((Number) row[3]).longValue();
+                boolean inline = ((Number) row[4]).intValue() != 0;
+                extensions.put(
+                    new ExtensionKey(packName, extension),
+                    new ExtensionSnapshot(packId, fileSize, inline, PackSource.INSERT));
+              }
+              Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
+              return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
+            });
+    inlinePayloadCache.retainOnly(cacheableIdentities(catalog.extensions()));
+    return catalog;
   }
 
   private List<DfsPackDescription> descriptionsFrom(
@@ -203,9 +209,11 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         return new ReadAheadChunkedReadableChannel(
             sessionFactory, snapshot.packId(), snapshot.fileSize());
       }
-      byte[] cached = inlinePayloadCache.get(snapshot.packId());
-      if (cached != null) {
-        return new InlineReadableChannel(cached);
+      if (isCacheableExtension(key.extension())) {
+        byte[] cached = inlinePayloadCache.get(payloadIdentity(key, snapshot));
+        if (cached != null) {
+          return new InlineReadableChannel(cached);
+        }
       }
     }
     return openFileFromDatabase(description, extension);
@@ -236,7 +244,6 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
               });
       packFileReadCounters.record(extension, result.inline());
       if (result.inline()) {
-        inlinePayloadCache.put(result.packId(), result.inlineData());
         return new InlineReadableChannel(result.inlineData());
       }
       return new ReadAheadChunkedReadableChannel(
@@ -326,15 +333,16 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     if (replacedPackNames.isEmpty()) {
       return;
     }
-    List<Long> replacedRowIds = new ArrayList<>();
+    List<Identity> replacedIdentities = new ArrayList<>();
     for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry :
         previousCatalog.extensions().entrySet()) {
       if (entry.getValue().inline()
+          && isCacheableExtension(entry.getKey().extension())
           && replacedPackNames.contains(entry.getKey().packName())) {
-        replacedRowIds.add(entry.getValue().packId());
+        replacedIdentities.add(payloadIdentity(entry.getKey(), entry.getValue()));
       }
     }
-    inlinePayloadCache.removeAll(replacedRowIds);
+    inlinePayloadCache.removeAll(replacedIdentities);
   }
 
   private static Set<String> packNames(Collection<DfsPackDescription> descriptions) {
@@ -353,27 +361,56 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     for (DfsPackDescription description : descriptions) {
       packSources.put(baseName(description), description.getPackSource());
     }
+
+    Map<ExtensionKey, ExtensionSnapshot> additions = new LinkedHashMap<>();
+    List<CachedPayload> payloads = new ArrayList<>();
+    for (CommittedExtension committed : commitResult.committedExtensions()) {
+      PackSource source = packSources.getOrDefault(committed.packName(), PackSource.INSERT);
+      ExtensionKey key = new ExtensionKey(committed.packName(), committed.extension());
+      ExtensionSnapshot snapshot =
+          new ExtensionSnapshot(
+              committed.packId(), committed.fileSize(), committed.inline(), source);
+      additions.put(key, snapshot);
+      if (committed.inline() && isCacheableExtension(committed.extension())) {
+        payloads.add(new CachedPayload(payloadIdentity(key, snapshot), committed.inlineData()));
+      }
+    }
+
     committedExtensionCatalog.updateAndGet(
         current -> {
           LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions =
               new LinkedHashMap<>(current.extensions());
-          for (CommittedExtension committed : commitResult.committedExtensions()) {
-            PackSource source = packSources.getOrDefault(committed.packName(), PackSource.INSERT);
-            extensions.put(
-                new ExtensionKey(committed.packName(), committed.extension()),
-                new ExtensionSnapshot(
-                    committed.packId(), committed.fileSize(), committed.inline(), source));
-            if (committed.inline()) {
-              inlinePayloadCache.put(committed.packId(), committed.inlineData());
-            }
-          }
+          extensions.putAll(additions);
           return current.completeMutation(extensions, commitResult.completeMetadata());
         });
+    for (CachedPayload payload : payloads) {
+      inlinePayloadCache.put(payload.identity(), payload.data());
+    }
   }
 
   private void restoreCatalogAfterFailedMutation(CatalogState previousCatalog) {
     committedExtensionCatalog.updateAndGet(
         current -> previousCatalog.withGeneration(current.generation() + 1));
+  }
+
+  private static Set<Identity> cacheableIdentities(
+      Map<ExtensionKey, ExtensionSnapshot> extensions) {
+    Set<Identity> identities = new HashSet<>();
+    for (Map.Entry<ExtensionKey, ExtensionSnapshot> entry : extensions.entrySet()) {
+      if (entry.getValue().inline() && isCacheableExtension(entry.getKey().extension())) {
+        identities.add(payloadIdentity(entry.getKey(), entry.getValue()));
+      }
+    }
+    return Set.copyOf(identities);
+  }
+
+  private static boolean isCacheableExtension(String extension) {
+    return PackExt.PACK.getExtension().equals(extension)
+        || PackExt.REFTABLE.getExtension().equals(extension);
+  }
+
+  private static Identity payloadIdentity(ExtensionKey key, ExtensionSnapshot snapshot) {
+    return new Identity(key.packName(), key.extension(), snapshot.packId(), snapshot.fileSize());
   }
 
   private static String baseName(DfsPackDescription description) {
@@ -386,6 +423,8 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
   private record ExtensionSnapshot(
       Long packId, long fileSize, boolean inline, PackSource packSource) {}
+
+  private record CachedPayload(Identity identity, byte[] data) {}
 
   private record CatalogState(
       long generation,
