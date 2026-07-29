@@ -7,10 +7,9 @@
 ```properties
 hibernate.jdbc.batch_size=8
 hibernate.order_inserts=true
-hibernate.order_updates=true
 ```
 
-The batch size matches the storage writer's bounded eight-chunk `flush()`/`clear()` window. With one MiB chunks, the persistence context retains roughly eight MiB of chunk payload before flushing. Applications can override every setting explicitly.
+The batch size matches the storage writer's bounded eight-chunk `flush()`/`clear()` window. With one MiB chunks, the persistence context retains roughly eight MiB of chunk payload before flushing. Applications can override both settings explicitly. The provider deliberately does not change `hibernate.order_updates`, because update ordering would also affect unrelated application entities registered in the same persistence context.
 
 Framework-managed applications that construct their own `SessionFactory` do not pass through `HibernateSessionFactoryProvider` and must configure JDBC batching themselves.
 
