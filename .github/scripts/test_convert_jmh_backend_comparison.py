@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -18,7 +20,10 @@ SPEC.loader.exec_module(MODULE)
 
 class ConvertJmhBackendComparisonTest(unittest.TestCase):
     def test_converts_all_supported_backends_with_readable_labels(self) -> None:
-        raw = [self._backend_result(backend, index + 1.0) for index, backend in enumerate(MODULE.BACKEND_LABELS)]
+        raw = [
+            self._backend_result(backend, index + 1.0)
+            for index, backend in enumerate(MODULE.BACKEND_LABELS)
+        ]
 
         converted = MODULE.convert(raw)
 
@@ -27,9 +32,9 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         self.assertIn("operation — JGit + PostgreSQL + HikariCP", names)
         self.assertIn("operation — JGit + filesystem", names)
         for entry in converted:
-          self.assertEqual("ms/op", entry["unit"])
-          self.assertTrue(math.isfinite(entry["value"]))
-          self.assertIn("JDK: 21", entry["extra"])
+            self.assertEqual("ms/op", entry["unit"])
+            self.assertTrue(math.isfinite(entry["value"]))
+            self.assertIn("JDK: 21", entry["extra"])
 
     def test_converts_large_pack_batching_modes(self) -> None:
         converted = MODULE.convert(
@@ -43,6 +48,23 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         self.assertEqual(2, len(converted))
         self.assertIn("publishTwelveMiBPack — JGit + PostgreSQL (JDBC batching off)", names)
         self.assertIn("publishTwelveMiBPack — JGit + PostgreSQL (JDBC batching on)", names)
+
+    def test_loads_and_combines_multiple_result_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            standard = root / "standard.json"
+            focused = root / "focused.json"
+            standard.write_text(
+                json.dumps([self._backend_result("postgresql", 12.0)]), encoding="utf-8"
+            )
+            focused.write_text(
+                json.dumps([self._batching_result("enabled", 9.0)]), encoding="utf-8"
+            )
+
+            combined = MODULE.load_results([standard, focused])
+
+        self.assertEqual(2, len(combined))
+        self.assertEqual(2, len(MODULE.convert(combined)))
 
     def test_rejects_unknown_backends(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unsupported JMH backend"):
