@@ -125,6 +125,32 @@ jobs:
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/jdbc-batching/jmh-result.json" 2>&1 \
             | tee target/jdbc-batching/maven-benchmark.log
 
+          result_source="$(find jgit-storage-hibernate-benchmarks/target target \
+            -type f \( -name 'jdbc-batch-jmh-result.json' -o -name 'jmh-result.json' \) \
+            ! -path 'target/jdbc-batching/jmh-result.json' -print -quit)"
+          output_source="$(find jgit-storage-hibernate-benchmarks/target target \
+            -type f -name 'jdbc-batch-jmh-output.txt' \
+            ! -path 'target/jdbc-batching/jmh-output.txt' -print -quit)"
+
+          if [ -z "$result_source" ] && [ -s target/jdbc-batching/jmh-result.json ]; then
+            result_source=target/jdbc-batching/jmh-result.json
+          fi
+          if [ -z "$output_source" ] && [ -s target/jdbc-batching/jmh-output.txt ]; then
+            output_source=target/jdbc-batching/jmh-output.txt
+          fi
+
+          test -n "$result_source"
+          test -s "$result_source"
+          test -n "$output_source"
+          test -s "$output_source"
+
+          if [ "$(realpath "$result_source")" != "$(realpath -m target/jdbc-batching/jmh-result.json)" ]; then
+            cp "$result_source" target/jdbc-batching/jmh-result.json
+          fi
+          if [ "$(realpath "$output_source")" != "$(realpath -m target/jdbc-batching/jmh-output.txt)" ]; then
+            cp "$output_source" target/jdbc-batching/jmh-output.txt
+          fi
+
       - name: Convert focused batch comparison
         run: |
           python3 .github/scripts/convert-jmh-backend-comparison.py \
