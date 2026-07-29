@@ -106,7 +106,7 @@ class StagedPackExtensionStoreH2Test {
   }
 
   @Test
-  void publicationFailureRollsBackEveryNewExtension() throws Exception {
+  void publicationFailureRollsBackRowsAndCleansLocalStaging() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), "atomic-failure")) {
@@ -124,10 +124,10 @@ class StagedPackExtensionStoreH2Test {
           baselineRows + 1,
           rowCount(provider, "atomic-failure"),
           "Only the pre-existing conflicting row may remain after transaction rollback");
-      assertEquals(2, database.stagedExtensionCount());
-
-      database.rollbackPack(List.of(description));
-      assertEquals(0, database.stagedExtensionCount());
+      assertEquals(
+          0,
+          database.stagedExtensionCount(),
+          "Publication failure must clean local staging even when JGit has no rollback callback");
     }
   }
 
