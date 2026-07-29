@@ -17,11 +17,13 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +31,7 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.Session;
+import org.hibernate.exception.ConstraintViolationException;
 
 /**
  * JVM-local staging for unpublished DFS pack extensions.
@@ -48,6 +51,7 @@ import org.hibernate.Session;
 final class StagedPackExtensionStore {
 
   private static final int CHUNK_BATCH_SIZE = 8;
+  private static final String PACK_EXTENSION_UNIQUE_CONSTRAINT = "uk_pack_repo_name_ext";
 
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
@@ -193,21 +197,6 @@ final class StagedPackExtensionStore {
 
   private void persistCommitted(Session session, StagedExtension stagedExtension, Instant committedAt)
       throws IOException {
-    Long existing =
-        session
-            .createQuery(
-                "SELECT COUNT(p) FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name AND p.packExtension = :ext",
-                Long.class)
-            .setParameter("repo", repositoryName)
-            .setParameter("name", stagedExtension.key().packName())
-            .setParameter("ext", stagedExtension.key().extension())
-            .uniqueResult();
-    if (existing != null && existing.longValue() != 0L) {
-      throw new IOException(
-          "Pack extension already exists: " + stagedExtension.key().displayName());
-    }
-
     GitPackEntity entity = new GitPackEntity();
     entity.setRepositoryName(repositoryName);
     entity.setPackName(stagedExtension.key().packName());
@@ -223,12 +212,56 @@ final class StagedPackExtensionStore {
     try (FileChannel channel =
         FileChannel.open(stagedExtension.temporaryFile(), StandardOpenOption.READ)) {
       entity.setData(inline ? readInline(channel, stagedExtension.fileSize()) : null);
-      session.persist(entity);
-      session.flush();
-      if (!inline) {
-        persistChunks(session, entity.getId(), channel, stagedExtension.fileSize());
+      try {
+        session.persist(entity);
+        session.flush();
+        if (!inline) {
+          persistChunks(session, entity.getId(), channel, stagedExtension.fileSize());
+        }
+      } catch (RuntimeException exception) {
+        if (isDuplicatePackExtension(exception)) {
+          throw new IOException(
+              "Pack extension already exists: " + stagedExtension.key().displayName(), exception);
+        }
+        throw exception;
       }
     }
+  }
+
+  private static boolean isDuplicatePackExtension(Throwable failure) {
+    for (Throwable current = failure; current != null; current = current.getCause()) {
+      if (current instanceof ConstraintViolationException constraintViolation) {
+        String constraintName = constraintViolation.getConstraintName();
+        if (constraintName != null
+            && constraintName
+                .toLowerCase(Locale.ROOT)
+                .contains(PACK_EXTENSION_UNIQUE_CONSTRAINT)) {
+          return true;
+        }
+        if (isDuplicateSqlException(constraintViolation.getSQLException())) {
+          return true;
+        }
+      }
+      if (current instanceof SQLException sqlException && isDuplicateSqlException(sqlException)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean isDuplicateSqlException(SQLException exception) {
+    for (SQLException current = exception; current != null; current = current.getNextException()) {
+      String sqlState = current.getSQLState();
+      if ("23505".equals(sqlState) || current.getErrorCode() == 2601 || current.getErrorCode() == 2627) {
+        return true;
+      }
+      String message = current.getMessage();
+      if (message != null
+          && message.toLowerCase(Locale.ROOT).contains(PACK_EXTENSION_UNIQUE_CONSTRAINT)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void publishLegacyExtension(

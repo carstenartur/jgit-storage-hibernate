@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,12 +33,13 @@ import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 
 class StagedPackExtensionStoreH2Test {
 
   @Test
-  void publishesTwoExtensionsInOneLockedTransaction() throws Exception {
+  void publishesTwoExtensionsInOneLockedTransactionWithoutPreflightQueries() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), "atomic-publication")) {
@@ -59,8 +61,14 @@ class StagedPackExtensionStoreH2Test {
 
       StorageOperationMetrics aggregateBefore = repository.getStorageOperationMetrics();
       StorageOperationBreakdown breakdownBefore = repository.getStorageOperationBreakdown();
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
       database.commitPackImpl(List.of(description), null);
 
+      assertEquals(
+          0L,
+          statistics.getQueryExecutionCount(),
+          "Successful staged publication must not issue an HQL existence query");
       StorageOperationMetrics aggregate =
           repository.getStorageOperationMetrics().minus(aggregateBefore);
       StorageOperationBreakdown breakdown =
@@ -106,7 +114,8 @@ class StagedPackExtensionStoreH2Test {
   }
 
   @Test
-  void publicationFailureRollsBackRowsAndCleansLocalStaging() throws Exception {
+  void duplicateConstraintRollsBackRowsCleansStagingAndReportsStableIOException()
+      throws Exception {
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), "atomic-failure")) {
@@ -119,7 +128,19 @@ class StagedPackExtensionStoreH2Test {
       write(database, description, PackExt.INDEX, deterministicBytes(40, 5));
       persistConflictingIndex(provider, "atomic-failure", baseName(description));
 
-      assertThrows(IOException.class, () -> database.commitPackImpl(List.of(description), null));
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
+      IOException exception =
+          assertThrows(
+              IOException.class, () -> database.commitPackImpl(List.of(description), null));
+
+      assertTrue(exception.getMessage().contains("Pack extension already exists:"));
+      assertTrue(exception.getMessage().contains(".idx"));
+      assertNotNull(exception.getCause(), "The database constraint failure must remain available");
+      assertEquals(
+          0L,
+          statistics.getQueryExecutionCount(),
+          "Duplicate detection must come from the unique constraint, not an HQL preflight query");
       assertEquals(
           baselineRows + 1,
           rowCount(provider, "atomic-failure"),
@@ -223,6 +244,7 @@ class StagedPackExtensionStoreH2Test {
     properties.put("hibernate.hbm2ddl.auto", "create-drop");
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.connection.pool_size", "2");
+    properties.put("hibernate.generate_statistics", "true");
     properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
     return new HibernateSessionFactoryProvider(properties);
   }
