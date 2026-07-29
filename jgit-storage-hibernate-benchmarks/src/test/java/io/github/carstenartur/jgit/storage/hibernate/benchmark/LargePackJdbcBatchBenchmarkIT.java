@@ -30,6 +30,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class LargePackJdbcBatchBenchmarkIT {
 
+  static final String RESULT_FILE_PROPERTY = "benchmark.jdbcBatchResultFile";
+
   private static final Set<String> EXPECTED_MODES =
       Set.of(LargePackJdbcBatchBenchmark.DISABLED, LargePackJdbcBatchBenchmark.ENABLED);
 
@@ -45,7 +47,7 @@ class LargePackJdbcBatchBenchmarkIT {
     Path resultFile =
         Path.of(
                 System.getProperty(
-                    "benchmark.resultFile", "target/benchmarks/jdbc-batch-jmh-result.json"))
+                    RESULT_FILE_PROPERTY, "target/benchmarks/jdbc-batch-jmh-result.json"))
             .toAbsolutePath();
     Files.createDirectories(resultFile.getParent());
     Path outputFile = resultFile.resolveSibling("jdbc-batch-jmh-output.txt");
