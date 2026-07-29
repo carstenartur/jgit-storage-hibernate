@@ -19,6 +19,7 @@ BACKEND_LABELS = {
 BATCHING_MODE_LABELS = {
     "disabled": "JGit + PostgreSQL (JDBC batching off)",
     "enabled": "JGit + PostgreSQL (JDBC batching on)",
+    "enabled-rewrite": "JGit + PostgreSQL (JDBC batching + rewrite)",
 }
 
 
