@@ -88,15 +88,18 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     while (true) {
       CatalogState observedCatalog = committedExtensionCatalog.get();
       PackCatalog loaded = loadPackCatalog();
-      CatalogState currentCatalog = committedExtensionCatalog.get();
-      if (currentCatalog.generation() != observedCatalog.generation()) {
-        // A pack mutation crossed this scan. Re-read so neither the optimization catalog nor JGit's
-        // pack-list cache can be populated from the older committed generation.
-        continue;
+      CatalogState loadedCatalog =
+          new CatalogState(observedCatalog.generation(), loaded.extensions());
+      if (committedExtensionCatalog.compareAndSet(observedCatalog, loadedCatalog)) {
+        return loaded.descriptions();
       }
-      committedExtensionCatalog.compareAndSet(
-          observedCatalog, new CatalogState(observedCatalog.generation(), loaded.extensions()));
-      return loaded.descriptions();
+      if (committedExtensionCatalog.get().generation() == observedCatalog.generation()) {
+        // Another scan published the same committed generation first. Both query results describe
+        // the same mutation-free generation, so this result is equally valid for JGit's pack list.
+        return loaded.descriptions();
+      }
+      // A pack mutation crossed this scan. Re-read so neither the optimization catalog nor JGit's
+      // pack-list cache can be populated from the older committed generation.
     }
   }
 
