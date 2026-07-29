@@ -31,17 +31,19 @@ JGit's normal post-commit lifecycle is preserved:
 
 Without a handoff, step 4 sees JGit's `NO_PACKS` marker and calls the backend `listPacks()` again. This repeated scan was responsible for the two remaining `PACK_METADATA_READ` transactions in each measured push.
 
-When the pre-commit catalog is complete, the publication transaction now returns the exact generated row ID, persisted file size and storage mode for every committed extension. Core merges those rows into the immutable catalog, removes every replaced pack, and exposes the result as a one-shot local pack-list scan. The first JGit scan after `clearCache()` consumes the snapshot through compare-and-set without opening a Hibernate transaction. JGit then continues its native `addPack()` or `addReftable()` logic.
+When the pre-commit catalog is complete, the publication transaction now returns the exact generated row ID, persisted file size and storage mode for every newly staged extension. Core merges those rows into the immutable catalog, removes every replaced pack, and exposes the result as a one-shot local pack-list scan. The first JGit scan after `clearCache()` consumes the snapshot through compare-and-set without opening a Hibernate transaction. JGit then continues its native `addPack()` or `addReftable()` logic.
 
 The snapshot is safe whether the first consumer is the normal writer path or a packs-changed event listener. A second consumer sees JGit's already reconstructed atomic pack list rather than reusing the one-shot marker.
 
-## Concurrency and rollback
+## Concurrency, legacy data and rollback
 
 A fair repository-instance-local read/write lifecycle lock prevents `listPacks()` from querying the database while the same instance has an uncommitted pack replacement in progress. It does not replace the cross-instance repository row lock used for database writes.
 
 Pack replacements remove their old catalog entries before the transaction starts. Successful commit adds the exact new rows and enables one local scan. Failed commit restores the previous complete generation and leaves no local handoff for uncommitted data.
 
-If the previous catalog was incomplete, Core does not claim to know the complete pack set. The next scan uses the authoritative database and builds a new complete catalog. Independent repository instances likewise continue to observe each other's commits at their existing DFS cache refresh boundary; no cross-instance cache-coherence protocol is introduced.
+Legacy durable-uncommitted extensions are published through the compatibility `UPDATE` path. That path deliberately does not issue another query merely to obtain handoff metadata. If any extension in the publication lacks exact returned metadata, the resulting catalog is marked incomplete, the one-shot is disabled, and the next JGit scan loads the complete committed view once from the database.
+
+If the previous catalog was incomplete, Core likewise does not claim to know the complete pack set. Independent repository instances continue to observe each other's commits at their existing DFS cache refresh boundary; no cross-instance cache-coherence protocol is introduced.
 
 ## Memory bound
 
@@ -58,6 +60,7 @@ Core tests prove that:
 - direct successful publication exposes and consumes a zero-query local handoff;
 - `ObjectInserter.flush()` reaches JGit's `addPack()` without a `PACK_METADATA_READ` transaction;
 - replacement removes old catalog entries before the handoff;
+- legacy publication disables the handoff and performs exactly one authoritative refresh scan;
 - failed publication restores the prior complete generation;
 - H2, HSQLDB, PostgreSQL, SQL Server and every supported JGit line retain normal repository behavior.
 
