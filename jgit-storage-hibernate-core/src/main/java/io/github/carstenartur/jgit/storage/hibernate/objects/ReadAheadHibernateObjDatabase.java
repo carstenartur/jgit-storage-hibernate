@@ -48,10 +48,10 @@ import org.hibernate.SessionFactory;
  *
  * <p>Each successful pack-list scan may publish an immutable catalog of committed extension row
  * identifiers, sizes and storage modes. Publication uses an atomic generation check, so a scan that
- * started before a successful pack mutation cannot overwrite the subsequent invalidation with stale
- * metadata. Chunked files can then open without repeating the metadata query. Inline payload bytes are
- * deliberately not retained in the catalog; they continue to use the bounded database fallback so
- * repository memory does not grow with the number of historical packs.
+ * started before a successful pack mutation cannot overwrite the subsequent invalidation or return a
+ * stale list after that mutation. Chunked files can then open without repeating the metadata query.
+ * Inline payload bytes are deliberately not retained in the catalog; they continue to use the bounded
+ * database fallback so repository memory does not grow with the number of historical packs.
  */
 public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
@@ -85,51 +85,62 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
    */
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
-    CatalogState observedCatalog = committedExtensionCatalog.get();
-    PackCatalog loaded =
-        transactionContext.execute(
-            session -> {
-              List<Object[]> rows =
-                  session
-                      .createQuery(
-                          "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
-                              + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END "
-                              + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                              + "AND p.committed = true",
-                          Object[].class)
-                      .setParameter("repo", repositoryName)
-                      .getResultList();
-              LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
-              LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
-              for (Object[] row : rows) {
-                Long packId = (Long) row[0];
-                String packName = (String) row[1];
-                String extension = (String) row[2];
-                long fileSize = ((Number) row[3]).longValue();
-                boolean inline = ((Number) row[4]).intValue() != 0;
-                extensions.put(
-                    new ExtensionKey(packName, extension),
-                    new ExtensionSnapshot(packId, fileSize, inline));
-                DfsPackDescription description =
-                    descriptions.computeIfAbsent(
-                        packName,
-                        name ->
-                            new DfsPackDescription(
-                                getRepository().getDescription(), name, PackSource.INSERT));
-                for (PackExt packExtension : PackExt.values()) {
-                  if (packExtension.getExtension().equals(extension)) {
-                    description.addFileExt(packExtension);
-                    description.setFileSize(packExtension, fileSize);
-                    break;
-                  }
-                }
+    while (true) {
+      CatalogState observedCatalog = committedExtensionCatalog.get();
+      PackCatalog loaded = loadPackCatalog();
+      CatalogState currentCatalog = committedExtensionCatalog.get();
+      if (currentCatalog.generation() != observedCatalog.generation()) {
+        // A pack mutation crossed this scan. Re-read so neither the optimization catalog nor JGit's
+        // pack-list cache can be populated from the older committed generation.
+        continue;
+      }
+      committedExtensionCatalog.compareAndSet(
+          observedCatalog, new CatalogState(observedCatalog.generation(), loaded.extensions()));
+      return loaded.descriptions();
+    }
+  }
+
+  private PackCatalog loadPackCatalog() throws IOException {
+    return transactionContext.execute(
+        session -> {
+          List<Object[]> rows =
+              session
+                  .createQuery(
+                      "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
+                          + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END "
+                          + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                          + "AND p.committed = true",
+                      Object[].class)
+                  .setParameter("repo", repositoryName)
+                  .getResultList();
+          LinkedHashMap<String, DfsPackDescription> descriptions = new LinkedHashMap<>();
+          LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
+          for (Object[] row : rows) {
+            Long packId = (Long) row[0];
+            String packName = (String) row[1];
+            String extension = (String) row[2];
+            long fileSize = ((Number) row[3]).longValue();
+            boolean inline = ((Number) row[4]).intValue() != 0;
+            extensions.put(
+                new ExtensionKey(packName, extension),
+                new ExtensionSnapshot(packId, fileSize, inline));
+            DfsPackDescription description =
+                descriptions.computeIfAbsent(
+                    packName,
+                    name ->
+                        new DfsPackDescription(
+                            getRepository().getDescription(), name, PackSource.INSERT));
+            for (PackExt packExtension : PackExt.values()) {
+              if (packExtension.getExtension().equals(extension)) {
+                description.addFileExt(packExtension);
+                description.setFileSize(packExtension, fileSize);
+                break;
               }
-              return new PackCatalog(
-                  List.copyOf(new ArrayList<>(descriptions.values())), Map.copyOf(extensions));
-            });
-    committedExtensionCatalog.compareAndSet(
-        observedCatalog, new CatalogState(observedCatalog.generation(), loaded.extensions()));
-    return loaded.descriptions();
+            }
+          }
+          return new PackCatalog(
+              List.copyOf(new ArrayList<>(descriptions.values())), Map.copyOf(extensions));
+        });
   }
 
   @Override
