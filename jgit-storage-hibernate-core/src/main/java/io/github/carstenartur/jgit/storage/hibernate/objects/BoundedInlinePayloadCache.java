@@ -8,85 +8,70 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
-import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import org.hibernate.SessionFactory;
+import java.util.Set;
 
-/** Repository-instance-local LRU for already committed inline pack-extension payloads. */
+/**
+ * Hard-bounded repository-instance handoff for locally published inline PACK and Reftable bytes.
+ *
+ * <p>Entries are keyed by their complete immutable committed identity. Database-loaded arrays are
+ * never inserted. Authoritative catalog scans retain an entry only while every identity component
+ * still matches the committed row.
+ */
 final class BoundedInlinePayloadCache {
 
-  private final long maxBytes;
-  private final LinkedHashMap<Long, byte[]> payloads = new LinkedHashMap<>(16, 0.75f, true);
+  static final long MAX_RETAINED_BYTES = 512L * 1024;
+
+  private final LinkedHashMap<Identity, byte[]> payloads = new LinkedHashMap<>();
   private long retainedBytes;
 
-  BoundedInlinePayloadCache(long maxBytes) {
-    if (maxBytes < 0) {
-      throw new IllegalArgumentException("inline payload cache size must not be negative");
-    }
-    this.maxBytes = maxBytes;
+  synchronized byte[] get(Identity identity) {
+    return payloads.get(identity);
   }
 
-  static BoundedInlinePayloadCache from(SessionFactory sessionFactory) {
-    Objects.requireNonNull(sessionFactory, "sessionFactory");
-    Object configured =
-        sessionFactory
-            .getProperties()
-            .get(HibernateStorageSettings.INLINE_PAYLOAD_CACHE_MAX_BYTES);
-    long maxBytes =
-        configured == null
-            ? HibernateStorageSettings.DEFAULT_INLINE_PAYLOAD_CACHE_MAX_BYTES
-            : parseMaxBytes(configured);
-    return new BoundedInlinePayloadCache(maxBytes);
-  }
-
-  private static long parseMaxBytes(Object configured) {
-    try {
-      long parsed = Long.parseLong(configured.toString());
-      if (parsed < 0) {
-        throw new IllegalArgumentException(
-            HibernateStorageSettings.INLINE_PAYLOAD_CACHE_MAX_BYTES
-                + " must not be negative: "
-                + configured);
-      }
-      return parsed;
-    } catch (NumberFormatException exception) {
-      throw new IllegalArgumentException(
-          HibernateStorageSettings.INLINE_PAYLOAD_CACHE_MAX_BYTES
-              + " must be a whole number of bytes: "
-              + configured,
-          exception);
-    }
-  }
-
-  synchronized byte[] get(Long rowId) {
-    return maxBytes == 0 ? null : payloads.get(rowId);
-  }
-
-  synchronized void put(Long rowId, byte[] payload) {
-    Objects.requireNonNull(rowId, "rowId");
+  synchronized void put(Identity identity, byte[] payload) {
+    Objects.requireNonNull(identity, "identity");
     Objects.requireNonNull(payload, "payload");
-    if (maxBytes == 0
-        || payload.length > HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD
-        || payload.length > maxBytes) {
+    if (payload.length != identity.fileSize()) {
+      throw new IllegalArgumentException(
+          "inline payload size does not match committed identity: "
+              + payload.length
+              + " != "
+              + identity.fileSize());
+    }
+    if (payload.length > HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD
+        || payload.length > MAX_RETAINED_BYTES) {
       return;
     }
 
     byte[] retained = payload.clone();
-    byte[] previous = payloads.put(rowId, retained);
+    byte[] previous = payloads.remove(identity);
     if (previous != null) {
       retainedBytes -= previous.length;
     }
+    payloads.put(identity, retained);
     retainedBytes += retained.length;
-    evictToLimit();
+    evictOldestToLimit();
   }
 
-  synchronized void removeAll(Collection<Long> rowIds) {
-    for (Long rowId : rowIds) {
-      byte[] removed = payloads.remove(rowId);
+  synchronized void retainOnly(Set<Identity> committedIdentities) {
+    Iterator<Map.Entry<Identity, byte[]>> iterator = payloads.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<Identity, byte[]> entry = iterator.next();
+      if (!committedIdentities.contains(entry.getKey())) {
+        retainedBytes -= entry.getValue().length;
+        iterator.remove();
+      }
+    }
+  }
+
+  synchronized void removeAll(Collection<Identity> identities) {
+    for (Identity identity : identities) {
+      byte[] removed = payloads.remove(identity);
       if (removed != null) {
         retainedBytes -= removed.length;
       }
@@ -101,12 +86,23 @@ final class BoundedInlinePayloadCache {
     return retainedBytes;
   }
 
-  private void evictToLimit() {
-    Iterator<Map.Entry<Long, byte[]>> iterator = payloads.entrySet().iterator();
-    while (retainedBytes > maxBytes && iterator.hasNext()) {
-      Map.Entry<Long, byte[]> eldest = iterator.next();
-      retainedBytes -= eldest.getValue().length;
+  private void evictOldestToLimit() {
+    Iterator<Map.Entry<Identity, byte[]>> iterator = payloads.entrySet().iterator();
+    while (retainedBytes > MAX_RETAINED_BYTES && iterator.hasNext()) {
+      Map.Entry<Identity, byte[]> oldest = iterator.next();
+      retainedBytes -= oldest.getValue().length;
       iterator.remove();
+    }
+  }
+
+  record Identity(String packName, String extension, Long rowId, long fileSize) {
+    Identity {
+      Objects.requireNonNull(packName, "packName");
+      Objects.requireNonNull(extension, "extension");
+      Objects.requireNonNull(rowId, "rowId");
+      if (fileSize < 0) {
+        throw new IllegalArgumentException("fileSize must not be negative");
+      }
     }
   }
 }
