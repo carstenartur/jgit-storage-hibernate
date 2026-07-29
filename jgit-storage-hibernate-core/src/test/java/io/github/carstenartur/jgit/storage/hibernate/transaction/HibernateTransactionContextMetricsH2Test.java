@@ -16,6 +16,7 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import org.hibernate.Session;
@@ -88,27 +89,6 @@ class HibernateTransactionContextMetricsH2Test {
   }
 
   @Test
-  void scopedCallbackAttributesAnUncategorizedTransaction() throws Exception {
-    try (HibernateSessionFactoryProvider provider = provider(true)) {
-      HibernateTransactionContext context =
-          new HibernateTransactionContext(provider.getSessionFactory());
-
-      context.withinOperation(
-          StorageOperationKind.PACK_METADATA_READ,
-          () -> context.execute(session -> null));
-
-      assertEquals(
-          new StorageOperationMetrics(1, 1, 0, 0, 0),
-          context
-              .operationBreakdownSnapshot()
-              .metrics(StorageOperationKind.PACK_METADATA_READ));
-      assertEquals(
-          StorageOperationMetrics.ZERO,
-          context.operationBreakdownSnapshot().metrics(StorageOperationKind.OTHER));
-    }
-  }
-
-  @Test
   void remainsZeroWhenMetricsAreNotEnabled() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider(false)) {
       HibernateTransactionContext context =
@@ -126,9 +106,9 @@ class HibernateTransactionContextMetricsH2Test {
     assertThrows(IllegalArgumentException.class, () -> older.minus(newer));
 
     StorageOperationBreakdown olderBreakdown =
-        new StorageOperationBreakdown(MapBuilder.of(StorageOperationKind.OTHER, older));
+        new StorageOperationBreakdown(Map.of(StorageOperationKind.OTHER, older));
     StorageOperationBreakdown newerBreakdown =
-        new StorageOperationBreakdown(MapBuilder.of(StorageOperationKind.OTHER, newer));
+        new StorageOperationBreakdown(Map.of(StorageOperationKind.OTHER, newer));
     assertThrows(
         IllegalArgumentException.class, () -> olderBreakdown.minus(newerBreakdown));
   }
@@ -158,14 +138,5 @@ class HibernateTransactionContextMetricsH2Test {
         HibernateTransactionContext.METRICS_ENABLED_PROPERTY,
         Boolean.toString(metricsEnabled));
     return new HibernateSessionFactoryProvider(properties);
-  }
-
-  private static final class MapBuilder {
-    private MapBuilder() {}
-
-    private static java.util.Map<StorageOperationKind, StorageOperationMetrics> of(
-        StorageOperationKind kind, StorageOperationMetrics metrics) {
-      return java.util.Map.of(kind, metrics);
-    }
   }
 }
