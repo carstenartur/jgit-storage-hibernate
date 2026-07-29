@@ -113,7 +113,7 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
   private static void baselineAndMigrateCurrent() {
     Flyway flyway = currentFlyway(CoreSchemaMigrations.CURRENT_SCHEMA_VERSION);
     flyway.migrate();
-    assertEquals("0.1.14.2", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.1.17", flyway.info().current().getVersion().getVersion());
   }
 
   private static Flyway currentFlyway(String baselineVersion) {
@@ -223,7 +223,8 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
   }
 
   private static void downgradeToLegacySandboxSchema() throws Exception {
-    try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
+    try (Connection connection = openConnection();
+        Statement statement = connection.createStatement()) {
       assertEquals(0, count(connection, "select count(*) from git_packs where data is null"));
 
       statement.execute("drop table git_pack_chunks");
@@ -248,6 +249,7 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
       statement.execute(
           "create index idx_pack_repo_name on git_packs (repository_name, pack_name)");
 
+      statement.execute("drop index if exists idx_reflog_repo_id on git_reflog");
       statement.execute("drop index if exists idx_reflog_repo_ref on git_reflog");
       statement.execute("drop index if exists idx_reflog_repo on git_reflog");
       statement.execute("alter table git_reflog alter column repository_name varchar(255) not null");
@@ -314,7 +316,8 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
     properties.put("hibernate.connection.url", SQL_SERVER.getJdbcUrl());
     properties.put("hibernate.connection.username", SQL_SERVER.getUsername());
     properties.put("hibernate.connection.password", SQL_SERVER.getPassword());
-    properties.put("hibernate.connection.driver_class", "com.microsoft.sqlserver.jdbc.SQLServerDriver");
+    properties.put(
+        "hibernate.connection.driver_class", "com.microsoft.sqlserver.jdbc.SQLServerDriver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.SQLServerDialect");
     properties.put("hibernate.hbm2ddl.auto", ddlMode);
     properties.put("hibernate.show_sql", "false");
