@@ -15,6 +15,8 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.time.Instant;
@@ -23,13 +25,7 @@ import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogReader;
 import org.hibernate.SessionFactory;
 
-/**
- * A JGit repository stored in a relational database through Hibernate.
- *
- * <p>This implementation uses JGit's DFS/Reftable storage abstractions internally. Consumers should
- * depend on the public facade package instead of importing this class directly unless they need JGit
- * repository-level integration.
- */
+/** A JGit repository stored in a relational database through Hibernate. */
 public class HibernateRepository extends DfsRepository {
 
   private final HibernateObjDatabase objectDatabase;
@@ -83,16 +79,17 @@ public class HibernateRepository extends DfsRepository {
     return sessionFactory;
   }
 
-  /**
-   * Return monotone transaction and repository-lock metrics for this repository instance.
-   *
-   * @return current metrics snapshot, or zero counters when metrics are disabled
-   */
+  /** Return aggregate monotone transaction and repository-lock metrics. */
   public StorageOperationMetrics getStorageOperationMetrics() {
     return transactionContext.metricsSnapshot();
   }
 
-  /** Execute repository storage work in one shared transaction. */
+  /** Return the immutable per-operation metrics breakdown. */
+  public StorageOperationBreakdown getStorageOperationBreakdown() {
+    return transactionContext.operationBreakdownSnapshot();
+  }
+
+  /** Execute repository storage work in one shared uncategorized transaction. */
   public <T> T inTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
     try {
       return transactionContext.execute(work);
@@ -102,16 +99,11 @@ public class HibernateRepository extends DfsRepository {
     }
   }
 
-  /**
-   * Execute a ref mutation while holding the cross-SessionFactory repository lock.
-   *
-   * <p>Both the DFS pack list and Reftable stack are invalidated after the database row lock is
-   * obtained. The optimistic expected-old-ID comparison therefore observes updates committed by a
-   * different repository instance before the lock was acquired.
-   */
+  /** Execute a ref mutation while holding the cross-SessionFactory repository lock. */
   public <T> T inRefTransaction(HibernateTransactionContext.Work<T> work) throws IOException {
     try {
       return transactionContext.executeWithRepositoryLock(
+          StorageOperationKind.REF_PUBLICATION,
           repositoryName,
           session -> {
             objectDatabase.close();
@@ -127,6 +119,7 @@ public class HibernateRepository extends DfsRepository {
   private void ensureRepositoryLockRow() throws IOException {
     try {
       transactionContext.execute(
+          StorageOperationKind.REPOSITORY_INITIALIZATION,
           session -> {
             if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
               GitRepositoryLockEntity lock = new GitRepositoryLockEntity();
@@ -140,6 +133,7 @@ public class HibernateRepository extends DfsRepository {
     } catch (RuntimeException concurrentInsert) {
       try {
         transactionContext.execute(
+            StorageOperationKind.REPOSITORY_INITIALIZATION,
             session -> {
               if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
                 throw concurrentInsert;
