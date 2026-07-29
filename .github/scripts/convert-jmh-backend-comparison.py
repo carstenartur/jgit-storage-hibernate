@@ -14,7 +14,11 @@ BACKEND_LABELS = {
     "hsqldb": "JGit + HSQLDB (in-memory)",
     "postgresql": "JGit + PostgreSQL",
     "postgresql-hikari": "JGit + PostgreSQL + HikariCP",
-    "postgresql-no-jdbc-batch": "JGit + PostgreSQL (JDBC batching off)",
+}
+
+BATCHING_MODE_LABELS = {
+    "disabled": "JGit + PostgreSQL (JDBC batching off)",
+    "enabled": "JGit + PostgreSQL (JDBC batching on)",
 }
 
 
@@ -25,13 +29,27 @@ def _finite_number(value: Any, field: str) -> float:
     return number
 
 
+def _series_label(result: dict[str, Any]) -> str:
+    params = result.get("params", {})
+    backend = params.get("backend")
+    if backend is not None:
+        if backend not in BACKEND_LABELS:
+            raise ValueError(f"Unsupported JMH backend parameter: {backend!r}")
+        return BACKEND_LABELS[backend]
+
+    batching_mode = params.get("batchingMode")
+    if batching_mode is not None:
+        if batching_mode not in BATCHING_MODE_LABELS:
+            raise ValueError(f"Unsupported JMH batching mode: {batching_mode!r}")
+        return BATCHING_MODE_LABELS[batching_mode]
+
+    raise ValueError("JMH result has neither a backend nor a batchingMode parameter")
+
+
 def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     converted: list[dict[str, Any]] = []
     for result in results:
-        backend = result.get("params", {}).get("backend")
-        if backend not in BACKEND_LABELS:
-            raise ValueError(f"Missing or unsupported JMH backend parameter: {backend!r}")
-
+        series_label = _series_label(result)
         benchmark = str(result["benchmark"])
         operation = benchmark.rsplit(".", 1)[-1]
         metric = result["primaryMetric"]
@@ -41,13 +59,13 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         converted.append(
             {
-                "name": f"{operation} — {BACKEND_LABELS[backend]}",
+                "name": f"{operation} — {series_label}",
                 "unit": unit,
                 "value": score,
                 "range": score_error,
                 "extra": "\n".join(
                     (
-                        f"Backend: {BACKEND_LABELS[backend]}",
+                        f"Backend: {series_label}",
                         f"JDK: {result.get('jdkVersion', 'unknown')}",
                         f"Mode: {result.get('mode', 'unknown')}",
                         f"Forks: {result.get('forks', 'unknown')}",
