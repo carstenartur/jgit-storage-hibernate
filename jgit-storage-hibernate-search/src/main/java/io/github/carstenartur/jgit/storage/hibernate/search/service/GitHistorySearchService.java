@@ -109,7 +109,7 @@ public class GitHistorySearchService {
       hql.append(" AND c.authorEmail = :email");
     }
     if (query.pathFragment() != null) {
-      hql.append(" AND LOWER(c.changedPaths) LIKE :path ESCAPE '!'");
+      hql.append(" AND c.changedPaths ILIKE :path ESCAPE '!'");
     }
     if (query.from() != null) {
       hql.append(" AND c.").append(timeProperty).append(" >= :from");
