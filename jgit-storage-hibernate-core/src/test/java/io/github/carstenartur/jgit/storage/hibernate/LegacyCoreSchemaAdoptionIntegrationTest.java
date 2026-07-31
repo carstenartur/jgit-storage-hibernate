@@ -227,6 +227,7 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
       assertEquals(0, report.incompletePackRows());
       assertTrue(report.duplicatePackIdentities().isEmpty());
       assertTrue(tableExists(connection, "git_pack_chunks"));
+      assertTrue(tableExists(connection, "git_repository_lifecycle"));
       assertTrue(tableExists(connection, "git_repository_lock"));
       try (Statement statement = connection.createStatement();
           ResultSet resultSet =
@@ -362,7 +363,10 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
     try (Connection connection = database.openConnection();
         Statement statement = connection.createStatement()) {
       statement.execute("drop table git_pack_chunks");
+      statement.execute(
+          "alter table git_packs drop constraint fk_pack_repository_lifecycle");
       statement.execute("drop table git_repository_lock");
+      statement.execute("drop table git_repository_lifecycle");
       statement.execute("drop table \"" + CoreSchemaMigrations.SCHEMA_HISTORY_TABLE + "\"");
       statement.execute("drop index idx_pack_repo_lease");
       statement.execute("drop index idx_pack_repo_committed");
@@ -472,6 +476,7 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
       assertFalse(
           tableExists(connection, CoreSchemaMigrations.LEGACY_ADOPTION_SCHEMA_HISTORY_TABLE));
       assertFalse(tableExists(connection, "git_pack_chunks"));
+      assertFalse(tableExists(connection, "git_repository_lifecycle"));
       assertFalse(tableExists(connection, "git_repository_lock"));
       assertFalse(columnExists(connection, "git_packs", "write_token"));
       assertFalse(columnExists(connection, "git_packs", "write_lease_until"));
