@@ -19,7 +19,7 @@ public enum StorageOperationKind {
   /** Opening one committed pack extension for reading. */
   PACK_FILE_READ,
 
-  /** Reservation, payload persistence or lease renewal of unpublished pack extensions. */
+  /** Persistence or lease renewal of unpublished pack extensions. */
   PACK_EXTENSION_WRITE,
 
   /** Atomic publication of a complete expected logical-pack extension set. */
