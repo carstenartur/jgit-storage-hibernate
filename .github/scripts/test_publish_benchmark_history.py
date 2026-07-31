@@ -135,6 +135,45 @@ class PublishBenchmarkHistoryTest(unittest.TestCase):
         history = data["entries"]["Repository backend comparison"]
         self.assertEqual(["old-2", self.commit], [entry["commit"]["id"] for entry in history])
 
+    def test_migrates_existing_throughput_before_charting_and_comparison(self) -> None:
+        existing = {
+            "lastUpdate": 1,
+            "repoUrl": "https://github.com/example/project",
+            "entries": {
+                "Repository backend comparison": [
+                    {
+                        "commit": {"id": "old-throughput"},
+                        "date": 1,
+                        "tool": "customSmallerIsBetter",
+                        "benches": [
+                            {
+                                "name": "read",
+                                "unit": "ops/s",
+                                "value": 50.0,
+                                "range": "5.0",
+                                "extra": "Mode: thrpt",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+        self.data_file.parent.mkdir(parents=True)
+        self.data_file.write_text(PREFIX + json.dumps(existing), encoding="utf-8")
+        self._write_benchmarks(20.0)
+
+        self._run()
+
+        history = self._read_data()["entries"]["Repository backend comparison"]
+        migrated = history[0]["benches"][0]
+        self.assertEqual("ms/op", migrated["unit"])
+        self.assertAlmostEqual(20.0, migrated["value"])
+        self.assertAlmostEqual(2.0, migrated["range"])
+        self.assertIn("normalized from ops/s", migrated["extra"])
+        summary = self.summary_file.read_text(encoding="utf-8")
+        self.assertIn("1.00×", summary)
+        self.assertNotIn("exceeded", summary)
+
     def test_rejects_malformed_benchmark_input(self) -> None:
         self.benchmark_file.write_text(json.dumps([{"name": "missing fields"}]), encoding="utf-8")
         completed = subprocess.run(
