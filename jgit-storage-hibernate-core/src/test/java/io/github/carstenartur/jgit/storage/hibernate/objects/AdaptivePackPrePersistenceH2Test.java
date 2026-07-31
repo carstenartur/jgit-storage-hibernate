@@ -110,9 +110,9 @@ class AdaptivePackPrePersistenceH2Test {
           repository.getStorageOperationMetrics().minus(aggregateBefore);
       StorageOperationBreakdown breakdown =
           repository.getStorageOperationBreakdown().minus(breakdownBefore);
-      assertEquals(2, aggregate.transactionsStarted());
+      assertEquals(3, aggregate.transactionsStarted());
       assertEquals(2, aggregate.transactionsCommitted());
-      assertEquals(0, aggregate.transactionsRolledBack());
+      assertEquals(1, aggregate.transactionsRolledBack());
       assertEquals(1, aggregate.repositoryLocksAcquired());
       assertEquals(aggregate, breakdown.total());
 
@@ -129,6 +129,13 @@ class AdaptivePackPrePersistenceH2Test {
       assertEquals(1, publicationMetrics.transactionsCommitted());
       assertEquals(1, publicationMetrics.repositoryLocksAcquired());
       assertTrue(publicationMetrics.repositoryLockHeldNanos() > 0);
+
+      StorageOperationMetrics invisibleRead =
+          breakdown.metrics(StorageOperationKind.PACK_FILE_READ);
+      assertEquals(1, invisibleRead.transactionsStarted());
+      assertEquals(0, invisibleRead.transactionsCommitted());
+      assertEquals(1, invisibleRead.transactionsRolledBack());
+      assertEquals(0, invisibleRead.repositoryLocksAcquired());
       assertEquals(
           StorageOperationMetrics.ZERO, breakdown.metrics(StorageOperationKind.PACK_ROLLBACK));
     }
