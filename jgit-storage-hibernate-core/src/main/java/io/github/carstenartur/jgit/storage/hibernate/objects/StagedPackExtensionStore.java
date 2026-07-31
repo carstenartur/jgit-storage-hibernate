@@ -88,15 +88,19 @@ final class StagedPackExtensionStore {
               boolean completeMetadata = true;
               Instant committedAt = Instant.now();
               for (Publication publication : publications) {
+                PackDescriptionMetadata metadata =
+                    PackDescriptionMetadata.fromDescription(publication.description(), committedAt);
                 for (ExpectedExtension expected : publication.extensions()) {
                   if (expected.staged() != null) {
-                    committed.add(persistCommitted(session, expected.staged(), committedAt));
+                    committed.add(
+                        persistCommitted(session, expected.staged(), committedAt, metadata));
                   } else {
                     publishLegacyExtension(
                         session,
                         publication.packName(),
                         expected.extension(),
-                        committedAt);
+                        committedAt,
+                        metadata);
                     completeMetadata = false;
                   }
                 }
@@ -191,7 +195,7 @@ final class StagedPackExtensionStore {
       if (extensions.isEmpty()) {
         throw new IOException("Cannot publish a pack without extensions: " + packName);
       }
-      result.add(new Publication(packName, List.copyOf(extensions)));
+      result.add(new Publication(packName, description, List.copyOf(extensions)));
     }
     return result;
   }
@@ -208,7 +212,11 @@ final class StagedPackExtensionStore {
   }
 
   private CommittedExtension persistCommitted(
-      Session session, StagedExtension stagedExtension, Instant committedAt) throws IOException {
+      Session session,
+      StagedExtension stagedExtension,
+      Instant committedAt,
+      PackDescriptionMetadata metadata)
+      throws IOException {
     GitPackEntity entity = new GitPackEntity();
     entity.setRepositoryName(repositoryName);
     entity.setPackName(stagedExtension.key().packName());
@@ -219,6 +227,7 @@ final class StagedPackExtensionStore {
     entity.setCommittedAt(committedAt);
     entity.setWriteToken(null);
     entity.setWriteLeaseUntil(null);
+    metadata.applyTo(entity);
 
     boolean inline = stagedExtension.fileSize() <= HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
     byte[] inlineData;
@@ -246,7 +255,8 @@ final class StagedPackExtensionStore {
         entity.getId(),
         stagedExtension.fileSize(),
         inline,
-        inlineData);
+        inlineData,
+        metadata);
   }
 
   private static boolean isDuplicatePackExtension(Throwable failure) {
@@ -288,16 +298,31 @@ final class StagedPackExtensionStore {
   }
 
   private void publishLegacyExtension(
-      Session session, String packName, String extension, Instant committedAt) throws IOException {
+      Session session,
+      String packName,
+      String extension,
+      Instant committedAt,
+      PackDescriptionMetadata metadata)
+      throws IOException {
     int updated =
         session
             .createMutationQuery(
                 "UPDATE GitPackEntity p SET p.committed = true, "
                     + "p.committedAt = :committedAt, p.writeToken = null, "
-                    + "p.writeLeaseUntil = null WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name AND p.packExtension = :ext "
-                    + "AND p.committed = false")
+                    + "p.writeLeaseUntil = null, p.packSource = :packSource, "
+                    + "p.lastModified = :lastModified, p.objectCount = :objectCount, "
+                    + "p.deltaCount = :deltaCount, p.indexVersion = :indexVersion, "
+                    + "p.minUpdateIndex = :minUpdateIndex, p.maxUpdateIndex = :maxUpdateIndex "
+                    + "WHERE p.repositoryName = :repo AND p.packName = :name "
+                    + "AND p.packExtension = :ext AND p.committed = false")
             .setParameter("committedAt", committedAt)
+            .setParameter("packSource", metadata.packSource().name())
+            .setParameter("lastModified", metadata.lastModified())
+            .setParameter("objectCount", metadata.objectCount())
+            .setParameter("deltaCount", metadata.deltaCount())
+            .setParameter("indexVersion", metadata.indexVersion())
+            .setParameter("minUpdateIndex", metadata.minUpdateIndex())
+            .setParameter("maxUpdateIndex", metadata.maxUpdateIndex())
             .setParameter("repo", repositoryName)
             .setParameter("name", packName)
             .setParameter("ext", extension)
@@ -399,11 +424,13 @@ final class StagedPackExtensionStore {
       Long packId,
       long fileSize,
       boolean inline,
-      byte[] inlineData) {
+      byte[] inlineData,
+      PackDescriptionMetadata metadata) {
     CommittedExtension {
       if (inline != (inlineData != null)) {
         throw new IllegalArgumentException("inline payload must be present exactly for inline rows");
       }
+      metadata = Objects.requireNonNull(metadata, "metadata");
     }
   }
 
@@ -415,7 +442,8 @@ final class StagedPackExtensionStore {
 
   private record ExpectedExtension(String extension, StagedExtension staged) {}
 
-  private record Publication(String packName, List<ExpectedExtension> extensions) {}
+  private record Publication(
+      String packName, DfsPackDescription description, List<ExpectedExtension> extensions) {}
 
   @FunctionalInterface
   private interface StagingConsumer {
