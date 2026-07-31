@@ -54,12 +54,12 @@ class PackExtensionStagingBufferTest {
 
   @Test
   void spillsOnceWhenOwnerBudgetIsExhaustedAndPreservesReadSemantics() throws Exception {
-    byte[] first = deterministicBytes(64, 23);
-    byte[] second = deterministicBytes(96, 29);
+    byte[] first = deterministicBytes(900, 23);
+    byte[] second = deterministicBytes(300, 29);
     byte[] expected = new byte[first.length + second.length];
     System.arraycopy(first, 0, expected, 0, first.length);
     System.arraycopy(second, 0, expected, first.length, second.length);
-    MemoryBudget ownerBudget = new MemoryBudget(64);
+    MemoryBudget ownerBudget = new MemoryBudget(1_024);
     AtomicReference<StagedPayload> staged = new AtomicReference<>();
     long processBaseline = PackExtensionStagingBuffer.retainedMemoryBytes();
 
@@ -68,15 +68,16 @@ class PackExtensionStagingBufferTest {
             ownerBudget, (payload, fileSize, createdAt) -> staged.set(payload));
     buffer.write(first, 0, first.length);
     assertTrue(buffer.memoryBacked());
+    assertEquals(1_024, ownerBudget.usedBytes());
     buffer.write(second, 0, second.length);
     assertFalse(buffer.memoryBacked());
     assertEquals(0, ownerBudget.usedBytes());
     assertEquals(processBaseline, PackExtensionStagingBuffer.retainedMemoryBytes());
 
-    ByteBuffer selected = ByteBuffer.allocate(80);
-    assertEquals(80, buffer.read(40, selected));
+    ByteBuffer selected = ByteBuffer.allocate(240);
+    assertEquals(240, buffer.read(840, selected));
     assertArrayEquals(
-        java.util.Arrays.copyOfRange(expected, 40, 120), selected.flip().array());
+        java.util.Arrays.copyOfRange(expected, 840, 1_080), selected.flip().array());
     buffer.close();
 
     StagedPayload payload = staged.get();
