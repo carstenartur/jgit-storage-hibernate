@@ -57,7 +57,8 @@ import org.openjdk.jmh.infra.ThreadParams;
  * <p>Each operation inserts one non-compressible payload just above the inline threshold and
  * publishes one unique ref. This intentionally measures both logical-pack and ref-publication
  * boundaries. Fixture construction, schema validation and repository opening remain outside the
- * measured interval.
+ * measured interval. Hibernate Search is disabled for these Core-only factories so concurrent
+ * mapping bootstrap cannot contaminate storage-coordination measurements.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -153,6 +154,7 @@ public class ConcurrentPublicationBenchmark {
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.format_sql", "false");
     properties.put("hibernate.connection.pool_size", "8");
+    properties.put("hibernate.search.enabled", "false");
     properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
 
     switch (backend) {
@@ -256,8 +258,7 @@ public class ConcurrentPublicationBenchmark {
         return;
       }
 
-      provider =
-          new HibernateSessionFactoryProvider(benchmark.hibernateProperties("validate"));
+      provider = new HibernateSessionFactoryProvider(benchmark.hibernateProperties("validate"));
       sharedRepository =
           HibernateRepository.create(provider.getSessionFactory(), benchmark.sharedRepositoryName);
       isolatedRepository =
