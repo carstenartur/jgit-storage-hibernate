@@ -45,11 +45,17 @@ import org.hibernate.exception.ConstraintViolationException;
  * extension. Closing the stream retains the completed bytes in a bounded temporary file and creates
  * no database row.
  *
- * <p>Logical packs whose extensions all remain inline use one repository-locked transaction for
- * persistence and publication. When at least one extension requires chunked storage, Core first
- * reserves invisible lease-owned parent rows under a short repository lock, transfers every payload
- * in a lock-free Hibernate transaction, and then atomically publishes the complete logical generation
- * under a second short repository lock. Readers continue to select only {@code committed=true} rows.
+ * <p>Additive logical packs whose extensions all remain inline use one repository-locked transaction
+ * for persistence and publication. When an additive logical pack contains at least one chunked
+ * extension, Core first reserves invisible lease-owned parent rows under a short repository lock,
+ * transfers every payload in a lock-free Hibernate transaction, and then atomically publishes the
+ * complete logical generation under a second short repository lock. Readers continue to select only
+ * {@code committed=true} rows.
+ *
+ * <p>Pack replacement and compaction remain on the established single locked transaction path. JGit
+ * can validate refs before calling {@code commitPack}; releasing the repository lock between that
+ * validation and source-pack replacement would permit a conflicting ref update to cross the race
+ * check.
  *
  * <p>A crash after reservation can leave durable uncommitted rows. Their writer token and lease make
  * them eligible for the existing abandoned-write cleanup after expiry. Normal publication, failure
@@ -96,7 +102,7 @@ final class StagedPackExtensionStore {
       throws IOException {
     List<Publication> publications = publications(descriptions);
     CommitResult commitResult =
-        shouldPrePersist(publications)
+        shouldPrePersist(publications, replaces)
             ? commitPrePersisted(publications, replaces)
             : commitDirect(publications, replaces);
     discard(publications);
@@ -456,7 +462,11 @@ final class StagedPackExtensionStore {
     return result;
   }
 
-  private static boolean shouldPrePersist(List<Publication> publications) {
+  private static boolean shouldPrePersist(
+      List<Publication> publications, Collection<DfsPackDescription> replaces) {
+    if (replaces != null && !replaces.isEmpty()) {
+      return false;
+    }
     boolean chunked = false;
     for (Publication publication : publications) {
       for (ExpectedExtension expected : publication.extensions()) {
