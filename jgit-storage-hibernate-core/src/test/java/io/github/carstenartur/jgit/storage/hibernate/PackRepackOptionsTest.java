@@ -25,7 +25,6 @@ class PackRepackOptionsTest {
     assertTrue(optimized.buildBitmaps());
     assertTrue(optimized.writeCommitGraph());
     assertTrue(optimized.writeBloomFilter());
-    assertTrue(optimized.writeReverseIndex());
     assertTrue(optimized.compactReftables());
 
     PackRepackOptions compactOnly = PackRepackOptions.compactOnly();
@@ -33,7 +32,6 @@ class PackRepackOptionsTest {
     assertFalse(compactOnly.buildBitmaps());
     assertFalse(compactOnly.writeCommitGraph());
     assertFalse(compactOnly.writeBloomFilter());
-    assertFalse(compactOnly.writeReverseIndex());
     assertTrue(compactOnly.compactReftables());
   }
 
@@ -43,17 +41,17 @@ class PackRepackOptionsTest {
         IllegalArgumentException.class,
         () ->
             new PackRepackOptions(
-                true, true, false, true, true, true, Duration.ofDays(1), 1));
+                true, true, false, true, true, Duration.ofDays(1), 1));
     assertThrows(
         IllegalArgumentException.class,
         () ->
             new PackRepackOptions(
-                true, true, true, true, true, true, Duration.ofSeconds(-1), 1));
+                true, true, true, true, true, Duration.ofSeconds(-1), 1));
     assertThrows(
         IllegalArgumentException.class,
         () ->
             new PackRepackOptions(
-                true, true, true, true, true, true, Duration.ZERO, -1));
+                true, true, true, true, true, Duration.ZERO, -1));
   }
 
   @Test
