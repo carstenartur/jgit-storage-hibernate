@@ -1,22 +1,23 @@
 # jgit-storage-hibernate-core
 
-Use the familiar JGit `Repository` API while storing packs, refs, reftables and reflogs in the relational database and persistence lifecycle your application already operates.
+Use the familiar JGit `Repository` API while storing packs, refs, Reftables and reflogs in the relational database and persistence lifecycle your application already operates.
 
 ## Why use it
 
 - no filesystem-backed `.git` directory is required;
 - repository data can share the application's `DataSource`, schema lifecycle, backup and access controls;
-- pack-related payloads are constructed in bounded temporary files instead of complete heap byte arrays;
-- completed PACK/IDX/Reftable extensions are persisted and published atomically per logical pack;
+- small pack-related extensions are constructed in bounded random-readable memory, while larger extensions spill once to temporary files;
+- completed PACK/IDX/Reftable extensions are published atomically per logical pack;
 - small committed extensions may remain inline while large extensions use ordered 1 MiB chunks;
-- chunk inserts use portable Hibernate JDBC batching without generated-key round trips per chunk;
-- committed chunked extensions reuse an immutable pack-list metadata catalog instead of repeating the same open-time lookup;
+- additive chunked payloads are pre-persisted invisibly without occupying the repository publication lock;
+- pack replacement and compaction remain on the direct locked path so JGit's ref-race checks stay valid;
+- chunk inserts use portable Hibernate JDBC batching and exact final chunk arrays;
+- committed chunked extensions reuse an immutable metadata catalog instead of repeating open-time lookups;
 - local publication hands the exact committed pack list to JGit's post-commit scan without another database transaction;
-- existing inline BLOB, generated chunk-ID and legacy uncommitted rows remain readable after upgrade;
 - packs remain hidden until transactionally published, avoiding partially visible writes;
 - normal JGit ref updates publish Reftable state and queryable reflogs atomically;
 - repository-scoped database locks coordinate independent `SessionFactory` instances;
-- writer tokens and renewable leases retain safe cleanup for legacy durable uncommitted rows;
+- writer tokens and renewable leases support safe cleanup of durable invisible groups;
 - public consumers do not import `org.eclipse.jgit.internal.*`;
 - versioned H2, HSQLDB, PostgreSQL and Microsoft SQL Server migrations support production `migrate + validate` operation;
 - logical repositories have an explicit, idempotent and isolated deletion lifecycle.
@@ -43,8 +44,8 @@ A concrete example is the [auditable approval-workflow service](../docs/use-case
 4. Configure JDBC batching when the application owns the `SessionFactory`; the bundled provider applies conservative non-overriding defaults.
 5. Construct `DefaultHibernateRepositoryFactory` from the native Hibernate `SessionFactory`.
 6. Open repositories through `RepositoryName` and use normal public JGit APIs.
-7. Monitor JVM temporary-disk capacity for concurrent pack construction.
-8. Retain an operator policy for legacy durable uncommitted rows and stale staging files after abnormal process termination.
+7. Monitor heap, temporary-disk capacity and database transaction-log growth for concurrent pack construction.
+8. Retain an operator policy for expired durable invisible rows and stale spill files after abnormal termination.
 
 ```java
 Flyway.configure()
@@ -61,33 +62,27 @@ try (HibernateGitStorage storage =
 }
 ```
 
-Use `CoreSchemaMigrations.HSQLDB_LOCATION` for an embedded HSQLDB deployment or `CoreSchemaMigrations.SQL_SERVER_LOCATION` for Microsoft SQL Server. SQL Server applications must add Flyway's `flyway-sqlserver` database module and the Microsoft JDBC driver. Fresh databases, shared schemas, existing 0.1.4 installations and the copied pre-library Sandbox/Taxonomy schema require different procedures. See the [consumer guide](../docs/consuming.md) and [adoption runbook](../docs/taxonomy-adoption.md) before provisioning a persistent database.
+Use `CoreSchemaMigrations.HSQLDB_LOCATION` for HSQLDB or `CoreSchemaMigrations.SQL_SERVER_LOCATION` for Microsoft SQL Server. See the [consumer guide](../docs/consuming.md) and [adoption runbook](../docs/taxonomy-adoption.md) before provisioning a persistent database.
 
 ## Staged and chunked payload storage
 
 ```text
 JGit writer
-  -> temporary file for random read/write during extension construction
-  -> close completed PACK / IDX / Reftable extension without a database row
-  -> commitPack() acquires the repository lock once for the logical pack
-  -> persist inline data or ordered 1 MiB chunks
-  -> make every expected extension visible in the same Hibernate transaction
+  -> bounded random-readable memory
+  -> spill once to a temporary file when >256 KiB or the staging budget is full
+  -> close completed extension without creating a database row
+  -> direct atomic publication when every extension remains inline
+  -> otherwise persist the complete additive chunked group invisibly
+  -> acquire one short repository lock and publish the complete group
 ```
 
-The reader opens either:
+The in-memory path avoids creating, writing, rereading and deleting a temporary file for ordinary small PACK, IDX and Reftable extensions. One extension retains at most 256 KiB, and all repository instances share a 32 MiB process staging budget. Crossing either bound transparently preserves the previous file/chunk path.
 
-- an inline channel for a committed `git_packs.data` BLOB; or
-- a chunked channel with bounded multi-chunk read-ahead.
+The reader opens either an inline channel for committed `git_packs.data` or a chunked channel with bounded multi-chunk read-ahead. A successful pack-list scan publishes an immutable metadata catalog. Chunked files from that generation do not repeat the `git_packs` metadata query; selected locally published inline payloads use a separate hard-bounded handoff.
 
-A successful pack-list scan publishes an immutable metadata catalog for committed extensions. Chunked files opened from that generation do not repeat the `git_packs` metadata query; inline payload bytes remain outside the catalog and use the bounded database fallback.
+Temporary-disk and recovery details, including the optional 1/16/128 MiB profile, are documented in [Pack capacity and recovery](../docs/operations/capacity-and-recovery.md).
 
-After a successful local pack or Reftable publication, Core keeps JGit's normal `clearCache()` and packs-changed event ordering. The publication transaction returns the exact generated row IDs, file sizes and storage modes, and the first post-invalidation `listPacks()` call consumes that complete snapshot without opening a Hibernate transaction. An incomplete catalog or an independent repository instance still uses the authoritative database scan. A publication containing a legacy durable-uncommitted extension likewise disables the handoff rather than adding another metadata query; the next scan refreshes once from the database. See [Committed pack metadata catalog](../docs/operations/committed-pack-catalog.md).
-
-The migration does not rewrite existing published BLOBs. A later JGit repack can replace them naturally. Legacy uncommitted rows produced by the previous/base writer contract remain publishable or removable through the compatibility path.
-
-Temporary-disk capacity must cover concurrent open extensions and completed extensions waiting for their logical pack's publication callback. The detailed capacity envelope, optional 1/16/128 MiB profile, crash model and Sandbox predecessor review are documented in [Pack capacity and recovery](../docs/operations/capacity-and-recovery.md).
-
-## JDBC batching and keys
+## JDBC batching and chunk arrays
 
 `HibernateSessionFactoryProvider` applies these values only when the caller did not set them:
 
@@ -96,53 +91,35 @@ hibernate.jdbc.batch_size=8
 hibernate.order_inserts=true
 ```
 
-The eight-row batch matches the bounded eight-chunk persistence window. `GitPackChunkEntity` uses `(pack_id, chunk_index)` as its Hibernate identity, so every identifier is known before SQL execution and chunk inserts can be sent through real JDBC batches. Existing Flyway-managed schemas may retain their generated `git_pack_chunks.id` column; it remains read-only compatibility data and published payloads are not rewritten. The provider deliberately does not change update ordering for unrelated application entities.
+The eight-row batch matches the bounded chunk persistence window. `GitPackChunkEntity` uses `(pack_id, chunk_index)` as its Hibernate identity, so identifiers are known before SQL execution. The staged writer reads each chunk directly into the exact byte array retained by Hibernate instead of cloning a reusable one-MiB scratch buffer.
 
-Applications constructing a framework-managed `SessionFactory` must configure batching themselves. PostgreSQL `reWriteBatchedInserts` and SQL Server `useBulkCopyForBatchInsert` are optional deployment-level experiments, not forced library defaults. See [JDBC batching and pack-chunk keys](../docs/operations/jdbc-batching.md).
+PostgreSQL `reWriteBatchedInserts` and SQL Server `useBulkCopyForBatchInsert` remain deployment-level experiments, not forced defaults. See [JDBC batching and pack-chunk keys](../docs/operations/jdbc-batching.md).
 
 ## Transaction guarantees
 
-Core opens explicit Hibernate transactions for database mutations:
+Core opens explicit Hibernate transactions for storage operations:
 
 | Operation | Guarantee |
 |---|---|
-| Open/close staged extension | Bytes remain JVM-local; no `git_packs` or chunk row is created. |
-| Logical-pack publication | Every expected staged/legacy extension is validated, persisted and made committed under one repository lock and one Hibernate transaction. |
-| Publication failure | All rows and chunks inserted or deleted by that attempt roll back; the staged files remain available for JGit's rollback callback. |
-| Pure staged rollback | Temporary files are deleted without opening a database transaction. |
-| Mixed/legacy rollback | Local files and matching durable uncommitted rows/chunks are removed under the repository lock. |
-| Pack replacement | Replacement rows/chunks are deleted in the same transaction that publishes the new complete pack. |
-| Expired-write cleanup | Legacy durable extension groups are selected by age and lease under the repository lock, then chunks and metadata are deleted in one transaction. |
-| Normal `RefUpdate` | Reftable pack publication and the matching queryable `git_reflog` row share one repository-scoped Hibernate transaction. |
+| Open/close staged extension | Bytes remain JVM-local in memory or a spill file; no database row is created. |
+| Fully inline logical pack | Every expected extension is persisted and made visible in one repository-locked transaction. |
+| Additive chunked logical pack | One complete lock-free transaction persists an invisible token-owned group; one short locked transaction publishes exactly that group. |
+| Pack replacement/compaction | Source deletion and replacement publication remain in one repository-locked transaction. |
+| Publication failure | Database work rolls back; token-owned uncommitted rows/chunks and local staging are removed through the normal failure/rollback path. |
+| Pure local rollback | Memory reservations and spill files are released without database work. |
+| Normal `RefUpdate` | Reftable publication and the matching queryable `git_reflog` row share one repository-scoped transaction. |
 | Failed optimistic ref update | No Reftable change and no queryable reflog row are committed. |
-| Manual reflog import | `HibernateReflogWriter` can append externally produced history in an independent transaction. |
-| Repository deletion | Optional projection cleanup, reflogs, pack chunks and pack/reftable metadata are removed in one transaction. |
+| Repository deletion | Optional projection cleanup, reflogs, packs, chunks, lock and lifecycle state are removed transactionally. |
 
-The practical outcome is that a repository reader sees committed repository state rather than a partially published set of database rows. This is the ACID storage benefit described in [eclipse-jgit/jgit discussion #251](https://github.com/eclipse-jgit/jgit/discussions/251).
+A reader therefore sees committed repository state rather than a partially published set of rows. This is the ACID storage benefit discussed in [eclipse-jgit/jgit discussion #251](https://github.com/eclipse-jgit/jgit/discussions/251).
 
-### Boundary of the guarantee
-
-Supplying an application-managed `SessionFactory` does not automatically join Core operations to an already active application transaction. Git object insertion, Search indexing and arbitrary application entity changes remain separate transactional steps. A normal ref update and its queryable reflog are atomic with each other, but not automatically atomic with an unrelated application entity update.
-
-Do not advertise this module as providing one transaction over:
-
-```text
-application entity + Git object insertion + ref update + Search indexing
-```
-
-Applications needing cross-domain coordination should persist the published commit ID through an explicit workflow and use an outbox/idempotent projection step, or keep Git as the authoritative domain record. The full contract and failure model are documented in the [application use case](../docs/use-cases/versioned-approval-workflows.md#database-transaction-guarantees).
+Supplying an application-managed `SessionFactory` does not automatically join Core operations to an already active application transaction. Applications needing coordination with unrelated domain entities or Search indexing should use an explicit workflow/outbox and idempotent projection step.
 
 ## Recovering abandoned state
 
-### Local staging files
+Memory-backed staging disappears on process failure. Spilled files use the `jgit-storage-pack-` prefix; they are derived state and must not be imported as durable packs. Remove stale files only after confirming that the owning process is gone.
 
-Normal publication and rollback explicitly delete files created with the `jgit-storage-pack-` prefix. A hard JVM termination or operating-system deletion failure can leave stale files in the configured temporary directory. They have no committed database row and must never be imported as durable pack state. Remove them only after verifying that the owning process is no longer active.
-
-The implementation does not register every extension with the JVM-wide `deleteOnExit` registry, avoiding an unbounded registry in long-lived servers.
-
-### Legacy durable uncommitted rows
-
-Older/base writers may leave invisible `committed=false` rows when JGit's rollback callback cannot run. Clean them through the lease-aware maintenance API:
+A crash after adaptive pre-persistence can leave a complete invisible `committed=false` group. Clean expired groups through the lease-aware API rather than raw SQL:
 
 ```java
 PackCleanupResult result =
@@ -153,34 +130,34 @@ PackCleanupResult result =
             Instant.now());
 ```
 
-The service deletes a pack name only when every persisted extension is old, uncommitted and lacks a current lease. A group containing a published, recent or actively leased extension is skipped. Do not replace this with a raw SQL delete. See the [operations guide](../docs/operations/capacity-and-recovery.md).
+The service deletes a logical pack only when every persisted extension is old, uncommitted and lacks a current lease. See the [operations guide](../docs/operations/capacity-and-recovery.md).
 
 ## Repository deletion
 
-Close every `HibernateGitStorage` opened by a factory for the logical repository, then call:
+Close every `HibernateGitStorage` opened by the factory, then call:
 
 ```java
 RepositoryDeletionResult result =
     repositoryFactory.deleteRepository(new RepositoryName("domain-history"));
 ```
 
-Deletion is idempotent and filters all statements by the exact repository name. Open handles are rejected to prevent stale repository-scoped DFS caches. Optional modules participate through `RepositoryDeletionParticipant`; the Search module supplies `SearchRepositoryDeletionParticipant`. Chunk rows are removed with their pack metadata, and rollback preserves both.
+Deletion is idempotent and repository-scoped. Optional modules participate through `RepositoryDeletionParticipant`; the Search module supplies `SearchRepositoryDeletionParticipant`.
 
 ## Database ownership
 
 Core owns:
 
-- `git_packs`, including committed publication metadata, legacy inline payloads and compatibility fields for durable uncommitted rows;
-- `git_pack_chunks`, containing bounded payload rows for large committed or legacy staged extensions;
-- `git_repository_lock`, coordinating multi-instance publication, ref mutation and maintenance;
+- `git_packs`;
+- `git_pack_chunks`;
+- `git_repository_lifecycle`;
+- `git_repository_lock`;
 - `git_reflog`;
-- the Core Flyway history table;
-- the one-time legacy-adoption Flyway history table when that path is used.
+- the Core and optional legacy-adoption Flyway history tables.
 
 Workflow, session, audit, outbox and other application-specific tables remain owned by the consuming application.
 
 ## Verification
 
-H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. The suites verify fresh installation, 0.1.4 upgrades where applicable, pre-library adoption with unchanged BLOB checksums and reflog rows, Hibernate validation, adaptive inline/chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
+Normal CI covers H2, HSQLDB, PostgreSQL 17 and SQL Server 2022, including fresh migration, legacy adoption, Hibernate validation, refs/reflogs, inline and chunked publication, replacement, rollback, deletion, lifecycle cascade and `SessionFactory` restart. The JGit compatibility matrix covers every supported JGit line.
 
-Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion, legacy lease-aware cleanup, real JDBC batch execution, committed-pack catalog lifecycle, zero-query local pack-list handoff through normal `ObjectInserter.addPack()` and authoritative refresh after legacy publication. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. The optional `pack-capacity` Maven profile verifies 1 MiB, 16 MiB and 128 MiB payloads and is run manually and weekly by the existing performance workflow. A dedicated JMH comparison measures a twelve-MiB PostgreSQL pack with batching disabled and enabled.
+Staging contract tests cover in-memory positional reads, budget- and threshold-driven spill, reads across the spill boundary, direct inline publication, multi-chunk publication, exact memory release and idempotent cleanup. The optional `pack-capacity` profile verifies 1 MiB, 16 MiB and 128 MiB payloads, while JMH measures object, commit, protocol, concurrency and focused twelve-MiB PostgreSQL workloads.
