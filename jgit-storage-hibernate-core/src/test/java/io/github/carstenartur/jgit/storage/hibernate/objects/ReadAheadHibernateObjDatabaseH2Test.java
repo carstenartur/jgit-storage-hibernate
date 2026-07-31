@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
@@ -244,6 +246,18 @@ class ReadAheadHibernateObjDatabaseH2Test {
 
     try (Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
+      Instant createdAt = Instant.now();
+
+      GitRepositoryLifecycleEntity lifecycle = new GitRepositoryLifecycleEntity();
+      lifecycle.setRepositoryName("read-ahead");
+      lifecycle.setCreatedAt(createdAt);
+      session.persist(lifecycle);
+
+      GitRepositoryLockEntity lock = new GitRepositoryLockEntity();
+      lock.setRepositoryName("read-ahead");
+      lock.setCreatedAt(createdAt);
+      session.persist(lock);
+
       GitPackEntity pack = new GitPackEntity();
       pack.setRepositoryName("read-ahead");
       pack.setPackName("pack-test");
@@ -251,8 +265,8 @@ class ReadAheadHibernateObjDatabaseH2Test {
       pack.setData(null);
       pack.setFileSize(expected.length);
       pack.setCommitted(true);
-      pack.setCreatedAt(Instant.now());
-      pack.setCommittedAt(Instant.now());
+      pack.setCreatedAt(createdAt);
+      pack.setCommittedAt(createdAt);
       session.persist(pack);
       session.flush();
 
