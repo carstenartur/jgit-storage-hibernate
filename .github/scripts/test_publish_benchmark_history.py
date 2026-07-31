@@ -172,7 +172,7 @@ class PublishBenchmarkHistoryTest(unittest.TestCase):
         self.assertIn("normalized from ops/s", migrated["extra"])
         summary = self.summary_file.read_text(encoding="utf-8")
         self.assertIn("1.00×", summary)
-        self.assertNotIn("exceeded", summary)
+        self.assertIn("No benchmark exceeded", summary)
 
     def test_rejects_malformed_benchmark_input(self) -> None:
         self.benchmark_file.write_text(json.dumps([{"name": "missing fields"}]), encoding="utf-8")
