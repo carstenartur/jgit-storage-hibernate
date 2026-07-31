@@ -1,6 +1,6 @@
 # Performance optimization roadmap
 
-This document records the performance work that remains after adaptive small-pack persistence, atomic local staging, JDBC chunk batching, bounded multi-chunk read-ahead, committed-pack handoff, persistent logical pack metadata, real JGit protocol workloads and per-operation storage instrumentation.
+This document records the performance work that remains after adaptive small-pack persistence, atomic local staging, JDBC chunk batching, bounded multi-chunk read-ahead, committed-pack handoff, persistent logical pack metadata, read-optimized DFS maintenance, real JGit protocol workloads and per-operation storage instrumentation.
 
 ## Implemented performance slices
 
@@ -24,8 +24,9 @@ This document records the performance work that remains after adaptive small-pac
 - Hand locally published inline PACK and Reftable bytes to JGit through a hard-bounded repository-instance cache.
 - Delete replaced logical packs with one parent bulk mutation and the existing database foreign-key cascade.
 - Remove redundant pack, chunk and reflog indexes while retaining the measured access paths.
+- Expose JGit DFS garbage collection and repack with single-pack compaction, bitmaps, commit graph, changed-path Bloom filters and Reftable compaction through `PackStorageMaintenance`.
 
-See [Protocol storage metrics](protocol-storage-metrics.md) for counter semantics and interpretation limits.
+See [Protocol storage metrics](protocol-storage-metrics.md) for counter semantics and interpretation limits. See [Repack, garbage collection and read acceleration](operations/repack-and-gc.md) for the maintenance contract.
 
 ## Current protocol observations
 
@@ -37,20 +38,22 @@ The current 24-commit/4-commit protocol matrix shows:
 - HikariCP does not show a repeatable serial latency advantage;
 - portable JDBC batching reduces statement execution but is not itself a dominant local end-to-end latency improvement;
 - the committed-pack catalog and bounded local payload handoff remove deterministic metadata and local inline fallback reads;
-- persisted logical pack metadata keeps JGit lookup ordering, Reftable ordering and future maintenance decisions stable after repository reopen;
+- persisted logical pack metadata keeps JGit lookup ordering, Reftable ordering and maintenance decisions stable after repository reopen;
+- read-optimized maintenance can now trade background CPU and auxiliary index bytes for fewer active packs and lower future graph-walk work without weakening atomic publication;
+- JGit's DFS garbage collector does not currently emit a persisted reverse-index extension, so the library does not expose a misleading option for it;
 - protocol testing exposed and fixed DFS block-alignment and persisted-file-size contracts that object-level benchmarks did not exercise.
 
-The next implementation decision should use lock-held duration, transferred-byte counters and concurrent workload evidence, not the elapsed time of one serial push alone.
+The next implementation decision should use lock-held duration, transferred-byte counters, repository-aging measurements and concurrent workload evidence, not the elapsed time of one serial push alone.
 
 ## Next implementation candidates
 
 1. Add independent-`SessionFactory` reader/writer benchmarks for the same repository and for different repositories, reporting throughput plus p50, p95 and p99 latency.
 2. Record payload bytes written to temporary files, read from temporary files, persisted to the database and fetched by read-ahead windows.
-3. Measure repository-open and object-lookup cost after 1, 100 and 1,000 incremental pushes, including close/reopen boundaries.
+3. Measure repository-open and object-lookup cost after 1, 100 and 1,000 incremental pushes, including close/reopen boundaries and before/after repack comparisons.
 4. Move large payload transfer before the repository publication lock when lock-held measurements show that serialized database transfer is material. The pre-persisted rows must remain invisible and lease-owned until one short atomic publication transaction validates and exposes them.
 5. Evaluate a bounded memory-first staging buffer for extensions that remain below the inline threshold, spilling to a temporary file when the threshold or repository memory budget is exceeded.
-6. Evaluate JGit multi-pack-index maintenance before full repack for repositories whose pack count grows substantially.
-7. Add threshold-driven DFS garbage collection and repack after aging benchmarks establish useful pack-count and lookup-cost thresholds.
+6. Evaluate JGit multi-pack-index maintenance before full repack for very large repositories where rewriting payloads is more expensive than retaining multiple packs.
+7. Derive automatic maintenance thresholds from aging benchmarks instead of hard-coding a universal pack-count trigger.
 8. Compare one-, four- and sixteen-chunk read-ahead policies using fetched versus consumed bytes rather than query count alone.
 9. Profile allocation and GC pressure in multi-hundred-MiB publication before replacing Hibernate chunk persistence with a lower-level JDBC writer.
 
