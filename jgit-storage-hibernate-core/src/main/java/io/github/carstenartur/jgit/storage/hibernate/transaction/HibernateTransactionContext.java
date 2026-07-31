@@ -37,12 +37,15 @@ public final class HibernateTransactionContext {
   private final SessionFactory sessionFactory;
   private final ThreadLocal<Session> activeSession = new ThreadLocal<>();
   private final ThreadLocal<StorageOperationKind> activeOperation = new ThreadLocal<>();
+  private final ThreadLocal<Long> firstRepositoryLockAcquiredAtNanos = new ThreadLocal<>();
   private final boolean metricsEnabled;
   private final LongAdder transactionsStarted = new LongAdder();
   private final LongAdder transactionsCommitted = new LongAdder();
   private final LongAdder transactionsRolledBack = new LongAdder();
   private final LongAdder repositoryLocksAcquired = new LongAdder();
   private final LongAdder repositoryLockAcquisitionNanos = new LongAdder();
+  private final LongAdder transactionDurationNanos = new LongAdder();
+  private final LongAdder repositoryLockHeldNanos = new LongAdder();
   private final CategoryCounters[] categoryCounters;
 
   /**
@@ -105,6 +108,7 @@ public final class HibernateTransactionContext {
     }
     try (Session session = sessionFactory.openSession()) {
       Transaction transaction = session.beginTransaction();
+      long transactionStartedAt = metricsEnabled ? System.nanoTime() : 0L;
       activeSession.set(session);
       activeOperation.set(effectiveOperation);
       try {
@@ -125,9 +129,27 @@ public final class HibernateTransactionContext {
         }
         throw exception;
       } finally {
+        if (metricsEnabled) {
+          recordDurations(category, transactionStartedAt);
+        }
+        firstRepositoryLockAcquiredAtNanos.remove();
         activeOperation.remove();
         activeSession.remove();
       }
+    }
+  }
+
+  private void recordDurations(CategoryCounters category, long transactionStartedAt) {
+    long completedAt = System.nanoTime();
+    long transactionDuration = completedAt - transactionStartedAt;
+    transactionDurationNanos.add(transactionDuration);
+    category.transactionDurationNanos.add(transactionDuration);
+
+    Long lockAcquiredAt = firstRepositoryLockAcquiredAtNanos.get();
+    if (lockAcquiredAt != null) {
+      long lockHeldDuration = completedAt - lockAcquiredAt;
+      repositoryLockHeldNanos.add(lockHeldDuration);
+      category.repositoryLockHeldNanos.add(lockHeldDuration);
     }
   }
 
@@ -174,8 +196,9 @@ public final class HibernateTransactionContext {
   /**
    * Acquire the pessimistic row lock for a repository inside the caller's active transaction.
    *
-   * <p>The measured duration includes both database round-trip latency and any contention wait. It
-   * is therefore an end-to-end acquisition metric rather than a database-specific lock-wait value.
+   * <p>The measured acquisition duration includes both database round-trip latency and any
+   * contention wait. Lock hold duration is measured separately from the first successful acquisition
+   * in a context-managed top-level transaction until that transaction completes.
    *
    * @param session active Hibernate session and transaction
    * @param repositoryName logical repository name
@@ -190,8 +213,9 @@ public final class HibernateTransactionContext {
             GitRepositoryLockEntity.class,
             repositoryName,
             LockModeType.PESSIMISTIC_WRITE);
-    long elapsed = metricsEnabled ? System.nanoTime() - started : 0L;
+    long acquiredAt = metricsEnabled ? System.nanoTime() : 0L;
     if (metricsEnabled) {
+      long elapsed = acquiredAt - started;
       repositoryLockAcquisitionNanos.add(elapsed);
       counters(activeOperation()).repositoryLockAcquisitionNanos.add(elapsed);
     }
@@ -201,6 +225,9 @@ public final class HibernateTransactionContext {
     if (metricsEnabled) {
       repositoryLocksAcquired.increment();
       counters(activeOperation()).repositoryLocksAcquired.increment();
+      if (activeSession.get() == session && firstRepositoryLockAcquiredAtNanos.get() == null) {
+        firstRepositoryLockAcquiredAtNanos.set(acquiredAt);
+      }
     }
   }
 
@@ -222,6 +249,20 @@ public final class HibernateTransactionContext {
   }
 
   /**
+   * Return cumulative top-level transaction and repository-lock hold durations.
+   *
+   * @return current duration snapshot, or {@link StorageDurationMetrics#ZERO} when metrics are
+   *     disabled
+   */
+  public StorageDurationMetrics durationMetricsSnapshot() {
+    if (!metricsEnabled) {
+      return StorageDurationMetrics.ZERO;
+    }
+    return new StorageDurationMetrics(
+        transactionDurationNanos.sum(), repositoryLockHeldNanos.sum());
+  }
+
+  /**
    * Return the same monotone counters grouped by stable operation category.
    *
    * @return immutable breakdown, or {@link StorageOperationBreakdown#ZERO} when metrics are disabled
@@ -233,12 +274,33 @@ public final class HibernateTransactionContext {
     Map<StorageOperationKind, StorageOperationMetrics> snapshot =
         new EnumMap<>(StorageOperationKind.class);
     for (StorageOperationKind kind : StorageOperationKind.values()) {
-      StorageOperationMetrics value = categoryCounters[kind.ordinal()].snapshot();
+      StorageOperationMetrics value = categoryCounters[kind.ordinal()].operationSnapshot();
       if (!StorageOperationMetrics.ZERO.equals(value)) {
         snapshot.put(kind, value);
       }
     }
     return new StorageOperationBreakdown(snapshot);
+  }
+
+  /**
+   * Return cumulative transaction and repository-lock hold durations grouped by operation category.
+   *
+   * @return immutable duration breakdown, or {@link StorageDurationBreakdown#ZERO} when metrics are
+   *     disabled
+   */
+  public StorageDurationBreakdown durationBreakdownSnapshot() {
+    if (!metricsEnabled) {
+      return StorageDurationBreakdown.ZERO;
+    }
+    Map<StorageOperationKind, StorageDurationMetrics> snapshot =
+        new EnumMap<>(StorageOperationKind.class);
+    for (StorageOperationKind kind : StorageOperationKind.values()) {
+      StorageDurationMetrics value = categoryCounters[kind.ordinal()].durationSnapshot();
+      if (!StorageDurationMetrics.ZERO.equals(value)) {
+        snapshot.put(kind, value);
+      }
+    }
+    return new StorageDurationBreakdown(snapshot);
   }
 
   private StorageOperationKind effectiveOperation(StorageOperationKind requested) {
@@ -311,14 +373,21 @@ public final class HibernateTransactionContext {
     private final LongAdder transactionsRolledBack = new LongAdder();
     private final LongAdder repositoryLocksAcquired = new LongAdder();
     private final LongAdder repositoryLockAcquisitionNanos = new LongAdder();
+    private final LongAdder transactionDurationNanos = new LongAdder();
+    private final LongAdder repositoryLockHeldNanos = new LongAdder();
 
-    private StorageOperationMetrics snapshot() {
+    private StorageOperationMetrics operationSnapshot() {
       return new StorageOperationMetrics(
           transactionsStarted.sum(),
           transactionsCommitted.sum(),
           transactionsRolledBack.sum(),
           repositoryLocksAcquired.sum(),
           repositoryLockAcquisitionNanos.sum());
+    }
+
+    private StorageDurationMetrics durationSnapshot() {
+      return new StorageDurationMetrics(
+          transactionDurationNanos.sum(), repositoryLockHeldNanos.sum());
     }
   }
 
