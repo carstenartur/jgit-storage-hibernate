@@ -5,16 +5,23 @@
 package io.github.carstenartur.jgit.storage.hibernate;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
+import jakarta.persistence.LockModeType;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Callable;
@@ -36,6 +43,8 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.TreeFormatter;
 import org.flywaydb.core.Flyway;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,7 +124,11 @@ class MultiInstancePostgreSqlIntegrationTest {
           start.countDown();
 
           List<RefUpdate.Result> results = List.of(resultA.get(), resultB.get());
-          assertEquals(1, results.stream().filter(MultiInstancePostgreSqlIntegrationTest::success).count());
+          assertEquals(
+              1,
+              results.stream()
+                  .filter(MultiInstancePostgreSqlIntegrationTest::success)
+                  .count());
           assertEquals(
               1,
               results.stream().filter(result -> result == RefUpdate.Result.LOCK_FAILURE).count());
@@ -135,6 +148,56 @@ class MultiInstancePostgreSqlIntegrationTest {
     }
   }
 
+  @Test
+  void chunkedPayloadCommitsInvisiblyBeforeContendedPublicationLock() throws Exception {
+    String repositoryName = "shared-large-payload";
+    byte[] payload = deterministicBytes(512 * 1024 + 257, 43);
+    try (HibernateSessionFactoryProvider providerA = provider();
+        HibernateRepository repositoryA =
+            HibernateRepository.create(providerA.getSessionFactory(), repositoryName);
+        HibernateSessionFactoryProvider providerB = provider()) {
+      repositoryA.create(true);
+      try (HibernateRepository ignored =
+          HibernateRepository.create(providerB.getSessionFactory(), repositoryName)) {
+        CountDownLatch lockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+          Future<Void> lockHolder =
+              executor.submit(
+                  holdLockTask(providerB, repositoryName, lockAcquired, releaseLock));
+          assertTrue(lockAcquired.await(10, TimeUnit.SECONDS));
+
+          Future<ObjectId> insertion =
+              executor.submit(
+                  () -> {
+                    try (ObjectInserter inserter = repositoryA.newObjectInserter()) {
+                      ObjectId objectId = inserter.insert(Constants.OBJ_BLOB, payload);
+                      inserter.flush();
+                      return objectId;
+                    }
+                  });
+          try {
+            waitForPreparedRows(repositoryName, 1L);
+            assertEquals(
+                0L,
+                countRows(
+                    repositoryName,
+                    "committed = true and pack_name in "
+                        + "(select pack_name from git_packs where repository_name = ? "
+                        + "and committed = false and write_token is not null)"));
+          } finally {
+            releaseLock.countDown();
+          }
+
+          ObjectId objectId = insertion.get(30, TimeUnit.SECONDS);
+          lockHolder.get(30, TimeUnit.SECONDS);
+          assertEquals(0L, preparedRowCount(repositoryName));
+          assertArrayEquals(payload, repositoryA.open(objectId).getBytes());
+        }
+      }
+    }
+  }
+
   private Callable<RefUpdate.Result> updateTask(
       HibernateRepository repository,
       ObjectId expected,
@@ -146,6 +209,60 @@ class MultiInstancePostgreSqlIntegrationTest {
       assertTrue(start.await(10, TimeUnit.SECONDS));
       return update(repository, candidate, expected);
     };
+  }
+
+  private Callable<Void> holdLockTask(
+      HibernateSessionFactoryProvider provider,
+      String repositoryName,
+      CountDownLatch lockAcquired,
+      CountDownLatch releaseLock) {
+    return () -> {
+      try (Session session = provider.getSessionFactory().openSession()) {
+        Transaction transaction = session.beginTransaction();
+        GitRepositoryLockEntity lock =
+            session.find(
+                GitRepositoryLockEntity.class, repositoryName, LockModeType.PESSIMISTIC_WRITE);
+        assertNotNull(lock);
+        lockAcquired.countDown();
+        assertTrue(releaseLock.await(30, TimeUnit.SECONDS));
+        transaction.commit();
+      }
+      return null;
+    };
+  }
+
+  private void waitForPreparedRows(String repositoryName, long expected) throws Exception {
+    Instant deadline = Instant.now().plus(Duration.ofSeconds(15));
+    while (Instant.now().isBefore(deadline)) {
+      if (preparedRowCount(repositoryName) == expected) {
+        return;
+      }
+      Thread.sleep(20);
+    }
+    assertEquals(expected, preparedRowCount(repositoryName));
+  }
+
+  private long preparedRowCount(String repositoryName) throws Exception {
+    return countRows(
+        repositoryName, "committed = false and write_token is not null");
+  }
+
+  private long countRows(String repositoryName, String predicate) throws Exception {
+    String sql =
+        "select count(*) from git_packs where repository_name = ? and " + predicate;
+    try (Connection connection =
+            DriverManager.getConnection(
+                schemaUrl, POSTGRESQL.getUsername(), POSTGRESQL.getPassword());
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, repositoryName);
+      if (sql.chars().filter(character -> character == '?').count() > 1) {
+        statement.setString(2, repositoryName);
+      }
+      try (ResultSet resultSet = statement.executeQuery()) {
+        assertTrue(resultSet.next());
+        return resultSet.getLong(1);
+      }
+    }
   }
 
   private static boolean success(RefUpdate.Result result) {
@@ -183,6 +300,16 @@ class MultiInstancePostgreSqlIntegrationTest {
     }
   }
 
+  private static byte[] deterministicBytes(int length, int seed) {
+    byte[] result = new byte[length];
+    int value = seed;
+    for (int index = 0; index < result.length; index++) {
+      value = value * 1103515245 + 12345;
+      result[index] = (byte) (value >>> 16);
+    }
+    return result;
+  }
+
   private HibernateSessionFactoryProvider provider() {
     Properties properties = new Properties();
     properties.put("hibernate.connection.url", schemaUrl);
@@ -192,6 +319,7 @@ class MultiInstancePostgreSqlIntegrationTest {
     properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
     properties.put("hibernate.hbm2ddl.auto", "validate");
     properties.put("hibernate.show_sql", "false");
+    properties.put("hibernate.connection.pool_size", "4");
     return new HibernateSessionFactoryProvider(properties);
   }
 
