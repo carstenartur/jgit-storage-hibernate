@@ -13,10 +13,13 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -53,6 +56,24 @@ public class GitPackEntity {
   @Nationalized
   @Column(name = "repository_name", nullable = false, length = 255)
   private String repositoryName;
+
+  /**
+   * Owning repository lifecycle row.
+   *
+   * <p>The scalar repository name remains the write-facing mapping. This read-only association makes
+   * Hibernate-generated schemas enforce the same foreign-key and database-cascade contract as the
+   * versioned Flyway migrations. Removing the coordination row therefore also removes every pack and
+   * chunk that belongs to the deleted repository.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(
+      name = "repository_name",
+      referencedColumnName = "repository_name",
+      insertable = false,
+      updatable = false,
+      foreignKey = @ForeignKey(name = "fk_pack_repository_lock"))
+  @OnDelete(action = OnDeleteAction.CASCADE)
+  private GitRepositoryLockEntity repositoryLock;
 
   @Nationalized
   @Column(name = "pack_name", nullable = false, length = 255)
@@ -130,6 +151,10 @@ public class GitPackEntity {
 
   public void setRepositoryName(String repositoryName) {
     this.repositoryName = repositoryName;
+  }
+
+  public GitRepositoryLockEntity getRepositoryLock() {
+    return repositoryLock;
   }
 
   public String getPackName() {
