@@ -60,6 +60,21 @@ class HibernateTransactionContextMetricsH2Test {
           StorageOperationMetrics.ZERO,
           breakdown.metrics(StorageOperationKind.REFLOG_WRITE),
           "Nested work must inherit the owning top-level category");
+
+      StorageDurationMetrics durations = context.durationMetricsSnapshot();
+      StorageDurationBreakdown durationBreakdown = context.durationBreakdownSnapshot();
+      assertEquals(durations, durationBreakdown.total());
+      assertEquals(
+          durations.transactionDurationNanos(),
+          durationBreakdown
+                  .metrics(StorageOperationKind.PACK_PUBLICATION)
+                  .transactionDurationNanos()
+              + durationBreakdown
+                  .metrics(StorageOperationKind.PACK_ROLLBACK)
+                  .transactionDurationNanos());
+      assertEquals(
+          StorageDurationMetrics.ZERO,
+          durationBreakdown.metrics(StorageOperationKind.REFLOG_WRITE));
     }
   }
 
@@ -71,6 +86,8 @@ class HibernateTransactionContextMetricsH2Test {
           new HibernateTransactionContext(provider.getSessionFactory());
       StorageOperationMetrics before = context.metricsSnapshot();
       StorageOperationBreakdown breakdownBefore = context.operationBreakdownSnapshot();
+      StorageDurationMetrics durationsBefore = context.durationMetricsSnapshot();
+      StorageDurationBreakdown durationBreakdownBefore = context.durationBreakdownSnapshot();
 
       context.executeWithRepositoryLock(
           StorageOperationKind.REF_PUBLICATION, "metrics-repo", session -> null);
@@ -78,6 +95,10 @@ class HibernateTransactionContextMetricsH2Test {
       StorageOperationMetrics delta = context.metricsSnapshot().minus(before);
       StorageOperationBreakdown breakdown =
           context.operationBreakdownSnapshot().minus(breakdownBefore);
+      StorageDurationMetrics durationDelta =
+          context.durationMetricsSnapshot().minus(durationsBefore);
+      StorageDurationBreakdown durationBreakdown =
+          context.durationBreakdownSnapshot().minus(durationBreakdownBefore);
       assertEquals(1, delta.transactionsStarted());
       assertEquals(1, delta.transactionsCommitted());
       assertEquals(0, delta.transactionsRolledBack());
@@ -85,6 +106,13 @@ class HibernateTransactionContextMetricsH2Test {
       assertTrue(delta.repositoryLockAcquisitionNanos() >= 0);
       assertEquals(delta, breakdown.total());
       assertEquals(delta, breakdown.metrics(StorageOperationKind.REF_PUBLICATION));
+      assertTrue(durationDelta.transactionDurationNanos() >= 0);
+      assertTrue(durationDelta.repositoryLockHeldNanos() >= 0);
+      assertTrue(
+          durationDelta.transactionDurationNanos() >= durationDelta.repositoryLockHeldNanos());
+      assertEquals(durationDelta, durationBreakdown.total());
+      assertEquals(
+          durationDelta, durationBreakdown.metrics(StorageOperationKind.REF_PUBLICATION));
     }
   }
 
@@ -96,6 +124,8 @@ class HibernateTransactionContextMetricsH2Test {
       context.execute(StorageOperationKind.PACK_PUBLICATION, session -> null);
       assertEquals(StorageOperationMetrics.ZERO, context.metricsSnapshot());
       assertEquals(StorageOperationBreakdown.ZERO, context.operationBreakdownSnapshot());
+      assertEquals(StorageDurationMetrics.ZERO, context.durationMetricsSnapshot());
+      assertEquals(StorageDurationBreakdown.ZERO, context.durationBreakdownSnapshot());
     }
   }
 
