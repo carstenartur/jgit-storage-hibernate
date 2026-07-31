@@ -16,6 +16,8 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageDurationBreakdown;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageDurationMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
@@ -105,6 +107,31 @@ public class HibernateRepository extends DfsRepository {
    */
   public StorageOperationBreakdown getStorageOperationBreakdown() {
     return transactionContext.operationBreakdownSnapshot();
+  }
+
+  /**
+   * Return cumulative top-level transaction and repository-lock hold durations.
+   *
+   * <p>Repository-lock acquisition time remains available through {@link
+   * #getStorageOperationMetrics()}; comparing acquisition and hold duration distinguishes contention
+   * from storage work performed after the lock has been obtained.
+   *
+   * @return current duration snapshot, or zero durations when metrics are disabled
+   */
+  public StorageDurationMetrics getStorageDurationMetrics() {
+    return transactionContext.durationMetricsSnapshot();
+  }
+
+  /**
+   * Return transaction and repository-lock hold durations grouped by stable storage operation kind.
+   *
+   * <p>The category total equals {@link #getStorageDurationMetrics()} for the same snapshot. The
+   * breakdown is empty when metrics are disabled.
+   *
+   * @return monotone durations grouped by storage operation kind
+   */
+  public StorageDurationBreakdown getStorageDurationBreakdown() {
+    return transactionContext.durationBreakdownSnapshot();
   }
 
   /**
