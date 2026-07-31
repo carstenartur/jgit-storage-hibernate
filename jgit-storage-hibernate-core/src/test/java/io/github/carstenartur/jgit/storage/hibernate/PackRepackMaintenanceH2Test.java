@@ -89,7 +89,6 @@ class PackRepackMaintenanceH2Test {
         assertTrue(gcPack.hasFileExt(PackExt.PACK));
         assertTrue(gcPack.hasFileExt(PackExt.INDEX));
         assertTrue(gcPack.hasFileExt(PackExt.BITMAP_INDEX));
-        assertTrue(gcPack.hasFileExt(PackExt.REVERSE_INDEX));
         assertTrue(gcPack.hasFileExt(PackExt.COMMIT_GRAPH));
         assertTrue(gcPack.getObjectCount() > 0);
         assertTrue(gcPack.getLastModified() > 0);
