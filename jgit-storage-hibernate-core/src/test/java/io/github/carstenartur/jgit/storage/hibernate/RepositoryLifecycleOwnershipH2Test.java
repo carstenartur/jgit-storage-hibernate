@@ -61,9 +61,14 @@ class RepositoryLifecycleOwnershipH2Test {
         Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
       GitPackEntity pack = pack("missing-" + UUID.randomUUID(), Instant.now());
-      session.persist(pack);
 
-      RuntimeException failure = assertThrows(RuntimeException.class, session::flush);
+      RuntimeException failure =
+          assertThrows(
+              RuntimeException.class,
+              () -> {
+                session.persist(pack);
+                session.flush();
+              });
       assertTrue(
           hasConstraintViolation(failure),
           () -> "Expected repository lifecycle foreign-key violation but got " + failure);
