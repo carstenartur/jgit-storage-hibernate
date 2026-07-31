@@ -35,6 +35,46 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
             self.assertEqual("ms/op", entry["unit"])
             self.assertTrue(math.isfinite(entry["value"]))
             self.assertIn("JDK: 21", entry["extra"])
+            self.assertIn("Chart unit: ms/op", entry["extra"])
+
+    def test_normalizes_throughput_to_latency(self) -> None:
+        result = self._backend_result(50.0)
+        result["primaryMetric"] = {
+            "score": 50.0,
+            "scoreError": 5.0,
+            "scoreUnit": "ops/s",
+        }
+        result["mode"] = "thrpt"
+
+        converted = MODULE.convert([result])[0]
+
+        self.assertEqual("ms/op", converted["unit"])
+        self.assertAlmostEqual(20.0, converted["value"])
+        self.assertAlmostEqual(2.0, converted["range"])
+        self.assertIn("Original JMH unit: ops/s", converted["extra"])
+
+    def test_normalizes_other_time_units(self) -> None:
+        result = self._backend_result(2.0)
+        result["primaryMetric"] = {
+            "score": 2.0,
+            "scoreError": 0.25,
+            "scoreUnit": "s/op",
+        }
+
+        converted = MODULE.convert([result])[0]
+
+        self.assertAlmostEqual(2_000.0, converted["value"])
+        self.assertAlmostEqual(250.0, converted["range"])
+
+    def test_rejects_non_positive_throughput(self) -> None:
+        result = self._backend_result(0.0)
+        result["primaryMetric"] = {
+            "score": 0.0,
+            "scoreError": 0.0,
+            "scoreUnit": "ops/s",
+        }
+        with self.assertRaisesRegex(ValueError, "throughput must be positive"):
+            MODULE.convert([result])
 
     def test_converts_large_pack_batching_modes(self) -> None:
         converted = MODULE.convert(
