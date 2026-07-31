@@ -49,7 +49,11 @@ The current 24-commit/4-commit protocol and four-thread publication matrices sho
 - chunk transfer can therefore execute before the lock, but visibility, replacement and writer validation must remain one short atomic publication transaction;
 - protocol testing exposed and fixed DFS block-alignment and persisted-file-size contracts that object-level benchmarks did not exercise.
 
-Performance claims for adaptive pre-persistence must compare the same benchmark before and after the change. The important outputs are shared-repository throughput, independent-repository throughput, lock-acquisition time, lock-held time and total transaction duration—not merely the elapsed time of one serial push.
+The first CI A/B run of adaptive pre-persistence improved shared-repository PostgreSQL throughput from **49.2 to 63.5 operations/s** (+29.0%). PostgreSQL with HikariCP improved from **48.7 to 62.4 operations/s** (+28.1%). The minimum candidate iteration was above the maximum baseline iteration for both PostgreSQL variants. Independent-repository throughput changed from 78.1 to 76.1 operations/s without Hikari and from 81.0 to 78.4 operations/s with Hikari; those small decreases remain inside the observed run-to-run spread.
+
+The more stable within-run comparison shows the intended effect clearly: one shared PostgreSQL repository previously retained 63.0% of independent-repository throughput and now retains 83.4%; with Hikari the ratio improved from 60.2% to 79.6%. Aggregate shared-repository lock-acquisition time fell by 49.6% without Hikari and 51.3% with Hikari. Lock-held time fell by 21.6% and 31.4% respectively, with a reduction in every individual measurement iteration. The additional payload transaction increases transaction count by 50%, so future tuning must continue to protect independent-repository throughput and small inline writes.
+
+These results are strong directional evidence, not a universal database benchmark. Baseline and candidate were separate hosted-runner executions with three measurement iterations. Merge decisions therefore also require the complete correctness matrix and the absence of material regressions in the established protocol workloads.
 
 ## Next implementation candidates
 
