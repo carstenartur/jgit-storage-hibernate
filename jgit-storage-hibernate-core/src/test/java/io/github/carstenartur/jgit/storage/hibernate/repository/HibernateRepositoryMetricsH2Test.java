@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageDurationBreakdown;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageDurationMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
@@ -34,16 +36,24 @@ class HibernateRepositoryMetricsH2Test {
             HibernateRepository.create(provider.getSessionFactory(), "metrics-facade")) {
       StorageOperationMetrics before = repository.getStorageOperationMetrics();
       StorageOperationBreakdown breakdownBefore = repository.getStorageOperationBreakdown();
+      StorageDurationMetrics durationsBefore = repository.getStorageDurationMetrics();
+      StorageDurationBreakdown durationBreakdownBefore = repository.getStorageDurationBreakdown();
       repository.inTransaction(session -> null);
       StorageOperationMetrics delta = repository.getStorageOperationMetrics().minus(before);
       StorageOperationBreakdown breakdown =
           repository.getStorageOperationBreakdown().minus(breakdownBefore);
+      StorageDurationMetrics durationDelta =
+          repository.getStorageDurationMetrics().minus(durationsBefore);
+      StorageDurationBreakdown durationBreakdown =
+          repository.getStorageDurationBreakdown().minus(durationBreakdownBefore);
 
       assertEquals(1, delta.transactionsStarted());
       assertEquals(1, delta.transactionsCommitted());
       assertEquals(0, delta.transactionsRolledBack());
       assertEquals(delta, breakdown.total());
       assertEquals(delta, breakdown.metrics(StorageOperationKind.OTHER));
+      assertEquals(durationDelta, durationBreakdown.total());
+      assertEquals(durationDelta, durationBreakdown.metrics(StorageOperationKind.OTHER));
     }
 
     try (HibernateSessionFactoryProvider provider = provider(false);
@@ -52,6 +62,8 @@ class HibernateRepositoryMetricsH2Test {
       repository.inTransaction(session -> null);
       assertEquals(StorageOperationMetrics.ZERO, repository.getStorageOperationMetrics());
       assertEquals(StorageOperationBreakdown.ZERO, repository.getStorageOperationBreakdown());
+      assertEquals(StorageDurationMetrics.ZERO, repository.getStorageDurationMetrics());
+      assertEquals(StorageDurationBreakdown.ZERO, repository.getStorageDurationBreakdown());
     }
   }
 
@@ -65,6 +77,8 @@ class HibernateRepositoryMetricsH2Test {
       repository.create(true);
       StorageOperationMetrics before = repository.getStorageOperationMetrics();
       StorageOperationBreakdown breakdownBefore = repository.getStorageOperationBreakdown();
+      StorageDurationMetrics durationsBefore = repository.getStorageDurationMetrics();
+      StorageDurationBreakdown durationBreakdownBefore = repository.getStorageDurationBreakdown();
 
       ObjectId blob;
       try (ObjectInserter inserter = repository.newObjectInserter()) {
@@ -78,11 +92,19 @@ class HibernateRepositoryMetricsH2Test {
       StorageOperationMetrics aggregate = repository.getStorageOperationMetrics().minus(before);
       StorageOperationBreakdown breakdown =
           repository.getStorageOperationBreakdown().minus(breakdownBefore);
+      StorageDurationMetrics durationAggregate =
+          repository.getStorageDurationMetrics().minus(durationsBefore);
+      StorageDurationBreakdown durationBreakdown =
+          repository.getStorageDurationBreakdown().minus(durationBreakdownBefore);
       assertEquals(aggregate, breakdown.total());
+      assertEquals(durationAggregate, durationBreakdown.total());
       assertEquals(
           StorageOperationMetrics.ZERO,
           breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE),
           "Staged extension bytes are persisted by the owning publication transaction");
+      assertEquals(
+          StorageDurationMetrics.ZERO,
+          durationBreakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE));
       assertTrue(
           breakdown.metrics(StorageOperationKind.PACK_PUBLICATION).transactionsStarted() > 0);
       assertTrue(breakdown.metrics(StorageOperationKind.REF_PUBLICATION).transactionsStarted() > 0);
@@ -90,6 +112,10 @@ class HibernateRepositoryMetricsH2Test {
           StorageOperationMetrics.ZERO,
           breakdown.metrics(StorageOperationKind.OTHER),
           "Every real top-level repository transaction must have a stable operation category");
+      assertEquals(
+          StorageDurationMetrics.ZERO,
+          durationBreakdown.metrics(StorageOperationKind.OTHER),
+          "Every timed top-level repository transaction must have a stable operation category");
     }
   }
 
