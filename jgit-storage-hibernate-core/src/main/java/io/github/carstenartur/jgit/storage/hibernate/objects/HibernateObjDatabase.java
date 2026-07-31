@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -102,8 +103,11 @@ public class HibernateObjDatabase extends DfsObjDatabase {
           List<Object[]> rows =
               session
                   .createQuery(
-                      "SELECT p.packName, p.packExtension FROM GitPackEntity p "
-                          + "WHERE p.repositoryName = :repo AND p.committed = true",
+                      "SELECT p.packName, p.packExtension, p.fileSize, p.packSource, "
+                          + "p.lastModified, p.objectCount, p.deltaCount, p.indexVersion, "
+                          + "p.minUpdateIndex, p.maxUpdateIndex, p.committedAt, p.createdAt "
+                          + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                          + "AND p.committed = true",
                       Object[].class)
                   .setParameter("repo", repositoryName)
                   .getResultList();
@@ -111,15 +115,32 @@ public class HibernateObjDatabase extends DfsObjDatabase {
           for (Object[] row : rows) {
             String packName = (String) row[0];
             String extension = (String) row[1];
+            long fileSize = ((Number) row[2]).longValue();
+            PackDescriptionMetadata metadata =
+                PackDescriptionMetadata.fromStoredValues(
+                    (String) row[3],
+                    longValue(row[4]),
+                    longValue(row[5]),
+                    longValue(row[6]),
+                    integerValue(row[7]),
+                    longValue(row[8]),
+                    longValue(row[9]),
+                    (Instant) row[10],
+                    (Instant) row[11]);
             DfsPackDescription description =
                 descriptions.computeIfAbsent(
                     packName,
-                    name ->
-                        new DfsPackDescription(
-                            getRepository().getDescription(), name, PackSource.INSERT));
+                    name -> {
+                      DfsPackDescription created =
+                          new DfsPackDescription(
+                              getRepository().getDescription(), name, metadata.packSource());
+                      metadata.applyTo(created);
+                      return created;
+                    });
             for (PackExt packExtension : PackExt.values()) {
               if (packExtension.getExtension().equals(extension)) {
                 description.addFileExt(packExtension);
+                description.setFileSize(packExtension, fileSize);
                 break;
               }
             }
@@ -141,21 +162,31 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     transactionContext.executeWithRepositoryLock(
         repositoryName,
         session -> {
-          if (replaces != null) {
-            for (DfsPackDescription replace : replaces) {
-              deletePackRows(session, repositoryName, baseName(replace));
-            }
-          }
+          deletePackRows(session, repositoryName, packNames(replaces));
           Instant committedAt = Instant.now();
           for (DfsPackDescription description : descriptions) {
+            PackDescriptionMetadata metadata =
+                PackDescriptionMetadata.fromDescription(description, committedAt);
             int updated =
                 session
                     .createMutationQuery(
                         "UPDATE GitPackEntity p SET p.committed = true, "
                             + "p.committedAt = :committedAt, p.writeToken = null, "
-                            + "p.writeLeaseUntil = null WHERE p.repositoryName = :repo "
-                            + "AND p.packName = :name AND p.committed = false")
+                            + "p.writeLeaseUntil = null, p.packSource = :packSource, "
+                            + "p.lastModified = :lastModified, p.objectCount = :objectCount, "
+                            + "p.deltaCount = :deltaCount, p.indexVersion = :indexVersion, "
+                            + "p.minUpdateIndex = :minUpdateIndex, "
+                            + "p.maxUpdateIndex = :maxUpdateIndex "
+                            + "WHERE p.repositoryName = :repo AND p.packName = :name "
+                            + "AND p.committed = false")
                     .setParameter("committedAt", committedAt)
+                    .setParameter("packSource", metadata.packSource().name())
+                    .setParameter("lastModified", metadata.lastModified())
+                    .setParameter("objectCount", metadata.objectCount())
+                    .setParameter("deltaCount", metadata.deltaCount())
+                    .setParameter("indexVersion", metadata.indexVersion())
+                    .setParameter("minUpdateIndex", metadata.minUpdateIndex())
+                    .setParameter("maxUpdateIndex", metadata.maxUpdateIndex())
                     .setParameter("repo", repositoryName)
                     .setParameter("name", baseName(description))
                     .executeUpdate();
@@ -175,9 +206,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       transactionContext.executeWithRepositoryLock(
           repositoryName,
           session -> {
-            for (DfsPackDescription description : descriptions) {
-              deletePackRows(session, repositoryName, baseName(description));
-            }
+            deletePackRows(session, repositoryName, packNames(descriptions));
             return null;
           });
     } catch (IOException | RuntimeException ignored) {
@@ -185,26 +214,37 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     }
   }
 
-  private static void deletePackRows(Session session, String repositoryName, String packName) {
-    List<Long> packIds =
-        session
-            .createQuery(
-                "SELECT p.id FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name",
-                Long.class)
-            .setParameter("repo", repositoryName)
-            .setParameter("name", packName)
-            .getResultList();
-    if (!packIds.isEmpty()) {
-      session
-          .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
-      session
-          .createMutationQuery("DELETE FROM GitPackEntity p WHERE p.id IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
+  private static Set<String> packNames(Collection<DfsPackDescription> descriptions) {
+    if (descriptions == null || descriptions.isEmpty()) {
+      return Set.of();
     }
+    Set<String> names = new LinkedHashSet<>();
+    for (DfsPackDescription description : descriptions) {
+      names.add(baseName(description));
+    }
+    return Set.copyOf(names);
+  }
+
+  private static void deletePackRows(
+      Session session, String repositoryName, Collection<String> packNames) {
+    if (packNames.isEmpty()) {
+      return;
+    }
+    session
+        .createMutationQuery(
+            "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                + "AND p.packName IN :packNames")
+        .setParameter("repo", repositoryName)
+        .setParameter("packNames", packNames)
+        .executeUpdate();
+  }
+
+  private static Long longValue(Object value) {
+    return value == null ? null : ((Number) value).longValue();
+  }
+
+  private static Integer integerValue(Object value) {
+    return value == null ? null : ((Number) value).intValue();
   }
 
   @Override
