@@ -24,11 +24,11 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 /**
  * Random-readable pack-extension staging that keeps small payloads in memory and spills once.
  *
- * <p>Retained in-memory staging is bounded twice: one extension cannot exceed the normal inline
- * payload threshold, and all repository instances in this class loader share a 32-MiB process
- * budget. When either bound would be exceeded, the already written prefix is copied once to a
- * temporary file and all subsequent writes continue there. Positional reads retain identical
- * semantics before and after the spill.
+ * <p>Retained in-memory staging is bounded three times: one extension cannot exceed the normal
+ * inline payload threshold, one repository owns a separate memory budget, and all repository
+ * instances in this class loader share a process budget. When any bound would be exceeded, the
+ * already written prefix is copied once to a temporary file and all subsequent writes continue
+ * there. Positional reads retain identical semantics before and after the spill.
  */
 final class PackExtensionStagingBuffer extends DfsOutputStream {
 
@@ -38,6 +38,7 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
   private static final MemoryBudget PROCESS_MEMORY_BUDGET =
       new MemoryBudget(PROCESS_MEMORY_BUDGET_BYTES);
 
+  private final MemoryBudget repositoryMemoryBudget;
   private final CloseConsumer closeConsumer;
   private final Instant createdAt = Instant.now();
   private byte[] memory = new byte[0];
@@ -46,7 +47,10 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
   private long fileSize;
   private boolean closed;
 
-  PackExtensionStagingBuffer(CloseConsumer closeConsumer) {
+  PackExtensionStagingBuffer(
+      MemoryBudget repositoryMemoryBudget, CloseConsumer closeConsumer) {
+    this.repositoryMemoryBudget =
+        Objects.requireNonNull(repositoryMemoryBudget, "repositoryMemoryBudget");
     this.closeConsumer = Objects.requireNonNull(closeConsumer, "closeConsumer");
   }
 
@@ -151,8 +155,15 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
       try {
         Files.deleteIfExists(temporaryFile);
       } catch (IOException cleanupFailure) {
-        failure.addSuppressed(cleanupFailure);
+        if (failure == null) {
+          failure = cleanupFailure;
+        } else {
+          failure.addSuppressed(cleanupFailure);
+        }
       }
+    }
+    if (failure == null) {
+      throw new IOException("Could not close pack extension staging");
     }
     throw failure;
   }
@@ -167,20 +178,35 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
     }
     int newCapacity = Math.max(INITIAL_CAPACITY, memory.length);
     while (newCapacity < requiredCapacity) {
-      int doubled = Math.multiplyExact(newCapacity, 2);
-      newCapacity = Math.min(MAX_MEMORY_BYTES, doubled);
+      newCapacity = Math.min(MAX_MEMORY_BYTES, Math.multiplyExact(newCapacity, 2));
     }
     long additionalBytes = newCapacity - memory.length;
-    if (!PROCESS_MEMORY_BUDGET.tryReserve(additionalBytes)) {
+    if (!reserveMemory(additionalBytes)) {
       return false;
     }
     try {
       memory = Arrays.copyOf(memory, newCapacity);
       return true;
     } catch (RuntimeException | Error allocationFailure) {
-      PROCESS_MEMORY_BUDGET.release(additionalBytes);
+      releaseMemory(additionalBytes);
       throw allocationFailure;
     }
+  }
+
+  private boolean reserveMemory(long bytes) {
+    if (!repositoryMemoryBudget.tryReserve(bytes)) {
+      return false;
+    }
+    if (PROCESS_MEMORY_BUDGET.tryReserve(bytes)) {
+      return true;
+    }
+    repositoryMemoryBudget.release(bytes);
+    return false;
+  }
+
+  private void releaseMemory(long bytes) {
+    PROCESS_MEMORY_BUDGET.release(bytes);
+    repositoryMemoryBudget.release(bytes);
   }
 
   private void ensureFileBacked() throws IOException {
@@ -234,15 +260,15 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
       payloadBytes = memory;
     } else {
       payloadBytes = Arrays.copyOf(memory, size);
-      PROCESS_MEMORY_BUDGET.release(memory.length - size);
+      releaseMemory(memory.length - size);
     }
     memory = null;
-    return new MemoryPayload(payloadBytes);
+    return new MemoryPayload(payloadBytes, repositoryMemoryBudget);
   }
 
   private void releaseMemory() {
     if (memory != null && memory.length > 0) {
-      PROCESS_MEMORY_BUDGET.release(memory.length);
+      releaseMemory(memory.length);
     }
     memory = new byte[0];
   }
@@ -304,10 +330,12 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
 
   private static final class MemoryPayload implements StagedPayload {
     private final byte[] data;
+    private final MemoryBudget repositoryMemoryBudget;
     private final AtomicBoolean discarded = new AtomicBoolean();
 
-    private MemoryPayload(byte[] data) {
+    private MemoryPayload(byte[] data, MemoryBudget repositoryMemoryBudget) {
       this.data = data;
+      this.repositoryMemoryBudget = repositoryMemoryBudget;
     }
 
     @Override
@@ -347,6 +375,7 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
     public void discard() {
       if (discarded.compareAndSet(false, true)) {
         PROCESS_MEMORY_BUDGET.release(data.length);
+        repositoryMemoryBudget.release(data.length);
       }
     }
   }
