@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import java.io.IOException;
 import java.time.Instant;
@@ -141,9 +142,16 @@ class HibernateTransactionContextMetricsH2Test {
   private static void persistLock(HibernateSessionFactoryProvider provider, String repositoryName) {
     try (Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
+      Instant createdAt = Instant.now();
+
+      GitRepositoryLifecycleEntity lifecycle = new GitRepositoryLifecycleEntity();
+      lifecycle.setRepositoryName(repositoryName);
+      lifecycle.setCreatedAt(createdAt);
+      session.persist(lifecycle);
+
       GitRepositoryLockEntity lock = new GitRepositoryLockEntity();
       lock.setRepositoryName(repositoryName);
-      lock.setCreatedAt(Instant.now());
+      lock.setCreatedAt(createdAt);
       session.persist(lock);
       transaction.commit();
     }

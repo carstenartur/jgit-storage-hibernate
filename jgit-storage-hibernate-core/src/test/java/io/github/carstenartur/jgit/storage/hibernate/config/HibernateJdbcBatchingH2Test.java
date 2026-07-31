@@ -15,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkId;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
@@ -83,6 +85,18 @@ class HibernateJdbcBatchingH2Test {
   private static Long persistPack(HibernateSessionFactoryProvider provider) {
     try (Session session = provider.getSessionFactory().openSession()) {
       Transaction transaction = session.beginTransaction();
+      Instant createdAt = Instant.now();
+
+      GitRepositoryLifecycleEntity lifecycle = new GitRepositoryLifecycleEntity();
+      lifecycle.setRepositoryName("batching");
+      lifecycle.setCreatedAt(createdAt);
+      session.persist(lifecycle);
+
+      GitRepositoryLockEntity lock = new GitRepositoryLockEntity();
+      lock.setRepositoryName("batching");
+      lock.setCreatedAt(createdAt);
+      session.persist(lock);
+
       GitPackEntity pack = new GitPackEntity();
       pack.setRepositoryName("batching");
       pack.setPackName("pack-" + UUID.randomUUID());
@@ -90,8 +104,8 @@ class HibernateJdbcBatchingH2Test {
       pack.setData(null);
       pack.setFileSize(20L * 1024L * 1024L);
       pack.setCommitted(true);
-      pack.setCreatedAt(Instant.now());
-      pack.setCommittedAt(Instant.now());
+      pack.setCreatedAt(createdAt);
+      pack.setCommittedAt(createdAt);
       session.persist(pack);
       transaction.commit();
       return pack.getId();

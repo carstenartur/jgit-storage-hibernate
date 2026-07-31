@@ -60,6 +60,8 @@ class RepositoryDeletionH2Test {
       }
       assertTrue(countPacks(sessionFactory, firstName) > 0);
       assertTrue(countPacks(sessionFactory, secondName) > 0);
+      assertEquals(1L, countLifecycleRows(sessionFactory, firstName));
+      assertEquals(1L, countLockRows(sessionFactory, firstName));
 
       assertThrows(HibernateStorageException.class, () -> factory.deleteRepository(firstName));
       assertEquals(firstCommit, firstStorage.repository().exactRef("refs/heads/main").getObjectId());
@@ -72,12 +74,19 @@ class RepositoryDeletionH2Test {
       assertTrue(deleted.deletedAnything());
       assertEquals(0, countPacks(sessionFactory, firstName));
       assertEquals(0, countChunks(sessionFactory, firstName));
+      assertEquals(0L, countLifecycleRows(sessionFactory, firstName));
+      assertEquals(0L, countLockRows(sessionFactory, firstName));
       assertTrue(countPacks(sessionFactory, secondName) > 0);
+      assertEquals(1L, countLifecycleRows(sessionFactory, secondName));
 
       assertEquals(new RepositoryDeletionResult(0, 0, 0), factory.deleteRepository(firstName));
+      assertEquals(0L, countLifecycleRows(sessionFactory, firstName));
+      assertEquals(0L, countLockRows(sessionFactory, firstName));
 
       try (HibernateGitStorage reopenedFirst = factory.open(firstName)) {
         assertNull(reopenedFirst.repository().exactRef("refs/heads/main"));
+        assertEquals(1L, countLifecycleRows(sessionFactory, firstName));
+        assertEquals(1L, countLockRows(sessionFactory, firstName));
       }
       try (HibernateGitStorage reopenedSecond = factory.open(secondName)) {
         Ref main = reopenedSecond.repository().exactRef("refs/heads/main");
@@ -111,10 +120,14 @@ class RepositoryDeletionH2Test {
       long packsBefore = countPacks(sessionFactory, repositoryName);
       long chunksBefore = countChunks(sessionFactory, repositoryName);
       assertTrue(packsBefore > 0);
+      assertEquals(1L, countLifecycleRows(sessionFactory, repositoryName));
+      assertEquals(1L, countLockRows(sessionFactory, repositoryName));
 
       assertThrows(HibernateStorageException.class, () -> factory.deleteRepository(repositoryName));
       assertEquals(packsBefore, countPacks(sessionFactory, repositoryName));
       assertEquals(chunksBefore, countChunks(sessionFactory, repositoryName));
+      assertEquals(1L, countLifecycleRows(sessionFactory, repositoryName));
+      assertEquals(1L, countLockRows(sessionFactory, repositoryName));
 
       try (HibernateGitStorage storage =
           new DefaultHibernateRepositoryFactory(sessionFactory).open(repositoryName)) {
@@ -153,6 +166,31 @@ class RepositoryDeletionH2Test {
               .setParameter("repo", repositoryName.value())
               .getSingleResult();
       return count.longValue();
+    }
+  }
+
+  private static long countLifecycleRows(
+      SessionFactory sessionFactory, RepositoryName repositoryName) {
+    try (Session session = sessionFactory.openSession()) {
+      return session
+          .createQuery(
+              "SELECT COUNT(r) FROM GitRepositoryLifecycleEntity r "
+                  + "WHERE r.repositoryName = :repo",
+              Long.class)
+          .setParameter("repo", repositoryName.value())
+          .getSingleResult();
+    }
+  }
+
+  private static long countLockRows(
+      SessionFactory sessionFactory, RepositoryName repositoryName) {
+    try (Session session = sessionFactory.openSession()) {
+      return session
+          .createQuery(
+              "SELECT COUNT(r) FROM GitRepositoryLockEntity r WHERE r.repositoryName = :repo",
+              Long.class)
+          .setParameter("repo", repositoryName.value())
+          .getSingleResult();
     }
   }
 

@@ -84,6 +84,7 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
       assertTrue(report.duplicatePackIdentities().isEmpty());
       assertEquals(0, report.incompletePackRows());
       assertTrue(tableExists(connection, "git_pack_chunks"));
+      assertTrue(tableExists(connection, "git_repository_lifecycle"));
       assertTrue(tableExists(connection, "git_repository_lock"));
     }
 
@@ -228,7 +229,10 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
       assertEquals(0, count(connection, "select count(*) from git_packs where data is null"));
 
       statement.execute("drop table git_pack_chunks");
+      statement.execute(
+          "alter table git_packs drop constraint if exists fk_pack_repository_lifecycle");
       statement.execute("drop table git_repository_lock");
+      statement.execute("drop table git_repository_lifecycle");
       statement.execute("drop table " + CoreSchemaMigrations.SCHEMA_HISTORY_TABLE);
 
       statement.execute("drop index if exists idx_pack_repo_lease on git_packs");

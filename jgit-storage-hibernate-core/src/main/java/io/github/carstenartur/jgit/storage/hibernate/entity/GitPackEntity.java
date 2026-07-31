@@ -13,10 +13,13 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -53,6 +56,23 @@ public class GitPackEntity {
   @Nationalized
   @Column(name = "repository_name", nullable = false, length = 255)
   private String repositoryName;
+
+  /**
+   * Durable repository identity owning this pack-related file.
+   *
+   * <p>The scalar repository name remains the write-facing mapping. This read-only association makes
+   * Hibernate-generated schemas enforce the same lifecycle and cascading-delete contract as the
+   * versioned migrations, without coupling payload staging to the independent publication lock row.
+   */
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(
+      name = "repository_name",
+      referencedColumnName = "repository_name",
+      insertable = false,
+      updatable = false,
+      foreignKey = @ForeignKey(name = "fk_pack_repository_lifecycle"))
+  @OnDelete(action = OnDeleteAction.CASCADE)
+  private GitRepositoryLifecycleEntity repositoryLifecycle;
 
   @Nationalized
   @Column(name = "pack_name", nullable = false, length = 255)
@@ -130,6 +150,10 @@ public class GitPackEntity {
 
   public void setRepositoryName(String repositoryName) {
     this.repositoryName = repositoryName;
+  }
+
+  public GitRepositoryLifecycleEntity getRepositoryLifecycle() {
+    return repositoryLifecycle;
   }
 
   public String getPackName() {
