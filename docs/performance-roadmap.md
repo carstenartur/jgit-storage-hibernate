@@ -24,7 +24,7 @@ This document records the performance work that remains after adaptive small-pac
 - Hand locally published inline PACK and Reftable bytes to JGit through a hard-bounded repository-instance cache.
 - Delete replaced logical packs with one parent bulk mutation and the existing database foreign-key cascade.
 - Remove redundant pack, chunk and reflog indexes while retaining the measured access paths.
-- Expose JGit DFS garbage collection and repack with single-pack compaction, bitmaps, reverse index, commit graph, changed-path Bloom filters and Reftable compaction through `PackStorageMaintenance`.
+- Expose JGit DFS garbage collection and repack with single-pack compaction, bitmaps, commit graph, changed-path Bloom filters and Reftable compaction through `PackStorageMaintenance`.
 
 See [Protocol storage metrics](protocol-storage-metrics.md) for counter semantics and interpretation limits. See [Repack, garbage collection and read acceleration](operations/repack-and-gc.md) for the maintenance contract.
 
@@ -40,6 +40,7 @@ The current 24-commit/4-commit protocol matrix shows:
 - the committed-pack catalog and bounded local payload handoff remove deterministic metadata and local inline fallback reads;
 - persisted logical pack metadata keeps JGit lookup ordering, Reftable ordering and maintenance decisions stable after repository reopen;
 - read-optimized maintenance can now trade background CPU and auxiliary index bytes for fewer active packs and lower future graph-walk work without weakening atomic publication;
+- JGit's DFS garbage collector does not currently emit a persisted reverse-index extension, so the library does not expose a misleading option for it;
 - protocol testing exposed and fixed DFS block-alignment and persisted-file-size contracts that object-level benchmarks did not exercise.
 
 The next implementation decision should use lock-held duration, transferred-byte counters, repository-aging measurements and concurrent workload evidence, not the elapsed time of one serial push alone.
