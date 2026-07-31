@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from benchmark_units import normalize_benchmark
+
 SCRIPT_PREFIX = "window.BENCHMARK_DATA = "
 
 
@@ -24,6 +26,28 @@ def _git(repository: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
+def _normalize_history(data: dict[str, Any]) -> dict[str, Any]:
+    entries = data.get("entries")
+    if not isinstance(entries, dict):
+        raise ValueError("Benchmark data has no entries object")
+
+    for suite_name, history in entries.items():
+        if not isinstance(history, list):
+            raise ValueError(f"Benchmark suite {suite_name!r} is not a list")
+        for entry_index, entry in enumerate(history):
+            if not isinstance(entry, dict):
+                raise ValueError(
+                    f"Benchmark suite {suite_name!r} entry {entry_index} is not an object"
+                )
+            benches = entry.get("benches")
+            if not isinstance(benches, list):
+                raise ValueError(
+                    f"Benchmark suite {suite_name!r} entry {entry_index} has no benches array"
+                )
+            entry["benches"] = [normalize_benchmark(benchmark) for benchmark in benches]
+    return data
+
+
 def _load_data(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"lastUpdate": 0, "repoUrl": "", "entries": {}}
@@ -34,7 +58,7 @@ def _load_data(path: Path) -> dict[str, Any]:
     parsed = json.loads(content[len(SCRIPT_PREFIX) :])
     if not isinstance(parsed, dict) or not isinstance(parsed.get("entries"), dict):
         raise ValueError(f"Benchmark data file {path} has an invalid structure")
-    return parsed
+    return _normalize_history(parsed)
 
 
 def _load_benches(path: Path) -> list[dict[str, Any]]:
@@ -55,7 +79,7 @@ def _load_benches(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"Benchmark entry {index} has an invalid unit")
         if not isinstance(benchmark["value"], (int, float)):
             raise ValueError(f"Benchmark entry {index} has a non-numeric value")
-        benches.append(benchmark)
+        benches.append(normalize_benchmark(benchmark))
     return benches
 
 
@@ -168,7 +192,10 @@ def update_history(
     if not isinstance(history, list):
         raise ValueError(f"Benchmark suite {suite_name!r} is not a list")
 
-    previous = next((entry for entry in reversed(history) if entry.get("commit", {}).get("id") != commit), None)
+    previous = next(
+        (entry for entry in reversed(history) if entry.get("commit", {}).get("id") != commit),
+        None,
+    )
     current = {
         "commit": _commit_metadata(repository_dir, commit, repository_url, actor),
         "date": timestamp_ms,
@@ -184,7 +211,10 @@ def update_history(
     data["lastUpdate"] = timestamp_ms
     data["repoUrl"] = repository_url.rstrip("/")
     data_file.parent.mkdir(parents=True, exist_ok=True)
-    data_file.write_text(SCRIPT_PREFIX + json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    data_file.write_text(
+        SCRIPT_PREFIX + json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
     if summary_file is not None:
         _write_summary(summary_file, suite_name, previous, current, alert_threshold)
