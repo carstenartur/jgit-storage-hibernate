@@ -75,15 +75,26 @@ public final class StorageOperationBreakdown {
     long committed = 0;
     long rolledBack = 0;
     long locks = 0;
-    long lockNanos = 0;
+    long lockAcquisitionNanos = 0;
+    long transactionDurationNanos = 0;
+    long lockHeldNanos = 0;
     for (StorageOperationMetrics value : metrics.values()) {
       started += value.transactionsStarted();
       committed += value.transactionsCommitted();
       rolledBack += value.transactionsRolledBack();
       locks += value.repositoryLocksAcquired();
-      lockNanos += value.repositoryLockAcquisitionNanos();
+      lockAcquisitionNanos += value.repositoryLockAcquisitionNanos();
+      transactionDurationNanos += value.transactionDurationNanos();
+      lockHeldNanos += value.repositoryLockHeldNanos();
     }
-    return new StorageOperationMetrics(started, committed, rolledBack, locks, lockNanos);
+    return new StorageOperationMetrics(
+        started,
+        committed,
+        rolledBack,
+        locks,
+        lockAcquisitionNanos,
+        transactionDurationNanos,
+        lockHeldNanos);
   }
 
   /**
