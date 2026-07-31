@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import jakarta.persistence.LockModeType;
@@ -95,6 +96,12 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
           throw new HibernateStorageException(
               "Missing repository lock row for " + repositoryName.value());
         }
+        GitRepositoryLifecycleEntity repositoryLifecycle =
+            session.find(GitRepositoryLifecycleEntity.class, repositoryName.value());
+        if (repositoryLifecycle == null) {
+          throw new HibernateStorageException(
+              "Missing repository lifecycle row for " + repositoryName.value());
+        }
 
         int projectionRows = 0;
         for (RepositoryDeletionParticipant participant : deletionParticipants) {
@@ -114,7 +121,12 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
                     "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo")
                 .setParameter("repo", repositoryName.value())
                 .executeUpdate();
+
+        // Keep exact result accounting above, then remove the durable parent. Its database cascade is
+        // the race-safety net for any invisible pack row committed after the counted bulk delete.
         session.remove(repositoryLock);
+        session.flush();
+        session.remove(repositoryLifecycle);
         transaction.commit();
 
         cacheScope.getRefDatabase().refresh();
