@@ -23,7 +23,6 @@ The read-optimized preset requests:
 
 - one primary reachable-object pack;
 - JGit pack bitmaps for clone/fetch negotiation and graph walks;
-- a reverse index;
 - a commit graph;
 - changed-path Bloom filters in that commit graph;
 - Reftable compaction;
@@ -31,9 +30,11 @@ The read-optimized preset requests:
 
 Use `PackRepackOptions.compactOnly()` when the deployment wants fewer packs without paying the maintenance-time and storage cost of auxiliary read indexes. A custom immutable `PackRepackOptions` can select each feature independently; Bloom filters require commit-graph generation.
 
+JGit's current DFS garbage collector does not emit a persisted reverse-index extension. Reverse lookup remains available through JGit's normal in-memory/on-demand fallback, so Core does not expose a configuration flag that would suggest otherwise.
+
 ## Transaction and concurrency model
 
-JGit performs graph traversal, delta selection and extension construction through the repository's normal DFS interfaces. The Hibernate backend stages the resulting PACK, IDX, bitmap, reverse-index, commit-graph and Reftable extensions outside database visibility.
+JGit performs graph traversal, delta selection and extension construction through the repository's normal DFS interfaces. The Hibernate backend stages the resulting PACK, IDX, bitmap, commit-graph and Reftable extensions outside database visibility.
 
 The final replacement:
 
@@ -56,7 +57,7 @@ Maintenance for different logical repositories uses different lock rows and can 
 - end-to-end maintenance duration;
 - whether JGit accepted the replacement after its race check.
 
-`storedByteDelta()` is `after - before`. It may be positive even for a successful compaction because bitmaps, reverse indexes and commit graphs intentionally trade some storage for lower read latency and lower CPU cost. `packReduction()` reports the active ordinary-pack reduction independently.
+`storedByteDelta()` is `after - before`. It may be positive even for a successful compaction because bitmaps and commit graphs intentionally trade some storage for lower read latency and lower CPU cost. `packReduction()` reports the active ordinary-pack reduction independently.
 
 ## When to run
 
