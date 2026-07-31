@@ -36,6 +36,36 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
             self.assertTrue(math.isfinite(entry["value"]))
             self.assertIn("JDK: 21", entry["extra"])
 
+    def test_normalizes_throughput_to_milliseconds_per_operation(self) -> None:
+        result = self._backend_result("postgresql", 50.0)
+        result["primaryMetric"] = {
+            "score": 50.0,
+            "scoreError": 5.0,
+            "scoreUnit": "ops/s",
+        }
+        result["mode"] = "thrpt"
+
+        converted = MODULE.convert([result])[0]
+
+        self.assertEqual("ms/op", converted["unit"])
+        self.assertAlmostEqual(20.0, converted["value"])
+        self.assertAlmostEqual(2.0, converted["range"])
+        self.assertIn("Original metric: 50.0 ops/s", converted["extra"])
+
+    def test_normalizes_other_time_units(self) -> None:
+        result = self._backend_result("filesystem", 2_500_000.0)
+        result["primaryMetric"] = {
+            "score": 2_500_000.0,
+            "scoreError": 100_000.0,
+            "scoreUnit": "ns/op",
+        }
+
+        converted = MODULE.convert([result])[0]
+
+        self.assertEqual("ms/op", converted["unit"])
+        self.assertAlmostEqual(2.5, converted["value"])
+        self.assertAlmostEqual(0.1, converted["range"])
+
     def test_converts_large_pack_batching_modes(self) -> None:
         converted = MODULE.convert(
             [
@@ -78,6 +108,16 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         result = self._backend_result("postgresql", 1.0)
         result["params"] = {}
         with self.assertRaisesRegex(ValueError, "neither a backend nor a batchingMode"):
+            MODULE.convert([result])
+
+    def test_rejects_zero_throughput(self) -> None:
+        result = self._backend_result("postgresql", 1.0)
+        result["primaryMetric"] = {
+            "score": 0.0,
+            "scoreError": 0.0,
+            "scoreUnit": "ops/s",
+        }
+        with self.assertRaisesRegex(ValueError, "throughput must be positive"):
             MODULE.convert([result])
 
     @staticmethod

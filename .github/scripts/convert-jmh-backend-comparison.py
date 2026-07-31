@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Convert one or more JMH JSON files into the dashboard's smaller-is-better format."""
+"""Convert one or more JMH JSON files into one consistent smaller-is-better format."""
 
 from __future__ import annotations
 
 import json
-import math
 import sys
 from pathlib import Path
 from typing import Any, Iterable
+
+from benchmark_units import CANONICAL_UNIT, normalize_measurement
 
 BACKEND_LABELS = {
     "filesystem": "JGit + filesystem",
@@ -21,13 +22,6 @@ BATCHING_MODE_LABELS = {
     "enabled": "JGit + PostgreSQL (JDBC batching on)",
     "enabled-rewrite": "JGit + PostgreSQL (JDBC batching + rewrite)",
 }
-
-
-def _finite_number(value: Any, field: str) -> float:
-    number = float(value)
-    if not math.isfinite(number):
-        raise ValueError(f"{field} must be finite, got {value!r}")
-    return number
 
 
 def _series_label(result: dict[str, Any]) -> str:
@@ -64,24 +58,31 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         benchmark = str(result["benchmark"])
         operation = benchmark.rsplit(".", 1)[-1]
         metric = result["primaryMetric"]
-        score = _finite_number(metric["score"], "score")
-        score_error = _finite_number(metric.get("scoreError", 0.0), "scoreError")
-        unit = str(metric["scoreUnit"])
+        original_score = metric["score"]
+        original_error = metric.get("scoreError", 0.0)
+        original_unit = str(metric["scoreUnit"])
+        score, score_error = normalize_measurement(
+            original_score,
+            original_error,
+            original_unit,
+        )
+
+        extra_lines = [
+            f"Backend: {series_label}",
+            f"JDK: {result.get('jdkVersion', 'unknown')}",
+            f"Mode: {result.get('mode', 'unknown')}",
+            f"Forks: {result.get('forks', 'unknown')}",
+        ]
+        if original_unit != CANONICAL_UNIT:
+            extra_lines.append(f"Original metric: {original_score} {original_unit}")
 
         converted.append(
             {
                 "name": f"{operation} — {series_label}",
-                "unit": unit,
+                "unit": CANONICAL_UNIT,
                 "value": score,
                 "range": score_error,
-                "extra": "\n".join(
-                    (
-                        f"Backend: {series_label}",
-                        f"JDK: {result.get('jdkVersion', 'unknown')}",
-                        f"Mode: {result.get('mode', 'unknown')}",
-                        f"Forks: {result.get('forks', 'unknown')}",
-                    )
-                ),
+                "extra": "\n".join(extra_lines),
             }
         )
 

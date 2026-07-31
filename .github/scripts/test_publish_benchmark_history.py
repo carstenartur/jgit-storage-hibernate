@@ -42,11 +42,21 @@ class PublishBenchmarkHistoryTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
-    def _write_benchmarks(self, first_value: float = 1.25) -> None:
+    def _write_benchmarks(
+        self,
+        first_value: float = 1.25,
+        first_unit: str = "ms/op",
+        first_range: float = 0.1,
+    ) -> None:
         self.benchmark_file.write_text(
             json.dumps(
                 [
-                    {"name": "read", "unit": "ms/op", "value": first_value, "range": 0.1},
+                    {
+                        "name": "read",
+                        "unit": first_unit,
+                        "value": first_value,
+                        "range": first_range,
+                    },
                     {"name": "write", "unit": "ms/op", "value": 2.5},
                 ]
             ),
@@ -100,7 +110,58 @@ class PublishBenchmarkHistoryTest(unittest.TestCase):
         self.assertEqual("test-user", entry["commit"]["author"]["username"])
         self.assertEqual("customSmallerIsBetter", entry["tool"])
         self.assertEqual(2, len(entry["benches"]))
+        self.assertTrue(all(bench["unit"] == "ms/op" for bench in entry["benches"]))
         self.assertIn("Stored the first comparable benchmark result", self.summary_file.read_text(encoding="utf-8"))
+
+    def test_normalizes_current_throughput_input(self) -> None:
+        self._write_benchmarks(first_value=100.0, first_unit="ops/s", first_range=10.0)
+        self._run()
+
+        read = self._read_data()["entries"]["Repository backend comparison"][0]["benches"][0]
+        self.assertEqual("ms/op", read["unit"])
+        self.assertAlmostEqual(10.0, read["value"])
+        self.assertAlmostEqual(1.0, read["range"])
+        self.assertIn("Original metric: 100.0 ops/s", read["extra"])
+
+    def test_migrates_legacy_throughput_history_before_comparison(self) -> None:
+        existing = {
+            "lastUpdate": 1,
+            "repoUrl": "https://github.com/example/project",
+            "entries": {
+                "Repository backend comparison": [
+                    {
+                        "commit": {"id": "old-throughput"},
+                        "date": 1,
+                        "tool": "customBiggerIsBetter",
+                        "benches": [
+                            {
+                                "name": "read",
+                                "unit": "ops/s",
+                                "value": 100.0,
+                                "range": 10.0,
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+        self.data_file.parent.mkdir(parents=True)
+        self.data_file.write_text(PREFIX + json.dumps(existing), encoding="utf-8")
+        self._write_benchmarks(first_value=12.0)
+        self._run()
+
+        history = self._read_data()["entries"]["Repository backend comparison"]
+        self.assertEqual(2, len(history))
+        previous = history[0]
+        self.assertEqual("customSmallerIsBetter", previous["tool"])
+        self.assertEqual("ms/op", previous["benches"][0]["unit"])
+        self.assertAlmostEqual(10.0, previous["benches"][0]["value"])
+        self.assertAlmostEqual(1.0, previous["benches"][0]["range"])
+
+        summary = self.summary_file.read_text(encoding="utf-8")
+        self.assertIn("12.0 ms/op", summary)
+        self.assertIn("10.0 ms/op", summary)
+        self.assertIn("1.20×", summary)
 
     def test_replaces_same_commit_instead_of_duplicating_it(self) -> None:
         self._write_benchmarks(1.0)

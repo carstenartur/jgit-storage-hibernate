@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from benchmark_units import CANONICAL_UNIT, normalize_benchmark
+
 SCRIPT_PREFIX = "window.BENCHMARK_DATA = "
 
 
@@ -55,8 +57,28 @@ def _load_benches(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"Benchmark entry {index} has an invalid unit")
         if not isinstance(benchmark["value"], (int, float)):
             raise ValueError(f"Benchmark entry {index} has a non-numeric value")
-        benches.append(benchmark)
+        benches.append(normalize_benchmark(benchmark))
     return benches
+
+
+def _normalize_history(history: list[dict[str, Any]]) -> None:
+    """Migrate legacy mixed throughput/time points to one smaller-is-better unit."""
+
+    for entry_index, entry in enumerate(history):
+        if not isinstance(entry, dict):
+            raise ValueError(f"Benchmark history entry {entry_index} is not an object")
+        benches = entry.get("benches", [])
+        if not isinstance(benches, list):
+            raise ValueError(f"Benchmark history entry {entry_index} has invalid benches")
+        normalized: list[dict[str, Any]] = []
+        for bench_index, benchmark in enumerate(benches):
+            if not isinstance(benchmark, dict):
+                raise ValueError(
+                    f"Benchmark history entry {entry_index}, bench {bench_index} is not an object"
+                )
+            normalized.append(normalize_benchmark(benchmark))
+        entry["benches"] = normalized
+        entry["tool"] = "customSmallerIsBetter"
 
 
 def _commit_metadata(repository: Path, commit: str, repository_url: str, actor: str) -> dict[str, Any]:
@@ -118,6 +140,11 @@ def _write_summary(
                     f"| `{benchmark['name']}` | {benchmark['value']} {benchmark['unit']} | — | — |"
                 )
                 continue
+            if benchmark["unit"] != old["unit"]:
+                raise ValueError(
+                    f"Cannot compare {benchmark['name']!r}: "
+                    f"{old['unit']!r} versus {benchmark['unit']!r}"
+                )
             ratio = _ratio(old, benchmark, smaller_is_better=True)
             ratio_text = "∞" if ratio == float("inf") else f"{ratio:.2f}×"
             lines.append(
@@ -160,6 +187,10 @@ def update_history(
         raise ValueError("max-items must be at least one")
     if alert_threshold <= 0:
         raise ValueError("alert-threshold must be positive")
+    if tool != "customSmallerIsBetter":
+        raise ValueError(
+            f"Canonical {CANONICAL_UNIT} history requires customSmallerIsBetter, got {tool!r}"
+        )
 
     data = _load_data(data_file)
     benches = _load_benches(benchmark_file)
@@ -167,6 +198,7 @@ def update_history(
     history = suites.setdefault(suite_name, [])
     if not isinstance(history, list):
         raise ValueError(f"Benchmark suite {suite_name!r} is not a list")
+    _normalize_history(history)
 
     previous = next((entry for entry in reversed(history) if entry.get("commit", {}).get("id") != commit), None)
     current = {
