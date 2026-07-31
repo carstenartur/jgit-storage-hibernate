@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
   "label": "JMH",
-  "message": "readBlobAfterJGitCacheReset 0.01 ms/op",
-  "color": "brightgreen"
+  "message": "publishToDifferentRepositories 301.47 ops/s",
+  "color": "red"
 }
