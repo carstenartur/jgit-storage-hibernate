@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -141,11 +142,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     transactionContext.executeWithRepositoryLock(
         repositoryName,
         session -> {
-          if (replaces != null) {
-            for (DfsPackDescription replace : replaces) {
-              deletePackRows(session, repositoryName, baseName(replace));
-            }
-          }
+          deletePackRows(session, repositoryName, packNames(replaces));
           Instant committedAt = Instant.now();
           for (DfsPackDescription description : descriptions) {
             int updated =
@@ -175,9 +172,7 @@ public class HibernateObjDatabase extends DfsObjDatabase {
       transactionContext.executeWithRepositoryLock(
           repositoryName,
           session -> {
-            for (DfsPackDescription description : descriptions) {
-              deletePackRows(session, repositoryName, baseName(description));
-            }
+            deletePackRows(session, repositoryName, packNames(descriptions));
             return null;
           });
     } catch (IOException | RuntimeException ignored) {
@@ -185,26 +180,29 @@ public class HibernateObjDatabase extends DfsObjDatabase {
     }
   }
 
-  private static void deletePackRows(Session session, String repositoryName, String packName) {
-    List<Long> packIds =
-        session
-            .createQuery(
-                "SELECT p.id FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name",
-                Long.class)
-            .setParameter("repo", repositoryName)
-            .setParameter("name", packName)
-            .getResultList();
-    if (!packIds.isEmpty()) {
-      session
-          .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
-      session
-          .createMutationQuery("DELETE FROM GitPackEntity p WHERE p.id IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
+  private static Set<String> packNames(Collection<DfsPackDescription> descriptions) {
+    if (descriptions == null || descriptions.isEmpty()) {
+      return Set.of();
     }
+    Set<String> names = new LinkedHashSet<>();
+    for (DfsPackDescription description : descriptions) {
+      names.add(baseName(description));
+    }
+    return Set.copyOf(names);
+  }
+
+  private static void deletePackRows(
+      Session session, String repositoryName, Collection<String> packNames) {
+    if (packNames.isEmpty()) {
+      return;
+    }
+    session
+        .createMutationQuery(
+            "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                + "AND p.packName IN :packNames")
+        .setParameter("repo", repositoryName)
+        .setParameter("packNames", packNames)
+        .executeUpdate();
   }
 
   @Override
