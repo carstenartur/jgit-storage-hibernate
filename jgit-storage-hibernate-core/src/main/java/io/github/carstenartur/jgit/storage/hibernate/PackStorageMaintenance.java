@@ -185,7 +185,6 @@ public final class PackStorageMaintenance {
       PackConfig packConfig = new PackConfig(repository);
       packConfig.setSinglePack(options.singlePack());
       packConfig.setBuildBitmaps(options.buildBitmaps());
-      packConfig.setWriteReverseIndex(options.writeReverseIndex());
       collector.setPackConfig(packConfig);
       collector.setWriteCommitGraph(options.writeCommitGraph());
       collector.setWriteBloomFilter(options.writeBloomFilter());
