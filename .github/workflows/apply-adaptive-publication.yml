@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - perf/adaptive-publication-threshold
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -14,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: perf/adaptive-publication-threshold
           fetch-depth: 0
       - name: Reconstruct source files
         shell: bash
