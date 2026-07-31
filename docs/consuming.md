@@ -9,7 +9,7 @@ io.github.carstenartur:jgit-storage-hibernate-search
 
 Core provides database-backed JGit repositories. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
 
-The documented released line is **0.1.16**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and tested deployment stack instead of overriding only one side of the stack.
+The documented released line is **0.1.17**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and tested deployment stack instead of overriding only one side of the stack.
 
 SQL Server Search was introduced in **0.1.16**. Do not configure released Search 0.1.15 against SQL Server.
 
@@ -294,16 +294,18 @@ The normal Core writer builds each pack-related extension in a temporary file so
 Publication is adaptive:
 
 - a logical pack whose extensions all remain at or below 256 KiB is persisted and made visible in one repository-locked Hibernate transaction;
-- an additive logical pack containing a chunked extension first reserves every expected parent row under a short repository lock, transfers inline and chunk payloads in a lock-free transaction, then atomically changes the complete token-owned set to `committed=true` under a second short lock;
+- a fully local additive logical pack containing a chunked extension persists its complete parent and payload set in one lock-free transaction while every row remains `committed=false`, then atomically changes the exact token-owned set to committed under one short repository lock;
 - pack replacement, compaction and mixed legacy publication retain the established single locked transaction because no ref update may cross JGit's replacement race check.
 
 Readers query only committed rows and therefore never see a subset of newly published extensions. The final visibility update must affect exactly the expected extension count or the publication rolls back.
 
-Temporary-disk capacity must cover both open writers and completed extensions waiting for publication. For adaptive chunked publication, capacity must also allow a temporary overlap between the local files and invisible database payload rows. Normal publication and rollback delete local files explicitly.
+The lock-free pre-persistence transaction is itself all-or-nothing. A failure before it commits leaves no durable partial parent/chunk group. A hard process termination after it commits but before final publication can leave one complete invisible group with a shared writer token and renewed lease.
 
-A hard JVM termination or operating-system deletion failure can leave stale files with the `jgit-storage-pack-` prefix. A process that stops after reservation may additionally leave invisible `committed=false` database rows with a writer token and lease. Neither representation may be imported as durable Git state.
+Temporary-disk capacity must cover both open writers and completed extensions waiting for publication. For adaptive chunked publication, capacity must also allow a temporary overlap between the local files and the complete invisible database payload group. Normal publication and rollback delete local files explicitly.
 
-Writer tokens and renewable leases are therefore part of the normal adaptive chunked path as well as legacy/base-writer compatibility. All extensions of one prepared logical pack share a token. The existing maintenance service removes only old groups whose complete persisted extension set has no current lease.
+A hard JVM termination or operating-system deletion failure can leave stale files with the `jgit-storage-pack-` prefix. Neither local files nor uncommitted database rows may be imported or manually promoted as durable Git state.
+
+Writer tokens and renewable leases are part of the normal adaptive chunked path as well as legacy/base-writer compatibility. All extensions of one prepared logical pack share a token. The existing maintenance service removes only old groups whose complete persisted extension set has no current lease.
 
 The optional capacity profile exercises 1 MiB, 16 MiB and 128 MiB payloads:
 
@@ -321,7 +323,7 @@ A hard JVM termination can leave stale `jgit-storage-pack-` files in the configu
 
 ### Durable uncommitted rows
 
-A crash can leave invisible `committed=false` rows from adaptive reservation, an older writer or direct use of the base storage path. They may contain no payload, a complete inline payload or committed chunk rows, but readers ignore them and operators must not promote them directly.
+A crash can leave invisible `committed=false` rows from a completed adaptive pre-persistence transaction, an older writer or direct use of the base storage path. Readers ignore them and operators must not promote them directly. A failure during adaptive pre-persistence itself rolls back the whole transaction and leaves no durable partial group.
 
 Clean expired groups through the public service rather than direct SQL:
 
@@ -414,7 +416,7 @@ The Core and Search suites exercise:
 - copied pre-library Core adoption on HSQLDB, PostgreSQL and SQL Server;
 - Flyway history versions and Hibernate `validate`;
 - direct inline publication, adaptive additive chunked publication and bounded read-ahead;
-- invisible prepared payloads, exact final visibility counts and failure cleanup;
+- complete invisible prepared payload groups, exact final visibility counts and failure cleanup;
 - direct locked replacement/compaction plus refs, reflogs and legacy compatibility;
 - local, prepared, mixed and legacy rollback plus lease-aware abandoned-write cleanup;
 - repository deletion;
