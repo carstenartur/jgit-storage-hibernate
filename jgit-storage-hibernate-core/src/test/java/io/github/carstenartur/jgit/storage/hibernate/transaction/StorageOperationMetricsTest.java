@@ -17,29 +17,43 @@ class StorageOperationMetricsTest {
 
   @Test
   void calculatesAllCounterDeltas() {
-    StorageOperationMetrics earlier = new StorageOperationMetrics(2, 1, 1, 3, 5);
-    StorageOperationMetrics current = new StorageOperationMetrics(7, 5, 2, 9, 17);
+    StorageOperationMetrics earlier = new StorageOperationMetrics(2, 1, 1, 3, 5, 7, 11);
+    StorageOperationMetrics current = new StorageOperationMetrics(7, 5, 2, 9, 17, 29, 41);
 
-    assertEquals(new StorageOperationMetrics(5, 4, 1, 6, 12), current.minus(earlier));
+    assertEquals(
+        new StorageOperationMetrics(5, 4, 1, 6, 12, 22, 30), current.minus(earlier));
+  }
+
+  @Test
+  void retainsTheOriginalFiveCounterConstructor() {
+    assertEquals(
+        new StorageOperationMetrics(1, 2, 3, 4, 5, 0, 0),
+        new StorageOperationMetrics(1, 2, 3, 4, 5));
   }
 
   @Test
   void rejectsEveryNonMonotoneCounter() {
-    StorageOperationMetrics baseline = new StorageOperationMetrics(1, 1, 1, 1, 1);
+    StorageOperationMetrics baseline = new StorageOperationMetrics(1, 1, 1, 1, 1, 1, 1);
     assertThrows(
         IllegalArgumentException.class,
-        () -> new StorageOperationMetrics(0, 1, 1, 1, 1).minus(baseline));
+        () -> new StorageOperationMetrics(0, 1, 1, 1, 1, 1, 1).minus(baseline));
     assertThrows(
         IllegalArgumentException.class,
-        () -> new StorageOperationMetrics(1, 0, 1, 1, 1).minus(baseline));
+        () -> new StorageOperationMetrics(1, 0, 1, 1, 1, 1, 1).minus(baseline));
     assertThrows(
         IllegalArgumentException.class,
-        () -> new StorageOperationMetrics(1, 1, 0, 1, 1).minus(baseline));
+        () -> new StorageOperationMetrics(1, 1, 0, 1, 1, 1, 1).minus(baseline));
     assertThrows(
         IllegalArgumentException.class,
-        () -> new StorageOperationMetrics(1, 1, 1, 0, 1).minus(baseline));
+        () -> new StorageOperationMetrics(1, 1, 1, 0, 1, 1, 1).minus(baseline));
     assertThrows(
         IllegalArgumentException.class,
-        () -> new StorageOperationMetrics(1, 1, 1, 1, 0).minus(baseline));
+        () -> new StorageOperationMetrics(1, 1, 1, 1, 0, 1, 1).minus(baseline));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new StorageOperationMetrics(1, 1, 1, 1, 1, 0, 1).minus(baseline));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new StorageOperationMetrics(1, 1, 1, 1, 1, 1, 0).minus(baseline));
   }
 }
