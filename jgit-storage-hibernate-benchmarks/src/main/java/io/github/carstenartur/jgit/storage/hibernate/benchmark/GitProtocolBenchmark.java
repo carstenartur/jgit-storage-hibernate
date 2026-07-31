@@ -83,9 +83,11 @@ import org.openjdk.jmh.infra.BenchmarkParams;
  * <p>For Hibernate backends, JMH secondary results expose query, statement, transaction, connection
  * and repository-lock costs for the same measured operation. Aggregate storage counters are also
  * reconciled with a fixed per-operation breakdown so every measured top-level transaction and lock
- * is attributed exactly once. Pack-file fallback reads are additionally attributed by extension and
- * inline/chunked storage mode. Counters are reset after fixture preparation and therefore exclude
- * schema creation and baseline history construction.
+ * is attributed exactly once. Transaction duration, repository-lock acquisition and lock-held time
+ * remain separate so serialization can be distinguished from database round trips and other work.
+ * Pack-file fallback reads are additionally attributed by extension and inline/chunked storage mode.
+ * Counters are reset after fixture preparation and therefore exclude schema creation and baseline
+ * history construction.
  */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -311,6 +313,10 @@ public class GitProtocolBenchmark {
     counters.repositoryLocks = storageDelta.repositoryLocksAcquired();
     counters.repositoryLockAcquisitionMicros =
         TimeUnit.NANOSECONDS.toMicros(storageDelta.repositoryLockAcquisitionNanos());
+    counters.transactionDurationMicros =
+        TimeUnit.NANOSECONDS.toMicros(storageDelta.transactionDurationNanos());
+    counters.repositoryLockHeldMicros =
+        TimeUnit.NANOSECONDS.toMicros(storageDelta.repositoryLockHeldNanos());
 
     counters.repositoryInitializationTransactions =
         transactions(breakdownDelta, StorageOperationKind.REPOSITORY_INITIALIZATION);
@@ -610,6 +616,8 @@ public class GitProtocolBenchmark {
     public long storageRollbacks;
     public long repositoryLocks;
     public long repositoryLockAcquisitionMicros;
+    public long transactionDurationMicros;
+    public long repositoryLockHeldMicros;
     public long repositoryInitializationTransactions;
     public long packMetadataReadTransactions;
     public long packFileReadTransactions;
@@ -648,6 +656,8 @@ public class GitProtocolBenchmark {
       storageRollbacks = 0;
       repositoryLocks = 0;
       repositoryLockAcquisitionMicros = 0;
+      transactionDurationMicros = 0;
+      repositoryLockHeldMicros = 0;
       repositoryInitializationTransactions = 0;
       packMetadataReadTransactions = 0;
       packFileReadTransactions = 0;

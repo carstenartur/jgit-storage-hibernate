@@ -73,10 +73,14 @@ class StagedPackExtensionStoreH2Test {
           repository.getStorageOperationMetrics().minus(aggregateBefore);
       StorageOperationBreakdown breakdown =
           repository.getStorageOperationBreakdown().minus(breakdownBefore);
-      assertEquals(
-          new StorageOperationMetrics(
-              1, 1, 0, 1, aggregate.repositoryLockAcquisitionNanos()),
-          aggregate);
+      assertEquals(1, aggregate.transactionsStarted());
+      assertEquals(1, aggregate.transactionsCommitted());
+      assertEquals(0, aggregate.transactionsRolledBack());
+      assertEquals(1, aggregate.repositoryLocksAcquired());
+      assertTrue(aggregate.repositoryLockAcquisitionNanos() >= 0);
+      assertTrue(aggregate.transactionDurationNanos() > 0);
+      assertTrue(aggregate.repositoryLockHeldNanos() > 0);
+      assertTrue(aggregate.repositoryLockHeldNanos() <= aggregate.transactionDurationNanos());
       assertEquals(aggregate, breakdown.total());
       assertEquals(aggregate, breakdown.metrics(StorageOperationKind.PACK_PUBLICATION));
       assertEquals(

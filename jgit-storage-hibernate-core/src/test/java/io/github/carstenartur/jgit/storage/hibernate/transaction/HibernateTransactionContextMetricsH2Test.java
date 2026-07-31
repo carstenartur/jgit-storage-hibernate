@@ -46,16 +46,30 @@ class HibernateTransactionContextMetricsH2Test {
                     throw new IOException("rollback");
                   }));
 
-      StorageOperationMetrics aggregate = new StorageOperationMetrics(2, 1, 1, 0, 0);
-      assertEquals(aggregate, context.metricsSnapshot());
+      StorageOperationMetrics aggregate = context.metricsSnapshot();
+      assertEquals(2, aggregate.transactionsStarted());
+      assertEquals(1, aggregate.transactionsCommitted());
+      assertEquals(1, aggregate.transactionsRolledBack());
+      assertEquals(0, aggregate.repositoryLocksAcquired());
+      assertEquals(0, aggregate.repositoryLockAcquisitionNanos());
+      assertTrue(aggregate.transactionDurationNanos() > 0);
+      assertEquals(0, aggregate.repositoryLockHeldNanos());
+
       StorageOperationBreakdown breakdown = context.operationBreakdownSnapshot();
       assertEquals(aggregate, breakdown.total());
-      assertEquals(
-          new StorageOperationMetrics(1, 1, 0, 0, 0),
-          breakdown.metrics(StorageOperationKind.PACK_PUBLICATION));
-      assertEquals(
-          new StorageOperationMetrics(1, 0, 1, 0, 0),
-          breakdown.metrics(StorageOperationKind.PACK_ROLLBACK));
+      StorageOperationMetrics publication =
+          breakdown.metrics(StorageOperationKind.PACK_PUBLICATION);
+      assertEquals(1, publication.transactionsStarted());
+      assertEquals(1, publication.transactionsCommitted());
+      assertEquals(0, publication.transactionsRolledBack());
+      assertTrue(publication.transactionDurationNanos() > 0);
+
+      StorageOperationMetrics rollback = breakdown.metrics(StorageOperationKind.PACK_ROLLBACK);
+      assertEquals(1, rollback.transactionsStarted());
+      assertEquals(0, rollback.transactionsCommitted());
+      assertEquals(1, rollback.transactionsRolledBack());
+      assertTrue(rollback.transactionDurationNanos() > 0);
+
       assertEquals(
           StorageOperationMetrics.ZERO,
           breakdown.metrics(StorageOperationKind.REFLOG_WRITE),
@@ -64,7 +78,7 @@ class HibernateTransactionContextMetricsH2Test {
   }
 
   @Test
-  void attributesRepositoryLockToOwningTransaction() throws Exception {
+  void attributesRepositoryLockAndHeldDurationToOwningTransaction() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider(true)) {
       persistLock(provider, "metrics-repo");
       HibernateTransactionContext context =
@@ -73,7 +87,15 @@ class HibernateTransactionContextMetricsH2Test {
       StorageOperationBreakdown breakdownBefore = context.operationBreakdownSnapshot();
 
       context.executeWithRepositoryLock(
-          StorageOperationKind.REF_PUBLICATION, "metrics-repo", session -> null);
+          StorageOperationKind.REF_PUBLICATION,
+          "metrics-repo",
+          session -> {
+            long deadline = System.nanoTime() + 1_000_000L;
+            while (System.nanoTime() < deadline) {
+              Thread.onSpinWait();
+            }
+            return null;
+          });
 
       StorageOperationMetrics delta = context.metricsSnapshot().minus(before);
       StorageOperationBreakdown breakdown =
@@ -83,6 +105,9 @@ class HibernateTransactionContextMetricsH2Test {
       assertEquals(0, delta.transactionsRolledBack());
       assertEquals(1, delta.repositoryLocksAcquired());
       assertTrue(delta.repositoryLockAcquisitionNanos() >= 0);
+      assertTrue(delta.transactionDurationNanos() > 0);
+      assertTrue(delta.repositoryLockHeldNanos() >= 1_000_000L);
+      assertTrue(delta.repositoryLockHeldNanos() <= delta.transactionDurationNanos());
       assertEquals(delta, breakdown.total());
       assertEquals(delta, breakdown.metrics(StorageOperationKind.REF_PUBLICATION));
     }
@@ -101,8 +126,8 @@ class HibernateTransactionContextMetricsH2Test {
 
   @Test
   void rejectsSubtractingANewerSnapshot() {
-    StorageOperationMetrics older = new StorageOperationMetrics(1, 1, 0, 0, 0);
-    StorageOperationMetrics newer = new StorageOperationMetrics(2, 2, 0, 0, 0);
+    StorageOperationMetrics older = new StorageOperationMetrics(1, 1, 0, 0, 0, 1, 0);
+    StorageOperationMetrics newer = new StorageOperationMetrics(2, 2, 0, 0, 0, 2, 0);
     assertThrows(IllegalArgumentException.class, () -> older.minus(newer));
 
     StorageOperationBreakdown olderBreakdown =

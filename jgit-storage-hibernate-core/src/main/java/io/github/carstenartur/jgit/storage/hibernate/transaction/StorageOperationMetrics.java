@@ -12,7 +12,7 @@ package io.github.carstenartur.jgit.storage.hibernate.transaction;
  * Monotone diagnostic counters for one Hibernate-backed repository instance.
  *
  * <p>The counters deliberately cover only storage transaction boundaries and pessimistic repository
- * lock acquisition. Hibernate query, statement and connection counts remain available through
+ * lock coordination. Hibernate query, statement and connection counts remain available through
  * Hibernate's own {@code Statistics} API. Metrics are disabled by default and can be enabled with
  * {@value HibernateTransactionContext#METRICS_ENABLED_PROPERTY}.
  *
@@ -21,17 +21,46 @@ package io.github.carstenartur.jgit.storage.hibernate.transaction;
  * @param transactionsRolledBack top-level repository transactions rolled back
  * @param repositoryLocksAcquired pessimistic repository row locks acquired
  * @param repositoryLockAcquisitionNanos elapsed time spent acquiring repository row locks, including
- *     the database round trip
+ *     the database round trip and any contention wait
+ * @param transactionDurationNanos elapsed time spent inside top-level repository transaction
+ *     attempts, including session acquisition, commit or rollback
+ * @param repositoryLockHeldNanos elapsed time from the first successful repository-lock acquisition
+ *     in a top-level transaction until that transaction completes
  */
 public record StorageOperationMetrics(
     long transactionsStarted,
     long transactionsCommitted,
     long transactionsRolledBack,
     long repositoryLocksAcquired,
-    long repositoryLockAcquisitionNanos) {
+    long repositoryLockAcquisitionNanos,
+    long transactionDurationNanos,
+    long repositoryLockHeldNanos) {
 
   /** Empty metrics snapshot. */
-  public static final StorageOperationMetrics ZERO = new StorageOperationMetrics(0, 0, 0, 0, 0);
+  public static final StorageOperationMetrics ZERO =
+      new StorageOperationMetrics(0, 0, 0, 0, 0, 0, 0);
+
+  /**
+   * Compatibility constructor for callers compiled against the original aggregate counters.
+   *
+   * <p>Duration counters default to zero. New snapshots returned by the repository populate all
+   * counters.
+   */
+  public StorageOperationMetrics(
+      long transactionsStarted,
+      long transactionsCommitted,
+      long transactionsRolledBack,
+      long repositoryLocksAcquired,
+      long repositoryLockAcquisitionNanos) {
+    this(
+        transactionsStarted,
+        transactionsCommitted,
+        transactionsRolledBack,
+        repositoryLocksAcquired,
+        repositoryLockAcquisitionNanos,
+        0,
+        0);
+  }
 
   /**
    * Calculate the non-negative difference from an earlier monotone snapshot.
@@ -48,7 +77,15 @@ public record StorageOperationMetrics(
         difference(
             repositoryLockAcquisitionNanos,
             earlier.repositoryLockAcquisitionNanos,
-            "repositoryLockAcquisitionNanos"));
+            "repositoryLockAcquisitionNanos"),
+        difference(
+            transactionDurationNanos,
+            earlier.transactionDurationNanos,
+            "transactionDurationNanos"),
+        difference(
+            repositoryLockHeldNanos,
+            earlier.repositoryLockHeldNanos,
+            "repositoryLockHeldNanos"));
   }
 
   private static long difference(long current, long earlier, String counter) {
