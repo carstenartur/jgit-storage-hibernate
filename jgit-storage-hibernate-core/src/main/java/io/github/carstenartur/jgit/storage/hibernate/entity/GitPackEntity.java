@@ -95,6 +95,27 @@ public class GitPackEntity {
   @Column(name = "committed_at")
   private Instant committedAt;
 
+  @Column(name = "pack_source", length = 32)
+  private String packSource;
+
+  @Column(name = "last_modified")
+  private Long lastModified;
+
+  @Column(name = "object_count")
+  private Long objectCount;
+
+  @Column(name = "delta_count")
+  private Long deltaCount;
+
+  @Column(name = "index_version")
+  private Integer indexVersion;
+
+  @Column(name = "min_update_index")
+  private Long minUpdateIndex;
+
+  @Column(name = "max_update_index")
+  private Long maxUpdateIndex;
+
   public Long getId() {
     return id;
   }
@@ -185,5 +206,61 @@ public class GitPackEntity {
 
   public void setCommittedAt(Instant committedAt) {
     this.committedAt = committedAt;
+  }
+
+  public String getPackSource() {
+    return packSource;
+  }
+
+  public void setPackSource(String packSource) {
+    this.packSource = packSource;
+  }
+
+  public Long getLastModified() {
+    return lastModified;
+  }
+
+  public void setLastModified(Long lastModified) {
+    this.lastModified = lastModified;
+  }
+
+  public Long getObjectCount() {
+    return objectCount;
+  }
+
+  public void setObjectCount(Long objectCount) {
+    this.objectCount = objectCount;
+  }
+
+  public Long getDeltaCount() {
+    return deltaCount;
+  }
+
+  public void setDeltaCount(Long deltaCount) {
+    this.deltaCount = deltaCount;
+  }
+
+  public Integer getIndexVersion() {
+    return indexVersion;
+  }
+
+  public void setIndexVersion(Integer indexVersion) {
+    this.indexVersion = indexVersion;
+  }
+
+  public Long getMinUpdateIndex() {
+    return minUpdateIndex;
+  }
+
+  public void setMinUpdateIndex(Long minUpdateIndex) {
+    this.minUpdateIndex = minUpdateIndex;
+  }
+
+  public Long getMaxUpdateIndex() {
+    return maxUpdateIndex;
+  }
+
+  public void setMaxUpdateIndex(Long maxUpdateIndex) {
+    this.maxUpdateIndex = maxUpdateIndex;
   }
 }
