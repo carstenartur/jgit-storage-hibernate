@@ -19,13 +19,13 @@ public enum StorageOperationKind {
   /** Opening one committed pack extension for reading. */
   PACK_FILE_READ,
 
-  /** Persistence or lease renewal of an unpublished PACK, IDX or REFTABLE extension. */
+  /** Persistence or lease renewal of unpublished pack extensions. */
   PACK_EXTENSION_WRITE,
 
-  /** Atomic publication of complete pack extensions. */
+  /** Atomic publication of a complete expected logical-pack extension set. */
   PACK_PUBLICATION,
 
-  /** Best-effort removal of an unpublished pack after failure. */
+  /** Best-effort removal of local or durable unpublished pack state after failure. */
   PACK_ROLLBACK,
 
   /** Cleanup or other explicit maintenance of pack persistence state. */
