@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
@@ -118,6 +120,59 @@ class TwoPhasePackPublicationH2Test {
       assertEquals(
           StorageOperationMetrics.ZERO,
           breakdown.metrics(StorageOperationKind.PACK_ROLLBACK));
+    }
+  }
+
+  @Test
+  void chunkedReplacementRemainsInOneLockedPublicationTransaction() throws Exception {
+    String repositoryName = "two-phase-replacement";
+    byte[] replacementBytes =
+        deterministicBytes(HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD + 31, 37);
+    AtomicInteger hookCalls = new AtomicInteger();
+
+    try (HibernateSessionFactoryProvider provider = provider();
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      repository.create(true);
+      persistCommittedInlinePack(provider, repositoryName, "pack-replaced");
+
+      HibernateTransactionContext context =
+          new HibernateTransactionContext(provider.getSessionFactory());
+      ReadAheadHibernateObjDatabase database =
+          (ReadAheadHibernateObjDatabase) repository.getObjectDatabase();
+      DfsPackDescription replaced = description(database.listPacks(), "pack-replaced");
+      DfsPackDescription replacement = database.newPack(PackSource.COMPACT);
+
+      StagedPackExtensionStore store =
+          new StagedPackExtensionStore(
+              repositoryName, context, ignored -> hookCalls.incrementAndGet());
+      write(store, replacement, PackExt.PACK, replacementBytes);
+
+      StorageOperationMetrics before = context.metricsSnapshot();
+      StorageOperationBreakdown breakdownBefore = context.operationBreakdownSnapshot();
+      StagedPackExtensionStore.CommitResult result =
+          store.commit(List.of(replacement), List.of(replaced));
+
+      assertEquals(0, hookCalls.get(), "Replacing packs must not enter the unlocked payload phase");
+      assertTrue(result.completeMetadata());
+      assertEquals(1, result.committedExtensions().size());
+      assertEquals(0L, packRowCount(provider, repositoryName, "pack-replaced"));
+      assertEquals(1L, packRowCount(provider, repositoryName, baseName(replacement)));
+      assertChunkedPayload(
+          provider, repositoryName, baseName(replacement), replacementBytes);
+
+      StorageOperationMetrics aggregate = context.metricsSnapshot().minus(before);
+      StorageOperationBreakdown breakdown =
+          context.operationBreakdownSnapshot().minus(breakdownBefore);
+      assertEquals(1, aggregate.transactionsStarted());
+      assertEquals(1, aggregate.transactionsCommitted());
+      assertEquals(0, aggregate.transactionsRolledBack());
+      assertEquals(1, aggregate.repositoryLocksAcquired());
+      assertEquals(aggregate, breakdown.total());
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE));
+      assertEquals(aggregate, breakdown.metrics(StorageOperationKind.PACK_PUBLICATION));
     }
   }
 
@@ -308,6 +363,39 @@ class TwoPhasePackPublicationH2Test {
     }
   }
 
+  private static void assertChunkedPayload(
+      HibernateSessionFactoryProvider provider,
+      String repositoryName,
+      String packName,
+      byte[] expectedPack) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      Object[] row =
+          session
+              .createQuery(
+                  "SELECT p.id, p.data, p.committed, p.writeToken, p.writeLeaseUntil "
+                      + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                      + "AND p.packName = :name AND p.packExtension = 'pack'",
+                  Object[].class)
+              .setParameter("repo", repositoryName)
+              .setParameter("name", packName)
+              .getSingleResult();
+      assertNull(row[1]);
+      assertTrue((Boolean) row[2]);
+      assertNull(row[3]);
+      assertNull(row[4]);
+      List<byte[]> chunks =
+          session
+              .createQuery(
+                  "SELECT c.data FROM GitPackChunkEntity c WHERE c.packId = :packId "
+                      + "ORDER BY c.chunkIndex",
+                  byte[].class)
+              .setParameter("packId", row[0])
+              .getResultList();
+      assertEquals(1, chunks.size());
+      assertArrayEquals(expectedPack, chunks.getFirst());
+    }
+  }
+
   private static void deletePreparedExtension(
       HibernateSessionFactoryProvider provider,
       String repositoryName,
@@ -326,6 +414,47 @@ class TwoPhasePackPublicationH2Test {
               .executeUpdate();
       assertEquals(1, deleted);
       transaction.commit();
+    }
+  }
+
+  private static void persistCommittedInlinePack(
+      HibernateSessionFactoryProvider provider, String repositoryName, String packName) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      Transaction transaction = session.beginTransaction();
+      GitPackEntity entity = new GitPackEntity();
+      entity.setRepositoryName(repositoryName);
+      entity.setPackName(packName);
+      entity.setPackExtension(PackExt.PACK.getExtension());
+      entity.setData(new byte[] {1, 2, 3});
+      entity.setFileSize(3);
+      entity.setCommitted(true);
+      entity.setCreatedAt(Instant.now());
+      entity.setCommittedAt(Instant.now());
+      entity.setPackSource(PackSource.INSERT.name());
+      session.persist(entity);
+      transaction.commit();
+    }
+  }
+
+  private static DfsPackDescription description(
+      List<DfsPackDescription> descriptions, String packName) {
+    return descriptions.stream()
+        .filter(candidate -> baseName(candidate).equals(packName))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static long packRowCount(
+      HibernateSessionFactoryProvider provider, String repositoryName, String packName) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      return session
+          .createQuery(
+              "SELECT COUNT(p) FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                  + "AND p.packName = :name",
+              Long.class)
+          .setParameter("repo", repositoryName)
+          .setParameter("name", packName)
+          .getSingleResult();
     }
   }
 
