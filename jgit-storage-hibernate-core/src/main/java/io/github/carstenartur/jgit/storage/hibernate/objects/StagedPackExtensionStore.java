@@ -21,7 +21,6 @@ import java.nio.file.StandardOpenOption;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -603,14 +602,14 @@ final class StagedPackExtensionStore {
 
   private static void persistChunks(
       Session session, Long packId, FileChannel channel, long fileSize) throws IOException {
-    byte[] chunkBuffer = new byte[HibernateObjDatabase.PACK_CHUNK_SIZE];
     long position = 0;
     int chunkIndex = 0;
     int pendingChunks = 0;
     while (position < fileSize) {
       int chunkLength =
           (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
-      ByteBuffer destination = ByteBuffer.wrap(chunkBuffer, 0, chunkLength);
+      byte[] chunkData = new byte[chunkLength];
+      ByteBuffer destination = ByteBuffer.wrap(chunkData);
       long chunkPosition = position;
       while (destination.hasRemaining()) {
         int count = channel.read(destination, chunkPosition);
@@ -624,10 +623,9 @@ final class StagedPackExtensionStore {
       chunk.setPackId(packId);
       chunk.setChunkIndex(chunkIndex);
       chunk.setChunkSize(chunkLength);
-      chunk.setData(
-          chunkLength == HibernateObjDatabase.PACK_CHUNK_SIZE
-              ? chunkBuffer.clone()
-              : Arrays.copyOf(chunkBuffer, chunkLength));
+      // Hibernate retains this array until the bounded batch flush. Reading into the final array
+      // avoids cloning a reusable one-MiB scratch buffer for every full chunk.
+      chunk.setData(chunkData);
       session.persist(chunk);
 
       position += chunkLength;
