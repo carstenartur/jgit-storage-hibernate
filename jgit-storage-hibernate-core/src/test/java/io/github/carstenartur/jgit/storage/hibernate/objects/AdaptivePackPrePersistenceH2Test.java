@@ -11,7 +11,6 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -69,7 +68,11 @@ class AdaptivePackPrePersistenceH2Test {
       try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
         Future<?> lockHolder =
             executor.submit(
-                () -> holdRepositoryLock(provider, "adaptive-visibility", lockAcquired, releaseLock));
+                () -> {
+                  holdRepositoryLock(
+                      provider, "adaptive-visibility", lockAcquired, releaseLock);
+                  return null;
+                });
         assertTrue(lockAcquired.await(10, TimeUnit.SECONDS));
 
         Future<?> publication =
@@ -120,13 +123,14 @@ class AdaptivePackPrePersistenceH2Test {
       assertEquals(0, prePersistence.repositoryLocksAcquired());
       assertEquals(0, prePersistence.repositoryLockHeldNanos());
 
-      StorageOperationMetrics publication =
+      StorageOperationMetrics publicationMetrics =
           breakdown.metrics(StorageOperationKind.PACK_PUBLICATION);
-      assertEquals(1, publication.transactionsStarted());
-      assertEquals(1, publication.transactionsCommitted());
-      assertEquals(1, publication.repositoryLocksAcquired());
-      assertTrue(publication.repositoryLockHeldNanos() > 0);
-      assertEquals(StorageOperationMetrics.ZERO, breakdown.metrics(StorageOperationKind.PACK_ROLLBACK));
+      assertEquals(1, publicationMetrics.transactionsStarted());
+      assertEquals(1, publicationMetrics.transactionsCommitted());
+      assertEquals(1, publicationMetrics.repositoryLocksAcquired());
+      assertTrue(publicationMetrics.repositoryLockHeldNanos() > 0);
+      assertEquals(
+          StorageOperationMetrics.ZERO, breakdown.metrics(StorageOperationKind.PACK_ROLLBACK));
     }
   }
 
@@ -172,14 +176,16 @@ class AdaptivePackPrePersistenceH2Test {
       assertEquals(1, aggregate.repositoryLocksAcquired());
       assertEquals(aggregate, breakdown.total());
 
-      assertEquals(
-          new StorageOperationMetrics(1, 1, 0, 0, 0, 0, 0)
-              .transactionsStarted(),
-          breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE).transactionsStarted());
+      StorageOperationMetrics prePersistence =
+          breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE);
+      assertEquals(1, prePersistence.transactionsStarted());
+      assertEquals(1, prePersistence.transactionsCommitted());
+      assertEquals(0, prePersistence.repositoryLocksAcquired());
       assertEquals(
           1,
           breakdown.metrics(StorageOperationKind.PACK_PUBLICATION).transactionsRolledBack());
-      assertEquals(1, breakdown.metrics(StorageOperationKind.PACK_ROLLBACK).transactionsCommitted());
+      assertEquals(
+          1, breakdown.metrics(StorageOperationKind.PACK_ROLLBACK).transactionsCommitted());
     }
   }
 
