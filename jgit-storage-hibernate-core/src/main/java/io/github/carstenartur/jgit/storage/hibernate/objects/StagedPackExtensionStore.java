@@ -22,10 +22,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
@@ -80,11 +82,7 @@ final class StagedPackExtensionStore {
         transactionContext.executeWithRepositoryLock(
             repositoryName,
             session -> {
-              if (replaces != null) {
-                for (DfsPackDescription replace : replaces) {
-                  deletePackRows(session, baseName(replace));
-                }
-              }
+              deletePackRows(session, packNames(replaces));
 
               List<CommittedExtension> committed = new ArrayList<>();
               boolean completeMetadata = true;
@@ -159,9 +157,7 @@ final class StagedPackExtensionStore {
       transactionContext.executeWithRepositoryLock(
           repositoryName,
           session -> {
-            for (String packName : databasePackNames) {
-              deletePackRows(session, packName);
-            }
+            deletePackRows(session, databasePackNames);
             return null;
           });
     } catch (IOException | RuntimeException ignored) {
@@ -198,6 +194,17 @@ final class StagedPackExtensionStore {
       result.add(new Publication(packName, List.copyOf(extensions)));
     }
     return result;
+  }
+
+  private static Set<String> packNames(Collection<DfsPackDescription> descriptions) {
+    if (descriptions == null || descriptions.isEmpty()) {
+      return Set.of();
+    }
+    Set<String> names = new LinkedHashSet<>();
+    for (DfsPackDescription description : descriptions) {
+      names.add(baseName(description));
+    }
+    return Set.copyOf(names);
   }
 
   private CommittedExtension persistCommitted(
@@ -361,26 +368,17 @@ final class StagedPackExtensionStore {
     }
   }
 
-  private void deletePackRows(Session session, String packName) {
-    List<Long> packIds =
-        session
-            .createQuery(
-                "SELECT p.id FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name",
-                Long.class)
-            .setParameter("repo", repositoryName)
-            .setParameter("name", packName)
-            .getResultList();
-    if (!packIds.isEmpty()) {
-      session
-          .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
-      session
-          .createMutationQuery("DELETE FROM GitPackEntity p WHERE p.id IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
+  private void deletePackRows(Session session, Collection<String> packNames) {
+    if (packNames.isEmpty()) {
+      return;
     }
+    session
+        .createMutationQuery(
+            "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                + "AND p.packName IN :packNames")
+        .setParameter("repo", repositoryName)
+        .setParameter("packNames", packNames)
+        .executeUpdate();
   }
 
   private static String baseName(DfsPackDescription description) {
