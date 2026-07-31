@@ -37,6 +37,8 @@ class MissingRepositoryLockMetricsH2Test {
       assertEquals(1, delta.transactionsRolledBack());
       assertEquals(0, delta.repositoryLocksAcquired());
       assertTrue(delta.repositoryLockAcquisitionNanos() >= 0);
+      assertTrue(delta.transactionDurationNanos() > 0);
+      assertEquals(0, delta.repositoryLockHeldNanos());
     }
   }
 
