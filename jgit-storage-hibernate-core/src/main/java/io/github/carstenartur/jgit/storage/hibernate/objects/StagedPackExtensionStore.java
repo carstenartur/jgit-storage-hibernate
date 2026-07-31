@@ -23,7 +23,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -47,20 +46,20 @@ import org.hibernate.exception.ConstraintViolationException;
  *
  * <p>Additive logical packs whose extensions all remain inline use one repository-locked transaction
  * for persistence and publication. When an additive logical pack contains at least one chunked
- * extension, Core first reserves invisible lease-owned parent rows under a short repository lock,
- * transfers every payload in a lock-free Hibernate transaction, and then atomically publishes the
- * complete logical generation under a second short repository lock. Readers continue to select only
- * {@code committed=true} rows.
+ * extension, Core persists the complete expected parent and payload set as invisible lease-owned
+ * rows in one lock-free Hibernate transaction, then atomically publishes the complete logical
+ * generation under one short repository lock. Readers continue to select only {@code committed=true}
+ * rows.
  *
  * <p>Pack replacement and compaction remain on the established single locked transaction path. JGit
  * can validate refs before calling {@code commitPack}; releasing the repository lock between that
  * validation and source-pack replacement would permit a conflicting ref update to cross the race
  * check.
  *
- * <p>A crash after reservation can leave durable uncommitted rows. Their writer token and lease make
- * them eligible for the existing abandoned-write cleanup after expiry. Normal publication, failure
- * handling and rollback remove them explicitly. Local temporary files remain derived unpublished
- * state and are never imported as durable Git data.
+ * <p>A crash after pre-persistence can leave a complete durable uncommitted group. Its shared writer
+ * token and renewed lease make it eligible for the existing abandoned-write cleanup after expiry.
+ * Normal publication, failure handling and rollback remove it explicitly. Local temporary files
+ * remain derived unpublished state and are never imported as durable Git data.
  */
 final class StagedPackExtensionStore {
 
@@ -103,7 +102,7 @@ final class StagedPackExtensionStore {
     List<Publication> publications = publications(descriptions);
     CommitResult commitResult =
         shouldPrePersist(publications, replaces)
-            ? commitPrePersisted(publications, replaces)
+            ? commitPrePersisted(publications)
             : commitDirect(publications, replaces);
     discard(publications);
     return commitResult;
@@ -143,22 +142,19 @@ final class StagedPackExtensionStore {
         });
   }
 
-  private CommitResult commitPrePersisted(
-      List<Publication> publications, Collection<DfsPackDescription> replaces)
-      throws IOException {
-    Instant committedAt = Instant.now();
+  private CommitResult commitPrePersisted(List<Publication> publications) throws IOException {
+    Instant preparedAt = Instant.now();
     String writeToken = UUID.randomUUID().toString();
     Set<String> preparedPackNames = publicationPackNames(publications);
-    List<ReservedExtension> reserved =
-        reservePreparedRows(publications, writeToken, committedAt);
+    List<PersistedExtension> persisted =
+        persistPreparedPayloads(publications, writeToken, preparedAt);
     for (String packName : preparedPackNames) {
       preparedTokensByPackName.put(packName, writeToken);
     }
 
     try {
-      List<PersistedExtension> persisted = persistPreparedPayloads(reserved, writeToken);
       prePublicationHook.afterPayloadPersisted(writeToken);
-      CommitResult result = publishPrepared(persisted, writeToken, committedAt, replaces);
+      CommitResult result = publishPrepared(persisted, writeToken, Instant.now());
       clearPreparedMappings(preparedPackNames, writeToken);
       return result;
     } catch (IOException | RuntimeException failure) {
@@ -169,145 +165,94 @@ final class StagedPackExtensionStore {
     }
   }
 
-  private List<ReservedExtension> reservePreparedRows(
-      List<Publication> publications, String writeToken, Instant committedAt)
-      throws IOException {
-    return transactionContext.executeWithRepositoryLock(
+  private List<PersistedExtension> persistPreparedPayloads(
+      List<Publication> publications, String writeToken, Instant preparedAt) throws IOException {
+    return transactionContext.execute(
         StorageOperationKind.PACK_EXTENSION_WRITE,
-        repositoryName,
         session -> {
-          List<ReservedExtension> reserved = new ArrayList<>();
-          Instant leaseUntil = committedAt.plus(HibernateObjDatabase.PACK_WRITE_LEASE);
+          List<PersistedExtension> persisted = new ArrayList<>();
+          Instant initialLeaseUntil = preparedAt.plus(HibernateObjDatabase.PACK_WRITE_LEASE);
           for (Publication publication : publications) {
             PackDescriptionMetadata metadata =
-                PackDescriptionMetadata.fromDescription(publication.description(), committedAt);
+                PackDescriptionMetadata.fromDescription(publication.description(), preparedAt);
             for (ExpectedExtension expected : publication.extensions()) {
               StagedExtension stagedExtension =
                   Objects.requireNonNull(
                       expected.staged(), "pre-persisted extensions must be locally staged");
+              boolean inline =
+                  stagedExtension.fileSize() <= HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
+              byte[] inlineData;
               GitPackEntity entity = new GitPackEntity();
               entity.setRepositoryName(repositoryName);
               entity.setPackName(stagedExtension.key().packName());
               entity.setPackExtension(stagedExtension.key().extension());
-              entity.setData(null);
               entity.setFileSize(stagedExtension.fileSize());
               entity.setCommitted(false);
               entity.setCreatedAt(stagedExtension.createdAt());
               entity.setCommittedAt(null);
               entity.setWriteToken(writeToken);
-              entity.setWriteLeaseUntil(leaseUntil);
+              entity.setWriteLeaseUntil(initialLeaseUntil);
               metadata.applyTo(entity);
 
-              try {
-                session.persist(entity);
-                session.flush();
-              } catch (RuntimeException exception) {
-                if (isDuplicatePackExtension(exception)) {
-                  throw new IOException(
-                      "Pack extension already exists: "
-                          + stagedExtension.key().displayName(),
-                      exception);
-                }
-                throw exception;
-              }
-              reserved.add(
-                  new ReservedExtension(
-                      stagedExtension,
-                      entity.getId(),
-                      stagedExtension.fileSize()
-                          <= HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD,
-                      metadata));
-            }
-          }
-          return List.copyOf(reserved);
-        });
-  }
-
-  private List<PersistedExtension> persistPreparedPayloads(
-      List<ReservedExtension> reserved, String writeToken) throws IOException {
-    return transactionContext.execute(
-        StorageOperationKind.PACK_EXTENSION_WRITE,
-        session -> {
-          List<GitPackEntity> entities =
-              session
-                  .createQuery(
-                      "FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                          + "AND p.writeToken = :writeToken AND p.committed = false",
-                      GitPackEntity.class)
-                  .setParameter("repo", repositoryName)
-                  .setParameter("writeToken", writeToken)
-                  .getResultList();
-          Map<Long, GitPackEntity> entitiesById = new HashMap<>();
-          for (GitPackEntity entity : entities) {
-            entitiesById.put(entity.getId(), entity);
-          }
-          Set<Long> expectedIds = new LinkedHashSet<>();
-          for (ReservedExtension extension : reserved) {
-            expectedIds.add(extension.packId());
-          }
-          if (entitiesById.size() != reserved.size()
-              || !entitiesById.keySet().equals(expectedIds)) {
-            throw new IOException(
-                "Prepared pack ownership was lost before payload persistence for "
-                    + repositoryName);
-          }
-
-          Instant leaseUntil = Instant.now().plus(HibernateObjDatabase.PACK_WRITE_LEASE);
-          Map<Long, byte[]> inlinePayloads = new HashMap<>();
-          for (ReservedExtension extension : reserved) {
-            GitPackEntity entity = entitiesById.get(extension.packId());
-            if (entity.getFileSize() != extension.staged().fileSize()
-                || !writeToken.equals(entity.getWriteToken())) {
-              throw new IOException(
-                  "Prepared pack metadata changed for "
-                      + extension.staged().key().displayName());
-            }
-            entity.setWriteLeaseUntil(leaseUntil);
-            if (extension.inline()) {
               try (FileChannel channel =
                   FileChannel.open(
-                      extension.staged().temporaryFile(), StandardOpenOption.READ)) {
-                byte[] inlineData = readInline(channel, extension.staged().fileSize());
+                      stagedExtension.temporaryFile(), StandardOpenOption.READ)) {
+                inlineData = inline ? readInline(channel, stagedExtension.fileSize()) : null;
                 entity.setData(inlineData);
-                inlinePayloads.put(extension.packId(), inlineData);
+                try {
+                  session.persist(entity);
+                  session.flush();
+                  if (!inline) {
+                    persistChunks(session, entity.getId(), channel, stagedExtension.fileSize());
+                  }
+                } catch (RuntimeException exception) {
+                  if (isDuplicatePackExtension(exception)) {
+                    throw new IOException(
+                        "Pack extension already exists: "
+                            + stagedExtension.key().displayName(),
+                        exception);
+                  }
+                  throw exception;
+                }
               }
+              persisted.add(
+                  new PersistedExtension(
+                      stagedExtension, entity.getId(), inline, inlineData, metadata));
             }
           }
-          session.flush();
+
           session.clear();
-
-          for (ReservedExtension extension : reserved) {
-            if (extension.inline()) {
-              continue;
-            }
-            try (FileChannel channel =
-                FileChannel.open(
-                    extension.staged().temporaryFile(), StandardOpenOption.READ)) {
-              persistChunks(
-                  session, extension.packId(), channel, extension.staged().fileSize());
-            }
-          }
-
-          List<PersistedExtension> persisted = new ArrayList<>(reserved.size());
-          for (ReservedExtension extension : reserved) {
-            persisted.add(
-                new PersistedExtension(extension, inlinePayloads.get(extension.packId())));
+          Instant leaseUntil = Instant.now().plus(HibernateObjDatabase.PACK_WRITE_LEASE);
+          int renewed =
+              session
+                  .createMutationQuery(
+                      "UPDATE GitPackEntity p SET p.writeLeaseUntil = :leaseUntil "
+                          + "WHERE p.repositoryName = :repo AND p.writeToken = :writeToken "
+                          + "AND p.committed = false")
+                  .setParameter("leaseUntil", leaseUntil)
+                  .setParameter("repo", repositoryName)
+                  .setParameter("writeToken", writeToken)
+                  .executeUpdate();
+          if (renewed != persisted.size()) {
+            throw new IOException(
+                "Prepared pack persistence expected "
+                    + persisted.size()
+                    + " extensions but renewed "
+                    + renewed
+                    + " for "
+                    + repositoryName);
           }
           return List.copyOf(persisted);
         });
   }
 
   private CommitResult publishPrepared(
-      List<PersistedExtension> persisted,
-      String writeToken,
-      Instant committedAt,
-      Collection<DfsPackDescription> replaces)
+      List<PersistedExtension> persisted, String writeToken, Instant committedAt)
       throws IOException {
     return transactionContext.executeWithRepositoryLock(
         StorageOperationKind.PACK_PUBLICATION,
         repositoryName,
         session -> {
-          deletePackRows(session, packNames(replaces));
           int updated =
               session
                   .createMutationQuery(
@@ -331,17 +276,16 @@ final class StagedPackExtensionStore {
 
           List<CommittedExtension> committed = new ArrayList<>(persisted.size());
           for (PersistedExtension extension : persisted) {
-            ReservedExtension reserved = extension.reserved();
-            StagedExtension stagedExtension = reserved.staged();
+            StagedExtension stagedExtension = extension.staged();
             committed.add(
                 new CommittedExtension(
                     stagedExtension.key().packName(),
                     stagedExtension.key().extension(),
-                    reserved.packId(),
+                    extension.packId(),
                     stagedExtension.fileSize(),
-                    reserved.inline(),
+                    extension.inline(),
                     extension.inlineData(),
-                    reserved.metadata()));
+                    extension.metadata()));
           }
           return new CommitResult(List.copyOf(committed), true);
         });
@@ -754,25 +698,20 @@ final class StagedPackExtensionStore {
     }
   }
 
-  private record ReservedExtension(
+  private record PersistedExtension(
       StagedExtension staged,
       Long packId,
       boolean inline,
+      byte[] inlineData,
       PackDescriptionMetadata metadata) {
-    ReservedExtension {
+    PersistedExtension {
       staged = Objects.requireNonNull(staged, "staged");
       packId = Objects.requireNonNull(packId, "packId");
-      metadata = Objects.requireNonNull(metadata, "metadata");
-    }
-  }
-
-  private record PersistedExtension(ReservedExtension reserved, byte[] inlineData) {
-    PersistedExtension {
-      reserved = Objects.requireNonNull(reserved, "reserved");
-      if (reserved.inline() != (inlineData != null)) {
+      if (inline != (inlineData != null)) {
         throw new IllegalArgumentException(
             "inline payload must be present exactly for inline prepared rows");
       }
+      metadata = Objects.requireNonNull(metadata, "metadata");
     }
   }
 
