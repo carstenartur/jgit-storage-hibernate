@@ -23,6 +23,7 @@ import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackFile;
 import org.eclipse.jgit.internal.storage.dfs.DfsReftable;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.storage.pack.PackConfig;
@@ -235,8 +236,18 @@ public final class PackStorageMaintenance {
     for (DfsReftable reftable : reftables) {
       descriptions.add(reftable.getPackDescription());
     }
-    long bytes = descriptions.stream().mapToLong(DfsPackDescription::getTotalFileSize).sum();
+    long bytes = descriptions.stream().mapToLong(PackStorageMaintenance::totalFileSize).sum();
     return new PackInventory(packs.length, reftables.length, bytes);
+  }
+
+  private static long totalFileSize(DfsPackDescription description) {
+    long bytes = 0;
+    for (PackExt extension : PackExt.values()) {
+      if (description.hasFileExt(extension)) {
+        bytes += description.getFileSize(extension);
+      }
+    }
+    return bytes;
   }
 
   private record PackInventory(int packs, int reftables, long bytes) {}
