@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.repository;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import io.github.carstenartur.jgit.storage.hibernate.objects.HibernateObjDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.objects.ReadAheadHibernateObjDatabase;
@@ -57,7 +58,7 @@ public class HibernateRepository extends DfsRepository {
             transactionContext);
     this.reflogWriter = new HibernateReflogWriter(transactionContext, repositoryName);
     this.refDatabase = new HibernateRefDatabase(this);
-    ensureRepositoryLockRow();
+    ensureRepositoryRows();
   }
 
   public static HibernateRepository create(SessionFactory sessionFactory, String repositoryName)
@@ -152,18 +153,25 @@ public class HibernateRepository extends DfsRepository {
     }
   }
 
-  private void ensureRepositoryLockRow() throws IOException {
+  private void ensureRepositoryRows() throws IOException {
     try {
       transactionContext.execute(
           StorageOperationKind.REPOSITORY_INITIALIZATION,
           session -> {
+            Instant createdAt = Instant.now();
+            if (session.find(GitRepositoryLifecycleEntity.class, repositoryName) == null) {
+              GitRepositoryLifecycleEntity lifecycle = new GitRepositoryLifecycleEntity();
+              lifecycle.setRepositoryName(repositoryName);
+              lifecycle.setCreatedAt(createdAt);
+              session.persist(lifecycle);
+            }
             if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
               GitRepositoryLockEntity lock = new GitRepositoryLockEntity();
               lock.setRepositoryName(repositoryName);
-              lock.setCreatedAt(Instant.now());
+              lock.setCreatedAt(createdAt);
               session.persist(lock);
-              session.flush();
             }
+            session.flush();
             return null;
           });
     } catch (RuntimeException concurrentInsert) {
@@ -171,7 +179,11 @@ public class HibernateRepository extends DfsRepository {
         transactionContext.execute(
             StorageOperationKind.REPOSITORY_INITIALIZATION,
             session -> {
-              if (session.find(GitRepositoryLockEntity.class, repositoryName) == null) {
+              boolean lifecycleExists =
+                  session.find(GitRepositoryLifecycleEntity.class, repositoryName) != null;
+              boolean lockExists =
+                  session.find(GitRepositoryLockEntity.class, repositoryName) != null;
+              if (!lifecycleExists || !lockExists) {
                 throw concurrentInsert;
               }
               return null;
