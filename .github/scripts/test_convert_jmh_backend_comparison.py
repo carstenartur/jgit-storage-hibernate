@@ -38,7 +38,7 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
             self.assertIn("Chart unit: ms/op", entry["extra"])
 
     def test_normalizes_throughput_to_latency(self) -> None:
-        result = self._backend_result(50.0)
+        result = self._backend_result("postgresql", 50.0)
         result["primaryMetric"] = {
             "score": 50.0,
             "scoreError": 5.0,
@@ -54,7 +54,7 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         self.assertIn("Original JMH unit: ops/s", converted["extra"])
 
     def test_normalizes_other_time_units(self) -> None:
-        result = self._backend_result(2.0)
+        result = self._backend_result("postgresql", 2.0)
         result["primaryMetric"] = {
             "score": 2.0,
             "scoreError": 0.25,
@@ -67,7 +67,7 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         self.assertAlmostEqual(250.0, converted["range"])
 
     def test_rejects_non_positive_throughput(self) -> None:
-        result = self._backend_result(0.0)
+        result = self._backend_result("postgresql", 0.0)
         result["primaryMetric"] = {
             "score": 0.0,
             "scoreError": 0.0,
