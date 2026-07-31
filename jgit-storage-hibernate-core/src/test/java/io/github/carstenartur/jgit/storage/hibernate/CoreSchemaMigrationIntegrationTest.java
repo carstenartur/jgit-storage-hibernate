@@ -25,6 +25,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
@@ -75,12 +76,14 @@ class CoreSchemaMigrationIntegrationTest {
 
     String incompleteRepositoryName = "incomplete-only";
     insertUncommittedPack(database, incompleteRepositoryName);
+    assertRepositoryLifecycleRow(database, incompleteRepositoryName);
 
     String repositoryName = "migrated-empty";
     StoredHistory storedHistory;
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
       verifyUncommittedPackInvisible(provider.getSessionFactory(), incompleteRepositoryName);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
+      assertRepositoryLifecycleRow(database, repositoryName);
       assertRepositoryLockRow(database, repositoryName);
       assertPersistedPayloadRows(database, repositoryName);
     }
@@ -99,12 +102,14 @@ class CoreSchemaMigrationIntegrationTest {
 
     migrate(database, true);
     assertEquals(EXPECTED_MIGRATIONS, migrationVersions(database));
+    assertRepositoryLifecycleRow(database, legacyIncompleteRepository);
 
     String repositoryName = "legacy-0.1.4";
     StoredHistory storedHistory;
     try (HibernateSessionFactoryProvider provider = provider(database, "validate")) {
       verifyUncommittedPackInvisible(provider.getSessionFactory(), legacyIncompleteRepository);
       storedHistory = writeHistory(provider.getSessionFactory(), repositoryName);
+      assertRepositoryLifecycleRow(database, repositoryName);
       assertRepositoryLockRow(database, repositoryName);
       assertPersistedPayloadRows(database, repositoryName);
     }
@@ -216,20 +221,57 @@ class CoreSchemaMigrationIntegrationTest {
 
   private static void insertUncommittedPack(TestDatabase database, String repositoryName)
       throws SQLException {
-    String sql =
-        "insert into git_packs "
-            + "(repository_name, pack_name, pack_extension, data, file_size, committed, "
-            + "created_at, committed_at) values (?, ?, ?, ?, ?, false, ?, null)";
+    try (Connection connection = database.openConnection()) {
+      if (tableExists(connection, "git_repository_lifecycle")) {
+        try (var lifecycle =
+            connection.prepareStatement(
+                "insert into git_repository_lifecycle (repository_name, created_at) "
+                    + "values (?, current_timestamp)")) {
+          lifecycle.setString(1, repositoryName);
+          lifecycle.executeUpdate();
+        }
+      }
+
+      String sql =
+          "insert into git_packs "
+              + "(repository_name, pack_name, pack_extension, data, file_size, committed, "
+              + "created_at, committed_at) values (?, ?, ?, ?, ?, false, ?, null)";
+      try (var statement = connection.prepareStatement(sql)) {
+        byte[] unfinishedData = {1, 2, 3, 4};
+        statement.setString(1, repositoryName);
+        statement.setString(2, "pack-unfinished");
+        statement.setString(3, "pack");
+        statement.setBytes(4, unfinishedData);
+        statement.setLong(5, unfinishedData.length);
+        statement.setTimestamp(6, new java.sql.Timestamp(System.currentTimeMillis()));
+        statement.executeUpdate();
+      }
+    }
+  }
+
+  private static boolean tableExists(Connection connection, String tableName) throws SQLException {
+    String normalized = tableName.toLowerCase(Locale.ROOT);
+    try (ResultSet tables = connection.getMetaData().getTables(null, null, "%", new String[] {"TABLE"})) {
+      while (tables.next()) {
+        if (normalized.equals(tables.getString("TABLE_NAME").toLowerCase(Locale.ROOT))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static void assertRepositoryLifecycleRow(TestDatabase database, String repositoryName)
+      throws SQLException {
     try (Connection connection = database.openConnection();
-        var statement = connection.prepareStatement(sql)) {
-      byte[] unfinishedData = {1, 2, 3, 4};
+        var statement =
+            connection.prepareStatement(
+                "select count(*) from git_repository_lifecycle where repository_name = ?")) {
       statement.setString(1, repositoryName);
-      statement.setString(2, "pack-unfinished");
-      statement.setString(3, "pack");
-      statement.setBytes(4, unfinishedData);
-      statement.setLong(5, unfinishedData.length);
-      statement.setTimestamp(6, new java.sql.Timestamp(System.currentTimeMillis()));
-      statement.executeUpdate();
+      try (ResultSet resultSet = statement.executeQuery()) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+      }
     }
   }
 
