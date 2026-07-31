@@ -1,6 +1,6 @@
 # Performance optimization roadmap
 
-This document records the performance work that remains after adaptive small-pack persistence, atomic local staging, JDBC chunk batching, bounded multi-chunk read-ahead, committed-pack handoff, persistent logical pack metadata, read-optimized DFS maintenance, concurrent publication measurement and adaptive chunked publication.
+This document records the performance work that remains after adaptive small-pack persistence, atomic local staging, JDBC chunk batching, bounded multi-chunk read-ahead, committed-pack handoff, persistent logical pack metadata, read-optimized DFS maintenance, concurrent publication measurement and adaptive additive chunked publication.
 
 ## Implemented performance slices
 
@@ -26,7 +26,7 @@ This document records the performance work that remains after adaptive small-pac
 - Remove redundant pack, chunk and reflog indexes while retaining the measured access paths.
 - Expose JGit DFS garbage collection and repack with single-pack compaction, bitmaps, commit graph, changed-path Bloom filters and Reftable compaction through `PackStorageMaintenance`.
 - Compare four independent `SessionFactory` writers on one logical repository with four writers on independent repositories.
-- Keep fully inline logical packs on the single-transaction path while moving chunked payload transfer between short reservation and publication locks.
+- Keep fully inline and replacing logical packs on the single locked transaction path while moving additive chunked payload transfer between short reservation and publication locks.
 
 See [Protocol storage metrics](protocol-storage-metrics.md) for counter semantics and interpretation limits. See [Pack capacity and recovery](operations/capacity-and-recovery.md) for the adaptive publication and crash model. See [Repack, garbage collection and read acceleration](operations/repack-and-gc.md) for the maintenance contract.
 
@@ -45,7 +45,7 @@ The current 24-commit/4-commit protocol matrix shows:
 - JGit's DFS garbage collector does not currently emit a persisted reverse-index extension, so the library does not expose a misleading option for it;
 - protocol testing exposed and fixed DFS block-alignment and persisted-file-size contracts that object-level benchmarks did not exercise.
 
-The four-thread publication benchmark established the next write-path boundary:
+The four-thread publication benchmark established the next additive write-path boundary:
 
 | Backend | Same logical repository | Four independent repositories | Independent advantage |
 |---|---:|---:|---:|
@@ -56,11 +56,13 @@ The four-thread publication benchmark established the next write-path boundary:
 
 For PostgreSQL, repository-lock acquisition rose from roughly 0.6 ms per recorded lock with independent repositories to roughly 12 ms with shared-repository contention. HikariCP produced essentially the same ratio. The nearly flat filesystem result rules out the four-thread harness itself as the cause.
 
-This evidence justifies the adaptive chunked-publication design: expensive payload bytes are persisted while still invisible and writer-owned, whereas replacement and visibility remain inside short repository-locked transactions. Small inline packs retain the lower-overhead direct path.
+This evidence justifies the adaptive additive chunked-publication design: expensive payload bytes are persisted while still invisible and writer-owned, whereas the committed visibility change remains inside a short repository-locked transaction. Small inline packs retain the lower-overhead direct path.
+
+Replacing packs deliberately do not use this optimization. JGit performs ref-race validation before source-pack replacement; keeping construction, replacement deletion and publication in one repository-locked transaction prevents a ref update from crossing that check. Repack and compaction therefore optimize later read cost, not their own lock-held write time.
 
 ## Next implementation candidates
 
-1. Re-run serial protocol, focused large-pack and four-thread same/different-repository measurements after adaptive chunked publication; compare lock-held time, lock acquisition, throughput and added fixed transaction cost.
+1. Re-run serial protocol, focused large-pack and four-thread same/different-repository measurements after adaptive additive chunked publication; compare lock-held time, lock acquisition, throughput and added fixed transaction cost.
 2. Record payload bytes written to temporary files, read from temporary files, persisted to the database and fetched by read-ahead windows.
 3. Measure repository-open and object-lookup cost after 1, 100 and 1,000 incremental pushes, including close/reopen boundaries and before/after repack comparisons.
 4. Evaluate a bounded memory-first staging buffer for extensions that remain below the inline threshold, spilling to a temporary file when the threshold or repository memory budget is exceeded.
@@ -76,7 +78,7 @@ This evidence justifies the adaptive chunked-publication design: expensive paylo
 - Do not increase the read-ahead maximum merely because larger windows are possible. First measure fetched versus consumed bytes.
 - Do not enable vendor-specific batch rewrite, bulk-copy or large-object options as library defaults. Benchmark them in the deployment that owns the JDBC driver, network and rollback policy.
 - Do not reintroduce repeated durable flush persistence while JGit is still constructing an extension. Reservation begins only after every expected local extension is complete.
-- Do not move replacement deletion or the committed visibility flip outside the repository lock.
+- Do not split replacement/compaction across an unlocked interval merely to reduce transfer lock time; the ref-race contract takes precedence.
 
 ## Acceptance criteria for later optimizations
 
