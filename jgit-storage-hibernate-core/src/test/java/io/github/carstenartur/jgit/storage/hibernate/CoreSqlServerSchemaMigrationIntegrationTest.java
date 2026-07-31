@@ -61,7 +61,7 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
 
     flyway.migrate();
 
-    assertEquals("0.1.17", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.1.18", flyway.info().current().getVersion().getVersion());
     try (Connection connection =
         DriverManager.getConnection(
             SQL_SERVER.getJdbcUrl(), SQL_SERVER.getUsername(), SQL_SERVER.getPassword())) {
@@ -69,6 +69,13 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
       assertTrue(tableExists(connection, "git_reflog"));
       assertTrue(tableExists(connection, "git_pack_chunks"));
       assertTrue(tableExists(connection, "git_repository_lock"));
+      assertTrue(columnExists(connection, "git_packs", "pack_source"));
+      assertTrue(columnExists(connection, "git_packs", "last_modified"));
+      assertTrue(columnExists(connection, "git_packs", "object_count"));
+      assertTrue(columnExists(connection, "git_packs", "delta_count"));
+      assertTrue(columnExists(connection, "git_packs", "index_version"));
+      assertTrue(columnExists(connection, "git_packs", "min_update_index"));
+      assertTrue(columnExists(connection, "git_packs", "max_update_index"));
       assertTrue(indexExists(connection, "git_reflog", "idx_reflog_repo_id"));
       assertFalse(indexExists(connection, "git_packs", "idx_pack_repo"));
       assertFalse(indexExists(connection, "git_packs", "idx_pack_repo_name"));
@@ -137,6 +144,20 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
         metadata.getTables(null, connection.getSchema(), "%", new String[] {"TABLE"})) {
       while (resultSet.next()) {
         if (tableName.equalsIgnoreCase(resultSet.getString("TABLE_NAME"))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static boolean columnExists(Connection connection, String tableName, String columnName)
+      throws Exception {
+    DatabaseMetaData metadata = connection.getMetaData();
+    try (ResultSet resultSet =
+        metadata.getColumns(null, connection.getSchema(), tableName, columnName)) {
+      while (resultSet.next()) {
+        if (columnName.equalsIgnoreCase(resultSet.getString("COLUMN_NAME"))) {
           return true;
         }
       }
