@@ -113,7 +113,7 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
   private static void baselineAndMigrateCurrent() {
     Flyway flyway = currentFlyway(CoreSchemaMigrations.CURRENT_SCHEMA_VERSION);
     flyway.migrate();
-    assertEquals("0.1.17", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.1.18", flyway.info().current().getVersion().getVersion());
   }
 
   private static Flyway currentFlyway(String baselineVersion) {
@@ -237,6 +237,13 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
       statement.execute("drop index if exists idx_pack_repo on git_packs");
       statement.execute("alter table git_packs drop constraint if exists uk_pack_repo_name_ext");
       statement.execute("alter table git_packs alter column data varbinary(max) not null");
+      statement.execute("alter table git_packs drop column max_update_index");
+      statement.execute("alter table git_packs drop column min_update_index");
+      statement.execute("alter table git_packs drop column index_version");
+      statement.execute("alter table git_packs drop column delta_count");
+      statement.execute("alter table git_packs drop column object_count");
+      statement.execute("alter table git_packs drop column last_modified");
+      statement.execute("alter table git_packs drop column pack_source");
       statement.execute("alter table git_packs drop column write_lease_until");
       statement.execute("alter table git_packs drop column write_token");
       statement.execute("alter table git_packs drop column committed_at");
