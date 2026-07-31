@@ -96,18 +96,19 @@ class TwoPhasePackPublicationH2Test {
       StorageOperationMetrics aggregate = context.metricsSnapshot().minus(before);
       StorageOperationBreakdown breakdown =
           context.operationBreakdownSnapshot().minus(breakdownBefore);
-      assertEquals(3, aggregate.transactionsStarted());
-      assertEquals(3, aggregate.transactionsCommitted());
+      assertEquals(2, aggregate.transactionsStarted());
+      assertEquals(2, aggregate.transactionsCommitted());
       assertEquals(0, aggregate.transactionsRolledBack());
-      assertEquals(2, aggregate.repositoryLocksAcquired());
+      assertEquals(1, aggregate.repositoryLocksAcquired());
       assertEquals(aggregate, breakdown.total());
 
       StorageOperationMetrics writes =
           breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE);
-      assertEquals(2, writes.transactionsStarted());
-      assertEquals(2, writes.transactionsCommitted());
+      assertEquals(1, writes.transactionsStarted());
+      assertEquals(1, writes.transactionsCommitted());
       assertEquals(0, writes.transactionsRolledBack());
-      assertEquals(1, writes.repositoryLocksAcquired());
+      assertEquals(0, writes.repositoryLocksAcquired());
+      assertEquals(0, writes.repositoryLockHeldNanos());
 
       StorageOperationMetrics publication =
           breakdown.metrics(StorageOperationKind.PACK_PUBLICATION);
@@ -223,11 +224,18 @@ class TwoPhasePackPublicationH2Test {
       StorageOperationMetrics aggregate = context.metricsSnapshot().minus(before);
       StorageOperationBreakdown breakdown =
           context.operationBreakdownSnapshot().minus(breakdownBefore);
-      assertEquals(4, aggregate.transactionsStarted());
-      assertEquals(3, aggregate.transactionsCommitted());
+      assertEquals(3, aggregate.transactionsStarted());
+      assertEquals(2, aggregate.transactionsCommitted());
       assertEquals(1, aggregate.transactionsRolledBack());
-      assertEquals(2, aggregate.repositoryLocksAcquired());
+      assertEquals(1, aggregate.repositoryLocksAcquired());
       assertEquals(aggregate, breakdown.total());
+
+      StorageOperationMetrics writes =
+          breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE);
+      assertEquals(1, writes.transactionsStarted());
+      assertEquals(1, writes.transactionsCommitted());
+      assertEquals(0, writes.transactionsRolledBack());
+      assertEquals(0, writes.repositoryLocksAcquired());
 
       StorageOperationMetrics publication =
           breakdown.metrics(StorageOperationKind.PACK_PUBLICATION);
