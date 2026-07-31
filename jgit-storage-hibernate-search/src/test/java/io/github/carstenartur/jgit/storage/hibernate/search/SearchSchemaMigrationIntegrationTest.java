@@ -258,7 +258,8 @@ class SearchSchemaMigrationIntegrationTest {
 
   private static void assertMigrationVersions(TestDatabase database) throws SQLException {
     assertEquals(
-        List.of("0.1.4", "0.1.5", "0.1.14", "0.1.14.1", "0.1.14.2", "0.1.17"),
+        List.of(
+            "0.1.4", "0.1.5", "0.1.14", "0.1.14.1", "0.1.14.2", "0.1.17", "0.1.18"),
         migrationVersions(database, CoreSchemaMigrations.SCHEMA_HISTORY_TABLE));
     assertEquals(
         List.of("0.1.4", "0.1.5", "0.1.14"),

@@ -16,6 +16,7 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMet
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -56,11 +57,12 @@ import org.hibernate.SessionFactory;
  * implementation remains available for compatibility tests and legacy uncommitted rows.
  *
  * <p>Each successful pack-list scan publishes an immutable catalog of committed extension row
- * identifiers, sizes and storage modes. Publication uses an atomic generation check, so a scan that
- * started before a successful pack mutation cannot overwrite the subsequent invalidation or return a
- * stale list after that mutation. A fair repository-instance-local read/write lock prevents scans
- * from reading the database while this instance has an uncommitted pack replacement in progress.
- * Chunked files can then open without repeating the metadata query.
+ * identifiers, sizes, storage modes and logical JGit pack metadata. Publication uses an atomic
+ * generation check, so a scan that started before a successful pack mutation cannot overwrite the
+ * subsequent invalidation or return a stale list after that mutation. A fair repository-instance-
+ * local read/write lock prevents scans from reading the database while this instance has an
+ * uncommitted pack replacement in progress. Chunked files can then open without repeating the
+ * metadata query.
  *
  * <p>Inline payload bytes remain outside the generation catalog. Only newly staged inline PACK and
  * Reftable bytes may enter a hard-bounded 512-KiB repository-instance handoff after their database
@@ -103,12 +105,13 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   }
 
   /**
-   * Reconstruct stored pack descriptions with the persisted size of every extension.
+   * Reconstruct stored pack descriptions with sizes and logical JGit metadata.
    *
    * <p>Ordinary object reads can discover an unknown size lazily from the readable channel. JGit's
-   * upload-pack copy-as-is path needs the extension sizes on {@link DfsPackDescription} before it
-   * copies compressed object representations. Omitting them can produce a malformed outgoing pack
-   * even though direct object reads remain successful.
+   * upload-pack copy-as-is path needs extension sizes before it copies compressed object
+   * representations. Pack lookup, Reftable ordering and maintenance additionally use source,
+   * modification time, object counts and update indexes. Persisting and restoring these fields keeps
+   * repository reopen from degrading every pack to an undated {@code INSERT} description.
    */
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
@@ -152,7 +155,10 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                   session
                       .createQuery(
                           "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
-                              + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END "
+                              + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END, "
+                              + "p.packSource, p.lastModified, p.objectCount, p.deltaCount, "
+                              + "p.indexVersion, p.minUpdateIndex, p.maxUpdateIndex, "
+                              + "p.committedAt, p.createdAt "
                               + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
                               + "AND p.committed = true",
                           Object[].class)
@@ -165,9 +171,20 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                 String extension = (String) row[2];
                 long fileSize = ((Number) row[3]).longValue();
                 boolean inline = ((Number) row[4]).intValue() != 0;
+                PackDescriptionMetadata metadata =
+                    PackDescriptionMetadata.fromStoredValues(
+                        (String) row[5],
+                        longValue(row[6]),
+                        longValue(row[7]),
+                        longValue(row[8]),
+                        integerValue(row[9]),
+                        longValue(row[10]),
+                        longValue(row[11]),
+                        (Instant) row[12],
+                        (Instant) row[13]);
                 extensions.put(
                     new ExtensionKey(packName, extension),
-                    new ExtensionSnapshot(packId, fileSize, inline, PackSource.INSERT));
+                    new ExtensionSnapshot(packId, fileSize, inline, metadata));
               }
               Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
               return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
@@ -185,9 +202,15 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       DfsPackDescription description =
           descriptions.computeIfAbsent(
               key.packName(),
-              name ->
-                  new DfsPackDescription(
-                      getRepository().getDescription(), name, snapshot.packSource()));
+              name -> {
+                DfsPackDescription created =
+                    new DfsPackDescription(
+                        getRepository().getDescription(),
+                        name,
+                        snapshot.metadata().packSource());
+                snapshot.metadata().applyTo(created);
+                return created;
+              });
       for (PackExt packExtension : PackExt.values()) {
         if (packExtension.getExtension().equals(key.extension())) {
           description.addFileExt(packExtension);
@@ -280,7 +303,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         throw publicationFailure;
       }
       removeReplacedPayloads(previousCatalog, replaces);
-      completeCatalogMutation(descriptions, commitResult);
+      completeCatalogMutation(commitResult);
       clearCache();
     } finally {
       writeLock.unlock();
@@ -355,21 +378,17 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return names;
   }
 
-  private void completeCatalogMutation(
-      Collection<DfsPackDescription> descriptions, CommitResult commitResult) {
-    Map<String, PackSource> packSources = new LinkedHashMap<>();
-    for (DfsPackDescription description : descriptions) {
-      packSources.put(baseName(description), description.getPackSource());
-    }
-
+  private void completeCatalogMutation(CommitResult commitResult) {
     Map<ExtensionKey, ExtensionSnapshot> additions = new LinkedHashMap<>();
     List<CachedPayload> payloads = new ArrayList<>();
     for (CommittedExtension committed : commitResult.committedExtensions()) {
-      PackSource source = packSources.getOrDefault(committed.packName(), PackSource.INSERT);
       ExtensionKey key = new ExtensionKey(committed.packName(), committed.extension());
       ExtensionSnapshot snapshot =
           new ExtensionSnapshot(
-              committed.packId(), committed.fileSize(), committed.inline(), source);
+              committed.packId(),
+              committed.fileSize(),
+              committed.inline(),
+              committed.metadata());
       additions.put(key, snapshot);
       if (committed.inline() && isCacheableExtension(committed.extension())) {
         payloads.add(new CachedPayload(payloadIdentity(key, snapshot), committed.inlineData()));
@@ -413,6 +432,14 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return new Identity(key.packName(), key.extension(), snapshot.packId(), snapshot.fileSize());
   }
 
+  private static Long longValue(Object value) {
+    return value == null ? null : ((Number) value).longValue();
+  }
+
+  private static Integer integerValue(Object value) {
+    return value == null ? null : ((Number) value).intValue();
+  }
+
   private static String baseName(DfsPackDescription description) {
     String fileName = description.getFileName(PackExt.PACK);
     int dot = fileName.lastIndexOf('.');
@@ -422,7 +449,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private record ExtensionKey(String packName, String extension) {}
 
   private record ExtensionSnapshot(
-      Long packId, long fileSize, boolean inline, PackSource packSource) {}
+      Long packId, long fileSize, boolean inline, PackDescriptionMetadata metadata) {}
 
   private record CachedPayload(Identity identity, byte[] data) {}
 

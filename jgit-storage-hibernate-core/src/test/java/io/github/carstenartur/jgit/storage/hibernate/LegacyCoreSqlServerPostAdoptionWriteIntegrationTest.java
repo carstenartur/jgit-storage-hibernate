@@ -73,7 +73,7 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
             .baselineDescription("adopted pre-library core schema")
             .load();
     flyway.migrate();
-    assertEquals("0.1.17", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.1.18", flyway.info().current().getVersion().getVersion());
 
     ObjectId commitId;
     try (HibernateSessionFactoryProvider provider = provider();
@@ -100,6 +100,14 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
                   "select count(*) from git_packs "
                       + "where repository_name = 'post-adoption' and committed = 1")
               > 0);
+      assertEquals(
+          0,
+          count(
+              statement,
+              "select count(*) from git_packs where repository_name = 'post-adoption' "
+                  + "and committed = 1 and (pack_source is null or last_modified is null "
+                  + "or object_count is null or delta_count is null or index_version is null "
+                  + "or min_update_index is null or max_update_index is null)"));
       assertEquals(
           1,
           count(

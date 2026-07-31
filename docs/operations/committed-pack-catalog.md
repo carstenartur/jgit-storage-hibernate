@@ -2,9 +2,31 @@
 
 ## Purpose
 
-JGit first asks the object database to list committed packs and later opens individual PACK, IDX or Reftable extensions. The pack-list query already discovers the stable identity and size of every extension. Repeating that metadata lookup adds a read transaction, connection checkout and prepared statement.
+JGit first asks the object database to list committed packs and later opens individual PACK, IDX, Reftable and auxiliary extensions. The pack-list query already discovers the stable identity, size, storage mode and logical DFS metadata of every extension. Repeating that lookup adds a read transaction, connection checkout and prepared statement.
 
-`ReadAheadHibernateObjDatabase` therefore publishes an immutable catalog after each successful `listPacks()` scan. Each entry contains only the logical extension key, `git_packs.id`, persisted size, inline/chunked mode and the local JGit `PackSource` where known. It never retains Hibernate entities, sessions, JDBC connections or payload arrays.
+`ReadAheadHibernateObjDatabase` therefore publishes an immutable catalog after each successful `listPacks()` scan. Each entry contains the logical extension key, `git_packs.id`, persisted size, inline/chunked mode and the logical JGit pack metadata required to reconstruct `DfsPackDescription`. It never retains Hibernate entities, sessions, JDBC connections or database-loaded payload arrays.
+
+## Persisted logical pack metadata
+
+Core schema 0.1.18 adds nullable columns for:
+
+- pack source;
+- last-modified time;
+- object and delta counts;
+- pack-index version;
+- minimum and maximum Reftable update indexes.
+
+Every extension of a newly published logical pack receives the same normalized metadata in the existing repository-locked publication transaction. The successful publication result carries that exact value into the local catalog, so the post-commit one-shot pack-list handoff and a later authoritative database scan reconstruct the same description.
+
+This matters because JGit uses these fields for pack lookup ordering, Reftable ordering and DFS maintenance decisions. Reopening a repository must not turn every RECEIVE, GC or COMPACT pack into an undated `INSERT` pack with zero counters.
+
+The migration does not rewrite PACK, IDX, Reftable or chunk payloads. Existing rows receive nullable columns only. When historical rows have no stored metadata, Core uses conservative compatibility values:
+
+- unknown or missing source becomes `PackSource.INSERT`;
+- `committed_at`, then `created_at`, supplies the last-modified fallback;
+- unavailable counts, index version and update indexes remain zero.
+
+An unknown future source string also falls back to `INSERT`, keeping older library versions able to open the repository instead of failing during catalog reconstruction.
 
 ## Chunked reads
 
@@ -22,7 +44,7 @@ Core therefore retains only bytes that are already available during successful l
 - repository reopen and independent instances begin without retained payloads;
 - the database remains the sole durable and cross-instance authority.
 
-The publication transaction already reads an inline payload from the temporary staging file in order to persist it. Its result returns the generated row ID, persisted size, storage mode and that same byte array. After the transaction commits, Core defensively copies eligible bytes into the local handoff without another file or database read.
+The publication transaction already reads an inline payload from the temporary staging file in order to persist it. Its result returns the generated row ID, persisted size, storage mode, logical pack metadata and that same byte array. After the transaction commits, Core defensively copies eligible bytes into the local handoff without another file or database read.
 
 ## Hard memory bound
 
@@ -47,21 +69,23 @@ This also makes independent-instance behavior explicit: another instance may cha
 
 JGit's native lifecycle is preserved:
 
-1. all expected extensions are published in the repository-locked Hibernate transaction;
-2. Core merges exact committed metadata into the immutable catalog;
+1. all expected extensions and their shared logical metadata are published in the repository-locked Hibernate transaction;
+2. Core merges exact committed identities, sizes, storage modes and metadata into the immutable catalog;
 3. eligible local bytes enter the bounded handoff;
 4. `clearCache()` and the packs-changed event still form JGit's normal invalidation boundary;
 5. `DfsInserter`, `DfsPackParser` or Reftable publication continues through `addPack()` or `addReftable()`.
 
-When the previous catalog is complete, the first post-publication `listPacks()` consumes a one-shot local snapshot without a database transaction. A later authoritative scan revalidates retained payload identities.
+When the previous catalog is complete, the first post-publication `listPacks()` consumes a one-shot local snapshot without a database transaction. A later authoritative scan revalidates retained payload identities and reconstructs the same logical pack descriptions.
 
 Replacement removes old catalog entries before the transaction starts, but removes their payload identities only after publication commits. Failed publication restores the previous complete generation and leaves its valid local payloads intact. Successful replacement cannot serve old bytes because the deleted row ID no longer matches.
 
-Legacy durable-uncommitted publication continues through its compatibility `UPDATE` path. It does not synthesize payload state or issue an additional metadata query. Incomplete metadata disables the one-shot and forces one authoritative refresh scan.
+Replaced logical packs are removed with one repository-scoped parent bulk delete. The established `git_pack_chunks.pack_id -> git_packs.id ON DELETE CASCADE` foreign key removes their chunks in the same transaction.
+
+Legacy durable-uncommitted publication continues through its compatibility `UPDATE` path. It enriches the old rows with the current `DfsPackDescription` metadata but deliberately does not issue another query merely to synthesize exact generated-row handoff state. Incomplete returned metadata disables the one-shot and forces one authoritative refresh scan.
 
 ## Database indexes
 
-The same performance review found no missing pack-read index. Existing keys already cover the hot paths:
+Existing keys cover the hot paths:
 
 - unique `(repository_name, pack_name, pack_extension)` covers point and pack-name lookups;
 - `(repository_name, committed)` covers committed catalog scans;
@@ -73,23 +97,26 @@ Flyway migration 0.1.17 removes redundant secondary indexes that duplicate those
 - H2, HSQLDB and PostgreSQL: `(repository_name, ref_name, id DESC)`;
 - SQL Server: `(repository_name, id DESC) INCLUDE (ref_name)`, because `nvarchar(1024)` cannot be a portable SQL Server key column.
 
-This lowers index maintenance on pack extensions, chunks and reflog appends while preserving the measured read paths.
+Schema 0.1.18 adds no indexes. The additional values are returned by the existing committed-catalog scan and are not independent query predicates.
 
 ## Why not in-memory database tables
 
-Git objects, refs, reflogs and repository locks remain in durable ordinary tables. Database-specific memory-only, unlogged or memory-optimized tables would weaken restart recovery, complicate multi-instance correctness and fragment the supported H2, HSQLDB, PostgreSQL and SQL Server contract. The local handoff is safe precisely because it contains only reproducible bytes from already committed rows and is never authoritative.
+Git objects, refs, reflogs and repository locks remain in durable ordinary tables. Database-specific memory-only, unlogged or memory-optimized tables would weaken restart recovery, complicate multi-instance correctness and fragment the supported H2, HSQLDB, PostgreSQL and SQL Server contract. The local handoff is safe precisely because it contains only reproducible values from already committed rows and is never authoritative.
 
 ## Verification
 
 Core tests prove that:
 
+- every extension of a new logical pack stores identical source, time, count, index and Reftable metadata;
+- local post-commit handoff and repository reopen reconstruct the same complete `DfsPackDescription`;
+- historical null-column rows remain readable through deterministic compatibility fallbacks;
+- clean, upgraded and adopted schemas reach Core 0.1.18 on all four supported databases;
 - catalogued chunked extensions avoid repeated metadata reads;
 - locally published inline PACK and Reftable payloads open repeatedly without `PACK_FILE_READ` transactions while retained;
 - an exact authoritative scan preserves matching local bytes;
 - historical database-loaded payloads and IDX bytes are never retained;
 - total retained bytes never exceed 512 KiB and oldest entries are evicted first;
 - replacement cannot serve a removed row's bytes and rollback preserves the prior generation;
-- fresh, legacy and adopted schemas contain the intended index set on all four databases;
 - every supported JGit line retains normal push, clone, fetch, restart and publication behavior.
 
-The standard JMH benchmark reconciles attributed successful fallback reads with `PACK_FILE_READ` transactions. The final pull-request measurements are the source of truth for deterministic statement, connection and transaction reductions; latency percentages are claimed only when they exceed reported JMH uncertainty.
+The standard JMH benchmark reconciles attributed successful fallback reads with `PACK_FILE_READ` transactions. Structural counter changes are the supported performance evidence; latency percentages are claimed only when they exceed reported JMH uncertainty.

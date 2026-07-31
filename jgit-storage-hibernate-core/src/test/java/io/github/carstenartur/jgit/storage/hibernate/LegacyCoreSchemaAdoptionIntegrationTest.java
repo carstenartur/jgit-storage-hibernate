@@ -368,6 +368,13 @@ class LegacyCoreSchemaAdoptionIntegrationTest {
       statement.execute("drop index idx_pack_repo_committed");
       statement.execute("alter table git_packs drop constraint uk_pack_repo_name_ext");
       statement.execute("alter table git_packs alter column data set not null");
+      statement.execute("alter table git_packs drop column max_update_index");
+      statement.execute("alter table git_packs drop column min_update_index");
+      statement.execute("alter table git_packs drop column index_version");
+      statement.execute("alter table git_packs drop column delta_count");
+      statement.execute("alter table git_packs drop column object_count");
+      statement.execute("alter table git_packs drop column last_modified");
+      statement.execute("alter table git_packs drop column pack_source");
       statement.execute("alter table git_packs drop column write_lease_until");
       statement.execute("alter table git_packs drop column write_token");
       statement.execute("alter table git_packs drop column committed_at");
