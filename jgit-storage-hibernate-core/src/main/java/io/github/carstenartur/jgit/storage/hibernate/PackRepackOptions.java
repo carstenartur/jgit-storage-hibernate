@@ -17,7 +17,6 @@ public record PackRepackOptions(
     boolean buildBitmaps,
     boolean writeCommitGraph,
     boolean writeBloomFilter,
-    boolean writeReverseIndex,
     boolean compactReftables,
     Duration garbageTtl,
     long coalesceGarbageLimitBytes) {
@@ -42,14 +41,13 @@ public record PackRepackOptions(
    * Return a configuration optimized for repeated clone, fetch, history and path-history reads.
    *
    * <p>The maintenance run performs the expensive graph traversal outside request processing and
-   * creates one primary GC pack with bitmaps, reverse index, commit graph and changed-path Bloom
-   * filters. Reftables are compacted in the same logical publication.
+   * creates one primary GC pack with bitmaps, a commit graph and changed-path Bloom filters.
+   * Reftables are compacted in the same logical publication.
    *
    * @return read-optimized defaults
    */
   public static PackRepackOptions optimizedForReads() {
     return new PackRepackOptions(
-        true,
         true,
         true,
         true,
@@ -68,7 +66,6 @@ public record PackRepackOptions(
   public static PackRepackOptions compactOnly() {
     return new PackRepackOptions(
         true,
-        false,
         false,
         false,
         false,
