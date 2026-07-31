@@ -52,7 +52,7 @@ class CoreSchemaMigrationIntegrationTest {
   private static final String H2_LEGACY_SCHEMA =
       "/db/legacy/jgit-storage-hibernate/core/0.1.4/h2/schema.sql";
   private static final List<String> EXPECTED_MIGRATIONS =
-      List.of("0.1.4", "0.1.5", "0.1.14", "0.1.14.1", "0.1.14.2", "0.1.17");
+      List.of("0.1.4", "0.1.5", "0.1.14", "0.1.14.1", "0.1.14.2", "0.1.17", "0.1.18");
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
@@ -265,6 +265,13 @@ class CoreSchemaMigrationIntegrationTest {
         "select count(*) from git_packs p where p.repository_name = ? and p.data is not null "
             + "and exists (select 1 from git_pack_chunks c where c.pack_id = p.id)";
     assertCount(database, duplicatedPayload, repositoryName, 0);
+
+    String missingPackMetadata =
+        "select count(*) from git_packs p where p.repository_name = ? and p.committed = true "
+            + "and (p.pack_source is null or p.last_modified is null "
+            + "or p.object_count is null or p.delta_count is null or p.index_version is null "
+            + "or p.min_update_index is null or p.max_update_index is null)";
+    assertCount(database, missingPackMetadata, repositoryName, 0);
   }
 
   private static void assertCountGreaterThanZero(
