@@ -22,10 +22,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
@@ -80,25 +82,25 @@ final class StagedPackExtensionStore {
         transactionContext.executeWithRepositoryLock(
             repositoryName,
             session -> {
-              if (replaces != null) {
-                for (DfsPackDescription replace : replaces) {
-                  deletePackRows(session, baseName(replace));
-                }
-              }
+              deletePackRows(session, packNames(replaces));
 
               List<CommittedExtension> committed = new ArrayList<>();
               boolean completeMetadata = true;
               Instant committedAt = Instant.now();
               for (Publication publication : publications) {
+                PackDescriptionMetadata metadata =
+                    PackDescriptionMetadata.fromDescription(publication.description(), committedAt);
                 for (ExpectedExtension expected : publication.extensions()) {
                   if (expected.staged() != null) {
-                    committed.add(persistCommitted(session, expected.staged(), committedAt));
+                    committed.add(
+                        persistCommitted(session, expected.staged(), committedAt, metadata));
                   } else {
                     publishLegacyExtension(
                         session,
                         publication.packName(),
                         expected.extension(),
-                        committedAt);
+                        committedAt,
+                        metadata);
                     completeMetadata = false;
                   }
                 }
@@ -159,9 +161,7 @@ final class StagedPackExtensionStore {
       transactionContext.executeWithRepositoryLock(
           repositoryName,
           session -> {
-            for (String packName : databasePackNames) {
-              deletePackRows(session, packName);
-            }
+            deletePackRows(session, databasePackNames);
             return null;
           });
     } catch (IOException | RuntimeException ignored) {
@@ -195,13 +195,28 @@ final class StagedPackExtensionStore {
       if (extensions.isEmpty()) {
         throw new IOException("Cannot publish a pack without extensions: " + packName);
       }
-      result.add(new Publication(packName, List.copyOf(extensions)));
+      result.add(new Publication(packName, description, List.copyOf(extensions)));
     }
     return result;
   }
 
+  private static Set<String> packNames(Collection<DfsPackDescription> descriptions) {
+    if (descriptions == null || descriptions.isEmpty()) {
+      return Set.of();
+    }
+    Set<String> names = new LinkedHashSet<>();
+    for (DfsPackDescription description : descriptions) {
+      names.add(baseName(description));
+    }
+    return Set.copyOf(names);
+  }
+
   private CommittedExtension persistCommitted(
-      Session session, StagedExtension stagedExtension, Instant committedAt) throws IOException {
+      Session session,
+      StagedExtension stagedExtension,
+      Instant committedAt,
+      PackDescriptionMetadata metadata)
+      throws IOException {
     GitPackEntity entity = new GitPackEntity();
     entity.setRepositoryName(repositoryName);
     entity.setPackName(stagedExtension.key().packName());
@@ -212,6 +227,7 @@ final class StagedPackExtensionStore {
     entity.setCommittedAt(committedAt);
     entity.setWriteToken(null);
     entity.setWriteLeaseUntil(null);
+    metadata.applyTo(entity);
 
     boolean inline = stagedExtension.fileSize() <= HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
     byte[] inlineData;
@@ -281,16 +297,31 @@ final class StagedPackExtensionStore {
   }
 
   private void publishLegacyExtension(
-      Session session, String packName, String extension, Instant committedAt) throws IOException {
+      Session session,
+      String packName,
+      String extension,
+      Instant committedAt,
+      PackDescriptionMetadata metadata)
+      throws IOException {
     int updated =
         session
             .createMutationQuery(
                 "UPDATE GitPackEntity p SET p.committed = true, "
                     + "p.committedAt = :committedAt, p.writeToken = null, "
-                    + "p.writeLeaseUntil = null WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name AND p.packExtension = :ext "
-                    + "AND p.committed = false")
+                    + "p.writeLeaseUntil = null, p.packSource = :packSource, "
+                    + "p.lastModified = :lastModified, p.objectCount = :objectCount, "
+                    + "p.deltaCount = :deltaCount, p.indexVersion = :indexVersion, "
+                    + "p.minUpdateIndex = :minUpdateIndex, p.maxUpdateIndex = :maxUpdateIndex "
+                    + "WHERE p.repositoryName = :repo AND p.packName = :name "
+                    + "AND p.packExtension = :ext AND p.committed = false")
             .setParameter("committedAt", committedAt)
+            .setParameter("packSource", metadata.packSource().name())
+            .setParameter("lastModified", metadata.lastModified())
+            .setParameter("objectCount", metadata.objectCount())
+            .setParameter("deltaCount", metadata.deltaCount())
+            .setParameter("indexVersion", metadata.indexVersion())
+            .setParameter("minUpdateIndex", metadata.minUpdateIndex())
+            .setParameter("maxUpdateIndex", metadata.maxUpdateIndex())
             .setParameter("repo", repositoryName)
             .setParameter("name", packName)
             .setParameter("ext", extension)
@@ -361,26 +392,17 @@ final class StagedPackExtensionStore {
     }
   }
 
-  private void deletePackRows(Session session, String packName) {
-    List<Long> packIds =
-        session
-            .createQuery(
-                "SELECT p.id FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                    + "AND p.packName = :name",
-                Long.class)
-            .setParameter("repo", repositoryName)
-            .setParameter("name", packName)
-            .getResultList();
-    if (!packIds.isEmpty()) {
-      session
-          .createMutationQuery("DELETE FROM GitPackChunkEntity c WHERE c.packId IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
-      session
-          .createMutationQuery("DELETE FROM GitPackEntity p WHERE p.id IN :packIds")
-          .setParameter("packIds", packIds)
-          .executeUpdate();
+  private void deletePackRows(Session session, Collection<String> packNames) {
+    if (packNames.isEmpty()) {
+      return;
     }
+    session
+        .createMutationQuery(
+            "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                + "AND p.packName IN :packNames")
+        .setParameter("repo", repositoryName)
+        .setParameter("packNames", packNames)
+        .executeUpdate();
   }
 
   private static String baseName(DfsPackDescription description) {
@@ -417,7 +439,8 @@ final class StagedPackExtensionStore {
 
   private record ExpectedExtension(String extension, StagedExtension staged) {}
 
-  private record Publication(String packName, List<ExpectedExtension> extensions) {}
+  private record Publication(
+      String packName, DfsPackDescription description, List<ExpectedExtension> extensions) {}
 
   @FunctionalInterface
   private interface StagingConsumer {
