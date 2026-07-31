@@ -8,21 +8,38 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate;
 
+import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateRefDatabase;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.eclipse.jgit.internal.storage.dfs.DfsGarbageCollector;
+import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase;
+import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
+import org.eclipse.jgit.internal.storage.dfs.DfsPackFile;
+import org.eclipse.jgit.internal.storage.dfs.DfsReftable;
+import org.eclipse.jgit.lib.NullProgressMonitor;
+import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.storage.pack.PackConfig;
 import org.hibernate.SessionFactory;
 
 /**
- * Operator-facing maintenance for abandoned, uncommitted pack payloads.
+ * Operator-facing maintenance for Hibernate-backed JGit pack storage.
  *
- * <p>Cleanup is repository-scoped and uses the same pessimistic database row lock as pack and ref
- * publication. A pack name is eligible only when every persisted extension is old, uncommitted and
- * has no current writer lease. Published packs and partially active multi-extension packs are never
- * candidates.
+ * <p>Abandoned-write cleanup is repository-scoped and uses the same pessimistic database row lock as
+ * pack and ref publication. A pack name is eligible only when every persisted extension is old,
+ * uncommitted and has no current writer lease. Published packs and partially active multi-extension
+ * packs are never candidates.
+ *
+ * <p>Repack maintenance delegates graph traversal, delta selection, bitmap generation, commit-graph
+ * generation and race detection to JGit's DFS garbage collector. The expensive new extensions are
+ * built through the normal local staging path; the final logical pack and optional compacted
+ * Reftable are published through the existing atomic Hibernate transaction.
  */
 public final class PackStorageMaintenance {
 
@@ -93,15 +110,20 @@ public final class PackStorageMaintenance {
             long payloadBytes =
                 rows.stream().mapToLong(row -> ((Number) row[1]).longValue()).sum();
             int chunkRows =
-                session
-                    .createMutationQuery(
-                        "DELETE FROM GitPackChunkEntity c WHERE c.packId IN :packIds")
-                    .setParameter("packIds", packIds)
-                    .executeUpdate();
+                Math.toIntExact(
+                    session
+                        .createQuery(
+                            "SELECT COUNT(c) FROM GitPackChunkEntity c WHERE c.packId IN :packIds",
+                            Long.class)
+                        .setParameter("packIds", packIds)
+                        .getSingleResult());
             int packRows =
                 session
-                    .createMutationQuery("DELETE FROM GitPackEntity p WHERE p.id IN :packIds")
-                    .setParameter("packIds", packIds)
+                    .createMutationQuery(
+                        "DELETE FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                            + "AND p.packName IN :packNames")
+                    .setParameter("repo", repositoryName.value())
+                    .setParameter("packNames", packNames)
                     .executeUpdate();
             return new PackCleanupResult(packRows, chunkRows, payloadBytes);
           });
@@ -110,4 +132,113 @@ public final class PackStorageMaintenance {
           "Could not clean expired pack payloads for " + repositoryName, exception);
     }
   }
+
+  /**
+   * Repack one repository with the read-optimized maintenance defaults.
+   *
+   * @param repositoryName logical repository
+   * @return structural maintenance outcome
+   */
+  public PackRepackResult repackForReads(RepositoryName repositoryName) {
+    return repack(
+        repositoryName, PackRepackOptions.optimizedForReads(), NullProgressMonitor.INSTANCE);
+  }
+
+  /**
+   * Repack one repository through JGit's DFS garbage collector.
+   *
+   * @param repositoryName logical repository
+   * @param options pack, graph, bitmap and garbage-retention options
+   * @return structural maintenance outcome
+   */
+  public PackRepackResult repack(
+      RepositoryName repositoryName, PackRepackOptions options) {
+    return repack(repositoryName, options, NullProgressMonitor.INSTANCE);
+  }
+
+  /**
+   * Repack one repository through JGit's DFS garbage collector.
+   *
+   * <p>The collector validates that refs did not move incompatibly before replacing source packs. A
+   * {@code successful=false} result means JGit detected such a race and the operation should be
+   * retried later; it is not reported as storage corruption.
+   *
+   * @param repositoryName logical repository
+   * @param options pack, graph, bitmap and garbage-retention options
+   * @param progressMonitor receives JGit maintenance progress
+   * @return structural maintenance outcome
+   */
+  public PackRepackResult repack(
+      RepositoryName repositoryName,
+      PackRepackOptions options,
+      ProgressMonitor progressMonitor) {
+    Objects.requireNonNull(repositoryName, "repositoryName");
+    Objects.requireNonNull(options, "options");
+    Objects.requireNonNull(progressMonitor, "progressMonitor");
+
+    try (HibernateRepository repository =
+        HibernateRepository.create(sessionFactory, repositoryName.value())) {
+      DfsObjDatabase objectDatabase = repository.getObjectDatabase();
+      PackInventory before = inventory(objectDatabase);
+
+      DfsGarbageCollector collector = new DfsGarbageCollector(repository);
+      PackConfig packConfig = new PackConfig(repository);
+      packConfig.setSinglePack(options.singlePack());
+      packConfig.setBuildBitmaps(options.buildBitmaps());
+      packConfig.setWriteReverseIndex(options.writeReverseIndex());
+      collector.setPackConfig(packConfig);
+      collector.setWriteCommitGraph(options.writeCommitGraph());
+      collector.setWriteBloomFilter(options.writeBloomFilter());
+      collector.setGarbageTtl(
+          options.garbageTtl().toMillis(), TimeUnit.MILLISECONDS);
+      collector.setCoalesceGarbageLimit(options.coalesceGarbageLimitBytes());
+
+      if (options.compactReftables()) {
+        if (!(repository.getRefDatabase() instanceof HibernateRefDatabase refDatabase)) {
+          throw new HibernateStorageException(
+              "Repository does not use the Hibernate Reftable database: " + repositoryName);
+        }
+        collector.setReftableConfig(refDatabase.getReftableConfig());
+        collector.setConvertToReftable(true);
+      } else {
+        collector.setConvertToReftable(false);
+      }
+
+      long started = System.nanoTime();
+      boolean successful = collector.pack(progressMonitor);
+      long elapsedNanos = System.nanoTime() - started;
+      PackInventory after = inventory(objectDatabase);
+
+      return new PackRepackResult(
+          successful,
+          before.packs(),
+          after.packs(),
+          before.reftables(),
+          after.reftables(),
+          before.bytes(),
+          after.bytes(),
+          collector.getSourcePacks().size(),
+          collector.getNewPacks().size(),
+          elapsedNanos);
+    } catch (IOException exception) {
+      throw new HibernateStorageException(
+          "Could not repack Hibernate-backed repository " + repositoryName, exception);
+    }
+  }
+
+  private static PackInventory inventory(DfsObjDatabase objectDatabase) throws IOException {
+    DfsPackFile[] packs = objectDatabase.getPacks();
+    DfsReftable[] reftables = objectDatabase.getReftables();
+    Set<DfsPackDescription> descriptions = new LinkedHashSet<>();
+    for (DfsPackFile pack : packs) {
+      descriptions.add(pack.getPackDescription());
+    }
+    for (DfsReftable reftable : reftables) {
+      descriptions.add(reftable.getPackDescription());
+    }
+    long bytes = descriptions.stream().mapToLong(DfsPackDescription::getTotalFileSize).sum();
+    return new PackInventory(packs.length, reftables.length, bytes);
+  }
+
+  private record PackInventory(int packs, int reftables, long bytes) {}
 }
