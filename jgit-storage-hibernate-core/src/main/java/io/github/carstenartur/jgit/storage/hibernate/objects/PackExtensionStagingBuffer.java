@@ -24,11 +24,11 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 /**
  * Random-readable pack-extension staging that keeps small payloads in memory and spills once.
  *
- * <p>Retained in-memory staging is bounded three times: one extension cannot exceed the normal
- * inline payload threshold, one repository owns a separate memory budget, and all repository
- * instances in this class loader share a process budget. When any bound would be exceeded, the
- * already written prefix is copied once to a temporary file and all subsequent writes continue
- * there. Positional reads retain identical semantics before and after the spill.
+ * <p>Retained in-memory staging is bounded by the normal inline payload threshold for each
+ * extension and by one process-wide budget shared by every repository instance in this class
+ * loader. A caller can additionally provide a narrower owner budget. When any bound would be
+ * exceeded, the already written prefix is copied once to a temporary file and all subsequent writes
+ * continue there. Positional reads retain identical semantics before and after the spill.
  */
 final class PackExtensionStagingBuffer extends DfsOutputStream {
 
@@ -38,7 +38,7 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
   private static final MemoryBudget PROCESS_MEMORY_BUDGET =
       new MemoryBudget(PROCESS_MEMORY_BUDGET_BYTES);
 
-  private final MemoryBudget repositoryMemoryBudget;
+  private final MemoryBudget ownerMemoryBudget;
   private final CloseConsumer closeConsumer;
   private final Instant createdAt = Instant.now();
   private byte[] memory = new byte[0];
@@ -47,10 +47,12 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
   private long fileSize;
   private boolean closed;
 
-  PackExtensionStagingBuffer(
-      MemoryBudget repositoryMemoryBudget, CloseConsumer closeConsumer) {
-    this.repositoryMemoryBudget =
-        Objects.requireNonNull(repositoryMemoryBudget, "repositoryMemoryBudget");
+  PackExtensionStagingBuffer(CloseConsumer closeConsumer) {
+    this(new MemoryBudget(MAX_MEMORY_BYTES), closeConsumer);
+  }
+
+  PackExtensionStagingBuffer(MemoryBudget ownerMemoryBudget, CloseConsumer closeConsumer) {
+    this.ownerMemoryBudget = Objects.requireNonNull(ownerMemoryBudget, "ownerMemoryBudget");
     this.closeConsumer = Objects.requireNonNull(closeConsumer, "closeConsumer");
   }
 
@@ -194,19 +196,19 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
   }
 
   private boolean reserveMemory(long bytes) {
-    if (!repositoryMemoryBudget.tryReserve(bytes)) {
+    if (!ownerMemoryBudget.tryReserve(bytes)) {
       return false;
     }
     if (PROCESS_MEMORY_BUDGET.tryReserve(bytes)) {
       return true;
     }
-    repositoryMemoryBudget.release(bytes);
+    ownerMemoryBudget.release(bytes);
     return false;
   }
 
   private void releaseMemory(long bytes) {
     PROCESS_MEMORY_BUDGET.release(bytes);
-    repositoryMemoryBudget.release(bytes);
+    ownerMemoryBudget.release(bytes);
   }
 
   private void ensureFileBacked() throws IOException {
@@ -263,7 +265,7 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
       releaseMemory(memory.length - size);
     }
     memory = null;
-    return new MemoryPayload(payloadBytes, repositoryMemoryBudget);
+    return new MemoryPayload(payloadBytes, ownerMemoryBudget);
   }
 
   private void releaseMemory() {
@@ -330,12 +332,12 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
 
   private static final class MemoryPayload implements StagedPayload {
     private final byte[] data;
-    private final MemoryBudget repositoryMemoryBudget;
+    private final MemoryBudget ownerMemoryBudget;
     private final AtomicBoolean discarded = new AtomicBoolean();
 
-    private MemoryPayload(byte[] data, MemoryBudget repositoryMemoryBudget) {
+    private MemoryPayload(byte[] data, MemoryBudget ownerMemoryBudget) {
       this.data = data;
-      this.repositoryMemoryBudget = repositoryMemoryBudget;
+      this.ownerMemoryBudget = ownerMemoryBudget;
     }
 
     @Override
@@ -375,7 +377,7 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
     public void discard() {
       if (discarded.compareAndSet(false, true)) {
         PROCESS_MEMORY_BUDGET.release(data.length);
-        repositoryMemoryBudget.release(data.length);
+        ownerMemoryBudget.release(data.length);
       }
     }
   }
