@@ -8,32 +8,33 @@ Core separates binary construction from transactional publication:
 - JGit can perform random reads through the still-open `DfsOutputStream` while constructing or resolving an extension;
 - closing an extension stages the completed temporary file in the repository instance but creates no database row;
 - logical packs whose extensions all remain at or below the 256-KiB inline threshold are persisted and published in one repository-locked Hibernate transaction;
-- additive logical packs containing at least one chunked extension use an adaptive three-phase path: reserve invisible parents under a short lock, transfer payloads without the repository lock, then atomically publish the complete generation under a second short lock;
+- additive logical packs containing at least one chunked extension use an adaptive two-transaction path: persist the complete invisible parent/payload set without the repository lock, then atomically publish the complete generation under one short lock;
 - pack replacement and compaction remain on the established single locked transaction path so no ref update can cross JGit's race check before source-pack deletion;
 - `git_packs` owns repository, pack name, extension, declared size, writer lease and committed publication metadata;
 - small committed extensions remain inline in `git_packs.data`;
 - larger committed extensions use ordered **1 MiB** rows in `git_pack_chunks`;
 - existing inline, chunked and legacy uncommitted rows remain compatible without a destructive migration.
 
-Readers select only `committed=true` rows. An additive chunked logical pack can therefore have complete parent and payload rows before publication without exposing a partial generation to JGit.
+Readers select only `committed=true` rows. An additive chunked logical pack can therefore have complete parent and payload rows in the database before publication without exposing a partial generation to JGit.
 
 ### Adaptive chunked publication
 
 For a fully local additive logical pack with at least one extension above the inline threshold, `commitPack()` performs:
 
-1. a short `PACK_EXTENSION_WRITE` transaction that acquires the repository lock, reserves every expected extension with one UUID writer token and a current lease, and commits no payload bytes;
-2. a lock-free `PACK_EXTENSION_WRITE` transaction that verifies the complete token-owned parent set, renews the lease, writes inline bytes and inserts bounded chunk rows;
-3. a short `PACK_PUBLICATION` transaction that acquires the repository lock and changes every expected token-owned row to `committed=true` in one bulk update.
+1. one lock-free `PACK_EXTENSION_WRITE` transaction that creates every expected parent, assigns one UUID writer token and lease, writes inline payloads and inserts bounded chunk rows;
+2. one short `PACK_PUBLICATION` transaction that acquires the repository lock and changes every expected token-owned row to `committed=true` in one bulk update.
+
+The first transaction is all-or-nothing. A process or database failure before it commits leaves no durable parent or chunk rows. After it commits, the complete logical pack is durable but still invisible. The lease is renewed at the end of this transaction so a large transfer does not publish an already-expired prepared group.
 
 The final update count must match the complete expected extension set. A missing or changed row aborts the visibility transaction. Normal failure handling then deletes every remaining token-owned uncommitted parent; the database foreign-key cascade removes its chunks.
 
-The first short lock prevents a concurrent publication from claiming the same logical pack identity during parent reservation. Payload transfer is deliberately outside that lock. The final lock remains the sole visibility boundary and serializes the committed generation with ref publication, repository deletion, pack replacement and maintenance.
+The final repository lock remains the sole committed visibility boundary and serializes the new generation with ref publication, repository deletion, pack replacement and maintenance. Parent identity conflicts are handled by the existing unique constraint rather than by a preliminary repository lock.
 
 A logical pack containing a legacy durable-uncommitted extension stays on the established single locked publication path. The adaptive path is used only when every expected extension is locally staged and the operation is additive.
 
 Pack replacement, compaction and read-optimized garbage collection also stay direct even when the new payload is chunked. JGit can validate refs before invoking `commitPack()`. Releasing the repository lock between that validation and source-pack replacement would allow a conflicting ref update to cross the race check and could make the replacement decision stale.
 
-No partially persisted staged extension is visible to readers. A database rollback of payload transfer leaves only invisible reserved parents, which normal cleanup removes. A hard process termination may leave those parents and any already committed chunks for lease-aware maintenance.
+No partially persisted staged extension is visible to readers. A hard process termination after lock-free pre-persistence can leave only a complete invisible token-owned group, never a committed subset. Lease-aware maintenance removes such groups after the operator cutoff and lease expiry.
 
 This removes the requirement that the largest individual extension fit into one Java byte array and prevents large additive database transfer from occupying the repository publication lock. It is still not a claim that repository size is unlimited: database throughput, temporary-disk capacity, JGit caches, transaction log capacity and concurrent work remain deployment constraints.
 
@@ -52,7 +53,7 @@ The production path uses:
 
 Temporary files remain until the corresponding logical pack is committed or rolled back, not merely until each extension stream closes. The directory used by `Files.createTempFile(...)` must therefore have enough free space for all concurrent open writers plus every completed extension waiting for its `commitPack()` callback.
 
-During adaptive publication, bytes temporarily exist both in the local staging file and in invisible database rows. Capacity planning must allow that overlap for every concurrent chunked writer. The database transaction log must also accommodate one payload-transfer transaction per additive logical pack; payload chunks are flushed in bounded ORM batches, but visibility remains transactional.
+During adaptive publication, bytes temporarily exist both in the local staging file and in invisible database rows. Capacity planning must allow that overlap for every concurrent chunked writer. The database transaction log must also accommodate one complete pre-persistence transaction per additive logical pack; payload chunks are flushed in bounded ORM batches, but the transaction commits only after every expected extension is complete.
 
 Normal publication and rollback delete temporary files explicitly. The implementation deliberately does not register every extension with the JVM-wide `deleteOnExit` registry, because that registry grows for the lifetime of a server process. A JVM crash or operating-system deletion failure can leave files with the `jgit-storage-pack-` prefix in the configured temporary directory. They are unpublished derived state and are never treated as durable or resumable Git data. Operators may remove stale prefixed files only after verifying that no matching JVM/process is active.
 
@@ -64,7 +65,8 @@ Normal pull-request tests cover:
 
 - no database row when an extension merely closes;
 - direct atomic multi-extension publication for fully inline logical packs;
-- invisible writer-token reservation and lock-free payload transfer for additive chunked logical packs;
+- complete invisible writer-token pre-persistence for additive chunked logical packs;
+- one lock-free pre-persistence transaction and one short locked visibility transaction;
 - exact all-or-nothing publication after every expected chunked and inline extension is present;
 - publication mismatch, transaction rollback and token-owned row/chunk cleanup;
 - direct locked publication for chunked pack replacement and compaction;
@@ -91,14 +93,14 @@ Before production use, also test an import or repack representative of the large
 
 Writer tokens and leases protect every durable uncommitted row, including:
 
-- parents reserved by the adaptive chunked-publication path;
+- complete groups pre-persisted by the adaptive chunked-publication path;
 - databases containing uncommitted rows produced by an earlier library version;
 - direct use of the base `HibernateObjDatabase` contract;
 - safe maintenance and rollback of those durable rows.
 
-Every persisted uncommitted extension has a UUID `write_token` and renewable `write_lease_until`. All extensions reserved for one adaptive logical pack share the same token. Payload transfer verifies the exact token-owned parent IDs and declared sizes before writing bytes, and renews the group lease before chunk insertion.
+Every persisted uncommitted extension has a UUID `write_token` and renewable `write_lease_until`. All extensions pre-persisted for one adaptive logical pack share the same token. The pre-persistence transaction owns the complete parent and payload set and renews the group lease immediately before commit.
 
-The base writer verifies ownership on persistence and close. Pack reservation, final publication, direct replacement, ref publication and maintenance use the repository-scoped pessimistic lock. The potentially long additive payload-transfer transaction deliberately does not hold that lock because its rows remain invisible and token-owned.
+The base writer verifies ownership on persistence and close. Final publication, direct replacement, ref publication and maintenance use the repository-scoped pessimistic lock. The potentially long additive pre-persistence transaction deliberately does not hold that lock because its rows remain invisible and token-owned.
 
 The staging path may publish a logical pack containing both local staged extensions and legacy durable uncommitted extensions. Such a mixed representation is validated and made committed in the established single locked transaction rather than being converted to the adaptive path.
 
@@ -106,20 +108,20 @@ The staging path may publish a logical pack containing both local staged extensi
 
 ### Local staging files
 
-A hard JVM termination can prevent normal rollback and leave temporary files. They contain no authoritative state. A chunked writer may also have corresponding invisible database rows, but the local files still must not be imported or treated as resumable Git packs.
+A hard JVM termination can prevent normal rollback and leave temporary files. They contain no authoritative state. A chunked writer may also have a corresponding complete invisible database group, but the local files still must not be imported or treated as resumable Git packs.
 
 Recover local files through operating-system temporary-directory policy or an operator cleanup that selects stale `jgit-storage-pack-` files after confirming the owning process is gone. The association with JGit's in-memory `DfsPackDescription`, expected extensions and publication callback was lost with the process.
 
 ### Uncommitted database rows
 
-A crash can leave invisible `committed=false` rows in several states:
+A crash can leave invisible `committed=false` rows in two normal forms:
 
-- reserved parents with no payload yet;
-- a partially transferred group whose payload transaction rolled back;
-- a complete inline/chunked group whose process stopped before final publication;
+- a complete additive logical pack whose pre-persistence transaction committed but whose final publication did not run;
 - an older/base-writer row.
 
-Readers ignore all of them. They must never be promoted with direct SQL because the lost process can no longer prove the complete expected extension set or JGit publication state. Use the public maintenance service:
+A failure during adaptive pre-persistence itself rolls back the complete database transaction and leaves no durable partial group.
+
+Readers ignore all uncommitted rows. They must never be promoted with direct SQL because the lost process can no longer prove JGit publication state. Use the public maintenance service:
 
 ```java
 PackCleanupResult result =
@@ -158,7 +160,7 @@ where committed = false
 order by repository_name, pack_name, pack_extension;
 ```
 
-A normal all-inline publication does not appear in this query before commit. A normal additive chunked publication can appear briefly after parent reservation and until the atomic visibility update completes. A current lease means the group may belong to a live writer.
+A normal all-inline publication does not appear in this query before commit. A normal additive chunked publication appears only after its complete pre-persistence transaction commits and remains until the short atomic visibility update completes. A current lease means the group may belong to a live writer.
 
 Do not schedule a raw `DELETE FROM git_packs WHERE committed = false`; it bypasses repository coordination, pack-extension grouping and lease checks implemented by `PackStorageMaintenance`.
 
