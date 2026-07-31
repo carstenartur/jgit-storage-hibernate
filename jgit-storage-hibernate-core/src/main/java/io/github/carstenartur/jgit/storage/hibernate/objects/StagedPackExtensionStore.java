@@ -255,7 +255,8 @@ final class StagedPackExtensionStore {
         entity.getId(),
         stagedExtension.fileSize(),
         inline,
-        inlineData);
+        inlineData,
+        metadata);
   }
 
   private static boolean isDuplicatePackExtension(Throwable failure) {
@@ -423,11 +424,13 @@ final class StagedPackExtensionStore {
       Long packId,
       long fileSize,
       boolean inline,
-      byte[] inlineData) {
+      byte[] inlineData,
+      PackDescriptionMetadata metadata) {
     CommittedExtension {
       if (inline != (inlineData != null)) {
         throw new IllegalArgumentException("inline payload must be present exactly for inline rows");
       }
+      metadata = Objects.requireNonNull(metadata, "metadata");
     }
   }
 
