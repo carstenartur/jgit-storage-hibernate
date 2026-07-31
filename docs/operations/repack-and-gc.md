@@ -2,7 +2,7 @@
 
 Long-lived repositories accumulate small `INSERT` and `RECEIVE` packs. Retaining every pack is transactionally correct, but eventually increases pack-index memory, object-lookup fan-out and the work required to negotiate clone and fetch requests.
 
-Core exposes JGit's DFS garbage collector through `PackStorageMaintenance`. The service keeps the relational database as the durable authority while using the same atomic pack-publication path as ordinary writes.
+Core exposes JGit's DFS garbage collector through `PackStorageMaintenance`. The service keeps the relational database as the durable authority while using the same atomic pack-publication path as ordinary writes. Persisted logical pack metadata keeps JGit's source, ordering and lifecycle decisions identical before and after a repository restart.
 
 ## Read-optimized maintenance
 
