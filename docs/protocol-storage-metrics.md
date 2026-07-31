@@ -50,7 +50,7 @@ Protocol and concurrent storage counters use JMH `@AuxCounters(AuxCounters.Type.
 
 The same rule applies to the microsecond duration counters. Concurrent throughput tests execute many operations per iteration, so normalize event totals by the matching operation count before comparing per-operation costs.
 
-Before adaptive chunked publication, PostgreSQL produced these stable raw structural values for the serial protocol matrix:
+Before adaptive additive chunked publication, PostgreSQL produced these stable raw structural values for the serial protocol matrix:
 
 | Workload, per invocation | Transactions | Locks | Prepared statements | Category distribution |
 |---|---:|---:|---:|---|
@@ -59,7 +59,7 @@ Before adaptive chunked publication, PostgreSQL produced these stable raw struct
 | Initial clone | 1 | 0 | 2 | 1 file read |
 | Incremental fetch | 2 | 0 | 3 | 2 file reads |
 
-Adaptive publication intentionally changes the write-side structure for logical packs containing chunked extensions: one former `PACK_PUBLICATION` transaction becomes two `PACK_EXTENSION_WRITE` transactions plus one shorter `PACK_PUBLICATION` transaction, with one reservation lock and one final publication lock. Fully inline and mixed legacy publications retain the direct path. The merge decision therefore compares added fixed transaction cost against reduced `PACK_PUBLICATION` lock-held time and improved shared-repository throughput.
+Adaptive publication intentionally changes the write-side structure only for fully local additive logical packs containing chunked extensions: one former `PACK_PUBLICATION` transaction becomes two `PACK_EXTENSION_WRITE` transactions plus one shorter `PACK_PUBLICATION` transaction, with one reservation lock and one final publication lock. Fully inline, replacing and mixed legacy publications retain the direct path. The merge decision therefore compares added fixed transaction cost against reduced `PACK_PUBLICATION` lock-held time and improved shared-repository throughput.
 
 Duration values are intentionally not documented as fixed constants. They depend on database placement, contention, payload size, WAL behavior and runner load and should be compared through raw per-operation samples.
 
@@ -67,7 +67,7 @@ Duration values are intentionally not documented as fixed constants. They depend
 
 The four-thread benchmark gives every Hibernate thread an independent `SessionFactory` connected to the same database. It compares four handles sharing one logical repository lock row with four handles using independent repositories.
 
-The baseline that selected adaptive chunked publication was:
+The baseline that selected adaptive additive chunked publication was:
 
 | Backend | Same logical repository | Four independent repositories | Independent advantage |
 |---|---:|---:|---:|
@@ -96,15 +96,17 @@ Every top-level repository transaction receives exactly one stable `StorageOpera
 | `REFLOG_WRITE` | standalone reflog persistence outside a ref-publication transaction |
 | `OTHER` | explicit uncategorized application work or an internal call site still requiring classification |
 
-For adaptive chunked publication, the expected category sequence is:
+For adaptive additive chunked publication, the expected category sequence is:
 
 ```text
 PACK_EXTENSION_WRITE  locked parent reservation
 PACK_EXTENSION_WRITE  lock-free inline/chunk payload transfer
-PACK_PUBLICATION      locked replacement + atomic visibility update
+PACK_PUBLICATION      locked atomic visibility update
 ```
 
 A failed final update is a rolled-back `PACK_PUBLICATION`; successful token cleanup is a lock-free `PACK_ROLLBACK`. Readers cannot observe the intermediate rows because every read path requires `committed=true`.
+
+Replacing packs do not use this sequence. JGit performs ref-race validation before replacement, so construction, source-pack deletion and committed publication remain inside the established single `PACK_PUBLICATION` transaction and repository lock.
 
 The raw JMH JSON publishes transaction counters for every category and lock counters for categories that can acquire the repository lock. High-value fields include:
 
@@ -123,7 +125,7 @@ otherRepositoryLocks
 
 For the supported benchmark workloads, `otherStorageTransactions` and `otherRepositoryLocks` must be zero. A non-zero value is treated as a diagnostic gap rather than silently folded into a misleading category.
 
-The Java snapshot API also retains transaction and lock duration per operation category. This makes it possible to verify that payload transfer moved into lock-free `PACK_EXTENSION_WRITE` work while `PACK_PUBLICATION` lock-held time decreased.
+The Java snapshot API also retains transaction and lock duration per operation category. This makes it possible to verify that additive payload transfer moved into lock-free `PACK_EXTENSION_WRITE` work while `PACK_PUBLICATION` lock-held time decreased.
 
 ## Pack-file read attribution
 
@@ -221,10 +223,11 @@ long allLookups = delta.totalLookups();
 
 The metrics are intended to choose and validate optimizations using evidence:
 
-- high `PACK_PUBLICATION` lock-held time with low acquisition time suggests moving payload transfer before the publication lock;
+- high `PACK_PUBLICATION` lock-held time with low acquisition time suggests moving additive payload transfer before the publication lock;
 - high acquisition time under concurrent same-repository writes indicates genuine lock contention;
-- after adaptive publication, `PACK_EXTENSION_WRITE` payload-transfer transactions should have zero locks while final `PACK_PUBLICATION` retains atomic visibility;
+- after adaptive publication, additive `PACK_EXTENSION_WRITE` payload-transfer transactions should have zero locks while final `PACK_PUBLICATION` retains atomic visibility;
 - higher transaction count is acceptable only when shared-repository throughput or publication lock-held time improves materially and serial small-pack behavior does not regress;
+- replacement and compaction metrics must remain on one locked `PACK_PUBLICATION` boundary to preserve JGit's race contract;
 - high transaction duration with little or no lock-held time points to read transactions, connection setup or database work outside serialized publication;
 - many `REF_PUBLICATION` transactions or locks suggest ref/reftable coordination is the dominant fixed cost;
 - many `PACK_METADATA_READ` transactions suggest pack-list reconstruction should be examined;
