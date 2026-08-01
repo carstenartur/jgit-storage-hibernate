@@ -730,22 +730,6 @@ final class StagedPackExtensionStore {
     return total;
   }
 
-  private static long committedPayloadBytes(List<CommittedExtension> extensions) {
-    long total = 0;
-    for (CommittedExtension extension : extensions) {
-      total = saturatingAdd(total, extension.fileSize());
-    }
-    return total;
-  }
-
-  private static long persistedPayloadBytes(List<PersistedExtension> extensions) {
-    long total = 0;
-    for (PersistedExtension extension : extensions) {
-      total = saturatingAdd(total, extension.staged().fileSize());
-    }
-    return total;
-  }
-
   private void deletePreparedRows(Session session, Collection<String> writeTokens) {
     if (writeTokens.isEmpty()) {
       return;
