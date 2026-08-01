@@ -17,6 +17,7 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
@@ -26,15 +27,16 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Runs only the focused large-pack JDBC batching comparison. */
+/** Runs the focused stateful-versus-stateless large-pack comparison. */
 @Testcontainers(disabledWithoutDocker = true)
 class LargePackJdbcBatchBenchmarkIT {
 
   private static final Set<String> EXPECTED_MODES =
       Set.of(
-          LargePackJdbcBatchBenchmark.DISABLED,
-          LargePackJdbcBatchBenchmark.ENABLED,
-          LargePackJdbcBatchBenchmark.ENABLED_REWRITE);
+          LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_DISABLED,
+          LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
+          LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_REWRITE,
+          LargePackJdbcBatchBenchmark.STATELESS);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -44,7 +46,7 @@ class LargePackJdbcBatchBenchmarkIT {
           .withPassword("benchmark");
 
   @Test
-  void recordsPortableAndDriverRewrittenBatchingModes() throws Exception {
+  void recordsStatefulAndStatelessChunkWriterModes() throws Exception {
     Path resultFile =
         Path.of(
                 System.getProperty(
@@ -57,10 +59,12 @@ class LargePackJdbcBatchBenchmarkIT {
         new OptionsBuilder()
             .include(LargePackJdbcBatchBenchmark.class.getName())
             .param(
-                "batchingMode",
-                LargePackJdbcBatchBenchmark.DISABLED,
-                LargePackJdbcBatchBenchmark.ENABLED,
-                LargePackJdbcBatchBenchmark.ENABLED_REWRITE)
+                "writeMode",
+                LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_DISABLED,
+                LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
+                LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_REWRITE,
+                LargePackJdbcBatchBenchmark.STATELESS)
+            .addProfiler(GCProfiler.class)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
             .result(resultFile.toString())
@@ -78,11 +82,11 @@ class LargePackJdbcBatchBenchmarkIT {
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
-    assertEquals(3, results.size(), "The focused benchmark must produce exactly three results");
+    assertEquals(4, results.size(), "The focused benchmark must produce four results");
     assertEquals(
         EXPECTED_MODES,
         results.stream()
-            .map(result -> result.getParams().getParam("batchingMode"))
+            .map(result -> result.getParams().getParam("writeMode"))
             .collect(Collectors.toSet()));
     assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
