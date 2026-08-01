@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 : "${RELEASE_VERSION:?RELEASE_VERSION is required}"
-NEXT_VERSION_INPUT=${NEXT_VERSION_INPUT:-}
+trim(){
+  local value=${1-}
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+RELEASE_VERSION=$(trim "$RELEASE_VERSION")
+NEXT_VERSION_INPUT=$(trim "${NEXT_VERSION_INPUT:-}")
 SKIP_TESTS=${SKIP_TESTS:-false}
 DRY_RUN=${DRY_RUN:-false}
 SOURCE_BRANCH=${SOURCE_BRANCH:-main}
