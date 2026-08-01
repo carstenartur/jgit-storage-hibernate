@@ -1,0 +1,122 @@
+name: Apply read-ahead metric hot-path fix
+
+on:
+  push:
+    branches:
+      - perf/storage-byte-metrics-v2
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/storage-byte-metrics-v2
+          fetch-depth: 0
+      - name: Replace whole-chunk cardinality scans
+        shell: python
+        run: |
+          from pathlib import Path
+
+          source = Path("jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/ReadAheadHibernateObjDatabase.java")
+          text = source.read_text()
+          old = '''    private static final class CachedChunk {
+            private final byte[] data;
+            private final BitSet consumed;
+
+            private CachedChunk(byte[] data, boolean trackConsumption) {
+              this.data = data;
+              this.consumed = trackConsumption ? new BitSet(data.length) : null;
+            }
+
+            private byte[] data() {
+              return data;
+            }
+
+            private int markConsumed(int offset, int length) {
+              if (consumed == null) {
+                return 0;
+              }
+              int before = consumed.cardinality();
+              consumed.set(offset, offset + length);
+              return consumed.cardinality() - before;
+            }
+
+            private long unconsumedBytes() {
+              return consumed == null ? 0 : data.length - consumed.cardinality();
+            }
+          }
+'''
+          new = '''    private static final class CachedChunk {
+            private final byte[] data;
+            private final BitSet consumed;
+            private int consumedBytes;
+
+            private CachedChunk(byte[] data, boolean trackConsumption) {
+              this.data = data;
+              this.consumed = trackConsumption ? new BitSet(data.length) : null;
+            }
+
+            private byte[] data() {
+              return data;
+            }
+
+            private int markConsumed(int offset, int length) {
+              if (consumed == null) {
+                return 0;
+              }
+              int end = offset + length;
+              int newlyConsumed = 0;
+              int cursor = offset;
+              while (cursor < end) {
+                int nextConsumed = consumed.nextSetBit(cursor);
+                if (nextConsumed < 0 || nextConsumed >= end) {
+                  newlyConsumed += end - cursor;
+                  break;
+                }
+                newlyConsumed += nextConsumed - cursor;
+                cursor = consumed.nextClearBit(nextConsumed);
+              }
+              consumed.set(offset, end);
+              consumedBytes += newlyConsumed;
+              return newlyConsumed;
+            }
+
+            private long unconsumedBytes() {
+              return consumed == null ? 0 : data.length - consumedBytes;
+            }
+          }
+'''
+          if old not in text:
+              raise SystemExit("CachedChunk source shape changed")
+          source.write_text(text.replace(old, new))
+
+          test = Path("jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/StorageByteMetricsH2Test.java")
+          text = test.read_text()
+          old = '''          channel.setReadAheadBytes(payload.length);
+                    assertEquals(32, channel.read(ByteBuffer.allocate(32)));
+                  }
+'''
+          new = '''          channel.setReadAheadBytes(payload.length);
+                    assertEquals(32, channel.read(ByteBuffer.allocate(32)));
+                    channel.position(0);
+                    assertEquals(32, channel.read(ByteBuffer.allocate(32)));
+                  }
+'''
+          if old not in text:
+              raise SystemExit("read-ahead test source shape changed")
+          test.write_text(text.replace(old, new))
+      - name: Commit final source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/apply-read-ahead-metric-hotpath.yml
+          git add jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/ReadAheadHibernateObjDatabase.java
+          git add jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/StorageByteMetricsH2Test.java
+          git commit -m 'Avoid whole-chunk scans in read-ahead metrics'
+          git push origin HEAD:perf/storage-byte-metrics-v2
