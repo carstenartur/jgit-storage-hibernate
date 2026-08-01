@@ -48,20 +48,39 @@ The normal Maven workflow runs a `Public Maven repository contract` job. It deri
 
 A release can be started from the Actions UI or through a guarded request branch.
 
-Manual inputs:
+The release version is never entered manually. The workflow reads the authoritative root POM version `X.Y.Z-SNAPSHOT` and derives release `X.Y.Z`.
 
 ```text
-release_version = X.Y.Z
-next_development_version = X.Y.Z-SNAPSHOT   # optional
+next_development_version = A.B.C-SNAPSHOT  # optional exact override
+next_version_increment = patch | minor | major
 skip_tests = false                          # only permitted for a dry run
 dry_run = false
 ```
 
-For an agent-driven release, create branch `release-request/X.Y.Z` from current `main` and add `.github/release-request` containing exactly `X.Y.Z`. The workflow checks out authoritative `main`, verifies the marker against the branch name, runs the release and removes the request branch after success.
+Normal automated releases provide only `next_version_increment`; they do not construct or transmit a next-version string. The optional exact override is normalized, validated and must be numerically newer than the release.
+
+For example, a repository at `0.1.17-SNAPSHOT` releases `0.1.17`; without an exact override the choices produce:
+
+| Choice | Next development version |
+|---|---:|
+| `patch` | `0.1.18-SNAPSHOT` |
+| `minor` | `0.2.0-SNAPSHOT` |
+| `major` | `1.0.0-SNAPSHOT` |
+
+For an agent-driven standard release, create branch `release-request/X.Y.Z` from current `main` and add `.github/release-request` containing exactly `X.Y.Z`. The workflow checks out authoritative `main`, verifies the marker against the branch name, runs the release and removes the request branch after success. A reviewed non-standard next version can be expressed as JSON:
+
+```json
+{
+  "release_version": "X.Y.Z",
+  "next_development_version": "A.B.C-SNAPSHOT"
+}
+```
+
+Exact version jumps therefore live in version control and review history when automation initiates them, rather than in a generated dispatch payload.
 
 ## Real release sequence
 
-1. Validate requested/current/documented versions and static repository configuration.
+1. Derive and validate current/documented versions and static repository configuration.
 2. Prepare release Maven and documentation metadata.
 3. Run the complete Maven reactor, including Testcontainers-backed PostgreSQL coverage.
 4. Deploy all release POMs and primary/source/Javadoc JARs into a local Maven-layout directory.
@@ -70,7 +89,7 @@ For an agent-driven release, create branch `release-request/X.Y.Z` from current 
 7. Merge it into branch `maven-repository`; an existing version is accepted only when bytes are identical.
 8. Resolve the published repository over anonymous HTTPS with retry for CDN propagation.
 9. Commit/tag the release on `main` and create the GitHub Release.
-10. Advance Maven/software metadata to the next snapshot while public examples remain on the released version.
+10. Advance Maven/software metadata to the exact or calculated next snapshot while public examples remain on the released version.
 
 A real release cannot skip tests. A dry run stops after local repository staging and anonymous resolution.
 
