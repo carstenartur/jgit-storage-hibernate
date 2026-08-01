@@ -1,0 +1,120 @@
+name: Fix memory-first staging v2
+
+on:
+  push:
+    branches:
+      - perf/memory-first-staging-v2
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/memory-first-staging-v2
+          fetch-depth: 0
+      - name: Correct merged implementation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          buffer_path = Path('jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackExtensionStagingBuffer.java')
+          text = buffer_path.read_text()
+          text = text.replace(
+              ' * Random-readable pack-extension staging that keeps tiny payloads in memory and spills once.\n'
+              ' *\n'
+              ' * <p>Retained in-memory staging is bounded by a deliberately narrow 16-KiB limit for each\n'
+              ' * extension and by one process-wide budget shared by every repository instance in this class\n'
+              ' * loader. A caller can additionally provide a narrower owner budget. The memory limit is lower than\n'
+              ' * the 256-KiB database inline threshold: measurements showed that retaining a larger prefix before a\n'
+              ' * multi-MiB spill regressed large-pack publication. When any bound is exceeded, the already written\n'
+              ' * prefix is copied once to a temporary file and all subsequent writes continue there. Positional\n'
+              ' * reads retain identical semantics before and after the spill.\n',
+              ' * Random-readable pack-extension staging that keeps small payloads in memory and spills once.\n'
+              ' *\n'
+              ' * <p>Retained in-memory staging is bounded by the 256-KiB inline payload threshold for each\n'
+              ' * extension and by one process-wide budget shared by every repository instance in this class\n'
+              ' * loader. A caller can additionally provide a narrower owner budget. The buffer starts with one\n'
+              ' * 16-KiB reservation to reduce global-budget coordination for ordinary small extensions. When any\n'
+              ' * bound is exceeded, the already written prefix is copied once to a temporary file and all subsequent\n'
+              ' * writes continue there. Positional reads retain identical semantics before and after the spill.\n')
+          text = text.replace(
+              '  static final int MAX_MEMORY_BYTES = 16 * 1024;\n',
+              '  static final int MAX_MEMORY_BYTES = HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;\n')
+          old_append = '''      if (count <= 0) {
+                  throw new IOException("Could not append to temporary pack file");
+                }
+                writePosition += count;
+          '''
+          new_append = '''      if (count <= 0) {
+                  throw new IOException("Could not append to temporary pack file");
+                }
+                storageByteCounters.recordTemporaryFileBytesWritten(count);
+                writePosition += count;
+          '''
+          if text.count(old_append) != 1:
+              raise SystemExit('append source shape changed')
+          text = text.replace(old_append, new_append)
+          text = text.replace(
+              '''        if (ownerMemoryBudget != null) {
+                ownerMemoryBudget.release(data.length);
+              }
+              }
+          ''',
+              '''        if (ownerMemoryBudget != null) {
+                  ownerMemoryBudget.release(data.length);
+                }
+              }
+          ''')
+          buffer_path.write_text(text)
+
+          store_path = Path('jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java')
+          text = store_path.read_text()
+          helper = '''  private static long committedPayloadBytes(List<CommittedExtension> extensions) {
+              long total = 0;
+              for (CommittedExtension extension : extensions) {
+                total = saturatingAdd(total, extension.fileSize());
+              }
+              return total;
+            }
+
+            private static long persistedPayloadBytes(List<PersistedExtension> extensions) {
+              long total = 0;
+              for (PersistedExtension extension : extensions) {
+                total = saturatingAdd(total, extension.staged().fileSize());
+              }
+              return total;
+            }
+
+          '''
+          if text.count(helper) != 2:
+              raise SystemExit(f'expected duplicate helper pair, found {text.count(helper)}')
+          first = text.index(helper)
+          second = text.index(helper, first + len(helper))
+          text = text[:second] + text[second + len(helper):]
+          store_path.write_text(text)
+
+          metric_test = Path('jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/MemoryFirstStorageByteMetricsH2Test.java')
+          text = metric_test.read_text()
+          text = text.replace(
+              ' * SPDX-License-Identifier: BSD-3-Clause\n',
+              ' * This program and the accompanying materials are made available under the\n'
+              ' * terms of the BSD 3-Clause License.\n'
+              ' *\n'
+              ' * SPDX-License-Identifier: BSD-3-Clause\n')
+          metric_test.write_text(text)
+      - name: Commit corrected source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/fix-memory-first-v2.yml
+          git add jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackExtensionStagingBuffer.java
+          git add jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java
+          git add jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/MemoryFirstStorageByteMetricsH2Test.java
+          git commit -m 'Correct memory-first staging bounds and metrics'
+          git push origin HEAD:perf/memory-first-staging-v2
