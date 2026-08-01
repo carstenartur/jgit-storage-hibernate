@@ -1,0 +1,67 @@
+name: Finalize memory-first staging v2
+
+on:
+  push:
+    branches:
+      - perf/memory-first-staging-v2
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/memory-first-staging-v2
+          fetch-depth: 0
+      - name: Finalize temporary-file accounting and formatting
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackExtensionStagingBuffer.java')
+          text = path.read_text()
+          text = text.replace(
+              ' * bound is exceeded, the already written prefix is copied once to a temporary file and all subsequent\n'
+              ' * writes continue there. Positional reads retain identical semantics before and after the spill.\n',
+              ' * bound is exceeded, the already written prefix is copied once to a temporary file and all\n'
+              ' * subsequent writes continue there. Positional reads retain identical semantics before and after the\n'
+              ' * spill.\n')
+          old = '    return readFile(fileChannel, fileSize, position, destination);\n'
+          new = '''    int count = readFile(fileChannel, fileSize, position, destination);
+              if (count > 0) {
+                storageByteCounters.recordTemporaryFileBytesRead(count);
+              }
+              return count;
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one open-stream file read, found {text.count(old)}')
+          text = text.replace(old, new)
+          old = '''      if (discarded.compareAndSet(false, true)) {
+                PROCESS_MEMORY_BUDGET.release(data.length);
+                if (ownerMemoryBudget != null) {
+                ownerMemoryBudget.release(data.length);
+              }
+              }
+          '''
+          new = '''      if (discarded.compareAndSet(false, true)) {
+                PROCESS_MEMORY_BUDGET.release(data.length);
+                if (ownerMemoryBudget != null) {
+                  ownerMemoryBudget.release(data.length);
+                }
+              }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('memory payload cleanup source shape changed')
+          path.write_text(text.replace(old, new))
+      - name: Commit final source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/fix-memory-first-v2b.yml
+          git add jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackExtensionStagingBuffer.java
+          git commit -m 'Complete memory-first temporary-file accounting'
+          git push origin HEAD:perf/memory-first-staging-v2
