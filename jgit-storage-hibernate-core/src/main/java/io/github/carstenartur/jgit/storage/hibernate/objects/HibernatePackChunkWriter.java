@@ -46,18 +46,21 @@ final class HibernatePackChunkWriter implements AutoCloseable {
   private final StatelessSession statelessSession;
   private final SharedSessionContractImplementor jdbcSession;
   private final String jdbcInsertSql;
+  private final PreparedStatement jdbcStatement;
 
   private HibernatePackChunkWriter(
       Mode mode,
       Session statefulSession,
       StatelessSession statelessSession,
       SharedSessionContractImplementor jdbcSession,
-      String jdbcInsertSql) {
+      String jdbcInsertSql,
+      PreparedStatement jdbcStatement) {
     this.mode = mode;
     this.statefulSession = statefulSession;
     this.statelessSession = statelessSession;
     this.jdbcSession = jdbcSession;
     this.jdbcInsertSql = jdbcInsertSql;
+    this.jdbcStatement = jdbcStatement;
   }
 
   /**
@@ -73,7 +76,7 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     Mode mode = configuredMode(parentSession);
     return switch (mode) {
       case STATEFUL ->
-          new HibernatePackChunkWriter(mode, parentSession, null, null, null);
+          new HibernatePackChunkWriter(mode, parentSession, null, null, null, null);
       case STATELESS -> {
         parentSession.clear();
         StatelessSession child =
@@ -82,14 +85,20 @@ final class HibernatePackChunkWriter implements AutoCloseable {
                 .connection()
                 .initialCacheMode(CacheMode.IGNORE)
                 .open();
-        yield new HibernatePackChunkWriter(mode, null, child, null, null);
+        yield new HibernatePackChunkWriter(mode, null, child, null, null, null);
       }
       case JDBC -> {
         parentSession.clear();
         SharedSessionContractImplementor session =
             parentSession.unwrap(SharedSessionContractImplementor.class);
+        String insertSql = directJdbcInsertSql(session);
+        PreparedStatement statement =
+            session
+                .getJdbcCoordinator()
+                .getMutationStatementPreparer()
+                .prepareStatement(insertSql, false);
         yield new HibernatePackChunkWriter(
-            mode, null, null, session, directJdbcInsertSql(session));
+            mode, null, null, session, insertSql, statement);
       }
     };
   }
@@ -102,7 +111,8 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     }
     switch (mode) {
       case JDBC -> insertJdbc(packId, firstChunkIndex, chunkData);
-      case STATELESS -> statelessSession.insertMultiple(toEntities(packId, firstChunkIndex, chunkData));
+      case STATELESS ->
+          statelessSession.insertMultiple(toEntities(packId, firstChunkIndex, chunkData));
       case STATEFUL -> {
         for (GitPackChunkEntity chunk : toEntities(packId, firstChunkIndex, chunkData)) {
           statefulSession.persist(chunk);
@@ -126,29 +136,36 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     if (statelessSession != null) {
       statelessSession.close();
     }
+    if (jdbcStatement != null) {
+      JdbcCoordinator jdbcCoordinator = jdbcSession.getJdbcCoordinator();
+      jdbcCoordinator
+          .getLogicalConnection()
+          .getResourceRegistry()
+          .release(jdbcStatement);
+      jdbcCoordinator.afterStatementExecution();
+    }
   }
 
   private void insertJdbc(long packId, int firstChunkIndex, List<byte[]> chunkData) {
     JdbcCoordinator jdbcCoordinator = jdbcSession.getJdbcCoordinator();
-    PreparedStatement statement =
-        jdbcCoordinator.getMutationStatementPreparer().prepareStatement(jdbcInsertSql, false);
     try {
       for (int offset = 0; offset < chunkData.size(); offset++) {
         byte[] data = Objects.requireNonNull(chunkData.get(offset), "chunkData[" + offset + "]");
-        statement.setLong(1, packId);
-        statement.setInt(2, Math.addExact(firstChunkIndex, offset));
-        statement.setBytes(3, data);
-        statement.setInt(4, data.length);
-        statement.addBatch();
+        jdbcStatement.setLong(1, packId);
+        jdbcStatement.setInt(2, Math.addExact(firstChunkIndex, offset));
+        jdbcStatement.setBytes(3, data);
+        jdbcStatement.setInt(4, data.length);
+        jdbcStatement.addBatch();
       }
 
       int[] rowCounts;
       try {
         jdbcSession.getEventListenerManager().jdbcExecuteBatchStart();
-        rowCounts = statement.executeBatch();
+        rowCounts = jdbcStatement.executeBatch();
       } finally {
         jdbcSession.getEventListenerManager().jdbcExecuteBatchEnd();
       }
+      jdbcStatement.clearBatch();
       verifyRowCounts(rowCounts, chunkData.size());
     } catch (SQLException exception) {
       jdbcCoordinator.afterFailedStatementExecution(exception);
@@ -157,10 +174,6 @@ final class HibernatePackChunkWriter implements AutoCloseable {
           .getSqlExceptionHelper()
           .convert(exception, "Could not insert pack chunks through direct JDBC", jdbcInsertSql);
     } finally {
-      jdbcCoordinator
-          .getLogicalConnection()
-          .getResourceRegistry()
-          .release(statement);
       jdbcCoordinator.afterStatementExecution();
     }
   }
