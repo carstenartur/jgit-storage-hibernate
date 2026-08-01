@@ -48,15 +48,18 @@ The normal Maven workflow runs a `Public Maven repository contract` job. It deri
 
 A release can be started from the Actions UI or through a guarded request branch.
 
-The normal Actions dialog does not accept version strings. The workflow reads the authoritative root POM version `X.Y.Z-SNAPSHOT`, derives release `X.Y.Z`, and asks only how the following development line should advance:
+The release version is never entered manually. The workflow reads the authoritative root POM version `X.Y.Z-SNAPSHOT` and derives release `X.Y.Z`.
 
 ```text
+next_development_version = A.B.C-SNAPSHOT  # optional exact override
 next_version_increment = patch | minor | major
 skip_tests = false                          # only permitted for a dry run
 dry_run = false
 ```
 
-For example, a repository at `0.1.17-SNAPSHOT` releases `0.1.17`; the choices produce:
+Normal automated releases provide only `next_version_increment`; they do not construct or transmit a next-version string. The optional exact override is normalized, validated and must be numerically newer than the release.
+
+For example, a repository at `0.1.17-SNAPSHOT` releases `0.1.17`; without an exact override the choices produce:
 
 | Choice | Next development version |
 |---|---:|
@@ -73,7 +76,7 @@ For an agent-driven standard release, create branch `release-request/X.Y.Z` from
 }
 ```
 
-Exact version jumps therefore live in version control and review history, rather than in an ad-hoc Actions text field.
+Exact version jumps therefore live in version control and review history when automation initiates them, rather than in a generated dispatch payload.
 
 ## Real release sequence
 
@@ -86,7 +89,7 @@ Exact version jumps therefore live in version control and review history, rather
 7. Merge it into branch `maven-repository`; an existing version is accepted only when bytes are identical.
 8. Resolve the published repository over anonymous HTTPS with retry for CDN propagation.
 9. Commit/tag the release on `main` and create the GitHub Release.
-10. Advance Maven/software metadata to the calculated or reviewed next snapshot while public examples remain on the released version.
+10. Advance Maven/software metadata to the exact or calculated next snapshot while public examples remain on the released version.
 
 A real release cannot skip tests. A dry run stops after local repository staging and anonymous resolution.
 
