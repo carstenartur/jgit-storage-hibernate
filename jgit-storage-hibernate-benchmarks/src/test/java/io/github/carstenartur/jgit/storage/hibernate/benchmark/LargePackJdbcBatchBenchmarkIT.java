@@ -27,7 +27,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Runs the focused stateful-versus-stateless large-pack comparison. */
+/** Runs the focused stateful, stateless ORM and direct JDBC large-pack comparison. */
 @Testcontainers(disabledWithoutDocker = true)
 class LargePackJdbcBatchBenchmarkIT {
 
@@ -36,7 +36,8 @@ class LargePackJdbcBatchBenchmarkIT {
           LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_DISABLED,
           LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
           LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_REWRITE,
-          LargePackJdbcBatchBenchmark.STATELESS);
+          LargePackJdbcBatchBenchmark.STATELESS,
+          LargePackJdbcBatchBenchmark.JDBC);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -46,7 +47,7 @@ class LargePackJdbcBatchBenchmarkIT {
           .withPassword("benchmark");
 
   @Test
-  void recordsStatefulAndStatelessChunkWriterModes() throws Exception {
+  void recordsAllPackChunkWriterModes() throws Exception {
     Path resultFile =
         Path.of(
                 System.getProperty(
@@ -63,7 +64,8 @@ class LargePackJdbcBatchBenchmarkIT {
                 LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_DISABLED,
                 LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
                 LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_REWRITE,
-                LargePackJdbcBatchBenchmark.STATELESS)
+                LargePackJdbcBatchBenchmark.STATELESS,
+                LargePackJdbcBatchBenchmark.JDBC)
             .addProfiler(GCProfiler.class)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
@@ -82,7 +84,7 @@ class LargePackJdbcBatchBenchmarkIT {
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
-    assertEquals(4, results.size(), "The focused benchmark must produce four results");
+    assertEquals(5, results.size(), "The focused benchmark must produce five results");
     assertEquals(
         EXPECTED_MODES,
         results.stream()
