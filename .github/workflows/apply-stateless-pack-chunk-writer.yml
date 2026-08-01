@@ -1,0 +1,961 @@
+name: Apply stateless pack chunk writer
+
+on:
+  push:
+    branches: [ perf/stateless-pack-chunk-writer ]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[stateless-writer-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: perf/stateless-pack-chunk-writer
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Apply implementation and tests
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def write(path: str, content: str) -> None:
+              target = Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content, encoding="utf-8")
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"Expected source fragment not found in {path}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          write(
+              "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/HibernatePackChunkWriter.java",
+              r'''/*
+           * Copyright (C) 2026, Carsten Hammer and contributors.
+           *
+           * This program and the accompanying materials are made available under the
+           * terms of the BSD 3-Clause License.
+           *
+           * SPDX-License-Identifier: BSD-3-Clause
+           */
+          package io.github.carstenartur.jgit.storage.hibernate.objects;
+
+          import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
+          import java.util.List;
+          import java.util.Locale;
+          import java.util.Objects;
+          import org.hibernate.CacheMode;
+          import org.hibernate.Session;
+          import org.hibernate.StatelessSession;
+
+          /**
+           * Internal insertion strategy for immutable pack payload chunks.
+           *
+           * <p>The default stateful path preserves the established persistence-context batching
+           * behavior. The experimental stateless path opens a child session that shares the parent
+           * session's JDBC connection and resource-local transaction. Only non-indexed raw chunk rows
+           * pass through this class; searchable projections continue to use ordinary stateful sessions.
+           */
+          final class HibernatePackChunkWriter implements AutoCloseable {
+
+            static final String MODE_PROPERTY = "jgit.storage.hibernate.pack.chunk_writer";
+            static final String STATEFUL_MODE = "stateful";
+            static final String STATELESS_MODE = "stateless";
+
+            private final Session statefulSession;
+            private final StatelessSession statelessSession;
+
+            private HibernatePackChunkWriter(
+                Session statefulSession, StatelessSession statelessSession) {
+              this.statefulSession = statefulSession;
+              this.statelessSession = statelessSession;
+            }
+
+            /**
+             * Open the configured writer for a parent session whose pending parent insert was flushed.
+             *
+             * <p>The stateless path clears the parent persistence context before opening the child so
+             * parent and child never manage the same entity instance. Calling {@code connection()} on
+             * the child builder keeps parent, chunks and any later publication mutation in the same JDBC
+             * transaction.
+             */
+            static HibernatePackChunkWriter open(Session parentSession) {
+              Objects.requireNonNull(parentSession, "parentSession");
+              if (configuredMode(parentSession) == Mode.STATELESS) {
+                parentSession.clear();
+                StatelessSession child =
+                    parentSession
+                        .statelessWithOptions()
+                        .connection()
+                        .initialCacheMode(CacheMode.IGNORE)
+                        .open();
+                return new HibernatePackChunkWriter(null, child);
+              }
+              return new HibernatePackChunkWriter(parentSession, null);
+            }
+
+            void insert(List<GitPackChunkEntity> chunks) {
+              Objects.requireNonNull(chunks, "chunks");
+              if (chunks.isEmpty()) {
+                return;
+              }
+              if (statelessSession != null) {
+                statelessSession.insertMultiple(List.copyOf(chunks));
+                return;
+              }
+              for (GitPackChunkEntity chunk : chunks) {
+                statefulSession.persist(chunk);
+              }
+              statefulSession.flush();
+              statefulSession.clear();
+            }
+
+            boolean stateless() {
+              return statelessSession != null;
+            }
+
+            @Override
+            public void close() {
+              if (statelessSession != null) {
+                statelessSession.close();
+              }
+            }
+
+            private static Mode configuredMode(Session session) {
+              Object configured = session.getSessionFactory().getProperties().get(MODE_PROPERTY);
+              if (configured == null || configured.toString().isBlank()) {
+                return Mode.STATEFUL;
+              }
+              return switch (configured.toString().trim().toLowerCase(Locale.ROOT)) {
+                case STATEFUL_MODE -> Mode.STATEFUL;
+                case STATELESS_MODE -> Mode.STATELESS;
+                default ->
+                    throw new IllegalArgumentException(
+                        "Unsupported "
+                            + MODE_PROPERTY
+                            + " value '"
+                            + configured
+                            + "'; expected '"
+                            + STATEFUL_MODE
+                            + "' or '"
+                            + STATELESS_MODE
+                            + "'");
+              };
+            }
+
+            private enum Mode {
+              STATEFUL,
+              STATELESS
+            }
+          }
+          '''.replace("          ", "", 1).replace("\n          ", "\n"))
+
+          staged_store = "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java"
+          replace_once(
+              staged_store,
+              r'''  private void persistChunks(
+              Session session, Long packId, StagedExtension stagedExtension) throws IOException {
+            long fileSize = stagedExtension.fileSize();
+            long position = 0;
+            int chunkIndex = 0;
+            int pendingChunks = 0;
+            try (StagedPayloadReader reader = stagedExtension.openReader()) {
+              while (position < fileSize) {
+                int chunkLength =
+                    (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
+                byte[] chunkData = new byte[chunkLength];
+                ByteBuffer destination = ByteBuffer.wrap(chunkData);
+                long chunkPosition = position;
+                while (destination.hasRemaining()) {
+                  int count = reader.read(chunkPosition, destination);
+                  if (count <= 0) {
+                    throw new IOException("Staged pack payload ended before declared size " + fileSize);
+                  }
+                  chunkPosition += count;
+                }
+
+                GitPackChunkEntity chunk = new GitPackChunkEntity();
+                chunk.setPackId(packId);
+                chunk.setChunkIndex(chunkIndex);
+                chunk.setChunkSize(chunkLength);
+                chunk.setData(chunkData);
+                session.persist(chunk);
+
+                position += chunkLength;
+                chunkIndex++;
+                pendingChunks++;
+                if (pendingChunks == CHUNK_BATCH_SIZE) {
+                  session.flush();
+                  session.clear();
+                  pendingChunks = 0;
+                }
+              }
+            }
+            if (pendingChunks > 0) {
+              session.flush();
+            }
+          }
+          ''',
+              r'''  private void persistChunks(
+              Session session, Long packId, StagedExtension stagedExtension) throws IOException {
+            long fileSize = stagedExtension.fileSize();
+            long position = 0;
+            int chunkIndex = 0;
+            List<GitPackChunkEntity> pendingChunks = new ArrayList<>(CHUNK_BATCH_SIZE);
+            try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);
+                StagedPayloadReader reader = stagedExtension.openReader()) {
+              while (position < fileSize) {
+                int chunkLength =
+                    (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
+                byte[] chunkData = new byte[chunkLength];
+                ByteBuffer destination = ByteBuffer.wrap(chunkData);
+                long chunkPosition = position;
+                while (destination.hasRemaining()) {
+                  int count = reader.read(chunkPosition, destination);
+                  if (count <= 0) {
+                    throw new IOException("Staged pack payload ended before declared size " + fileSize);
+                  }
+                  chunkPosition += count;
+                }
+
+                GitPackChunkEntity chunk = new GitPackChunkEntity();
+                chunk.setPackId(packId);
+                chunk.setChunkIndex(chunkIndex);
+                chunk.setChunkSize(chunkLength);
+                chunk.setData(chunkData);
+                pendingChunks.add(chunk);
+
+                position += chunkLength;
+                chunkIndex++;
+                if (pendingChunks.size() == CHUNK_BATCH_SIZE) {
+                  chunkWriter.insert(pendingChunks);
+                  pendingChunks.clear();
+                }
+              }
+              if (!pendingChunks.isEmpty()) {
+                chunkWriter.insert(pendingChunks);
+              }
+            }
+          }
+          ''')
+
+          write(
+              "jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/HibernatePackChunkWriterH2Test.java",
+              r'''/*
+           * Copyright (C) 2026, Carsten Hammer and contributors.
+           *
+           * This program and the accompanying materials are made available under the
+           * terms of the BSD 3-Clause License.
+           *
+           * SPDX-License-Identifier: BSD-3-Clause
+           */
+          package io.github.carstenartur.jgit.storage.hibernate.objects;
+
+          import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+          import static org.junit.jupiter.api.Assertions.assertEquals;
+          import static org.junit.jupiter.api.Assertions.assertFalse;
+          import static org.junit.jupiter.api.Assertions.assertThrows;
+          import static org.junit.jupiter.api.Assertions.assertTrue;
+
+          import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+          import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
+          import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
+          import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
+          import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+          import java.time.Instant;
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.Properties;
+          import java.util.Random;
+          import java.util.UUID;
+          import org.eclipse.jgit.lib.Constants;
+          import org.eclipse.jgit.lib.ObjectId;
+          import org.eclipse.jgit.lib.ObjectInserter;
+          import org.hibernate.Session;
+          import org.hibernate.Transaction;
+          import org.junit.jupiter.api.Test;
+
+          class HibernatePackChunkWriterH2Test {
+
+            @Test
+            void statelessWriterSharesTheOuterResourceLocalTransaction() {
+              try (HibernateSessionFactoryProvider provider = provider(HibernatePackChunkWriter.STATELESS_MODE);
+                  Session session = provider.getSessionFactory().openSession()) {
+                Transaction transaction = session.beginTransaction();
+                Long packId = persistParent(session);
+
+                List<GitPackChunkEntity> chunks = chunks(packId, 3);
+                try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
+                  assertTrue(writer.stateless());
+                  writer.insert(chunks);
+                }
+
+                assertEquals(3L, chunkCount(session, packId));
+                transaction.rollback();
+              }
+
+              try (HibernateSessionFactoryProvider provider = providerForExistingDatabase()) {
+                assertEquals(0L, totalPackCount(provider));
+                assertEquals(0L, totalChunkCount(provider));
+              }
+            }
+
+            @Test
+            void defaultWriterRemainsStateful() {
+              try (HibernateSessionFactoryProvider provider = provider(null);
+                  Session session = provider.getSessionFactory().openSession()) {
+                session.beginTransaction();
+                try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
+                  assertFalse(writer.stateless());
+                }
+                session.getTransaction().rollback();
+              }
+            }
+
+            @Test
+            void rejectsUnknownWriterMode() {
+              try (HibernateSessionFactoryProvider provider = provider("mystery");
+                  Session session = provider.getSessionFactory().openSession()) {
+                session.beginTransaction();
+                assertThrows(
+                    IllegalArgumentException.class, () -> HibernatePackChunkWriter.open(session));
+                session.getTransaction().rollback();
+              }
+            }
+
+            @Test
+            void statelessWriterPublishesAndReopensLargePackPayload() throws Exception {
+              String databaseName = "stateless-reopen-" + UUID.randomUUID();
+              Properties properties = h2Properties(databaseName);
+              properties.put(
+                  HibernatePackChunkWriter.MODE_PROPERTY, HibernatePackChunkWriter.STATELESS_MODE);
+              byte[] payload = new byte[2 * 1024 * 1024 + 257];
+              new Random(0x53544154454c4553L).nextBytes(payload);
+              ObjectId objectId;
+
+              try (HibernateSessionFactoryProvider provider =
+                  new HibernateSessionFactoryProvider(properties)) {
+                try (HibernateRepository repository =
+                    HibernateRepository.create(provider.getSessionFactory(), "stateless-reopen")) {
+                  repository.create(true);
+                  try (ObjectInserter inserter = repository.newObjectInserter()) {
+                    objectId = inserter.insert(Constants.OBJ_BLOB, payload);
+                    inserter.flush();
+                  }
+                }
+
+                assertTrue(totalChunkCount(provider) > 0L);
+                try (HibernateRepository reopened =
+                    HibernateRepository.create(provider.getSessionFactory(), "stateless-reopen")) {
+                  assertArrayEquals(payload, reopened.open(objectId).getBytes());
+                }
+              }
+            }
+
+            private static final String ROLLBACK_DATABASE =
+                "stateless-rollback-" + UUID.randomUUID();
+
+            private static HibernateSessionFactoryProvider provider(String mode) {
+              Properties properties = h2Properties(ROLLBACK_DATABASE);
+              if (mode != null) {
+                properties.put(HibernatePackChunkWriter.MODE_PROPERTY, mode);
+              }
+              return new HibernateSessionFactoryProvider(properties);
+            }
+
+            private static HibernateSessionFactoryProvider providerForExistingDatabase() {
+              return new HibernateSessionFactoryProvider(h2Properties(ROLLBACK_DATABASE));
+            }
+
+            private static Properties h2Properties(String databaseName) {
+              Properties properties = new Properties();
+              properties.put(
+                  "hibernate.connection.url",
+                  "jdbc:h2:mem:" + databaseName + ";DB_CLOSE_DELAY=-1");
+              properties.put("hibernate.connection.driver_class", "org.h2.Driver");
+              properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+              properties.put("hibernate.hbm2ddl.auto", "update");
+              properties.put("hibernate.show_sql", "false");
+              return properties;
+            }
+
+            private static Long persistParent(Session session) {
+              Instant now = Instant.now();
+              GitRepositoryLifecycleEntity lifecycle = new GitRepositoryLifecycleEntity();
+              lifecycle.setRepositoryName("rollback");
+              lifecycle.setCreatedAt(now);
+              session.persist(lifecycle);
+
+              GitPackEntity pack = new GitPackEntity();
+              pack.setRepositoryName("rollback");
+              pack.setPackName("pack-rollback");
+              pack.setPackExtension("pack");
+              pack.setData(null);
+              pack.setFileSize(3L * 1024L * 1024L);
+              pack.setCommitted(false);
+              pack.setCreatedAt(now);
+              session.persist(pack);
+              session.flush();
+              return pack.getId();
+            }
+
+            private static List<GitPackChunkEntity> chunks(Long packId, int count) {
+              List<GitPackChunkEntity> chunks = new ArrayList<>(count);
+              for (int index = 0; index < count; index++) {
+                GitPackChunkEntity chunk = new GitPackChunkEntity();
+                chunk.setPackId(packId);
+                chunk.setChunkIndex(index);
+                chunk.setChunkSize(4);
+                chunk.setData(new byte[] {(byte) index, 1, 2, 3});
+                chunks.add(chunk);
+              }
+              return chunks;
+            }
+
+            private static long chunkCount(Session session, Long packId) {
+              return session
+                  .createQuery(
+                      "SELECT COUNT(c) FROM GitPackChunkEntity c WHERE c.packId = :packId",
+                      Long.class)
+                  .setParameter("packId", packId)
+                  .getSingleResult();
+            }
+
+            private static long totalPackCount(HibernateSessionFactoryProvider provider) {
+              try (Session session = provider.getSessionFactory().openSession()) {
+                return session
+                    .createQuery("SELECT COUNT(p) FROM GitPackEntity p", Long.class)
+                    .getSingleResult();
+              }
+            }
+
+            private static long totalChunkCount(HibernateSessionFactoryProvider provider) {
+              try (Session session = provider.getSessionFactory().openSession()) {
+                return session
+                    .createQuery("SELECT COUNT(c) FROM GitPackChunkEntity c", Long.class)
+                    .getSingleResult();
+              }
+            }
+          }
+          '''.replace("          ", "", 1).replace("\n          ", "\n"))
+
+          write(
+              "jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/StatelessChunkWriterHibernateSearchH2Test.java",
+              r'''/*
+           * Copyright (C) 2026, Carsten Hammer and contributors.
+           *
+           * This program and the accompanying materials are made available under the
+           * terms of the BSD 3-Clause License.
+           *
+           * SPDX-License-Identifier: BSD-3-Clause
+           */
+          package io.github.carstenartur.jgit.storage.hibernate.search;
+
+          import static org.junit.jupiter.api.Assertions.assertEquals;
+          import static org.junit.jupiter.api.Assertions.assertTrue;
+
+          import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+          import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+          import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+          import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitIndexer;
+          import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
+          import java.util.List;
+          import java.util.Properties;
+          import java.util.Random;
+          import java.util.UUID;
+          import org.eclipse.jgit.lib.CommitBuilder;
+          import org.eclipse.jgit.lib.Constants;
+          import org.eclipse.jgit.lib.FileMode;
+          import org.eclipse.jgit.lib.ObjectId;
+          import org.eclipse.jgit.lib.ObjectInserter;
+          import org.eclipse.jgit.lib.PersonIdent;
+          import org.eclipse.jgit.lib.TreeFormatter;
+          import org.hibernate.Session;
+          import org.junit.jupiter.api.Test;
+
+          class StatelessChunkWriterHibernateSearchH2Test {
+
+            private static final String CHUNK_WRITER_PROPERTY =
+                "jgit.storage.hibernate.pack.chunk_writer";
+
+            @Test
+            void statelessRawChunkPersistenceAndStatefulSearchIndexingCoexist() throws Exception {
+              String repositoryName = "search-stateless-" + UUID.randomUUID();
+              Properties properties = h2Properties(repositoryName);
+              properties.put(CHUNK_WRITER_PROPERTY, "stateless");
+
+              try (HibernateSessionFactoryProvider provider =
+                      new HibernateSessionFactoryProvider(
+                          properties, SearchEntities.annotatedClasses());
+                  HibernateRepository repository =
+                      HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+                repository.create(true);
+                ObjectId commitId = createLargeCommit(repository);
+
+                assertTrue(chunkCount(provider) > 0L, "The large pack must use raw chunk rows");
+                GitCommitIndex projection =
+                    new CommitIndexer(provider.getSessionFactory(), repositoryName)
+                        .indexCommit(repository, commitId);
+                assertEquals(commitId.name(), projection.getObjectId());
+
+                GitHistorySearchService search =
+                    new GitHistorySearchService(provider.getSessionFactory());
+                assertEquals(
+                    List.of(commitId.name()),
+                    objectIds(search.searchCommitText(repositoryName, "stateless searchable", 10)));
+                assertEquals(
+                    List.of(commitId.name()),
+                    objectIds(search.searchCommitText(repositoryName, "large-payload.bin", 10)));
+              }
+            }
+
+            private static ObjectId createLargeCommit(HibernateRepository repository)
+                throws Exception {
+              byte[] payload = new byte[2 * 1024 * 1024 + 257];
+              new Random(0x5345415243484cL).nextBytes(payload);
+              try (ObjectInserter inserter = repository.newObjectInserter()) {
+                ObjectId blobId = inserter.insert(Constants.OBJ_BLOB, payload);
+                TreeFormatter tree = new TreeFormatter();
+                tree.append("large-payload.bin", FileMode.REGULAR_FILE, blobId);
+                ObjectId treeId = inserter.insert(tree);
+
+                CommitBuilder commit = new CommitBuilder();
+                commit.setTreeId(treeId);
+                commit.setAuthor(new PersonIdent("Search Writer", "search@example.com"));
+                commit.setCommitter(new PersonIdent("Search Writer", "search@example.com"));
+                commit.setMessage("Stateless searchable pack publication");
+                ObjectId commitId = inserter.insert(commit);
+                inserter.flush();
+                return commitId;
+              }
+            }
+
+            private static List<String> objectIds(List<GitCommitIndex> hits) {
+              return hits.stream().map(GitCommitIndex::getObjectId).toList();
+            }
+
+            private static long chunkCount(HibernateSessionFactoryProvider provider) {
+              try (Session session = provider.getSessionFactory().openSession()) {
+                return session
+                    .createQuery("SELECT COUNT(c) FROM GitPackChunkEntity c", Long.class)
+                    .getSingleResult();
+              }
+            }
+
+            private static Properties h2Properties(String name) {
+              Properties properties = new Properties();
+              properties.put(
+                  "hibernate.connection.url", "jdbc:h2:mem:" + name + ";DB_CLOSE_DELAY=-1");
+              properties.put("hibernate.connection.driver_class", "org.h2.Driver");
+              properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+              properties.put("hibernate.hbm2ddl.auto", "create-drop");
+              properties.put("hibernate.show_sql", "false");
+              properties.put("hibernate.search.backend.type", "lucene");
+              properties.put("hibernate.search.backend.directory.type", "local-heap");
+              return properties;
+            }
+          }
+          '''.replace("          ", "", 1).replace("\n          ", "\n"))
+
+          write(
+              "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/LargePackJdbcBatchBenchmark.java",
+              r'''/*
+           * Copyright (C) 2026, Carsten Hammer and contributors.
+           *
+           * This program and the accompanying materials are made available under the
+           * terms of the BSD 3-Clause License.
+           *
+           * SPDX-License-Identifier: BSD-3-Clause
+           */
+          package io.github.carstenartur.jgit.storage.hibernate.benchmark;
+
+          import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+          import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
+          import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
+          import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
+          import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+          import java.util.Properties;
+          import java.util.Random;
+          import java.util.concurrent.TimeUnit;
+          import java.util.concurrent.atomic.AtomicInteger;
+          import org.eclipse.jgit.lib.Constants;
+          import org.eclipse.jgit.lib.ObjectId;
+          import org.eclipse.jgit.lib.ObjectInserter;
+          import org.hibernate.stat.Statistics;
+          import org.openjdk.jmh.annotations.AuxCounters;
+          import org.openjdk.jmh.annotations.Benchmark;
+          import org.openjdk.jmh.annotations.BenchmarkMode;
+          import org.openjdk.jmh.annotations.Fork;
+          import org.openjdk.jmh.annotations.Level;
+          import org.openjdk.jmh.annotations.Measurement;
+          import org.openjdk.jmh.annotations.Mode;
+          import org.openjdk.jmh.annotations.OutputTimeUnit;
+          import org.openjdk.jmh.annotations.Param;
+          import org.openjdk.jmh.annotations.Scope;
+          import org.openjdk.jmh.annotations.Setup;
+          import org.openjdk.jmh.annotations.State;
+          import org.openjdk.jmh.annotations.TearDown;
+          import org.openjdk.jmh.annotations.Threads;
+          import org.openjdk.jmh.annotations.Warmup;
+
+          /** Compares stateful batching and a shared-transaction stateless chunk writer. */
+          @BenchmarkMode(Mode.SingleShotTime)
+          @OutputTimeUnit(TimeUnit.MILLISECONDS)
+          @Warmup(iterations = 1)
+          @Measurement(iterations = 5)
+          @Fork(1)
+          @Threads(1)
+          @State(Scope.Thread)
+          public class LargePackJdbcBatchBenchmark {
+
+            static final String STATEFUL_BATCHING_DISABLED = "stateful-batching-disabled";
+            static final String STATEFUL_BATCHING = "stateful-batching";
+            static final String STATEFUL_BATCHING_REWRITE = "stateful-batching-rewrite";
+            static final String STATELESS = "stateless";
+            private static final String CHUNK_WRITER_PROPERTY =
+                "jgit.storage.hibernate.pack.chunk_writer";
+            private static final int PAYLOAD_SIZE = 12 * 1024 * 1024 + 257;
+
+            private final AtomicInteger invocationCounter = new AtomicInteger();
+
+            @Param({
+              STATEFUL_BATCHING_DISABLED,
+              STATEFUL_BATCHING,
+              STATEFUL_BATCHING_REWRITE,
+              STATELESS
+            })
+            public String writeMode;
+
+            private HibernateSessionFactoryProvider provider;
+            private HibernateRepository repository;
+            private Statistics statistics;
+            private byte[] payload;
+
+            @Setup(Level.Trial)
+            public void setupTrial() {
+              Properties properties = new Properties();
+              String jdbcUrl =
+                  requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY);
+              if (STATEFUL_BATCHING_REWRITE.equals(writeMode)) {
+                jdbcUrl = appendJdbcParameter(jdbcUrl, "reWriteBatchedInserts", "true");
+              }
+              properties.put("hibernate.connection.url", jdbcUrl);
+              properties.put(
+                  "hibernate.connection.username",
+                  requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY));
+              properties.put(
+                  "hibernate.connection.password",
+                  requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+              properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
+              properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+              properties.put("hibernate.hbm2ddl.auto", "create-drop");
+              properties.put("hibernate.show_sql", "false");
+              properties.put("hibernate.format_sql", "false");
+              properties.put("hibernate.connection.pool_size", "4");
+              properties.put("hibernate.generate_statistics", "true");
+              properties.put(
+                  "hibernate.session.events.auto",
+                  JdbcBatchMetricsSessionEventListener.class.getName());
+              if (STATEFUL_BATCHING_DISABLED.equals(writeMode)) {
+                properties.put(HibernateStorageSettings.JDBC_BATCH_SIZE, "0");
+              }
+              if (STATELESS.equals(writeMode)) {
+                properties.put(CHUNK_WRITER_PROPERTY, STATELESS);
+              }
+
+              provider = new HibernateSessionFactoryProvider(properties);
+              statistics = provider.getSessionFactory().getStatistics();
+              payload = new byte[PAYLOAD_SIZE];
+              new Random(0x4a444243).nextBytes(payload);
+            }
+
+            @Setup(Level.Invocation)
+            public void setupInvocation() throws Exception {
+              String repositoryName =
+                  "jmh-large-pack-"
+                      + writeMode
+                      + "-"
+                      + invocationCounter.incrementAndGet()
+                      + "-"
+                      + Long.toHexString(System.nanoTime());
+              repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+              repository.create(true);
+              statistics.clear();
+              JdbcBatchMetricsSessionEventListener.resetCurrentThread();
+            }
+
+            @TearDown(Level.Invocation)
+            public void tearDownInvocation() {
+              if (repository != null) {
+                repository.close();
+                repository = null;
+              }
+            }
+
+            @TearDown(Level.Trial)
+            public void tearDownTrial() {
+              if (provider != null) {
+                provider.close();
+                provider = null;
+                statistics = null;
+              }
+            }
+
+            @Benchmark
+            public ObjectId publishTwelveMiBPack(LargePackCounters counters) throws Exception {
+              ObjectId objectId;
+              try (ObjectInserter inserter = repository.newObjectInserter()) {
+                objectId = inserter.insert(Constants.OBJ_BLOB, payload);
+                inserter.flush();
+              }
+
+              JdbcBatchMetricsSessionEventListener.Snapshot jdbcEvents =
+                  JdbcBatchMetricsSessionEventListener.snapshotCurrentThread();
+              counters.jdbcBatchExecutions = jdbcEvents.batchExecutions();
+              counters.jdbcStatementExecutions = jdbcEvents.statementExecutions();
+              counters.preparedStatements = statistics.getPrepareStatementCount();
+              counters.connections = statistics.getConnectCount();
+              counters.flushes = statistics.getFlushCount();
+              counters.packEntityInserts =
+                  statistics.getEntityStatistics(GitPackEntity.class.getName()).getInsertCount();
+              counters.chunkEntityInserts =
+                  statistics.getEntityStatistics(GitPackChunkEntity.class.getName()).getInsertCount();
+              return objectId;
+            }
+
+            private static String appendJdbcParameter(String jdbcUrl, String name, String value) {
+              return jdbcUrl + (jdbcUrl.contains("?") ? "&" : "?") + name + "=" + value;
+            }
+
+            private static String requiredSystemProperty(String name) {
+              String value = System.getProperty(name);
+              if (value == null || value.isBlank()) {
+                throw new IllegalStateException(
+                    "Missing PostgreSQL benchmark system property "
+                        + name
+                        + "; run through the Maven jdbc-batch-comparison profile");
+              }
+              return value;
+            }
+
+            /** Low-level JDBC and ORM write counts for the measured large-pack publication. */
+            @AuxCounters(AuxCounters.Type.EVENTS)
+            @State(Scope.Thread)
+            public static class LargePackCounters {
+              public long jdbcBatchExecutions;
+              public long jdbcStatementExecutions;
+              public long preparedStatements;
+              public long connections;
+              public long flushes;
+              public long packEntityInserts;
+              public long chunkEntityInserts;
+
+              @Setup(Level.Invocation)
+              public void reset() {
+                jdbcBatchExecutions = 0;
+                jdbcStatementExecutions = 0;
+                preparedStatements = 0;
+                connections = 0;
+                flushes = 0;
+                packEntityInserts = 0;
+                chunkEntityInserts = 0;
+              }
+            }
+          }
+          '''.replace("          ", "", 1).replace("\n          ", "\n"))
+
+          write(
+              "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/LargePackJdbcBatchBenchmarkIT.java",
+              r'''/*
+           * Copyright (C) 2026, Carsten Hammer and contributors.
+           *
+           * This program and the accompanying materials are made available under the
+           * terms of the BSD 3-Clause License.
+           *
+           * SPDX-License-Identifier: BSD-3-Clause
+           */
+          package io.github.carstenartur.jgit.storage.hibernate.benchmark;
+
+          import static org.junit.jupiter.api.Assertions.assertEquals;
+          import static org.junit.jupiter.api.Assertions.assertTrue;
+
+          import java.nio.file.Files;
+          import java.nio.file.Path;
+          import java.util.Collection;
+          import java.util.Set;
+          import java.util.stream.Collectors;
+          import org.junit.jupiter.api.Test;
+          import org.openjdk.jmh.profile.GCProfiler;
+          import org.openjdk.jmh.results.RunResult;
+          import org.openjdk.jmh.results.format.ResultFormatType;
+          import org.openjdk.jmh.runner.Runner;
+          import org.openjdk.jmh.runner.options.Options;
+          import org.openjdk.jmh.runner.options.OptionsBuilder;
+          import org.testcontainers.containers.PostgreSQLContainer;
+          import org.testcontainers.junit.jupiter.Container;
+          import org.testcontainers.junit.jupiter.Testcontainers;
+
+          /** Runs the focused stateful-versus-stateless large-pack comparison. */
+          @Testcontainers(disabledWithoutDocker = true)
+          class LargePackJdbcBatchBenchmarkIT {
+
+            private static final Set<String> EXPECTED_MODES =
+                Set.of(
+                    LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_DISABLED,
+                    LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
+                    LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_REWRITE,
+                    LargePackJdbcBatchBenchmark.STATELESS);
+
+            @Container
+            static final PostgreSQLContainer<?> POSTGRESQL =
+                new PostgreSQLContainer<>("postgres:17.10-alpine")
+                    .withDatabaseName("jgit_storage_batch_benchmark")
+                    .withUsername("benchmark")
+                    .withPassword("benchmark");
+
+            @Test
+            void recordsStatefulAndStatelessChunkWriterModes() throws Exception {
+              Path resultFile =
+                  Path.of(
+                          System.getProperty(
+                              "benchmark.resultFile",
+                              "target/benchmarks/jdbc-batch-jmh-result.json"))
+                      .toAbsolutePath();
+              Files.createDirectories(resultFile.getParent());
+              Path outputFile = resultFile.resolveSibling("jdbc-batch-jmh-output.txt");
+
+              Options options =
+                  new OptionsBuilder()
+                      .include(LargePackJdbcBatchBenchmark.class.getName())
+                      .param(
+                          "writeMode",
+                          LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_DISABLED,
+                          LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
+                          LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_REWRITE,
+                          LargePackJdbcBatchBenchmark.STATELESS)
+                      .addProfiler(GCProfiler.class)
+                      .shouldFailOnError(true)
+                      .resultFormat(ResultFormatType.JSON)
+                      .result(resultFile.toString())
+                      .output(outputFile.toString())
+                      .jvmArgsAppend(
+                          RepositoryBackendBenchmarkIT.systemProperty(
+                              HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
+                              POSTGRESQL.getJdbcUrl()),
+                          RepositoryBackendBenchmarkIT.systemProperty(
+                              HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
+                              POSTGRESQL.getUsername()),
+                          RepositoryBackendBenchmarkIT.systemProperty(
+                              HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+                              POSTGRESQL.getPassword()))
+                      .build();
+
+              Collection<RunResult> results = new Runner(options).run();
+              assertEquals(4, results.size(), "The focused benchmark must produce four results");
+              assertEquals(
+                  EXPECTED_MODES,
+                  results.stream()
+                      .map(result -> result.getParams().getParam("writeMode"))
+                      .collect(Collectors.toSet()));
+              assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
+              assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
+            }
+          }
+          '''.replace("          ", "", 1).replace("\n          ", "\n"))
+
+          docs_path = "docs/operations/jdbc-batching.md"
+          replace_once(
+              docs_path,
+              "# JDBC batching and pack-chunk keys\n",
+              "# JDBC batching and pack-chunk writers\n")
+          replace_once(
+              docs_path,
+              "## Chunk key strategy\n",
+              r'''## Experimental stateless chunk writer
+
+          Large immutable pack payloads may be benchmarked with a stateless ORM insert path:
+
+          ```properties
+          jgit.storage.hibernate.pack.chunk_writer=stateless
+          ```
+
+          The default remains `stateful` until allocation, GC and elapsed-time measurements show a
+          material advantage across the supported database matrix. The stateless writer is deliberately
+          limited to `GitPackChunkEntity`, which is raw non-indexed payload data. Pack parents, publication
+          metadata, reflogs and all Hibernate Search projections continue to use ordinary stateful
+          sessions.
+
+          The child `StatelessSession` is opened from the active parent session with `connection()`, so it
+          shares the same JDBC connection and resource-local transaction. Parent and chunk inserts therefore
+          roll back together. `CacheMode.IGNORE` prevents one-MiB payload arrays from entering the second-level
+          cache, and explicit `insertMultiple()` batches preserve synchronous failure reporting without
+          relying on stateless write-behind.
+
+          The focused PostgreSQL benchmark compares stateful insertion with batching disabled, portable
+          stateful batching, PostgreSQL batch rewriting and the stateless shared-transaction writer. Its GC
+          profiler records allocation and collection metrics in addition to elapsed time and JDBC counters.
+
+          ## Chunk key strategy
+          '''.replace("          ", "", 1).replace("\n          ", "\n"))
+
+          workflow_path = ".github/workflows/performance.yml"
+          replace_once(
+              workflow_path,
+              "    name: PostgreSQL JDBC batching comparison\n",
+              "    name: PostgreSQL pack-chunk writer comparison\n")
+          replace_once(
+              workflow_path,
+              "      - name: Compare large-pack publication with batching off and on\n",
+              "      - name: Compare stateful batching and stateless chunk publication\n")
+          replace_once(
+              workflow_path,
+              "          echo '### PostgreSQL JDBC batching' >> \"$GITHUB_STEP_SUMMARY\"\n",
+              "          echo '### PostgreSQL pack-chunk writers' >> \"$GITHUB_STEP_SUMMARY\"\n")
+          replace_once(
+              workflow_path,
+              "          echo 'A focused twelve-MiB non-compressible pack is measured with Hibernate JDBC batching disabled and enabled.' >> \"$GITHUB_STEP_SUMMARY\"\n"
+              "          echo 'The artifact includes elapsed time, prepared statements, entity inserts, flushes and real JDBC batch-execution events.' >> \"$GITHUB_STEP_SUMMARY\"\n",
+              "          echo 'A focused twelve-MiB non-compressible pack compares stateful insertion with batching disabled, portable batching, PostgreSQL rewriting and a stateless shared-transaction writer.' >> \"$GITHUB_STEP_SUMMARY\"\n"
+              "          echo 'The artifact includes elapsed time, allocation and GC metrics, prepared statements, entity inserts, flushes and real JDBC batch-execution events.' >> \"$GITHUB_STEP_SUMMARY\"\n")
+          PY
+
+      - name: Verify source tree
+        shell: bash
+        run: |
+          git diff --check
+          mvn -B verify
+
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/apply-stateless-pack-chunk-writer.yml
+          git add \
+            .github/workflows/performance.yml \
+            docs/operations/jdbc-batching.md \
+            jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/HibernatePackChunkWriter.java \
+            jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/HibernatePackChunkWriterH2Test.java \
+            jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/StatelessChunkWriterHibernateSearchH2Test.java \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/LargePackJdbcBatchBenchmark.java \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/LargePackJdbcBatchBenchmarkIT.java
+          git commit -m 'Add stateless ORM pack chunk writer [stateless-writer-applied]'
+          git push origin HEAD:perf/stateless-pack-chunk-writer
