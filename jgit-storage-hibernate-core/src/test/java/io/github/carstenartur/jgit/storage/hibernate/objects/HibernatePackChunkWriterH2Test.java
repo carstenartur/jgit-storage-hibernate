@@ -34,40 +34,34 @@ import org.junit.jupiter.api.Test;
 
 class HibernatePackChunkWriterH2Test {
 
-  private static final String ROLLBACK_DATABASE =
+  private static final String STATELESS_ROLLBACK_DATABASE =
       "stateless-rollback-" + UUID.randomUUID();
+  private static final String JDBC_ROLLBACK_DATABASE = "jdbc-rollback-" + UUID.randomUUID();
 
   @Test
   void statelessWriterSharesTheOuterResourceLocalTransaction() {
-    try (HibernateSessionFactoryProvider provider =
-            provider(HibernatePackChunkWriter.STATELESS_MODE);
-        Session session = provider.getSessionFactory().openSession()) {
-      Transaction transaction = session.beginTransaction();
-      Long packId = persistParent(session);
+    verifySharedRollback(
+        STATELESS_ROLLBACK_DATABASE,
+        HibernatePackChunkWriter.STATELESS_MODE,
+        HibernatePackChunkWriter::stateless);
+  }
 
-      List<GitPackChunkEntity> chunks = chunks(packId, 3);
-      try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
-        assertTrue(writer.stateless());
-        writer.insert(chunks);
-      }
-
-      assertEquals(3L, chunkCount(session, packId));
-      transaction.rollback();
-    }
-
-    try (HibernateSessionFactoryProvider provider = providerForExistingDatabase()) {
-      assertEquals(0L, totalPackCount(provider));
-      assertEquals(0L, totalChunkCount(provider));
-    }
+  @Test
+  void directJdbcWriterSharesTheOuterResourceLocalTransaction() {
+    verifySharedRollback(
+        JDBC_ROLLBACK_DATABASE,
+        HibernatePackChunkWriter.JDBC_MODE,
+        HibernatePackChunkWriter::jdbc);
   }
 
   @Test
   void defaultWriterRemainsStateful() {
-    try (HibernateSessionFactoryProvider provider = provider(null);
+    try (HibernateSessionFactoryProvider provider = provider("default-writer", null);
         Session session = provider.getSessionFactory().openSession()) {
       session.beginTransaction();
       try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
         assertFalse(writer.stateless());
+        assertFalse(writer.jdbc());
       }
       session.getTransaction().rollback();
     }
@@ -75,7 +69,7 @@ class HibernatePackChunkWriterH2Test {
 
   @Test
   void rejectsUnknownWriterMode() {
-    try (HibernateSessionFactoryProvider provider = provider("mystery");
+    try (HibernateSessionFactoryProvider provider = provider("unknown-writer", "mystery");
         Session session = provider.getSessionFactory().openSession()) {
       session.beginTransaction();
       assertThrows(
@@ -86,18 +80,56 @@ class HibernatePackChunkWriterH2Test {
 
   @Test
   void statelessWriterPublishesAndReopensLargePackPayload() throws Exception {
-    String databaseName = "stateless-reopen-" + UUID.randomUUID();
+    verifyLargePackReopen(HibernatePackChunkWriter.STATELESS_MODE, false);
+  }
+
+  @Test
+  void directJdbcWriterPublishesAndReopensLargePackPayloadWithQualifiedSchema()
+      throws Exception {
+    verifyLargePackReopen(HibernatePackChunkWriter.JDBC_MODE, true);
+  }
+
+  private static void verifySharedRollback(
+      String databaseName,
+      String mode,
+      java.util.function.Predicate<HibernatePackChunkWriter> modePredicate) {
+    try (HibernateSessionFactoryProvider provider = provider(databaseName, mode);
+        Session session = provider.getSessionFactory().openSession()) {
+      Transaction transaction = session.beginTransaction();
+      Long packId = persistParent(session);
+
+      List<GitPackChunkEntity> chunks = chunks(packId, 3);
+      try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
+        assertTrue(modePredicate.test(writer));
+        writer.insert(chunks);
+      }
+
+      assertEquals(3L, chunkCount(session, packId));
+      transaction.rollback();
+    }
+
+    try (HibernateSessionFactoryProvider provider = providerForExistingDatabase(databaseName)) {
+      assertEquals(0L, totalPackCount(provider));
+      assertEquals(0L, totalChunkCount(provider));
+    }
+  }
+
+  private static void verifyLargePackReopen(String mode, boolean qualifiedSchema) throws Exception {
+    String databaseName = mode + "-reopen-" + UUID.randomUUID();
     Properties properties = h2Properties(databaseName);
-    properties.put(
-        HibernatePackChunkWriter.MODE_PROPERTY, HibernatePackChunkWriter.STATELESS_MODE);
+    properties.put(HibernatePackChunkWriter.MODE_PROPERTY, mode);
+    if (qualifiedSchema) {
+      properties.put("hibernate.default_schema", "PUBLIC");
+    }
     byte[] payload = new byte[2 * 1024 * 1024 + 257];
-    new Random(0x53544154454c4553L).nextBytes(payload);
+    new Random(0x53544154454c4553L ^ mode.hashCode()).nextBytes(payload);
     ObjectId objectId;
+    String repositoryName = mode + "-reopen";
 
     try (HibernateSessionFactoryProvider provider =
         new HibernateSessionFactoryProvider(properties)) {
       try (HibernateRepository repository =
-          HibernateRepository.create(provider.getSessionFactory(), "stateless-reopen")) {
+          HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
         repository.create(true);
         try (ObjectInserter inserter = repository.newObjectInserter()) {
           objectId = inserter.insert(Constants.OBJ_BLOB, payload);
@@ -107,22 +139,22 @@ class HibernatePackChunkWriterH2Test {
 
       assertTrue(totalChunkCount(provider) > 0L);
       try (HibernateRepository reopened =
-          HibernateRepository.create(provider.getSessionFactory(), "stateless-reopen")) {
+          HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
         assertArrayEquals(payload, reopened.open(objectId).getBytes());
       }
     }
   }
 
-  private static HibernateSessionFactoryProvider provider(String mode) {
-    Properties properties = h2Properties(ROLLBACK_DATABASE);
+  private static HibernateSessionFactoryProvider provider(String databaseName, String mode) {
+    Properties properties = h2Properties(databaseName);
     if (mode != null) {
       properties.put(HibernatePackChunkWriter.MODE_PROPERTY, mode);
     }
     return new HibernateSessionFactoryProvider(properties);
   }
 
-  private static HibernateSessionFactoryProvider providerForExistingDatabase() {
-    return new HibernateSessionFactoryProvider(h2Properties(ROLLBACK_DATABASE));
+  private static HibernateSessionFactoryProvider providerForExistingDatabase(String databaseName) {
+    return new HibernateSessionFactoryProvider(h2Properties(databaseName));
   }
 
   private static Properties h2Properties(String databaseName) {
