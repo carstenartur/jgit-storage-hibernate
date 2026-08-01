@@ -35,6 +35,41 @@
     };
   }
 
+  function operationAnchor(operation) {
+    const slug = operation
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+      .replace(/([A-Za-z])([0-9])/g, '$1-$2')
+      .replace(/([0-9])([A-Za-z])/g, '$1-$2')
+      .replace(/[^A-Za-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+    return 'benchmark-' + slug;
+  }
+
+  function scrollToRequestedChart() {
+    const rawAnchor = window.location.hash.slice(1);
+    if (!rawAnchor) {
+      return;
+    }
+
+    let anchor = rawAnchor;
+    try {
+      anchor = decodeURIComponent(rawAnchor);
+    } catch (_ignored) {
+      // Keep the literal hash when it is not valid percent-encoding.
+    }
+
+    const target = document.getElementById(anchor);
+    if (target === null) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ block: 'start' });
+      target.focus({ preventScroll: true });
+    });
+  }
+
   function collectOperations(entries) {
     const operations = new Map();
     for (const entry of entries) {
@@ -170,10 +205,20 @@
   function renderOperation(parent, operation, backends) {
     const card = document.createElement('section');
     card.className = 'benchmark-chart-card';
+    card.id = operationAnchor(operation);
+    card.tabIndex = -1;
     parent.appendChild(card);
 
     const title = document.createElement('h3');
     title.textContent = operation;
+    const permalink = document.createElement('a');
+    permalink.className = 'chart-permalink';
+    permalink.href = '#' + card.id;
+    permalink.setAttribute('aria-label', 'Permanent link to ' + operation);
+    permalink.title = 'Permanent link to this chart';
+    permalink.textContent = '¶';
+    title.appendChild(document.createTextNode(' '));
+    title.appendChild(permalink);
     card.appendChild(title);
 
     const container = document.createElement('div');
@@ -336,6 +381,9 @@
     for (const [suiteName, entries] of Object.entries(benchmarkData.entries)) {
       renderSuite(main, suiteName, entries);
     }
+
+    scrollToRequestedChart();
+    window.addEventListener('hashchange', scrollToRequestedChart);
   }
 
   initialize();
