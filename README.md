@@ -8,7 +8,7 @@
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)](pom.xml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 
-📈 **[Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)** · ⚙️ **[Benchmark workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)**
+📈 **[Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)** · 📊 **[Performance status and distance to the ceiling](docs/performance-status.md)** · ⚙️ **[Benchmark workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)**
 
 https://doi.org/10.5281/zenodo.21210132
 
@@ -212,7 +212,9 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 
 ## Documentation
 
+- [Performance status and distance to the ceiling](docs/performance-status.md)
 - [Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
+- [Benchmark methodology](docs/benchmarks.md)
 - [Consumer, migration and database matrix](docs/consuming.md)
 - [Change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md)
 - [Approval-workflow use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
