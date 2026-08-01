@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - perf/memory-first-staging
+  pull_request:
+    branches:
+      - main
+    types: [edited]
 
 permissions:
   contents: read
