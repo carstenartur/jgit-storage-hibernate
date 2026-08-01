@@ -28,14 +28,16 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
  * extension and by one process-wide budget shared by every repository instance in this class
  * loader. A caller can additionally provide a narrower owner budget. The buffer starts with one
  * 16-KiB reservation to reduce global-budget coordination for ordinary small extensions. When any
- * bound is exceeded, the already written prefix is copied once to a temporary file and all subsequent
- * writes continue there. Positional reads retain identical semantics before and after the spill.
+ * bound is exceeded, the already written prefix is copied once to a temporary file and all
+ * subsequent writes continue there. Positional reads retain identical semantics before and after the
+ * spill.
  */
 final class PackExtensionStagingBuffer extends DfsOutputStream {
 
   static final int MAX_MEMORY_BYTES = HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
   static final long PROCESS_MEMORY_BUDGET_BYTES = 32L * 1024 * 1024;
   private static final int INITIAL_CAPACITY = 16 * 1024;
+  private static final int CONSTRAINED_INITIAL_CAPACITY = 1024;
   private static final MemoryBudget PROCESS_MEMORY_BUDGET =
       new MemoryBudget(PROCESS_MEMORY_BUDGET_BYTES);
 
@@ -122,7 +124,11 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
       destination.put(memory, Math.toIntExact(position), count);
       return count;
     }
-    return readFile(fileChannel, fileSize, position, destination);
+    int count = readFile(fileChannel, fileSize, position, destination);
+    if (count > 0) {
+      storageByteCounters.recordTemporaryFileBytesRead(count);
+    }
+    return count;
   }
 
   @Override
@@ -195,10 +201,25 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
     if (requiredCapacity <= memory.length) {
       return true;
     }
-    int newCapacity = Math.max(INITIAL_CAPACITY, memory.length);
-    while (newCapacity < requiredCapacity) {
-      newCapacity = Math.min(MAX_MEMORY_BYTES, Math.multiplyExact(newCapacity, 2));
+    int preferredCapacity = Math.max(INITIAL_CAPACITY, memory.length);
+    while (preferredCapacity < requiredCapacity) {
+      preferredCapacity =
+          Math.min(MAX_MEMORY_BYTES, Math.multiplyExact(preferredCapacity, 2));
     }
+    if (resizeMemory(preferredCapacity)) {
+      return true;
+    }
+
+    // Narrow owner budgets are useful for tests and embedded integrations. The fallback is not
+    // attempted on the ordinary process-budget-only path, so production writes retain one
+    // reservation operation per growth step.
+    int constrainedCapacity = Math.max(CONSTRAINED_INITIAL_CAPACITY, requiredCapacity);
+    return ownerMemoryBudget != null
+        && constrainedCapacity != preferredCapacity
+        && resizeMemory(constrainedCapacity);
+  }
+
+  private boolean resizeMemory(int newCapacity) {
     long additionalBytes = newCapacity - memory.length;
     if (!reserveMemory(additionalBytes)) {
       return false;
@@ -400,8 +421,8 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
       if (discarded.compareAndSet(false, true)) {
         PROCESS_MEMORY_BUDGET.release(data.length);
         if (ownerMemoryBudget != null) {
-        ownerMemoryBudget.release(data.length);
-      }
+          ownerMemoryBudget.release(data.length);
+        }
       }
     }
   }
