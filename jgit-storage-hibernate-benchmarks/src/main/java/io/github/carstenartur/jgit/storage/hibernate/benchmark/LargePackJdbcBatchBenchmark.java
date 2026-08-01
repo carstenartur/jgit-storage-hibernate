@@ -37,7 +37,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
-/** Compares portable and PostgreSQL-rewritten JDBC batching for one multi-chunk pack. */
+/** Compares stateful batching and a shared-transaction stateless chunk writer. */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 1)
@@ -47,15 +47,23 @@ import org.openjdk.jmh.annotations.Warmup;
 @State(Scope.Thread)
 public class LargePackJdbcBatchBenchmark {
 
-  static final String DISABLED = "disabled";
-  static final String ENABLED = "enabled";
-  static final String ENABLED_REWRITE = "enabled-rewrite";
+  static final String STATEFUL_BATCHING_DISABLED = "stateful-batching-disabled";
+  static final String STATEFUL_BATCHING = "stateful-batching";
+  static final String STATEFUL_BATCHING_REWRITE = "stateful-batching-rewrite";
+  static final String STATELESS = "stateless";
+  private static final String CHUNK_WRITER_PROPERTY =
+      "jgit.storage.hibernate.pack.chunk_writer";
   private static final int PAYLOAD_SIZE = 12 * 1024 * 1024 + 257;
 
   private final AtomicInteger invocationCounter = new AtomicInteger();
 
-  @Param({DISABLED, ENABLED, ENABLED_REWRITE})
-  public String batchingMode;
+  @Param({
+    STATEFUL_BATCHING_DISABLED,
+    STATEFUL_BATCHING,
+    STATEFUL_BATCHING_REWRITE,
+    STATELESS
+  })
+  public String writeMode;
 
   private HibernateSessionFactoryProvider provider;
   private HibernateRepository repository;
@@ -65,8 +73,9 @@ public class LargePackJdbcBatchBenchmark {
   @Setup(Level.Trial)
   public void setupTrial() {
     Properties properties = new Properties();
-    String jdbcUrl = requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY);
-    if (ENABLED_REWRITE.equals(batchingMode)) {
+    String jdbcUrl =
+        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY);
+    if (STATEFUL_BATCHING_REWRITE.equals(writeMode)) {
       jdbcUrl = appendJdbcParameter(jdbcUrl, "reWriteBatchedInserts", "true");
     }
     properties.put("hibernate.connection.url", jdbcUrl);
@@ -85,8 +94,11 @@ public class LargePackJdbcBatchBenchmark {
     properties.put("hibernate.generate_statistics", "true");
     properties.put(
         "hibernate.session.events.auto", JdbcBatchMetricsSessionEventListener.class.getName());
-    if (DISABLED.equals(batchingMode)) {
+    if (STATEFUL_BATCHING_DISABLED.equals(writeMode)) {
       properties.put(HibernateStorageSettings.JDBC_BATCH_SIZE, "0");
+    }
+    if (STATELESS.equals(writeMode)) {
+      properties.put(CHUNK_WRITER_PROPERTY, STATELESS);
     }
 
     provider = new HibernateSessionFactoryProvider(properties);
@@ -99,7 +111,7 @@ public class LargePackJdbcBatchBenchmark {
   public void setupInvocation() throws Exception {
     String repositoryName =
         "jmh-large-pack-"
-            + batchingMode
+            + writeMode
             + "-"
             + invocationCounter.incrementAndGet()
             + "-"
@@ -159,7 +171,7 @@ public class LargePackJdbcBatchBenchmark {
       throw new IllegalStateException(
           "Missing PostgreSQL benchmark system property "
               + name
-              + "; run through the Maven benchmark-comparison profile");
+              + "; run through the Maven jdbc-batch-comparison profile");
     }
     return value;
   }
