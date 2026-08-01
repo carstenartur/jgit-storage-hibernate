@@ -107,6 +107,8 @@ class StorageByteMetricsH2Test {
         try (ReadableChannel channel = database.openFile(description, PackExt.PACK)) {
           channel.setReadAheadBytes(payload.length);
           assertEquals(32, channel.read(ByteBuffer.allocate(32)));
+          channel.position(0);
+          assertEquals(32, channel.read(ByteBuffer.allocate(32)));
         }
 
         StorageByteMetrics delta = repository.getStorageByteMetrics().minus(before);

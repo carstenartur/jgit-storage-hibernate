@@ -828,6 +828,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     private static final class CachedChunk {
       private final byte[] data;
       private final BitSet consumed;
+      private int consumedBytes;
 
       private CachedChunk(byte[] data, boolean trackConsumption) {
         this.data = data;
@@ -842,13 +843,25 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         if (consumed == null) {
           return 0;
         }
-        int before = consumed.cardinality();
-        consumed.set(offset, offset + length);
-        return consumed.cardinality() - before;
+        int end = offset + length;
+        int newlyConsumed = 0;
+        int cursor = offset;
+        while (cursor < end) {
+          int nextConsumed = consumed.nextSetBit(cursor);
+          if (nextConsumed < 0 || nextConsumed >= end) {
+            newlyConsumed += end - cursor;
+            break;
+          }
+          newlyConsumed += nextConsumed - cursor;
+          cursor = consumed.nextClearBit(nextConsumed);
+        }
+        consumed.set(offset, end);
+        consumedBytes += newlyConsumed;
+        return newlyConsumed;
       }
 
       private long unconsumedBytes() {
-        return consumed == null ? 0 : data.length - consumed.cardinality();
+        return consumed == null ? 0 : data.length - consumedBytes;
       }
     }
   }
