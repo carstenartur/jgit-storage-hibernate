@@ -1,10 +1,9 @@
 name: Export memory-first staging source
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
-    types: [edited]
+      - perf/memory-first-staging
 
 permissions:
   contents: read
