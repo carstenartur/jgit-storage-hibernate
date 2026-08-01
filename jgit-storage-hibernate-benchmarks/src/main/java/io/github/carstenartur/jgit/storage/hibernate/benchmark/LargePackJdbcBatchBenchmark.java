@@ -37,7 +37,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
-/** Compares stateful batching and a shared-transaction stateless chunk writer. */
+/** Compares stateful, stateless ORM and direct JDBC pack-chunk writers. */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 1)
@@ -51,6 +51,7 @@ public class LargePackJdbcBatchBenchmark {
   static final String STATEFUL_BATCHING = "stateful-batching";
   static final String STATEFUL_BATCHING_REWRITE = "stateful-batching-rewrite";
   static final String STATELESS = "stateless";
+  static final String JDBC = "jdbc";
   private static final String CHUNK_WRITER_PROPERTY =
       "jgit.storage.hibernate.pack.chunk_writer";
   private static final int PAYLOAD_SIZE = 12 * 1024 * 1024 + 257;
@@ -61,7 +62,8 @@ public class LargePackJdbcBatchBenchmark {
     STATEFUL_BATCHING_DISABLED,
     STATEFUL_BATCHING,
     STATEFUL_BATCHING_REWRITE,
-    STATELESS
+    STATELESS,
+    JDBC
   })
   public String writeMode;
 
@@ -97,8 +99,8 @@ public class LargePackJdbcBatchBenchmark {
     if (STATEFUL_BATCHING_DISABLED.equals(writeMode)) {
       properties.put(HibernateStorageSettings.JDBC_BATCH_SIZE, "0");
     }
-    if (STATELESS.equals(writeMode)) {
-      properties.put(CHUNK_WRITER_PROPERTY, STATELESS);
+    if (STATELESS.equals(writeMode) || JDBC.equals(writeMode)) {
+      properties.put(CHUNK_WRITER_PROPERTY, writeMode);
     }
 
     provider = new HibernateSessionFactoryProvider(properties);
