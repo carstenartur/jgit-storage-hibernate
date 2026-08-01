@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
@@ -29,10 +30,12 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 
 class HibernatePackChunkWriterH2Test {
 
+  private static final String NON_DEFAULT_SCHEMA = "JGIT_STORAGE";
   private static final String STATELESS_ROLLBACK_DATABASE =
       "stateless-rollback-" + UUID.randomUUID();
   private static final String JDBC_ROLLBACK_DATABASE = "jdbc-rollback-" + UUID.randomUUID();
@@ -51,6 +54,36 @@ class HibernatePackChunkWriterH2Test {
         JDBC_ROLLBACK_DATABASE,
         HibernatePackChunkWriter.JDBC_MODE,
         HibernatePackChunkWriter::jdbc);
+  }
+
+  @Test
+  void directJdbcWriterReusesOneStatementWithoutOrmChunkInserts() {
+    Properties properties = h2Properties("jdbc-statement-reuse-" + UUID.randomUUID());
+    properties.put(HibernatePackChunkWriter.MODE_PROPERTY, HibernatePackChunkWriter.JDBC_MODE);
+    properties.put("hibernate.generate_statistics", "true");
+
+    try (HibernateSessionFactoryProvider provider =
+            new HibernateSessionFactoryProvider(properties);
+        Session session = provider.getSessionFactory().openSession()) {
+      Transaction transaction = session.beginTransaction();
+      Long packId = persistParent(session);
+      Statistics statistics = provider.getSessionFactory().getStatistics();
+      statistics.clear();
+
+      try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
+        writer.insert(packId, 0, chunks(8));
+        writer.insert(packId, 8, chunks(1));
+      }
+
+      assertEquals(1L, statistics.getPrepareStatementCount());
+      assertEquals(
+          0L,
+          statistics
+              .getEntityStatistics(GitPackChunkEntity.class.getName())
+              .getInsertCount());
+      assertEquals(9L, chunkCount(session, packId));
+      transaction.rollback();
+    }
   }
 
   @Test
@@ -118,7 +151,13 @@ class HibernatePackChunkWriterH2Test {
     Properties properties = h2Properties(databaseName);
     properties.put(HibernatePackChunkWriter.MODE_PROPERTY, mode);
     if (qualifiedSchema) {
-      properties.put("hibernate.default_schema", "PUBLIC");
+      properties.put(
+          "hibernate.connection.url",
+          "jdbc:h2:mem:"
+              + databaseName
+              + ";DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS "
+              + NON_DEFAULT_SCHEMA);
+      properties.put("hibernate.default_schema", NON_DEFAULT_SCHEMA);
     }
     byte[] payload = new byte[2 * 1024 * 1024 + 257];
     new Random(0x53544154454c4553L ^ mode.hashCode()).nextBytes(payload);
