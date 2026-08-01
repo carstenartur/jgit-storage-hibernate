@@ -1,9 +1,11 @@
 name: Apply read-ahead metric hot-path fix
 
 on:
-  push:
+  pull_request:
     branches:
-      - perf/storage-byte-metrics-v2
+      - main
+    types:
+      - edited
 
 permissions:
   contents: write
@@ -23,90 +25,86 @@ jobs:
 
           source = Path("jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/ReadAheadHibernateObjDatabase.java")
           text = source.read_text()
-          old = '''    private static final class CachedChunk {
-            private final byte[] data;
-            private final BitSet consumed;
-
-            private CachedChunk(byte[] data, boolean trackConsumption) {
-              this.data = data;
-              this.consumed = trackConsumption ? new BitSet(data.length) : null;
-            }
-
-            private byte[] data() {
-              return data;
-            }
-
-            private int markConsumed(int offset, int length) {
-              if (consumed == null) {
-                return 0;
-              }
-              int before = consumed.cardinality();
-              consumed.set(offset, offset + length);
-              return consumed.cardinality() - before;
-            }
-
-            private long unconsumedBytes() {
-              return consumed == null ? 0 : data.length - consumed.cardinality();
-            }
-          }
-'''
-          new = '''    private static final class CachedChunk {
-            private final byte[] data;
-            private final BitSet consumed;
-            private int consumedBytes;
-
-            private CachedChunk(byte[] data, boolean trackConsumption) {
-              this.data = data;
-              this.consumed = trackConsumption ? new BitSet(data.length) : null;
-            }
-
-            private byte[] data() {
-              return data;
-            }
-
-            private int markConsumed(int offset, int length) {
-              if (consumed == null) {
-                return 0;
-              }
-              int end = offset + length;
-              int newlyConsumed = 0;
-              int cursor = offset;
-              while (cursor < end) {
-                int nextConsumed = consumed.nextSetBit(cursor);
-                if (nextConsumed < 0 || nextConsumed >= end) {
-                  newlyConsumed += end - cursor;
-                  break;
-                }
-                newlyConsumed += nextConsumed - cursor;
-                cursor = consumed.nextClearBit(nextConsumed);
-              }
-              consumed.set(offset, end);
-              consumedBytes += newlyConsumed;
-              return newlyConsumed;
-            }
-
-            private long unconsumedBytes() {
-              return consumed == null ? 0 : data.length - consumedBytes;
-            }
-          }
-'''
-          if old not in text:
+          old = (
+              "    private static final class CachedChunk {\n"
+              "      private final byte[] data;\n"
+              "      private final BitSet consumed;\n\n"
+              "      private CachedChunk(byte[] data, boolean trackConsumption) {\n"
+              "        this.data = data;\n"
+              "        this.consumed = trackConsumption ? new BitSet(data.length) : null;\n"
+              "      }\n\n"
+              "      private byte[] data() {\n"
+              "        return data;\n"
+              "      }\n\n"
+              "      private int markConsumed(int offset, int length) {\n"
+              "        if (consumed == null) {\n"
+              "          return 0;\n"
+              "        }\n"
+              "        int before = consumed.cardinality();\n"
+              "        consumed.set(offset, offset + length);\n"
+              "        return consumed.cardinality() - before;\n"
+              "      }\n\n"
+              "      private long unconsumedBytes() {\n"
+              "        return consumed == null ? 0 : data.length - consumed.cardinality();\n"
+              "      }\n"
+              "    }\n"
+          )
+          new = (
+              "    private static final class CachedChunk {\n"
+              "      private final byte[] data;\n"
+              "      private final BitSet consumed;\n"
+              "      private int consumedBytes;\n\n"
+              "      private CachedChunk(byte[] data, boolean trackConsumption) {\n"
+              "        this.data = data;\n"
+              "        this.consumed = trackConsumption ? new BitSet(data.length) : null;\n"
+              "      }\n\n"
+              "      private byte[] data() {\n"
+              "        return data;\n"
+              "      }\n\n"
+              "      private int markConsumed(int offset, int length) {\n"
+              "        if (consumed == null) {\n"
+              "          return 0;\n"
+              "        }\n"
+              "        int end = offset + length;\n"
+              "        int newlyConsumed = 0;\n"
+              "        int cursor = offset;\n"
+              "        while (cursor < end) {\n"
+              "          int nextConsumed = consumed.nextSetBit(cursor);\n"
+              "          if (nextConsumed < 0 || nextConsumed >= end) {\n"
+              "            newlyConsumed += end - cursor;\n"
+              "            break;\n"
+              "          }\n"
+              "          newlyConsumed += nextConsumed - cursor;\n"
+              "          cursor = consumed.nextClearBit(nextConsumed);\n"
+              "        }\n"
+              "        consumed.set(offset, end);\n"
+              "        consumedBytes += newlyConsumed;\n"
+              "        return newlyConsumed;\n"
+              "      }\n\n"
+              "      private long unconsumedBytes() {\n"
+              "        return consumed == null ? 0 : data.length - consumedBytes;\n"
+              "      }\n"
+              "    }\n"
+          )
+          if text.count(old) != 1:
               raise SystemExit("CachedChunk source shape changed")
           source.write_text(text.replace(old, new))
 
           test = Path("jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/StorageByteMetricsH2Test.java")
           text = test.read_text()
-          old = '''          channel.setReadAheadBytes(payload.length);
-                    assertEquals(32, channel.read(ByteBuffer.allocate(32)));
-                  }
-'''
-          new = '''          channel.setReadAheadBytes(payload.length);
-                    assertEquals(32, channel.read(ByteBuffer.allocate(32)));
-                    channel.position(0);
-                    assertEquals(32, channel.read(ByteBuffer.allocate(32)));
-                  }
-'''
-          if old not in text:
+          old = (
+              "          channel.setReadAheadBytes(payload.length);\n"
+              "          assertEquals(32, channel.read(ByteBuffer.allocate(32)));\n"
+              "        }\n"
+          )
+          new = (
+              "          channel.setReadAheadBytes(payload.length);\n"
+              "          assertEquals(32, channel.read(ByteBuffer.allocate(32)));\n"
+              "          channel.position(0);\n"
+              "          assertEquals(32, channel.read(ByteBuffer.allocate(32)));\n"
+              "        }\n"
+          )
+          if text.count(old) != 1:
               raise SystemExit("read-ahead test source shape changed")
           test.write_text(text.replace(old, new))
       - name: Commit final source only
