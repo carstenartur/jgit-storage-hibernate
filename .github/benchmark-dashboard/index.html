@@ -59,9 +59,24 @@
         border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
         border-radius: 8px;
         background: color-mix(in srgb, Canvas 96%, CanvasText 4%);
+        scroll-margin-top: 16px;
+      }
+      .benchmark-chart-card:target {
+        outline: 3px solid color-mix(in srgb, #3273dc 72%, transparent);
+        outline-offset: 3px;
       }
       .benchmark-chart-card h3 {
         margin: 0 0 12px;
+      }
+      .chart-permalink {
+        font-size: 0.78em;
+        font-weight: normal;
+        text-decoration: none;
+        opacity: 0.55;
+      }
+      .benchmark-chart-card h3:hover .chart-permalink,
+      .chart-permalink:focus {
+        opacity: 1;
       }
       .chart-container {
         position: relative;
@@ -121,7 +136,7 @@
           <option value="linear">Linear</option>
           <option value="logarithmic">Logarithmic</option>
         </select>
-        <span>Each chart groups the same JGit operation across all storage backends. Timing and throughput measurements are normalized to ms/op, where lower is better. Patterns, markers and the table expose overlapping measurements.</span>
+        <span>Each chart groups the same JGit operation across all storage backends. Timing and throughput measurements are normalized to ms/op, where lower is better. Patterns, markers and the table expose overlapping measurements. The ¶ beside a chart title is a stable direct link.</span>
       </div>
     </header>
 
