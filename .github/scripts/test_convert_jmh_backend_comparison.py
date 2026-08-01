@@ -73,11 +73,12 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
                 self._write_result("stateful-batching", 9.0),
                 self._write_result("stateful-batching-rewrite", 8.0),
                 self._write_result("stateless", 7.0),
+                self._write_result("jdbc", 6.0),
             ]
         )
 
         names = {entry["name"] for entry in converted}
-        self.assertEqual(4, len(converted))
+        self.assertEqual(5, len(converted))
         self.assertIn(
             "publishTwelveMiBPack — JGit + PostgreSQL (stateful, batching off)", names
         )
@@ -90,6 +91,9 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         )
         self.assertIn(
             "publishTwelveMiBPack — JGit + PostgreSQL (stateless chunk writer)", names
+        )
+        self.assertIn(
+            "publishTwelveMiBPack — JGit + PostgreSQL (direct JDBC chunk writer)", names
         )
 
     def test_retains_legacy_batching_mode_labels(self) -> None:
@@ -118,7 +122,7 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
                 json.dumps([self._backend_result("postgresql", 12.0)]), encoding="utf-8"
             )
             focused.write_text(
-                json.dumps([self._write_result("stateless", 9.0)]), encoding="utf-8"
+                json.dumps([self._write_result("jdbc", 9.0)]), encoding="utf-8"
             )
 
             combined = MODULE.load_results([standard, focused])
