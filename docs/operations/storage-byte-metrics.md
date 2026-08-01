@@ -18,6 +18,12 @@ StorageByteMetrics delta = repository.getStorageByteMetrics().minus(before);
 
 Diagnostics are disabled by default. A disabled repository returns `StorageByteMetrics.ZERO` and does not update byte counters on hot paths.
 
+## Operational sampling
+
+Snapshots are thread-safe, cumulative and local to one `HibernateRepository` instance. Calculate a delta only from an earlier snapshot of that same instance. Independent repository handles intentionally maintain independent counters even when they point to the same logical database repository.
+
+For request-level telemetry, capture the first snapshot immediately before the operation and the second after every stream or readable channel opened by that operation has been closed. This produces a stable overfetch classification and avoids attributing unrelated concurrent work to the request.
+
 ## Counters
 
 | Counter | Meaning |
