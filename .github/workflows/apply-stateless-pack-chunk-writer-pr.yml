@@ -60,7 +60,7 @@ jobs:
                           and "private void persistChunks(" in old):
                       method_start = text.index("  private void persistChunks(")
                       method_end = text.index(
-                          "\n  private static long committedPayloadBytes", method_start)
+                          "\\n  private static long committedPayloadBytes", method_start)
                       target.write_text(
                           text[:method_start] + new.rstrip() + text[method_end:],
                           encoding="utf-8")
