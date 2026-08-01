@@ -24,17 +24,15 @@ import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 /**
  * Random-readable pack-extension staging that keeps tiny payloads in memory and spills once.
  *
- * <p>Retained in-memory staging is bounded by a deliberately narrow 16-KiB limit for each
- * extension and by one process-wide budget shared by every repository instance in this class
- * loader. A caller can additionally provide a narrower owner budget. The memory limit is lower than
- * the 256-KiB database inline threshold: measurements showed that retaining a larger prefix before a
- * multi-MiB spill regressed large-pack publication. When any bound is exceeded, the already written
+ * <p>Retained in-memory staging is bounded by a 256-KiB limit for each extension and by one
+ * process-wide budget shared by every repository instance in this class loader. A caller can
+ * additionally provide a narrower owner budget. When any bound is exceeded, the already written
  * prefix is copied once to a temporary file and all subsequent writes continue there. Positional
  * reads retain identical semantics before and after the spill.
  */
 final class PackExtensionStagingBuffer extends DfsOutputStream {
 
-  static final int MAX_MEMORY_BYTES = 16 * 1024;
+  static final int MAX_MEMORY_BYTES = 256 * 1024;
   static final long PROCESS_MEMORY_BUDGET_BYTES = 32L * 1024 * 1024;
   private static final int INITIAL_CAPACITY = 1024;
   private static final MemoryBudget PROCESS_MEMORY_BUDGET =
@@ -481,10 +479,14 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
       if (bytes < 0) {
         throw new IllegalArgumentException("bytes must not be negative");
       }
-      long remaining = usedBytes.addAndGet(-bytes);
-      if (remaining < 0) {
-        usedBytes.addAndGet(bytes);
-        throw new IllegalStateException("Released more staging memory than was reserved");
+      while (true) {
+        long current = usedBytes.get();
+        if (bytes > current) {
+          throw new IllegalStateException("Released more staging memory than was reserved");
+        }
+        if (usedBytes.compareAndSet(current, current - bytes)) {
+          return;
+        }
       }
     }
 

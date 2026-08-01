@@ -88,7 +88,7 @@ class PackExtensionStagingBufferTest {
   }
 
   @Test
-  void spillsWhenInlineThresholdIsCrossedAndRejectsClosedAccess() throws Exception {
+  void spillsWhenStagingMemoryLimitIsCrossedAndRejectsClosedAccess() throws Exception {
     byte[] data =
         deterministicBytes(PackExtensionStagingBuffer.MAX_MEMORY_BYTES + 37, 31);
     AtomicReference<StagedPayload> staged = new AtomicReference<>();
