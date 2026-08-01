@@ -27,7 +27,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Remove ORM entity allocation from direct JDBC hot path
+      - name: Normalize raw-chunk hot-path source
         shell: bash
         run: |
           python3 <<'PY'
@@ -39,56 +39,50 @@ jobs:
               'StagedPackExtensionStore.java'
           )
           text = path.read_text(encoding='utf-8')
-          import_line = (
-              'import io.github.carstenartur.jgit.storage.hibernate.entity.'
-              'GitPackChunkEntity;\n'
-          )
-          if import_line not in text:
-              raise SystemExit('Expected GitPackChunkEntity import was not found')
-          text = text.replace(import_line, '', 1)
-
           method_start = text.index('  private void persistChunks(')
           method_end = text.index(
               '\n  private static long committedPayloadBytes', method_start
           )
-          replacement = '''  private void persistChunks(
-              Session session, Long packId, StagedExtension stagedExtension) throws IOException {
-            long fileSize = stagedExtension.fileSize();
-            long position = 0;
-            int chunkIndex = 0;
-            List<byte[]> pendingChunks = new ArrayList<>(CHUNK_BATCH_SIZE);
-            try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);
-                StagedPayloadReader reader = stagedExtension.openReader()) {
-              while (position < fileSize) {
-                int chunkLength =
-                    (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
-                byte[] chunkData = new byte[chunkLength];
-                ByteBuffer destination = ByteBuffer.wrap(chunkData);
-                long chunkPosition = position;
-                while (destination.hasRemaining()) {
-                  int count = reader.read(chunkPosition, destination);
-                  if (count <= 0) {
-                    throw new IOException("Staged pack payload ended before declared size " + fileSize);
-                  }
-                  chunkPosition += count;
-                }
-
-                pendingChunks.add(chunkData);
-                position += chunkLength;
-                chunkIndex++;
-                if (pendingChunks.size() == CHUNK_BATCH_SIZE) {
-                  chunkWriter.insert(
-                      packId, chunkIndex - pendingChunks.size(), pendingChunks);
-                  pendingChunks.clear();
-                }
-              }
-              if (!pendingChunks.isEmpty()) {
-                chunkWriter.insert(packId, chunkIndex - pendingChunks.size(), pendingChunks);
-              }
-            }
-          }
-          '''
-          text = text[:method_start] + replacement.rstrip() + text[method_end:]
+          replacement = '\n'.join([
+              '  private void persistChunks(',
+              '      Session session, Long packId, StagedExtension stagedExtension) throws IOException {',
+              '    long fileSize = stagedExtension.fileSize();',
+              '    long position = 0;',
+              '    int chunkIndex = 0;',
+              '    List<byte[]> pendingChunks = new ArrayList<>(CHUNK_BATCH_SIZE);',
+              '    try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);',
+              '        StagedPayloadReader reader = stagedExtension.openReader()) {',
+              '      while (position < fileSize) {',
+              '        int chunkLength =',
+              '            (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);',
+              '        byte[] chunkData = new byte[chunkLength];',
+              '        ByteBuffer destination = ByteBuffer.wrap(chunkData);',
+              '        long chunkPosition = position;',
+              '        while (destination.hasRemaining()) {',
+              '          int count = reader.read(chunkPosition, destination);',
+              '          if (count <= 0) {',
+              '            throw new IOException(',
+              '                "Staged pack payload ended before declared size " + fileSize);',
+              '          }',
+              '          chunkPosition += count;',
+              '        }',
+              '',
+              '        pendingChunks.add(chunkData);',
+              '        position += chunkLength;',
+              '        chunkIndex++;',
+              '        if (pendingChunks.size() == CHUNK_BATCH_SIZE) {',
+              '          chunkWriter.insert(',
+              '              packId, chunkIndex - pendingChunks.size(), pendingChunks);',
+              '          pendingChunks.clear();',
+              '        }',
+              '      }',
+              '      if (!pendingChunks.isEmpty()) {',
+              '        chunkWriter.insert(packId, chunkIndex - pendingChunks.size(), pendingChunks);',
+              '      }',
+              '    }',
+              '  }',
+          ])
+          text = text[:method_start] + replacement + text[method_end:]
           path.write_text(text, encoding='utf-8')
           PY
 
@@ -103,9 +97,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm \
-            .github/workflows/apply-direct-jdbc-raw-chunks.yml \
-            .github/workflows/apply-direct-jdbc-raw-chunks-pr.yml
+          git rm .github/workflows/apply-direct-jdbc-raw-chunks-pr.yml
           git add -A
-          git commit -m 'Avoid ORM entity allocation in direct JDBC writer [direct-jdbc-raw-chunks-applied]'
+          git commit -m 'Finalize direct JDBC raw-chunk writer [direct-jdbc-raw-chunks-applied]'
           git push origin HEAD:perf/direct-jdbc-pack-chunk-writer
