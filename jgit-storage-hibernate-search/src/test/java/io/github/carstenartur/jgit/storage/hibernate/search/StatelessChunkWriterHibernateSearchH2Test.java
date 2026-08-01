@@ -37,16 +37,26 @@ class StatelessChunkWriterHibernateSearchH2Test {
 
   @Test
   void statelessRawChunkPersistenceAndStatefulSearchIndexingCoexist() throws Exception {
-    String repositoryName = "search-stateless-" + UUID.randomUUID();
+    verifyRawChunkWriterAndSearch("stateless", "stateless searchable");
+  }
+
+  @Test
+  void directJdbcRawChunkPersistenceAndStatefulSearchIndexingCoexist() throws Exception {
+    verifyRawChunkWriterAndSearch("jdbc", "direct jdbc searchable");
+  }
+
+  private static void verifyRawChunkWriterAndSearch(String writerMode, String searchableText)
+      throws Exception {
+    String repositoryName = "search-" + writerMode + "-" + UUID.randomUUID();
     Properties properties = h2Properties(repositoryName);
-    properties.put(CHUNK_WRITER_PROPERTY, "stateless");
+    properties.put(CHUNK_WRITER_PROPERTY, writerMode);
 
     try (HibernateSessionFactoryProvider provider =
             new HibernateSessionFactoryProvider(properties, SearchEntities.annotatedClasses());
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
-      ObjectId commitId = createLargeCommit(repository);
+      ObjectId commitId = createLargeCommit(repository, searchableText);
 
       assertTrue(chunkCount(provider) > 0L, "The large pack must use raw chunk rows");
       GitCommitIndex projection =
@@ -58,16 +68,17 @@ class StatelessChunkWriterHibernateSearchH2Test {
           new GitHistorySearchService(provider.getSessionFactory());
       assertEquals(
           List.of(commitId.name()),
-          objectIds(search.searchCommitText(repositoryName, "stateless searchable", 10)));
+          objectIds(search.searchCommitText(repositoryName, searchableText, 10)));
       assertEquals(
           List.of(commitId.name()),
           objectIds(search.searchCommitText(repositoryName, "large-payload.bin", 10)));
     }
   }
 
-  private static ObjectId createLargeCommit(HibernateRepository repository) throws Exception {
+  private static ObjectId createLargeCommit(
+      HibernateRepository repository, String searchableText) throws Exception {
     byte[] payload = new byte[2 * 1024 * 1024 + 257];
-    new Random(0x5345415243484cL).nextBytes(payload);
+    new Random(0x5345415243484cL ^ searchableText.hashCode()).nextBytes(payload);
     try (ObjectInserter inserter = repository.newObjectInserter()) {
       ObjectId blobId = inserter.insert(Constants.OBJ_BLOB, payload);
       TreeFormatter tree = new TreeFormatter();
@@ -78,7 +89,7 @@ class StatelessChunkWriterHibernateSearchH2Test {
       commit.setTreeId(treeId);
       commit.setAuthor(new PersonIdent("Search Writer", "search@example.com"));
       commit.setCommitter(new PersonIdent("Search Writer", "search@example.com"));
-      commit.setMessage("Stateless searchable pack publication");
+      commit.setMessage(searchableText + " pack publication");
       ObjectId commitId = inserter.insert(commit);
       inserter.flush();
       return commitId;
