@@ -15,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
-import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
@@ -98,10 +97,10 @@ class HibernatePackChunkWriterH2Test {
       Transaction transaction = session.beginTransaction();
       Long packId = persistParent(session);
 
-      List<GitPackChunkEntity> chunks = chunks(packId, 3);
+      List<byte[]> chunks = chunks(3);
       try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
         assertTrue(modePredicate.test(writer));
-        writer.insert(chunks);
+        writer.insert(packId, 0, chunks);
       }
 
       assertEquals(3L, chunkCount(session, packId));
@@ -188,15 +187,10 @@ class HibernatePackChunkWriterH2Test {
     return pack.getId();
   }
 
-  private static List<GitPackChunkEntity> chunks(Long packId, int count) {
-    List<GitPackChunkEntity> chunks = new ArrayList<>(count);
+  private static List<byte[]> chunks(int count) {
+    List<byte[]> chunks = new ArrayList<>(count);
     for (int index = 0; index < count; index++) {
-      GitPackChunkEntity chunk = new GitPackChunkEntity();
-      chunk.setPackId(packId);
-      chunk.setChunkIndex(index);
-      chunk.setChunkSize(4);
-      chunk.setData(new byte[] {(byte) index, 1, 2, 3});
-      chunks.add(chunk);
+      chunks.add(new byte[] {(byte) index, 1, 2, 3});
     }
     return chunks;
   }
