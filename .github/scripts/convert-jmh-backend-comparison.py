@@ -22,6 +22,7 @@ WRITE_MODE_LABELS = {
     "stateful-batching": "JGit + PostgreSQL (stateful batching)",
     "stateful-batching-rewrite": "JGit + PostgreSQL (stateful batching + rewrite)",
     "stateless": "JGit + PostgreSQL (stateless chunk writer)",
+    "jdbc": "JGit + PostgreSQL (direct JDBC chunk writer)",
 }
 
 # Retain compatibility with focused result files published before writeMode was introduced.
