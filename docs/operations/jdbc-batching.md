@@ -13,19 +13,34 @@ The batch size matches the default stateful writer's bounded eight-chunk `flush(
 
 Framework-managed applications that construct their own `SessionFactory` do not pass through `HibernateSessionFactoryProvider` and must configure JDBC batching themselves.
 
-## Experimental stateless chunk writer
+## Experimental writer modes
 
-Large immutable pack payloads may be benchmarked with a stateless ORM insert path:
+The established `stateful` writer remains the default. Two internal alternatives are available for controlled comparison:
 
 ```properties
 jgit.storage.hibernate.pack.chunk_writer=stateless
+jgit.storage.hibernate.pack.chunk_writer=jdbc
 ```
 
-The default remains `stateful` until allocation, GC and elapsed-time measurements show a material advantage across the supported database matrix. The stateless writer is deliberately limited to `GitPackChunkEntity`, which is raw non-indexed payload data. Pack parents, publication metadata, reflogs and all Hibernate Search projections continue to use ordinary stateful sessions.
+Both alternatives are deliberately limited to `GitPackChunkEntity`, which is raw non-indexed payload data. Pack parents, publication metadata, reflogs, repository locks and all Hibernate Search projections continue to use ordinary stateful sessions.
+
+Neither alternative is selected automatically. A different default requires repeatable allocation, GC and elapsed-time evidence across representative payload sizes and the supported database matrix.
+
+### Stateless ORM writer
 
 The child `StatelessSession` is opened from the active parent session with `connection()`, so it shares the same JDBC connection and resource-local transaction. Parent and chunk inserts therefore roll back together. `CacheMode.IGNORE` prevents one-MiB payload arrays from entering the second-level cache, and explicit `insertMultiple()` batches preserve synchronous failure reporting without relying on stateless write-behind.
 
-The focused PostgreSQL benchmark compares stateful insertion with batching disabled, portable stateful batching, PostgreSQL batch rewriting and the stateless shared-transaction writer. Its GC profiler records allocation and collection metrics in addition to elapsed time and JDBC counters.
+The first focused twelve-MiB PostgreSQL result reduced allocation by 23.9% and Hibernate flushes by 40% compared with portable stateful batching. Mean elapsed time was 2.5% lower, but the confidence intervals overlapped. That is a clear memory-management improvement, not yet a statistically secure latency result.
+
+### Direct JDBC writer
+
+The direct JDBC mode clears the parent persistence context after the pack parent has been inserted and flushed. It then prepares one portable `INSERT` statement through the active Hibernate session's JDBC coordinator and executes the same bounded eight-row batches on the Hibernate-managed connection and resource-local transaction.
+
+The SQL does not hard-code a catalog, schema, table or physical column names. It is assembled from Hibernate's resolved `GitPackChunkEntity` mapping, so configured naming and schema qualification remain in force. Every batch result is checked: each command must report one affected row or standard JDBC `SUCCESS_NO_INFO`; failed or incomplete batches abort the surrounding transaction.
+
+This path intentionally bypasses entity creation and ORM mutation coordination only for the immutable chunk rows. It does not bypass repository lifecycle, pack visibility, leases, rollback or final publication. Direct JDBC is justified only if it produces a material improvement beyond the stateless ORM writer, not merely beyond the older stateful baseline.
+
+The focused PostgreSQL benchmark now compares stateful insertion with batching disabled, portable stateful batching, PostgreSQL batch rewriting, stateless ORM and direct JDBC. Its GC profiler records allocation and collection metrics in addition to elapsed time and JDBC counters.
 
 ## Chunk key strategy
 
@@ -49,7 +64,7 @@ The pack key still uses `GenerationType.IDENTITY`, so Hibernate must insert and 
 
 ## Existing stateful baseline
 
-The measurements below predate the stateless writer and remain the stateful baseline. The focused JMH test publishes one non-compressible twelve-MiB blob to PostgreSQL. Every invocation creates exactly 13 chunk rows and 2 pack rows, uses 2 connections and performs 5 Hibernate flushes.
+The measurements below predate the stateless and direct JDBC writers and remain the stateful baseline. The focused JMH test publishes one non-compressible twelve-MiB blob to PostgreSQL. Every invocation creates exactly 13 chunk rows and 2 pack rows, uses 2 connections and performs 5 Hibernate flushes.
 
 | Mode | Time | JDBC batch executions | JDBC statement executions | Prepared statements |
 |---|---:|---:|---:|---:|
@@ -63,7 +78,7 @@ The standard protocol suite also remains stable: PostgreSQL incremental push mea
 
 ## Driver-specific options
 
-Portable Hibernate batching works without JDBC-URL extensions. Deployments may benchmark additional driver features separately.
+Portable Hibernate batching and the direct JDBC writer work without JDBC-URL extensions. Deployments may benchmark additional driver features separately.
 
 ### PostgreSQL
 
@@ -92,8 +107,9 @@ The normal Core tests verify that:
 - real `jdbcExecuteBatchStart()` events occur for chunk inserts;
 - chunks remain addressable by `(pack_id, chunk_index)`;
 - create-drop and migration-backed schemas remain valid;
-- stateless chunk inserts share the outer transaction and roll back with their parent pack;
-- a multi-MiB pack written statelessly remains byte-identical after repository reopen;
-- stateless raw chunk persistence coexists with ordinary Hibernate Search indexing and querying.
+- stateless and direct JDBC chunk inserts share the outer transaction and roll back with their parent pack;
+- multi-MiB packs written through either experimental mode remain byte-identical after repository reopen;
+- the direct JDBC writer follows Hibernate's resolved schema-qualified table mapping;
+- stateless and direct JDBC raw chunk persistence coexist with ordinary Hibernate Search indexing and querying.
 
-The performance workflow runs the established backend/protocol matrix and a separate focused PostgreSQL job for stateful batching disabled, portable stateful batching, batching plus driver rewrite and the stateless shared-transaction writer. On `main`, both raw JMH artifacts are combined into the published dashboard history without changing the standard performance badge contract.
+The performance workflow runs the established backend/protocol matrix and a separate focused PostgreSQL job for stateful batching disabled, portable stateful batching, batching plus driver rewrite, stateless ORM and direct JDBC. On `main`, both raw JMH artifacts are combined into the published dashboard history without changing the standard performance badge contract.
