@@ -13,11 +13,13 @@ import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtension
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -83,6 +85,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
+  private final StorageByteCounters storageByteCounters;
   private final StagedPackExtensionStore stagedExtensions;
   private final PackFileReadCounters packFileReadCounters;
   private final BoundedInlinePayloadCache inlinePayloadCache = new BoundedInlinePayloadCache();
@@ -100,7 +103,9 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
     this.transactionContext = transactionContext;
-    this.stagedExtensions = new StagedPackExtensionStore(repositoryName, transactionContext);
+    this.storageByteCounters = StorageByteCounters.from(sessionFactory);
+    this.stagedExtensions =
+        new StagedPackExtensionStore(repositoryName, transactionContext, storageByteCounters);
     this.packFileReadCounters = PackFileReadCounters.from(sessionFactory);
   }
 
@@ -230,7 +235,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     if (snapshot != null) {
       if (!snapshot.inline()) {
         return new ReadAheadChunkedReadableChannel(
-            sessionFactory, snapshot.packId(), snapshot.fileSize());
+            sessionFactory, snapshot.packId(), snapshot.fileSize(), storageByteCounters);
       }
       if (isCacheableExtension(key.extension())) {
         byte[] cached = inlinePayloadCache.get(payloadIdentity(key, snapshot));
@@ -267,10 +272,11 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
               });
       packFileReadCounters.record(extension, result.inline());
       if (result.inline()) {
+        storageByteCounters.recordDatabasePayloadBytesRead(result.inlineData().length);
         return new InlineReadableChannel(result.inlineData());
       }
       return new ReadAheadChunkedReadableChannel(
-          sessionFactory, result.packId(), result.fileSize());
+          sessionFactory, result.packId(), result.fileSize(), storageByteCounters);
     } catch (FileNotFoundException missing) {
       packFileReadCounters.recordMissing();
       throw missing;
@@ -342,6 +348,15 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
    */
   public PackFileReadMetrics packFileReadMetricsSnapshot() {
     return packFileReadCounters.snapshot();
+  }
+
+  /**
+   * Return monotone staged-file, database-payload and read-ahead byte counters.
+   *
+   * @return current byte metrics, or {@link StorageByteMetrics#ZERO} when diagnostics are disabled
+   */
+  public StorageByteMetrics storageByteMetricsSnapshot() {
+    return storageByteCounters.snapshot();
   }
 
   private CatalogState beginCatalogMutation(Collection<DfsPackDescription> replaces) {
@@ -615,15 +630,25 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     private final SessionFactory sessionFactory;
     private final Long packId;
     private final long fileSize;
-    private final LinkedHashMap<Integer, byte[]> cachedChunks = new LinkedHashMap<>();
+    private final StorageByteCounters storageByteCounters;
+    private final LinkedHashMap<Integer, CachedChunk> cachedChunks = new LinkedHashMap<>();
     private long position;
     private boolean open = true;
     private int readAheadBytes;
 
     ReadAheadChunkedReadableChannel(SessionFactory sessionFactory, Long packId, long fileSize) {
+      this(sessionFactory, packId, fileSize, StorageByteCounters.disabled());
+    }
+
+    ReadAheadChunkedReadableChannel(
+        SessionFactory sessionFactory,
+        Long packId,
+        long fileSize,
+        StorageByteCounters storageByteCounters) {
       this.sessionFactory = sessionFactory;
       this.packId = packId;
       this.fileSize = fileSize;
+      this.storageByteCounters = storageByteCounters;
     }
 
     @Override
@@ -637,16 +662,18 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
         int chunkIndex = Math.toIntExact(position / PACK_CHUNK_SIZE);
         int offset = (int) (position % PACK_CHUNK_SIZE);
         int lastChunkIndex = lastChunkToPrefetch(chunkIndex, destination.remaining());
-        byte[] chunk = loadChunk(chunkIndex, lastChunkIndex);
+        CachedChunk chunk = loadChunk(chunkIndex, lastChunkIndex);
         int count =
             (int)
                 Math.min(
-                    Math.min(destination.remaining(), chunk.length - offset), fileSize - position);
+                    Math.min(destination.remaining(), chunk.data().length - offset),
+                    fileSize - position);
         if (count <= 0) {
           throw new IOException(
               "Invalid chunk " + chunkIndex + " for pack " + packId + " at position " + position);
         }
-        destination.put(chunk, offset, count);
+        destination.put(chunk.data(), offset, count);
+        storageByteCounters.recordReadAheadBytesConsumed(chunk.markConsumed(offset, count));
         position += count;
         total += count;
       }
@@ -660,13 +687,13 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       return Math.min(requestedLast, firstChunkIndex + MAX_PREFETCH_CHUNKS - 1);
     }
 
-    private byte[] loadChunk(int chunkIndex, int lastChunkIndex) throws IOException {
-      byte[] cached = cachedChunks.get(chunkIndex);
+    private CachedChunk loadChunk(int chunkIndex, int lastChunkIndex) throws IOException {
+      CachedChunk cached = cachedChunks.get(chunkIndex);
       if (cached != null) {
         return cached;
       }
       loadWindow(chunkIndex, lastChunkIndex);
-      byte[] loaded = cachedChunks.get(chunkIndex);
+      CachedChunk loaded = cachedChunks.get(chunkIndex);
       if (loaded == null) {
         throw new IOException("Missing chunk " + chunkIndex + " for pack " + packId);
       }
@@ -689,22 +716,35 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                 .getResultList();
       }
 
-      cachedChunks.clear();
+      LinkedHashMap<Integer, CachedChunk> loadedChunks = new LinkedHashMap<>();
+      long fetchedBytes = 0;
       int expectedChunkIndex = firstChunkIndex;
-      for (Object[] row : rows) {
-        int actualChunkIndex = ((Number) row[0]).intValue();
-        if (actualChunkIndex != expectedChunkIndex) {
+      try {
+        for (Object[] row : rows) {
+          int actualChunkIndex = ((Number) row[0]).intValue();
+          if (actualChunkIndex != expectedChunkIndex) {
+            throw new IOException("Missing chunk " + expectedChunkIndex + " for pack " + packId);
+          }
+          byte[] data = (byte[]) row[1];
+          int declaredSize = ((Number) row[2]).intValue();
+          storageByteCounters.recordDatabasePayloadBytesRead(data.length);
+          storageByteCounters.recordReadAheadBytesFetched(data.length);
+          fetchedBytes += data.length;
+          validateChunk(actualChunkIndex, data, declaredSize);
+          loadedChunks.put(
+              actualChunkIndex, new CachedChunk(data, storageByteCounters.enabled()));
+          expectedChunkIndex++;
+        }
+        if (expectedChunkIndex <= lastChunkIndex) {
           throw new IOException("Missing chunk " + expectedChunkIndex + " for pack " + packId);
         }
-        byte[] data = (byte[]) row[1];
-        int declaredSize = ((Number) row[2]).intValue();
-        validateChunk(actualChunkIndex, data, declaredSize);
-        cachedChunks.put(actualChunkIndex, data);
-        expectedChunkIndex++;
+      } catch (IOException failure) {
+        storageByteCounters.recordReadAheadOverfetchBytes(fetchedBytes);
+        throw failure;
       }
-      if (expectedChunkIndex <= lastChunkIndex) {
-        throw new IOException("Missing chunk " + expectedChunkIndex + " for pack " + packId);
-      }
+
+      discardCachedWindow();
+      cachedChunks.putAll(loadedChunks);
     }
 
     private void validateChunk(int chunkIndex, byte[] data, int declaredSize) throws IOException {
@@ -721,10 +761,22 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       }
     }
 
+    private void discardCachedWindow() {
+      if (storageByteCounters.enabled()) {
+        for (CachedChunk chunk : cachedChunks.values()) {
+          storageByteCounters.recordReadAheadOverfetchBytes(chunk.unconsumedBytes());
+        }
+      }
+      cachedChunks.clear();
+    }
+
     @Override
     public void close() {
+      if (!open) {
+        return;
+      }
       open = false;
-      cachedChunks.clear();
+      discardCachedWindow();
     }
 
     @Override
@@ -746,7 +798,7 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       if (newPosition < fileSize) {
         int targetChunkIndex = Math.toIntExact(newPosition / PACK_CHUNK_SIZE);
         if (!cachedChunks.containsKey(targetChunkIndex)) {
-          cachedChunks.clear();
+          discardCachedWindow();
         }
       }
       position = newPosition;
@@ -770,6 +822,33 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     private void ensureOpen() throws IOException {
       if (!open) {
         throw new IOException("Pack channel is closed");
+      }
+    }
+
+    private static final class CachedChunk {
+      private final byte[] data;
+      private final BitSet consumed;
+
+      private CachedChunk(byte[] data, boolean trackConsumption) {
+        this.data = data;
+        this.consumed = trackConsumption ? new BitSet(data.length) : null;
+      }
+
+      private byte[] data() {
+        return data;
+      }
+
+      private int markConsumed(int offset, int length) {
+        if (consumed == null) {
+          return 0;
+        }
+        int before = consumed.cardinality();
+        consumed.set(offset, offset + length);
+        return consumed.cardinality() - before;
+      }
+
+      private long unconsumedBytes() {
+        return consumed == null ? 0 : data.length - consumed.cardinality();
       }
     }
   }
