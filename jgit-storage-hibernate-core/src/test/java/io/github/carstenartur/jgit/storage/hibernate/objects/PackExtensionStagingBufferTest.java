@@ -68,7 +68,7 @@ class PackExtensionStagingBufferTest {
             ownerBudget, (payload, fileSize, createdAt) -> staged.set(payload));
     buffer.write(first, 0, first.length);
     assertTrue(buffer.memoryBacked());
-    assertEquals(1_024, ownerBudget.usedBytes());
+    assertEquals(first.length, ownerBudget.usedBytes());
     buffer.write(second, 0, second.length);
     assertFalse(buffer.memoryBacked());
     assertEquals(0, ownerBudget.usedBytes());

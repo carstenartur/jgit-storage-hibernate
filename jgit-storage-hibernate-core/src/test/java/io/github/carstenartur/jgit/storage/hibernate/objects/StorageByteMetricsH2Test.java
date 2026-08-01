@@ -31,7 +31,7 @@ class StorageByteMetricsH2Test {
   @Test
   void countsTemporaryFileTrafficAndCommittedInlinePayloadBytes() throws Exception {
     String repositoryName = "byte-metrics-staging";
-    byte[] payload = deterministicBytes(193, 17);
+    byte[] payload = deterministicBytes(HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD + 193, 17);
 
     try (HibernateSessionFactoryProvider provider = provider();
         HibernateRepository repository =

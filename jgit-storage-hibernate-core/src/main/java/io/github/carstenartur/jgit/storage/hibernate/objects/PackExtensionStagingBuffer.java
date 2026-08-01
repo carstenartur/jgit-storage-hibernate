@@ -37,7 +37,6 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
   static final int MAX_MEMORY_BYTES = HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD;
   static final long PROCESS_MEMORY_BUDGET_BYTES = 32L * 1024 * 1024;
   private static final int INITIAL_CAPACITY = 16 * 1024;
-  private static final int CONSTRAINED_INITIAL_CAPACITY = 1024;
   private static final MemoryBudget PROCESS_MEMORY_BUDGET =
       new MemoryBudget(PROCESS_MEMORY_BUDGET_BYTES);
 
@@ -213,7 +212,7 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
     // Narrow owner budgets are useful for tests and embedded integrations. The fallback is not
     // attempted on the ordinary process-budget-only path, so production writes retain one
     // reservation operation per growth step.
-    int constrainedCapacity = Math.max(CONSTRAINED_INITIAL_CAPACITY, requiredCapacity);
+    int constrainedCapacity = requiredCapacity;
     return ownerMemoryBudget != null
         && constrainedCapacity != preferredCapacity
         && resizeMemory(constrainedCapacity);
