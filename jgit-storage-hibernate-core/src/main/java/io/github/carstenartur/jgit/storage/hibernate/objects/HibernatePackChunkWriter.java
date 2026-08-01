@@ -12,6 +12,7 @@ import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -93,16 +94,17 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     };
   }
 
-  void insert(List<GitPackChunkEntity> chunks) {
-    Objects.requireNonNull(chunks, "chunks");
-    if (chunks.isEmpty()) {
+  /** Insert one ordered batch without creating ORM entities for the direct JDBC mode. */
+  void insert(long packId, int firstChunkIndex, List<byte[]> chunkData) {
+    Objects.requireNonNull(chunkData, "chunkData");
+    if (chunkData.isEmpty()) {
       return;
     }
     switch (mode) {
-      case STATELESS -> statelessSession.insertMultiple(List.copyOf(chunks));
-      case JDBC -> insertJdbc(chunks);
+      case JDBC -> insertJdbc(packId, firstChunkIndex, chunkData);
+      case STATELESS -> statelessSession.insertMultiple(toEntities(packId, firstChunkIndex, chunkData));
       case STATEFUL -> {
-        for (GitPackChunkEntity chunk : chunks) {
+        for (GitPackChunkEntity chunk : toEntities(packId, firstChunkIndex, chunkData)) {
           statefulSession.persist(chunk);
         }
         statefulSession.flush();
@@ -126,16 +128,17 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     }
   }
 
-  private void insertJdbc(List<GitPackChunkEntity> chunks) {
+  private void insertJdbc(long packId, int firstChunkIndex, List<byte[]> chunkData) {
     JdbcCoordinator jdbcCoordinator = jdbcSession.getJdbcCoordinator();
     PreparedStatement statement =
         jdbcCoordinator.getMutationStatementPreparer().prepareStatement(jdbcInsertSql, false);
     try {
-      for (GitPackChunkEntity chunk : chunks) {
-        statement.setLong(1, Objects.requireNonNull(chunk.getPackId(), "chunk.packId"));
-        statement.setInt(2, chunk.getChunkIndex());
-        statement.setBytes(3, Objects.requireNonNull(chunk.getData(), "chunk.data"));
-        statement.setInt(4, chunk.getChunkSize());
+      for (int offset = 0; offset < chunkData.size(); offset++) {
+        byte[] data = Objects.requireNonNull(chunkData.get(offset), "chunkData[" + offset + "]");
+        statement.setLong(1, packId);
+        statement.setInt(2, Math.addExact(firstChunkIndex, offset));
+        statement.setBytes(3, data);
+        statement.setInt(4, data.length);
         statement.addBatch();
       }
 
@@ -146,7 +149,7 @@ final class HibernatePackChunkWriter implements AutoCloseable {
       } finally {
         jdbcSession.getEventListenerManager().jdbcExecuteBatchEnd();
       }
-      verifyRowCounts(rowCounts, chunks.size());
+      verifyRowCounts(rowCounts, chunkData.size());
     } catch (SQLException exception) {
       jdbcCoordinator.afterFailedStatementExecution(exception);
       throw jdbcSession
@@ -160,6 +163,21 @@ final class HibernatePackChunkWriter implements AutoCloseable {
           .release(statement);
       jdbcCoordinator.afterStatementExecution();
     }
+  }
+
+  private static List<GitPackChunkEntity> toEntities(
+      long packId, int firstChunkIndex, List<byte[]> chunkData) {
+    List<GitPackChunkEntity> chunks = new ArrayList<>(chunkData.size());
+    for (int offset = 0; offset < chunkData.size(); offset++) {
+      byte[] data = Objects.requireNonNull(chunkData.get(offset), "chunkData[" + offset + "]");
+      GitPackChunkEntity chunk = new GitPackChunkEntity();
+      chunk.setPackId(packId);
+      chunk.setChunkIndex(Math.addExact(firstChunkIndex, offset));
+      chunk.setChunkSize(data.length);
+      chunk.setData(data);
+      chunks.add(chunk);
+    }
+    return chunks;
   }
 
   private static void verifyRowCounts(int[] rowCounts, int expectedRows) {
