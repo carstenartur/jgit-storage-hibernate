@@ -65,7 +65,7 @@ Core only:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.1.17</version>
+  <version>0.1.18</version>
 </dependency>
 ```
 
@@ -75,7 +75,7 @@ Optional generic history search:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.1.17</version>
+  <version>0.1.18</version>
 </dependency>
 ```
 
