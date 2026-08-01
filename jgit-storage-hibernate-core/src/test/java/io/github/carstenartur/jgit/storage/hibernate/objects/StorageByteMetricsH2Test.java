@@ -67,12 +67,12 @@ class StorageByteMetricsH2Test {
     byte[] payload = deterministicBytes(211, 29);
 
     try (HibernateSessionFactoryProvider provider = provider()) {
-      writePack(provider, repositoryName, payload);
+      String packName = writePack(provider, repositoryName, payload);
 
       try (HibernateRepository repository =
           HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
         ReadAheadHibernateObjDatabase database = database(repository);
-        DfsPackDescription description = database.listPacks().getFirst();
+        DfsPackDescription description = find(database.listPacks(), packName);
         StorageByteMetrics before = repository.getStorageByteMetrics();
 
         try (ReadableChannel channel = database.openFile(description, PackExt.PACK)) {
@@ -96,12 +96,12 @@ class StorageByteMetricsH2Test {
         deterministicBytes(HibernateObjDatabase.PACK_CHUNK_SIZE * 2 + 257, 43);
 
     try (HibernateSessionFactoryProvider provider = provider()) {
-      writePack(provider, repositoryName, payload);
+      String packName = writePack(provider, repositoryName, payload);
 
       try (HibernateRepository repository =
           HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
         ReadAheadHibernateObjDatabase database = database(repository);
-        DfsPackDescription description = database.listPacks().getFirst();
+        DfsPackDescription description = find(database.listPacks(), packName);
         StorageByteMetrics before = repository.getStorageByteMetrics();
 
         try (ReadableChannel channel = database.openFile(description, PackExt.PACK)) {
@@ -129,7 +129,7 @@ class StorageByteMetricsH2Test {
     }
   }
 
-  private static void writePack(
+  private static String writePack(
       HibernateSessionFactoryProvider provider, String repositoryName, byte[] payload)
       throws Exception {
     try (HibernateRepository repository =
@@ -137,13 +137,29 @@ class StorageByteMetricsH2Test {
       repository.create(true);
       ReadAheadHibernateObjDatabase database = database(repository);
       DfsPackDescription description = database.newPack(PackSource.RECEIVE);
+      String packName = baseName(description);
       try (DfsOutputStream stream = database.writeFile(description, PackExt.PACK)) {
         stream.write(payload, 0, payload.length);
       }
       description.addFileExt(PackExt.PACK);
       description.setFileSize(PackExt.PACK, payload.length);
       database.commitPackImpl(List.of(description), null);
+      return packName;
     }
+  }
+
+  private static DfsPackDescription find(
+      List<DfsPackDescription> descriptions, String packName) {
+    return descriptions.stream()
+        .filter(description -> baseName(description).equals(packName))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static String baseName(DfsPackDescription description) {
+    String fileName = description.getFileName(PackExt.PACK);
+    int dot = fileName.lastIndexOf('.');
+    return dot > 0 ? fileName.substring(0, dot) : fileName;
   }
 
   private static ReadAheadHibernateObjDatabase database(HibernateRepository repository) {
