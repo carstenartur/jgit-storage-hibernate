@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - perf/storage-byte-metrics-v2
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
