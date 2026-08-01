@@ -44,11 +44,12 @@ import org.hibernate.exception.ConstraintViolationException;
  * no database row.
  *
  * <p>Additive logical packs whose extensions all remain inline use one repository-locked transaction
- * for persistence and publication. When an additive logical pack contains at least one chunked
- * extension, Core persists the complete expected parent and payload set as invisible lease-owned
- * rows in one lock-free Hibernate transaction, then atomically publishes the complete logical
- * generation under one short repository lock. Readers continue to select only {@code committed=true}
- * rows.
+ * for persistence and publication. Small chunked logical packs also retain that direct path: below
+ * one MiB of total staged payload, the second transaction costs more than the lock interval it can
+ * save under ordinary low-contention operation. Larger additive packs are persisted as a complete
+ * invisible lease-owned generation in one lock-free Hibernate transaction, then atomically
+ * published under one short repository lock. Readers continue to select only
+ * {@code committed=true} rows.
  *
  * <p>Pack replacement and compaction remain on the established single locked transaction path. JGit
  * can validate refs before calling {@code commitPack}; releasing the repository lock between that
@@ -63,27 +64,52 @@ import org.hibernate.exception.ConstraintViolationException;
 final class StagedPackExtensionStore {
 
   private static final int CHUNK_BATCH_SIZE = 8;
+  static final long DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES = 1024L * 1024L;
+  private static final long MIN_PREPERSIST_PAYLOAD_BYTES =
+      HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD + 1L;
   private static final String PACK_EXTENSION_UNIQUE_CONSTRAINT = "uk_pack_repo_name_ext";
   private static final PrePublicationHook NO_PRE_PUBLICATION_HOOK = ignored -> {};
 
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
   private final PrePublicationHook prePublicationHook;
+  private final long minimumPrePersistedPayloadBytes;
   private final Map<ExtensionKey, StagedExtension> staged = new ConcurrentHashMap<>();
   private final Map<String, String> preparedTokensByPackName = new ConcurrentHashMap<>();
 
   StagedPackExtensionStore(
       String repositoryName, HibernateTransactionContext transactionContext) {
-    this(repositoryName, transactionContext, NO_PRE_PUBLICATION_HOOK);
+    this(
+        repositoryName,
+        transactionContext,
+        NO_PRE_PUBLICATION_HOOK,
+        DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES);
   }
 
   StagedPackExtensionStore(
       String repositoryName,
       HibernateTransactionContext transactionContext,
       PrePublicationHook prePublicationHook) {
+    this(
+        repositoryName,
+        transactionContext,
+        prePublicationHook,
+        MIN_PREPERSIST_PAYLOAD_BYTES);
+  }
+
+  StagedPackExtensionStore(
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
+      PrePublicationHook prePublicationHook,
+      long minimumPrePersistedPayloadBytes) {
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
     this.transactionContext = Objects.requireNonNull(transactionContext, "transactionContext");
     this.prePublicationHook = Objects.requireNonNull(prePublicationHook, "prePublicationHook");
+    if (minimumPrePersistedPayloadBytes < MIN_PREPERSIST_PAYLOAD_BYTES) {
+      throw new IllegalArgumentException(
+          "minimumPrePersistedPayloadBytes must be at least " + MIN_PREPERSIST_PAYLOAD_BYTES);
+    }
+    this.minimumPrePersistedPayloadBytes = minimumPrePersistedPayloadBytes;
   }
 
   DfsOutputStream open(DfsPackDescription description, PackExt extension) throws IOException {
@@ -405,23 +431,33 @@ final class StagedPackExtensionStore {
     return result;
   }
 
-  private static boolean shouldPrePersist(
+  private boolean shouldPrePersist(
       List<Publication> publications, Collection<DfsPackDescription> replaces) {
     if (replaces != null && !replaces.isEmpty()) {
       return false;
     }
     boolean chunked = false;
+    long totalPayloadBytes = 0;
     for (Publication publication : publications) {
       for (ExpectedExtension expected : publication.extensions()) {
         if (expected.staged() == null) {
           return false;
         }
-        if (expected.staged().fileSize() > HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD) {
+        long extensionBytes = expected.staged().fileSize();
+        totalPayloadBytes = saturatingAdd(totalPayloadBytes, extensionBytes);
+        if (extensionBytes > HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD) {
           chunked = true;
         }
       }
     }
-    return chunked;
+    return chunked && totalPayloadBytes >= minimumPrePersistedPayloadBytes;
+  }
+
+  private static long saturatingAdd(long left, long right) {
+    if (right > Long.MAX_VALUE - left) {
+      return Long.MAX_VALUE;
+    }
+    return left + right;
   }
 
   private static Set<String> publicationPackNames(List<Publication> publications) {
