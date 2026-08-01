@@ -1,14 +1,47 @@
 name: Apply adaptive publication source
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - perf/adaptive-publication-threshold
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
-  disabled-during-payload-upload:
-    if: ${{ false }}
+  apply:
     runs-on: ubuntu-latest
     steps:
-      - run: echo disabled
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/adaptive-publication-threshold
+          fetch-depth: 0
+      - name: Reconstruct and verify source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_path='jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java'
+          test_path='jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/AdaptivePackPublicationH2Test.java'
+          mkdir -p "$(dirname "$main_path")" "$(dirname "$test_path")"
+          cat .tmp/adaptive-staged.00 .tmp/adaptive-staged.01 .tmp/adaptive-staged.02 | base64 --decode | gzip --decompress > "$main_path"
+          cat .tmp/adaptive-test.00 .tmp/adaptive-test.01 | base64 --decode | gzip --decompress > "$test_path"
+          echo '3caa6a6286acb9651a674fe8c6aec22659ca862b0ba5ea2ee956666d318e3882  '"$main_path" | sha256sum --check
+          echo '2d3a874a0ea2b94090af2b93d795cc8e45595562bee82b870f77b00d4e05cf1c  '"$test_path" | sha256sum --check
+      - name: Commit reconstructed change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .tmp/adaptive-staged.java.gz.b64 .tmp/adaptive-test.java.gz.b64
+          git rm .tmp/adaptive-staged.00 .tmp/adaptive-staged.01 .tmp/adaptive-staged.02
+          git rm .tmp/adaptive-test.00 .tmp/adaptive-test.01
+          git rm .github/workflows/apply-adaptive-publication.yml
+          git add "$GITHUB_WORKSPACE/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java"
+          git add "$GITHUB_WORKSPACE/jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/AdaptivePackPublicationH2Test.java"
+          git commit -m 'Select two-phase publication only for larger logical packs'
+          git push origin HEAD:perf/adaptive-publication-threshold
