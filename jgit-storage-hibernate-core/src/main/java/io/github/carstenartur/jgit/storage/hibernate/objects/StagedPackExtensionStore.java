@@ -676,8 +676,9 @@ final class StagedPackExtensionStore {
     long fileSize = stagedExtension.fileSize();
     long position = 0;
     int chunkIndex = 0;
-    int pendingChunks = 0;
-    try (StagedPayloadReader reader = stagedExtension.openReader()) {
+    List<GitPackChunkEntity> pendingChunks = new ArrayList<>(CHUNK_BATCH_SIZE);
+    try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);
+        StagedPayloadReader reader = stagedExtension.openReader()) {
       while (position < fileSize) {
         int chunkLength =
             (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
@@ -697,20 +698,18 @@ final class StagedPackExtensionStore {
         chunk.setChunkIndex(chunkIndex);
         chunk.setChunkSize(chunkLength);
         chunk.setData(chunkData);
-        session.persist(chunk);
+        pendingChunks.add(chunk);
 
         position += chunkLength;
         chunkIndex++;
-        pendingChunks++;
-        if (pendingChunks == CHUNK_BATCH_SIZE) {
-          session.flush();
-          session.clear();
-          pendingChunks = 0;
+        if (pendingChunks.size() == CHUNK_BATCH_SIZE) {
+          chunkWriter.insert(pendingChunks);
+          pendingChunks.clear();
         }
       }
-    }
-    if (pendingChunks > 0) {
-      session.flush();
+      if (!pendingChunks.isEmpty()) {
+        chunkWriter.insert(pendingChunks);
+      }
     }
   }
 

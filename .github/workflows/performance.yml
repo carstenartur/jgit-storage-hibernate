@@ -93,7 +93,7 @@ jobs:
           echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
 
   jdbc-batching:
-    name: PostgreSQL JDBC batching comparison
+    name: PostgreSQL pack-chunk writer comparison
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -116,7 +116,7 @@ jobs:
           mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
             | tee target/jdbc-batching/maven-build.log
 
-      - name: Compare large-pack publication with batching off and on
+      - name: Compare stateful batching and stateless chunk publication
         shell: bash
         run: |
           set -o pipefail
@@ -151,14 +151,14 @@ jobs:
             cp "$output_source" target/jdbc-batching/jmh-output.txt
           fi
 
-      - name: Convert focused batch comparison
+      - name: Convert focused writer comparison
         run: |
           python3 .github/scripts/convert-jmh-backend-comparison.py \
             target/jdbc-batching/jmh-result.json \
             target/jdbc-batching/comparison.json
           cat target/jdbc-batching/comparison.json
 
-      - name: Upload focused batch results
+      - name: Upload focused writer results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -166,13 +166,13 @@ jobs:
           path: target/jdbc-batching/*
           if-no-files-found: error
 
-      - name: Report JDBC batch comparison
+      - name: Report pack-chunk writer comparison
         if: always()
         run: |
-          echo '### PostgreSQL JDBC batching' >> "$GITHUB_STEP_SUMMARY"
+          echo '### PostgreSQL pack-chunk writers' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo 'A focused twelve-MiB non-compressible pack is measured with Hibernate JDBC batching disabled and enabled.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'The artifact includes elapsed time, prepared statements, entity inserts, flushes and real JDBC batch-execution events.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A focused twelve-MiB non-compressible pack compares stateful insertion with batching disabled, portable batching, PostgreSQL rewriting and a stateless shared-transaction writer.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The artifact includes elapsed time, allocation and GC metrics, prepared statements, entity inserts, flushes and real JDBC batch-execution events.' >> "$GITHUB_STEP_SUMMARY"
 
   pack-capacity:
     name: Chunked pack capacity 1/16/128 MiB

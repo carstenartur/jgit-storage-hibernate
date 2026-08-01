@@ -66,7 +66,33 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         self.assertAlmostEqual(2.5, converted["value"])
         self.assertAlmostEqual(0.1, converted["range"])
 
-    def test_converts_large_pack_batching_modes(self) -> None:
+    def test_converts_large_pack_write_modes(self) -> None:
+        converted = MODULE.convert(
+            [
+                self._write_result("stateful-batching-disabled", 12.0),
+                self._write_result("stateful-batching", 9.0),
+                self._write_result("stateful-batching-rewrite", 8.0),
+                self._write_result("stateless", 7.0),
+            ]
+        )
+
+        names = {entry["name"] for entry in converted}
+        self.assertEqual(4, len(converted))
+        self.assertIn(
+            "publishTwelveMiBPack — JGit + PostgreSQL (stateful, batching off)", names
+        )
+        self.assertIn(
+            "publishTwelveMiBPack — JGit + PostgreSQL (stateful batching)", names
+        )
+        self.assertIn(
+            "publishTwelveMiBPack — JGit + PostgreSQL (stateful batching + rewrite)",
+            names,
+        )
+        self.assertIn(
+            "publishTwelveMiBPack — JGit + PostgreSQL (stateless chunk writer)", names
+        )
+
+    def test_retains_legacy_batching_mode_labels(self) -> None:
         converted = MODULE.convert(
             [
                 self._batching_result("disabled", 12.0),
@@ -92,7 +118,7 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
                 json.dumps([self._backend_result("postgresql", 12.0)]), encoding="utf-8"
             )
             focused.write_text(
-                json.dumps([self._batching_result("enabled", 9.0)]), encoding="utf-8"
+                json.dumps([self._write_result("stateless", 9.0)]), encoding="utf-8"
             )
 
             combined = MODULE.load_results([standard, focused])
@@ -104,10 +130,16 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unsupported JMH backend"):
             MODULE.convert([self._backend_result("unknown", 1.0)])
 
+    def test_rejects_unknown_write_modes(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unsupported JMH write mode"):
+            MODULE.convert([self._write_result("unknown", 1.0)])
+
     def test_rejects_results_without_series_parameter(self) -> None:
         result = self._backend_result("postgresql", 1.0)
         result["params"] = {}
-        with self.assertRaisesRegex(ValueError, "neither a backend nor a batchingMode"):
+        with self.assertRaisesRegex(
+            ValueError, "neither a backend, writeMode nor a batchingMode"
+        ):
             MODULE.convert([result])
 
     def test_rejects_zero_throughput(self) -> None:
@@ -124,6 +156,13 @@ class ConvertJmhBackendComparisonTest(unittest.TestCase):
     def _backend_result(backend: str, score: float) -> dict:
         result = ConvertJmhBackendComparisonTest._result(score)
         result["params"] = {"backend": backend}
+        return result
+
+    @staticmethod
+    def _write_result(write_mode: str, score: float) -> dict:
+        result = ConvertJmhBackendComparisonTest._result(score)
+        result["benchmark"] = "example.LargePackJdbcBatchBenchmark.publishTwelveMiBPack"
+        result["params"] = {"writeMode": write_mode}
         return result
 
     @staticmethod
