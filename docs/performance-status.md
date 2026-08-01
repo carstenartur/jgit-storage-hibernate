@@ -1,6 +1,6 @@
 # Performance status and distance to the ceiling
 
-This page records the performance work completed in `jgit-storage-hibernate`, the evidence behind it, and the remaining distance to an ideal implementation. The snapshot below describes `main` after PR [#174](https://github.com/carstenartur/jgit-storage-hibernate/pull/174) on 2026-08-01.
+This page records the performance work completed in `jgit-storage-hibernate`, the evidence behind it, and the remaining distance to an ideal implementation. The snapshot describes merged `main` after PR [#174](https://github.com/carstenartur/jgit-storage-hibernate/pull/174) and also records the subsequently rejected direct-JDBC experiment in PR [#176](https://github.com/carstenartur/jgit-storage-hibernate/pull/176), both on 2026-08-01.
 
 The companion [benchmark methodology](benchmarks.md) explains the JMH fixtures, databases and interpretation limits. The [public performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/) contains one chart per operation. Links on this page jump directly to the relevant chart.
 
@@ -8,7 +8,7 @@ The companion [benchmark methodology](benchmarks.md) explains the JMH fixtures, 
 
 The database backend is no longer uniformly slower than a filesystem repository. In the first complete protocol comparison, PostgreSQL was competitive with or faster than the filesystem point estimate for incremental push and initial clone-style fetch, while incremental fetch retained a moderate database overhead. Initial durable ingestion remained the largest visible gap.
 
-The focused 12 MiB pack-publication benchmark has also moved from statement-count tuning to memory- and payload-path tuning. Portable batching reduces database executions substantially. Directly filling final chunk arrays removed one payload-sized heap copy and improved the controlled 12 MiB run by roughly 8%. The optional stateless ORM writer then reduced allocation by another 23.9% and Hibernate flushes by 40%, while retaining the same JDBC batch and statement structure. Its mean latency was 2.5% lower in the first run, but the confidence intervals overlap, so the default remains the stateful writer.
+The focused 12 MiB pack-publication benchmark has also moved from statement-count tuning to memory- and payload-path tuning. Portable batching reduces database executions substantially. Directly filling final chunk arrays removed one payload-sized heap copy and improved the controlled 12 MiB run by roughly 8%. The optional stateless ORM writer then reduced allocation by another 23.9% and Hibernate flushes by 40%, while retaining the same JDBC batch and statement structure. Its mean latency was 2.5% lower in the first run, but the confidence intervals overlap, so the default remains the stateful writer. A subsequent direct-JDBC prototype removed chunk entities entirely, yet two independent runs saved only 0.047–0.048% additional allocation and showed no repeatable latency improvement; PR #176 was therefore closed without merge.
 
 The current position can therefore be summarized as follows:
 
@@ -77,13 +77,26 @@ The first four-mode result after PR #174 publishes a deterministic non-compressi
 
 See [publishTwelveMiBPack](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-publish-twelve-mi-b-pack) and the detailed [JDBC batching and chunk-writer notes](operations/jdbc-batching.md).
 
+### Direct JDBC experiment
+
+PR [#176](https://github.com/carstenartur/jgit-storage-hibernate/pull/176) implemented the strongest reasonable direct-JDBC comparison: no chunk entities, one schema-aware prepared statement reused across all bounded batches, the same Hibernate-managed connection and transaction, explicit row-count validation, shared rollback and ordinary Hibernate Search indexing for the stateful projection entities.
+
+Two independent workflow runs found no repeatable advantage over stateless ORM:
+
+| Run | Stateless mean | JDBC mean | Stateless median | JDBC median | Additional JDBC allocation saving |
+|---|---:|---:|---:|---:|---:|
+| 1 | 467.12 ms | 464.63 ms | 465.91 ms | 467.23 ms | 18.6 KiB / 0.047% |
+| 2 | 511.92 ms | 516.54 ms | 513.59 ms | 511.18 ms | 18.8 KiB / 0.048% |
+
+The sign of the tiny latency difference reversed between runs and the confidence intervals overlapped widely. Direct JDBC therefore duplicates almost all gains already achieved portably by `StatelessSession` while adding Hibernate-internal SPI dependencies and manual SQL, resource and error handling. It was deliberately not merged. The stateful writer remains the default; stateless ORM remains the preferred experimental path until larger payload measurements justify a threshold.
+
 What this establishes:
 
 - batching has already removed most avoidable per-chunk JDBC executions;
 - PostgreSQL `reWriteBatchedInserts` did not improve this local binary-payload workload;
 - the stateless path removes a material amount of persistence-context allocation without changing the SQL shape;
 - the remaining elapsed time is not primarily explained by statement count;
-- direct JDBC can only be justified if it improves beyond the stateless path, not merely beyond the old stateful baseline.
+- the completed direct-JDBC prototype did not improve materially beyond the stateless path and was not merged.
 
 What it does **not** establish:
 
@@ -115,6 +128,7 @@ What it does **not** establish:
 | Adaptive direct versus two-phase publication | Small/all-inline publications retain one transaction; large additive chunked payloads are persisted invisibly before the short publication lock. | [same repository](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-publish-to-same-repository), [different repositories](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-publish-to-different-repositories), PRs [#158](https://github.com/carstenartur/jgit-storage-hibernate/pull/158) and [#171](https://github.com/carstenartur/jgit-storage-hibernate/pull/171) |
 | Database-cascade replacement deletion | Removes parent-ID selection and explicit child deletion while preserving exact repository-scoped replacement semantics. | PR [#151](https://github.com/carstenartur/jgit-storage-hibernate/pull/151) |
 | Optional stateless chunk insertion | Avoids persistence-context/action-queue overhead for immutable non-indexed payload rows and reduced allocation by 23.9% in the first 12 MiB result. | [12 MiB writer](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-publish-twelve-mi-b-pack), PR [#174](https://github.com/carstenartur/jgit-storage-hibernate/pull/174) |
+| Direct JDBC prototype rejected | Proved that removing the remaining chunk entities and one prepared statement saves only about 19 KiB/op beyond stateless ORM and provides no repeatable latency gain; avoids adding Hibernate-internal SPI and manual SQL to production. | PR [#176](https://github.com/carstenartur/jgit-storage-hibernate/pull/176) |
 
 ### Read path
 
@@ -133,7 +147,7 @@ What it does **not** establish:
 | JGit pack/protocol CPU | Uses ordinary JGit APIs and pack formats. | Essentially unavoidable unless JGit itself changes or work is amortized through larger batches/repack. |
 | Small-payload staging | Memory-first path performs no temporary-file I/O when the complete extension remains inline. | Near the semantic floor; remaining cost is JGit generation, entity/SQL work and durable commit. |
 | Large-payload staging | One bounded file supplies random reads and publication streaming; redundant full-chunk copy is gone. | A physical write plus reread still occurs. Avoiding it requires a different random-readable staging design or direct streaming that remains compatible with JGit retries and rollback. |
-| ORM chunk handling | Stateful batching is bounded; stateless ORM removes the persistence context from chunk rows. | Direct JDBC may remove remaining entity/metamodel overhead, but must outperform stateless ORM measurably. |
+| ORM chunk handling | Stateful batching is bounded; stateless ORM removes the persistence context from chunk rows. A complete JDBC prototype confirmed that the remaining entity allocation is negligible. | Direct JDBC is no longer a promising gap. The remaining question is the payload-size threshold at which stateless ORM is repeatably worthwhile. |
 | JDBC round trips | Thirteen chunk rows fit into two batches in the focused workload; all batched/stateless modes use five JDBC executions. | Larger batches, SQL Server bulk copy or PostgreSQL-specific transfer can be tested, but portability and rollback/error semantics must remain intact. |
 | Database durability | Atomic transactions, WAL and committed visibility are preserved. | This is largely unavoidable. The current gap cannot be quantified until WAL bytes, fsync time and raw JDBC transfer capacity are measured. |
 | Repository lock | Large additive payload transfer occurs outside the lock; final publication remains repository-scoped. | The compare-and-publish section is required. Contention-aware selection or durable queues can improve scheduling, not eliminate ordering. |
@@ -162,7 +176,7 @@ Until then, the most honest ranking is:
 
 The open performance issues are ordered by the evidence they can add:
 
-1. [#166 — stateless ORM versus direct JDBC for very large payloads](https://github.com/carstenartur/jgit-storage-hibernate/issues/166): extend to 16/128/512 MiB and supported databases, then introduce direct JDBC only if it beats stateless ORM materially.
+1. [#166 — determine the large-pack threshold for stateless ORM](https://github.com/carstenartur/jgit-storage-hibernate/issues/166): direct JDBC has been rejected; extend stateful-versus-stateless measurements to 16/128/512 MiB, supported databases and concurrent publications before considering automatic selection.
 2. [#163 — publish storage byte metrics in JMH](https://github.com/carstenartur/jgit-storage-hibernate/issues/163): quantify staging amplification and read-ahead overfetch rather than optimizing only statement counts.
 3. [#165 — repository aging, MIDX and repack thresholds](https://github.com/carstenartur/jgit-storage-hibernate/issues/165): determine when fresh-repository results stop representing real lookup and clone/fetch behavior.
 4. [#161 — adaptive publication selection](https://github.com/carstenartur/jgit-storage-hibernate/issues/161): evaluate diagnostics and contention-aware policy against the deterministic one-MiB selector.
