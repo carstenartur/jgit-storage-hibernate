@@ -671,41 +671,42 @@ final class StagedPackExtensionStore {
   }
 
   private void persistChunks(
-    Session session, Long packId, StagedExtension stagedExtension) throws IOException {
-  long fileSize = stagedExtension.fileSize();
-  long position = 0;
-  int chunkIndex = 0;
-  List<byte[]> pendingChunks = new ArrayList<>(CHUNK_BATCH_SIZE);
-  try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);
-      StagedPayloadReader reader = stagedExtension.openReader()) {
-    while (position < fileSize) {
-      int chunkLength =
-          (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
-      byte[] chunkData = new byte[chunkLength];
-      ByteBuffer destination = ByteBuffer.wrap(chunkData);
-      long chunkPosition = position;
-      while (destination.hasRemaining()) {
-        int count = reader.read(chunkPosition, destination);
-        if (count <= 0) {
-          throw new IOException("Staged pack payload ended before declared size " + fileSize);
+      Session session, Long packId, StagedExtension stagedExtension) throws IOException {
+    long fileSize = stagedExtension.fileSize();
+    long position = 0;
+    int chunkIndex = 0;
+    List<byte[]> pendingChunks = new ArrayList<>(CHUNK_BATCH_SIZE);
+    try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);
+        StagedPayloadReader reader = stagedExtension.openReader()) {
+      while (position < fileSize) {
+        int chunkLength =
+            (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
+        byte[] chunkData = new byte[chunkLength];
+        ByteBuffer destination = ByteBuffer.wrap(chunkData);
+        long chunkPosition = position;
+        while (destination.hasRemaining()) {
+          int count = reader.read(chunkPosition, destination);
+          if (count <= 0) {
+            throw new IOException(
+                "Staged pack payload ended before declared size " + fileSize);
+          }
+          chunkPosition += count;
         }
-        chunkPosition += count;
-      }
 
-      pendingChunks.add(chunkData);
-      position += chunkLength;
-      chunkIndex++;
-      if (pendingChunks.size() == CHUNK_BATCH_SIZE) {
-        chunkWriter.insert(
-            packId, chunkIndex - pendingChunks.size(), pendingChunks);
-        pendingChunks.clear();
+        pendingChunks.add(chunkData);
+        position += chunkLength;
+        chunkIndex++;
+        if (pendingChunks.size() == CHUNK_BATCH_SIZE) {
+          chunkWriter.insert(
+              packId, chunkIndex - pendingChunks.size(), pendingChunks);
+          pendingChunks.clear();
+        }
       }
-    }
-    if (!pendingChunks.isEmpty()) {
-      chunkWriter.insert(packId, chunkIndex - pendingChunks.size(), pendingChunks);
+      if (!pendingChunks.isEmpty()) {
+        chunkWriter.insert(packId, chunkIndex - pendingChunks.size(), pendingChunks);
+      }
     }
   }
-}
   private static long committedPayloadBytes(List<CommittedExtension> extensions) {
     long total = 0;
     for (CommittedExtension extension : extensions) {
