@@ -44,6 +44,34 @@ jobs:
           script = '\n'.join(
               line[10:] if line.startswith('          ') else line
               for line in embedded.splitlines()) + '\n'
+
+          strict_replace = '''def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"Expected source fragment not found in {path}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+          '''
+          resilient_replace = '''def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if old not in text:
+                  if (path.endswith("StagedPackExtensionStore.java")
+                          and "private void persistChunks(" in old):
+                      method_start = text.index("  private void persistChunks(")
+                      method_end = text.index(
+                          "\n  private static long committedPayloadBytes", method_start)
+                      target.write_text(
+                          text[:method_start] + new.rstrip() + text[method_end:],
+                          encoding="utf-8")
+                      return
+                  raise SystemExit(f"Expected source fragment not found in {path}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+          '''
+          if strict_replace not in script:
+              raise SystemExit('Could not locate replace_once helper in embedded script')
+          script = script.replace(strict_replace, resilient_replace, 1)
+
           Path('/tmp/apply-stateless-pack-chunk-writer.py').write_text(
               script, encoding='utf-8')
           subprocess.run(
