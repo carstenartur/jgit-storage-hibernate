@@ -3,15 +3,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      release_version:
-        description: 'Release version without leading v in X.Y.Z format. Must match the current SNAPSHOT base.'
+      next_version_increment:
+        description: 'Select how the development version advances after this release'
         required: true
-        type: string
-      next_development_version:
-        description: 'Next development version in X.Y.Z-SNAPSHOT format. Leave empty to increment patch.'
-        required: false
-        type: string
-        default: ''
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
       skip_tests:
         description: 'Skip tests during a dry run; real releases reject this option'
         required: false
@@ -45,38 +45,149 @@ jobs:
           ref: main
           fetch-depth: 0
           token: ${{ github.token }}
-      - name: Resolve workflow inputs or guarded release request
+
+      - name: Resolve repository-owned release plan
         id: request
         env:
           EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref_name }}
-          INPUT_RELEASE: ${{ inputs.release_version }}
-          INPUT_NEXT: ${{ inputs.next_development_version }}
+          INPUT_INCREMENT: ${{ inputs.next_version_increment }}
           INPUT_SKIP: ${{ inputs.skip_tests }}
           INPUT_DRY: ${{ inputs.dry_run }}
+        shell: bash
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            version="$INPUT_RELEASE"; next="$INPUT_NEXT"; skip="$INPUT_SKIP"; dry="$INPUT_DRY"; request=''
-          else
-            version=${REF_NAME#release-request/}; request="$REF_NAME"; next=''; skip=false; dry=false
-            git fetch origin "$REF_NAME"
-            marker=$(git show "origin/$REF_NAME:.github/release-request" | tr -d '[:space:]')
-            [[ "$marker" == "$version" ]] || { echo "::error::Release marker $marker does not match branch version $version"; exit 1; }
-          fi
-          echo "release_version=$version" >> "$GITHUB_OUTPUT"
-          echo "next_version=$next" >> "$GITHUB_OUTPUT"
-          echo "skip_tests=$skip" >> "$GITHUB_OUTPUT"
-          echo "dry_run=$dry" >> "$GITHUB_OUTPUT"
-          echo "request_branch=$request" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import xml.etree.ElementTree as ET
+
+          release_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+          snapshot_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$")
+
+          def root_version() -> str:
+              root = ET.parse("pom.xml").getroot()
+              value = root.findtext("{http://maven.apache.org/POM/4.0.0}version")
+              if not value:
+                  raise SystemExit("::error::Root pom.xml has no project version")
+              return value.strip()
+
+          def bump(release: str, increment: str) -> str:
+              major, minor, patch = map(int, release.split("."))
+              if increment == "patch":
+                  patch += 1
+              elif increment == "minor":
+                  minor += 1
+                  patch = 0
+              elif increment == "major":
+                  major += 1
+                  minor = 0
+                  patch = 0
+              else:
+                  raise SystemExit(
+                      f"::error::Unsupported next_version_increment {increment!r}"
+                  )
+              return f"{major}.{minor}.{patch}-SNAPSHOT"
+
+          event = os.environ["EVENT_NAME"]
+          request_branch = ""
+          if event == "workflow_dispatch":
+              current = root_version()
+              if not snapshot_pattern.fullmatch(current):
+                  raise SystemExit(
+                      f"::error::Current Maven version must use X.Y.Z-SNAPSHOT, found {current!r}"
+                  )
+              release = current.removesuffix("-SNAPSHOT")
+              next_version = bump(release, os.environ["INPUT_INCREMENT"])
+              skip_tests = os.environ.get("INPUT_SKIP") or "false"
+              dry_run = os.environ.get("INPUT_DRY") or "false"
+          elif event == "push":
+              request_branch = os.environ["REF_NAME"]
+              if not request_branch.startswith("release-request/"):
+                  raise SystemExit(
+                      f"::error::Unexpected release request branch {request_branch!r}"
+                  )
+              branch_release = request_branch.removeprefix("release-request/")
+              subprocess.run(
+                  ["git", "fetch", "origin", request_branch], check=True
+              )
+              marker = subprocess.check_output(
+                  [
+                      "git",
+                      "show",
+                      f"origin/{request_branch}:.github/release-request",
+                  ],
+                  text=True,
+              ).strip()
+              try:
+                  request = json.loads(marker)
+              except json.JSONDecodeError:
+                  request = {"release_version": marker}
+              if not isinstance(request, dict):
+                  raise SystemExit(
+                      "::error::.github/release-request must be a version string or JSON object"
+                  )
+              release = str(request.get("release_version", "")).strip()
+              if release != branch_release:
+                  raise SystemExit(
+                      f"::error::Release marker {release!r} does not match branch version {branch_release!r}"
+                  )
+              requested_next = request.get("next_development_version")
+              if requested_next is None:
+                  next_version = bump(release, "patch")
+              elif not isinstance(requested_next, str):
+                  raise SystemExit(
+                      "::error::next_development_version in the release request must be a string"
+                  )
+              else:
+                  next_version = requested_next.strip()
+              skip_tests = "false"
+              dry_run = "false"
+          else:
+              raise SystemExit(f"::error::Unsupported release event {event!r}")
+
+          if not release_pattern.fullmatch(release):
+              raise SystemExit(
+                  f"::error::Resolved release version {release!r} must use X.Y.Z"
+              )
+          if not snapshot_pattern.fullmatch(next_version):
+              raise SystemExit(
+                  f"::error::Resolved next development version {next_version!r} must use X.Y.Z-SNAPSHOT"
+              )
+          if skip_tests not in {"true", "false"} or dry_run not in {"true", "false"}:
+              raise SystemExit("::error::Boolean release inputs must be true or false")
+
+          release_tuple = tuple(map(int, release.split(".")))
+          next_tuple = tuple(
+              map(int, next_version.removesuffix("-SNAPSHOT").split("."))
+          )
+          if next_tuple <= release_tuple:
+              raise SystemExit(
+                  f"::error::Next development version {next_version} must be newer than release {release}"
+              )
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              print(f"release_version={release}", file=handle)
+              print(f"next_version={next_version}", file=handle)
+              print(f"skip_tests={skip_tests}", file=handle)
+              print(f"dry_run={dry_run}", file=handle)
+              print(f"request_branch={request_branch}", file=handle)
+          PY
+
       - name: Set up JDK 21
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
+
       - name: Verify security policy
         run: python3 .github/scripts/verify-security-policy.py
+
       - name: Run release state machine
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
