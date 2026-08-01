@@ -1,0 +1,190 @@
+{
+  "canonicalChecksums": [
+    "sha256",
+    "sha512"
+  ],
+  "compatibilityChecksums": [
+    "sha1"
+  ],
+  "files": [
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18-javadoc.jar",
+      "sha1": "83081266672f0d8c911a5d9939f82db070480ffa",
+      "sha256": "7639c8d3507ecf900e60d209274f792678b3742e3134abc1dd3e7261f26e92ab",
+      "sha512": "822e4511fa5d34ead56b7f35c4355203b42c70dc453bb170d7094e13442d52bee2ae1b72dd96b41e469e01082ce346548b83d81023bb0badc561765357a941d9",
+      "size": 233838
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18-sources.jar",
+      "sha1": "cb2e5ae2d72f839fca55c5dc6c412cf915ac59f1",
+      "sha256": "210fa8ae8bceaf227b48fd6b0850b7011bdc4ce8467015aba33b89a3500152c4",
+      "sha512": "854ab56e2ffe16a49050f6af5aee14f05f066c167e947eaa0c4888180091faaa3d94abf8369e1813db3ee19dacb1edb1ce1d6e96daca8a2cbd4619fea92b4cba",
+      "size": 23884
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18.jar",
+      "sha1": "c451f3712844c582da8341aa0111e35f4ca65b19",
+      "sha256": "fdeb30f4f9a5048643040971af1d88a7e4441f21d6dc2fd2c2bffae3d2c52cdd",
+      "sha512": "785ced0ed8a5cc98921bfd7a6255f4e170608b2ad59fc2992c14f3aedfa008227dfcc28d8ca8709373f4fa7c6a79dc0ba644b7ff555ed15220f649c3de3a3a3c",
+      "size": 44470
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18.pom",
+      "sha1": "96ba49b55f11316f8a6dda60c3dfed35f591407d",
+      "sha256": "2f1fced01ab8b4d98f140573ad25b7238e4bdb6e13b958ab40c5e4d7d9ce5a01",
+      "sha512": "17d37e876a3d58f95a00d4bfed41bc68b95b40e6a38fe54698ea3a939f3ed6ef320878e6ee423db0049140eea612070c30a472e01812f0743234f1c6fad417db",
+      "size": 2156
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18-javadoc.jar",
+      "sha1": "35a19e53bfa89d330836930baacbcf729cca3d69",
+      "sha256": "1710c9f5324befdca98329c7d076adc98d856a1cd700f027aba9fe68dfc36148",
+      "sha512": "5bfa3448e9d1f26326a56c98db55f855db546556db4edf1ee2c13d9e6e7f01370f8536c77fab451097a8920c6e23acb1bcad4976ce606dcc5abb30ac272d53e9",
+      "size": 406538
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18-sources.jar",
+      "sha1": "50aa1e7ee39f1d9c6e41b95c00c6c8ccb08007bf",
+      "sha256": "6f20452969f161e3d96e42b5287cb44dd15e8a96b7037f980f4d09c7e808dabd",
+      "sha512": "8b6186c3fbf127aff0db6609b2b082195315d9536d3ea5f3503abaf933fa8a8692157a7e1d596e5da2f5f7e8bec602248d091ae16ee19fe4c18c78a6ba6b2ac5",
+      "size": 105028
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18.jar",
+      "sha1": "a0f6e91f82a5a9490a3290398099bc5c1930cb2c",
+      "sha256": "465116611d04fdd5ad56d6c36fa249a3fc70205c6990ef29aea9c05fea12b42f",
+      "sha512": "1e1c1d37d5fb314fa0ebc572740b24be92c083a5f8a79240f15f9b51f9f3774f3fb1b0ea9a1a84278cf088f80c9813d63be18a7bb793d039279b17c99342efaf",
+      "size": 198758
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18.pom",
+      "sha1": "dbab85e7c257540f7a4a06a653fa2a438dfe38b4",
+      "sha256": "20fa2db5482a564b8c5136dd9df1f42b43abaa79b372090cd12539121585f628",
+      "sha512": "edc930dfc47638987c277a7a6668049e78117144231b53aca5bafd8d15ad87b9167f24296c24243db384e3a61bc49df85a91062d90534e27c4c98bdffef728f5",
+      "size": 5134
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18-javadoc.jar",
+      "sha1": "47800284454edaacdb650a08910ab3c23552c220",
+      "sha256": "3872c82b7c59b188adecb6621f24d0031a97ba98df89a76d0688b1143af093d8",
+      "sha512": "d487f7cec6a4c26fa0f0604ef935a118c513e473d33a3e0e62a1e2c887fc41a7fbefcab7400de8671977adf737f29ef48687bef652a8beb86a01e6109f7c5d3c",
+      "size": 314959
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18-sources.jar",
+      "sha1": "ca6fadaca8a1c346095def71244a9bd5590199c3",
+      "sha256": "23eaad0815a012433a583e64bc8bc402ffa5be20c7486a9f0b2207197103db1d",
+      "sha512": "d9927980793886e4634263e6b1e0aec9f5e4e6c0e7d14528f5a72df646cfa0ee67d007abfdc444845bd6cd9c8c4b68544b569137a3de1a2e2f65ab9495255a92",
+      "size": 109189
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18.jar",
+      "sha1": "44a5bf160e09dc1632b0c635ed612170ce11c4d7",
+      "sha256": "17bd3b44a305f22dbbb49ee3c717a88cc1f7e41440c631246b25daff3ac5c1d0",
+      "sha512": "1fba4c0734f5acbd7f9ae1a72626d7e8e4262e2adcf83c47f04f95eed279d120e74d9ff8d05076d6b0db39043d18b981d6bb2ba7e15c290fdaedc56a16fbd55f",
+      "size": 197728
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18.pom",
+      "sha1": "4d0a16d337509dc17dcaed41ecd93c040c462499",
+      "sha256": "d40e660388db278772cb64e9c404bb82d438f3e9e9a63ff871780b15e4908f63",
+      "sha512": "9b331adf67e36544ea849a675a9767d7af9dddc2f4b61bcb80c6ffa5f544f97743ce0c4c3a1df6dfd6f6c42e7b80c41e6a0c548e569f8794f0122a26dc7ddb89",
+      "size": 4560
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18-javadoc.jar",
+      "sha1": "5f2493fd556b08a0e7df7995442426a491f64b31",
+      "sha256": "af1679141df64109c151a25bef8a6e3da1c366f857e3530990e46154c3cfb561",
+      "sha512": "e1930dcc6eda63bd1c931a48698fa53b3b8a327d2d1e78c237d524631f89722e548f3c793ebb91c7b21e0b2725acc761e8f3b2d5f8cbfa5e0de0c1d772179865",
+      "size": 408551
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18-sources.jar",
+      "sha1": "43b90ce6faf0c4cd2b55949a64ed8831b059a7fe",
+      "sha256": "0d345da07c4513b2908dc8fa15d73eaaceeda94d3983fc9afd50bab257686bc4",
+      "sha512": "a86eae9ccb5646df30bcac32c2bb9d15fc06681e67edd7287ce7595b122b191e35dc6e3876ee1288d03bcc7929cc74d5c1fd0c179c1d2a999a48ee728e975ca3",
+      "size": 64105
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18.jar",
+      "sha1": "7ffecd5743816215e1192c7eee4d6bf9802366aa",
+      "sha256": "2064e005d26aa3913fb20f5f29a0eab2f6c5d57ac735bcfc36aad534c2743dbf",
+      "sha512": "889566634eebee926d9b573ab6c6ab9ed804d97565dadaca945b0273771b8deb224994dd07b0320eb55150413110e965298ba5bb3543bb90571a8d189ec1d751",
+      "size": 146231
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18.pom",
+      "sha1": "8888d014d18666573794a0006a44814c07e91d8d",
+      "sha256": "48a1795b711f3a28300900cefdc19abf58c3af1c9821726b85063158da87c49e",
+      "sha512": "7852778110203cebbcad26c456f7d9126dba462b472510e030598c958b65a4557985a680e7cb1abd4596f2664a1e68024341fbceed2116647c5223d1b0ac029e",
+      "size": 2687
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-parent/0.1.18/jgit-storage-hibernate-parent-0.1.18.pom",
+      "sha1": "baac38f4a00329d42b0bd03fa197805bf1d78502",
+      "sha256": "761a81ab47c794fe8df05371616b2c88f0db20377f692e7b027b699cde4c195e",
+      "sha512": "efa2e376e8d57d5a187657b2b3a1e74c94be4d6c0f4d552399d40357cea81fb8dbebaa6494cdc3347a63405dddbe5e9114630e357998d563f914e2c8a5a56af5",
+      "size": 16031
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18-javadoc.jar",
+      "sha1": "aabc0b4a5dfed37f26cd51f3da77e6d4694260ab",
+      "sha256": "944545929060ca5b9bd7da5a81f92e49d47b571e80674c928b27dadd6b3ed861",
+      "sha512": "bfa1ab02918876262ffd2623b3a64b0d5bfe760d4fe9351281c270ad54fe7d35ae5370a8937a7cd5c2cb8dd55e19b261aa2726f7525835cf26e0fd889dc5bcd4",
+      "size": 208353
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18-sources.jar",
+      "sha1": "367d1c698c0034646edc48abd0bb9551fead5edb",
+      "sha256": "5a956bbbabf3129615b7155bafea84e7fba299a9d1b08995c6d6d3fe17ed3b21",
+      "sha512": "ad03aae20aab54cb5ec154220198039b1173351d1140bd15b26a202b64c90941d1149034b4840e0bd717fbdae14dc525c5500c418501add58f7b757bbdb6b686",
+      "size": 26171
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18.jar",
+      "sha1": "19fe2fe9a745ab2630f9ff6dcdfbac9ae662726a",
+      "sha256": "ef6f71eefe92e9b62470f35a067870a9aa150c94543f19588e0b1cff24123c31",
+      "sha512": "ea478bc64ddaddfc1a96a7cd82ac1ae8225a26345fc73de6bb19d435e170f6e13fcdbb5ced32d78638d84774a368a7f03ff83ecbaba34758d72b21a56b2d8277",
+      "size": 41959
+    },
+    {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18.pom",
+      "sha1": "8930f89526a67c539bb6f258bca89223bc890414",
+      "sha256": "d9e23cba3181a2fac4012429a7d1592f346b889f1af8b79be2a3bffef224a171",
+      "sha512": "f01d841659a28834b382cc011beee029759453c1cdaa6673b5884336c710c775ddef8bc6b2f346ab8d136865dd6e52f552dd6cf3c079f7d0cb17ed48aff1f48d",
+      "size": 3647
+    }
+  ],
+  "groupId": "io.github.carstenartur",
+  "removedVolatileFiles": [
+    "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18-javadoc.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18-sources.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-architecture/0.1.18/jgit-storage-hibernate-architecture-0.1.18.pom.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-architecture/maven-metadata.xml.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18-javadoc.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18-sources.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-benchmarks/0.1.18/jgit-storage-hibernate-benchmarks-0.1.18.pom.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-benchmarks/maven-metadata.xml.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18-javadoc.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18-sources.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-core/0.1.18/jgit-storage-hibernate-core-0.1.18.pom.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-core/maven-metadata.xml.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18-javadoc.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18-sources.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-java-analysis/0.1.18/jgit-storage-hibernate-java-analysis-0.1.18.pom.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-java-analysis/maven-metadata.xml.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-parent/0.1.18/jgit-storage-hibernate-parent-0.1.18.pom.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-parent/maven-metadata.xml.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18-javadoc.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18-sources.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18.jar.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-search/0.1.18/jgit-storage-hibernate-search-0.1.18.pom.md5",
+    "io/github/carstenartur/jgit-storage-hibernate-search/maven-metadata.xml.md5"
+  ],
+  "schemaVersion": 1,
+  "version": "0.1.18"
+}
