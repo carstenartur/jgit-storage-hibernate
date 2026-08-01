@@ -325,6 +325,18 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     return stagedExtensions.stagedExtensionCount();
   }
 
+  int stagedMemoryExtensionCount() {
+    return stagedExtensions.stagedMemoryExtensionCount();
+  }
+
+  int stagedFileExtensionCount() {
+    return stagedExtensions.stagedFileExtensionCount();
+  }
+
+  long stagedMemoryBytes() {
+    return stagedExtensions.stagedMemoryBytes();
+  }
+
   int committedExtensionCatalogSize() {
     return committedExtensionCatalog.get().extensions().size();
   }
