@@ -17,6 +17,14 @@ BACKEND_LABELS = {
     "postgresql-hikari": "JGit + PostgreSQL + HikariCP",
 }
 
+WRITE_MODE_LABELS = {
+    "stateful-batching-disabled": "JGit + PostgreSQL (stateful, batching off)",
+    "stateful-batching": "JGit + PostgreSQL (stateful batching)",
+    "stateful-batching-rewrite": "JGit + PostgreSQL (stateful batching + rewrite)",
+    "stateless": "JGit + PostgreSQL (stateless chunk writer)",
+}
+
+# Retain compatibility with focused result files published before writeMode was introduced.
 BATCHING_MODE_LABELS = {
     "disabled": "JGit + PostgreSQL (JDBC batching off)",
     "enabled": "JGit + PostgreSQL (JDBC batching on)",
@@ -32,13 +40,21 @@ def _series_label(result: dict[str, Any]) -> str:
             raise ValueError(f"Unsupported JMH backend parameter: {backend!r}")
         return BACKEND_LABELS[backend]
 
+    write_mode = params.get("writeMode")
+    if write_mode is not None:
+        if write_mode not in WRITE_MODE_LABELS:
+            raise ValueError(f"Unsupported JMH write mode: {write_mode!r}")
+        return WRITE_MODE_LABELS[write_mode]
+
     batching_mode = params.get("batchingMode")
     if batching_mode is not None:
         if batching_mode not in BATCHING_MODE_LABELS:
             raise ValueError(f"Unsupported JMH batching mode: {batching_mode!r}")
         return BATCHING_MODE_LABELS[batching_mode]
 
-    raise ValueError("JMH result has neither a backend nor a batchingMode parameter")
+    raise ValueError(
+        "JMH result has neither a backend, writeMode nor a batchingMode parameter"
+    )
 
 
 def load_results(sources: Iterable[Path]) -> list[dict[str, Any]]:
