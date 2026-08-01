@@ -17,6 +17,7 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
@@ -118,6 +119,18 @@ public class HibernateRepository extends DfsRepository {
    */
   public PackFileReadMetrics getPackFileReadMetrics() {
     return objectDatabase.packFileReadMetricsSnapshot();
+  }
+
+  /**
+   * Return monotone staged-file, database-payload and read-ahead byte counters.
+   *
+   * <p>These counters complement transaction and statement statistics by showing physical byte
+   * movement. They are zero when repository diagnostics are disabled.
+   *
+   * @return current storage byte metrics
+   */
+  public StorageByteMetrics getStorageByteMetrics() {
+    return objectDatabase.storageByteMetricsSnapshot();
   }
 
   /** Execute repository storage work in one shared transaction. */

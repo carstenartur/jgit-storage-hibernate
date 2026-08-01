@@ -74,6 +74,7 @@ final class StagedPackExtensionStore {
   private final HibernateTransactionContext transactionContext;
   private final PrePublicationHook prePublicationHook;
   private final long minimumPrePersistedPayloadBytes;
+  private final StorageByteCounters storageByteCounters;
   private final Map<ExtensionKey, StagedExtension> staged = new ConcurrentHashMap<>();
   private final Map<String, String> preparedTokensByPackName = new ConcurrentHashMap<>();
 
@@ -83,7 +84,20 @@ final class StagedPackExtensionStore {
         repositoryName,
         transactionContext,
         NO_PRE_PUBLICATION_HOOK,
-        DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES);
+        DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES,
+        StorageByteCounters.disabled());
+  }
+
+  StagedPackExtensionStore(
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
+      StorageByteCounters storageByteCounters) {
+    this(
+        repositoryName,
+        transactionContext,
+        NO_PRE_PUBLICATION_HOOK,
+        DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES,
+        storageByteCounters);
   }
 
   StagedPackExtensionStore(
@@ -94,7 +108,8 @@ final class StagedPackExtensionStore {
         repositoryName,
         transactionContext,
         prePublicationHook,
-        MIN_PREPERSIST_PAYLOAD_BYTES);
+        MIN_PREPERSIST_PAYLOAD_BYTES,
+        StorageByteCounters.disabled());
   }
 
   StagedPackExtensionStore(
@@ -102,6 +117,20 @@ final class StagedPackExtensionStore {
       HibernateTransactionContext transactionContext,
       PrePublicationHook prePublicationHook,
       long minimumPrePersistedPayloadBytes) {
+    this(
+        repositoryName,
+        transactionContext,
+        prePublicationHook,
+        minimumPrePersistedPayloadBytes,
+        StorageByteCounters.disabled());
+  }
+
+  StagedPackExtensionStore(
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
+      PrePublicationHook prePublicationHook,
+      long minimumPrePersistedPayloadBytes,
+      StorageByteCounters storageByteCounters) {
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
     this.transactionContext = Objects.requireNonNull(transactionContext, "transactionContext");
     this.prePublicationHook = Objects.requireNonNull(prePublicationHook, "prePublicationHook");
@@ -110,6 +139,7 @@ final class StagedPackExtensionStore {
           "minimumPrePersistedPayloadBytes must be at least " + MIN_PREPERSIST_PAYLOAD_BYTES);
     }
     this.minimumPrePersistedPayloadBytes = minimumPrePersistedPayloadBytes;
+    this.storageByteCounters = Objects.requireNonNull(storageByteCounters, "storageByteCounters");
   }
 
   DfsOutputStream open(DfsPackDescription description, PackExt extension) throws IOException {
@@ -118,7 +148,7 @@ final class StagedPackExtensionStore {
     if (staged.containsKey(key)) {
       throw new IOException("Pack extension is already staged: " + key.displayName());
     }
-    return new StagedOutputStream(key, this::register);
+    return new StagedOutputStream(key, this::register, storageByteCounters);
   }
 
   CommitResult commit(
@@ -136,35 +166,40 @@ final class StagedPackExtensionStore {
   private CommitResult commitDirect(
       List<Publication> publications, Collection<DfsPackDescription> replaces)
       throws IOException {
-    return transactionContext.executeWithRepositoryLock(
-        StorageOperationKind.PACK_PUBLICATION,
-        repositoryName,
-        session -> {
-          deletePackRows(session, packNames(replaces));
+    CommitResult result =
+        transactionContext.executeWithRepositoryLock(
+            StorageOperationKind.PACK_PUBLICATION,
+            repositoryName,
+            session -> {
+              deletePackRows(session, packNames(replaces));
 
-          List<CommittedExtension> committed = new ArrayList<>();
-          boolean completeMetadata = true;
-          Instant committedAt = Instant.now();
-          for (Publication publication : publications) {
-            PackDescriptionMetadata metadata =
-                PackDescriptionMetadata.fromDescription(publication.description(), committedAt);
-            for (ExpectedExtension expected : publication.extensions()) {
-              if (expected.staged() != null) {
-                committed.add(
-                    persistCommitted(session, expected.staged(), committedAt, metadata));
-              } else {
-                publishLegacyExtension(
-                    session,
-                    publication.packName(),
-                    expected.extension(),
-                    committedAt,
-                    metadata);
-                completeMetadata = false;
+              List<CommittedExtension> committed = new ArrayList<>();
+              boolean completeMetadata = true;
+              Instant committedAt = Instant.now();
+              for (Publication publication : publications) {
+                PackDescriptionMetadata metadata =
+                    PackDescriptionMetadata.fromDescription(
+                        publication.description(), committedAt);
+                for (ExpectedExtension expected : publication.extensions()) {
+                  if (expected.staged() != null) {
+                    committed.add(
+                        persistCommitted(session, expected.staged(), committedAt, metadata));
+                  } else {
+                    publishLegacyExtension(
+                        session,
+                        publication.packName(),
+                        expected.extension(),
+                        committedAt,
+                        metadata);
+                    completeMetadata = false;
+                  }
+                }
               }
-            }
-          }
-          return new CommitResult(List.copyOf(committed), completeMetadata);
-        });
+              return new CommitResult(List.copyOf(committed), completeMetadata);
+            });
+    storageByteCounters.recordDatabasePayloadBytesWritten(
+        committedPayloadBytes(result.committedExtensions()));
+    return result;
   }
 
   private CommitResult commitPrePersisted(List<Publication> publications) throws IOException {
@@ -173,6 +208,7 @@ final class StagedPackExtensionStore {
     Set<String> preparedPackNames = publicationPackNames(publications);
     List<PersistedExtension> persisted =
         persistPreparedPayloads(publications, writeToken, preparedAt);
+    storageByteCounters.recordDatabasePayloadBytesWritten(persistedPayloadBytes(persisted));
     for (String packName : preparedPackNames) {
       preparedTokensByPackName.put(packName, writeToken);
     }
@@ -622,7 +658,7 @@ final class StagedPackExtensionStore {
     }
   }
 
-  private static byte[] readInline(FileChannel channel, long fileSize) throws IOException {
+  private byte[] readInline(FileChannel channel, long fileSize) throws IOException {
     byte[] data = new byte[Math.toIntExact(fileSize)];
     ByteBuffer destination = ByteBuffer.wrap(data);
     long position = 0;
@@ -631,12 +667,13 @@ final class StagedPackExtensionStore {
       if (count <= 0) {
         throw new IOException("Temporary pack file ended before declared size " + fileSize);
       }
+      storageByteCounters.recordTemporaryFileBytesRead(count);
       position += count;
     }
     return data;
   }
 
-  private static void persistChunks(
+  private void persistChunks(
       Session session, Long packId, FileChannel channel, long fileSize) throws IOException {
     long position = 0;
     int chunkIndex = 0;
@@ -652,6 +689,7 @@ final class StagedPackExtensionStore {
         if (count <= 0) {
           throw new IOException("Temporary pack file ended before declared size " + fileSize);
         }
+        storageByteCounters.recordTemporaryFileBytesRead(count);
         chunkPosition += count;
       }
 
@@ -676,6 +714,22 @@ final class StagedPackExtensionStore {
     if (pendingChunks > 0) {
       session.flush();
     }
+  }
+
+  private static long committedPayloadBytes(List<CommittedExtension> extensions) {
+    long total = 0;
+    for (CommittedExtension extension : extensions) {
+      total = saturatingAdd(total, extension.fileSize());
+    }
+    return total;
+  }
+
+  private static long persistedPayloadBytes(List<PersistedExtension> extensions) {
+    long total = 0;
+    for (PersistedExtension extension : extensions) {
+      total = saturatingAdd(total, extension.staged().fileSize());
+    }
+    return total;
   }
 
   private void deletePreparedRows(Session session, Collection<String> writeTokens) {
@@ -813,16 +867,21 @@ final class StagedPackExtensionStore {
   private static final class StagedOutputStream extends DfsOutputStream {
     private final ExtensionKey key;
     private final StagingConsumer stagingConsumer;
+    private final StorageByteCounters storageByteCounters;
     private final Path temporaryFile;
     private final FileChannel fileChannel;
     private final Instant createdAt = Instant.now();
     private long fileSize;
     private boolean closed;
 
-    private StagedOutputStream(ExtensionKey key, StagingConsumer stagingConsumer)
+    private StagedOutputStream(
+        ExtensionKey key,
+        StagingConsumer stagingConsumer,
+        StorageByteCounters storageByteCounters)
         throws IOException {
       this.key = key;
       this.stagingConsumer = stagingConsumer;
+      this.storageByteCounters = storageByteCounters;
       temporaryFile = Files.createTempFile("jgit-storage-pack-", ".tmp");
       fileChannel =
           FileChannel.open(
@@ -845,6 +904,7 @@ final class StagedPackExtensionStore {
         if (count <= 0) {
           throw new IOException("Could not append to temporary pack file");
         }
+        storageByteCounters.recordTemporaryFileBytesWritten(count);
         writePosition += count;
       }
       fileSize = writePosition;
@@ -874,6 +934,7 @@ final class StagedPackExtensionStore {
         if (count <= 0) {
           break;
         }
+        storageByteCounters.recordTemporaryFileBytesRead(count);
         total += count;
         readPosition += count;
       }
