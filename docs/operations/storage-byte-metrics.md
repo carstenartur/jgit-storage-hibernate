@@ -50,6 +50,8 @@ readAheadBytesFetched
 
 A snapshot taken while a channel remains open may contain bytes that are fetched but not yet classified as consumed or overfetch. Close measured channels before using the relationship as a benchmark assertion.
 
+Consumption accounting examines only the requested range and keeps a running distinct-byte total. It does not rescan the complete one-MiB chunk for every read, and a seek followed by a repeated read of the same cached bytes does not increase the consumed counter again.
+
 A high overfetch ratio suggests that the configured JGit read-ahead hint or the sixteen-chunk upper bound is too aggressive for the workload. A low ratio with many chunk queries suggests the opposite. Neither result alone proves that a larger or smaller window improves end-to-end latency; compare query count, transferred bytes and elapsed time together.
 
 ## Write amplification
