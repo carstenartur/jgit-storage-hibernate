@@ -219,13 +219,13 @@ jobs:
           fetch-depth: 0
 
       - name: Download standard benchmark results outside the worktree
-        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
         with:
           name: jmh-backend-comparison-results
           path: ${{ runner.temp }}/jmh-benchmark-artifact
 
       - name: Download focused JDBC batch results outside the worktree
-        uses: actions/download-artifact@974686ed5098c7f9c9289ec946b9058e496a2561 # v8
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
         with:
           name: jdbc-batch-comparison-results
           path: ${{ runner.temp }}/jdbc-batch-benchmark-artifact
