@@ -37,9 +37,9 @@ permissions:
 
 jobs:
   investigate:
-    name: ${{ matrix.investigation }} (${{ github.event.inputs.profile || 'smoke' }})
+    name: ${{ matrix.investigation }} (${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -72,10 +72,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          profile="${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}"
           mvn -B -pl jgit-storage-hibernate-benchmarks verify \
             -Pperformance-investigations \
             -Djgit.storage.benchmark.investigation="${{ matrix.investigation }}" \
-            -Djgit.storage.benchmark.investigation.profile="${{ github.event.inputs.profile || 'smoke' }}" \
+            -Djgit.storage.benchmark.investigation.profile="$profile" \
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/investigations/${{ matrix.investigation }}/jmh-result.json" 2>&1 \
             | tee "target/investigations/${{ matrix.investigation }}/maven-benchmark.log"
 
@@ -83,7 +84,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: performance-investigation-${{ matrix.investigation }}-${{ github.event.inputs.profile || 'smoke' }}
+          name: performance-investigation-${{ matrix.investigation }}-${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}
           path: |
             target/investigations/${{ matrix.investigation }}/**
             jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
@@ -95,7 +96,7 @@ jobs:
           echo '### Performance investigation' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '- Investigation: `${{ matrix.investigation }}`' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Profile: `${{ github.event.inputs.profile || 'smoke' }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Profile: `${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}`' >> "$GITHUB_STEP_SUMMARY"
           echo '- Raw JMH JSON, console output, Maven logs and Failsafe reports are retained as one artifact.' >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ matrix.investigation }}" = 'write-queue' ]; then
             echo '- This existing experiment measures striped scheduling and backpressure. Atomic receiver record batching is implemented separately by the production `DurableStripedWriteQueue` and its Hibernate adapter.' >> "$GITHUB_STEP_SUMMARY"
@@ -103,8 +104,9 @@ jobs:
 
   stateless-threshold:
     name: Stateful/stateless threshold at 16/128/512 MiB
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
