@@ -81,6 +81,7 @@ jobs:
 
   batch-size-selection:
     name: Select chunk batches 8/16/32/50 at 10/20/50 ms RTT
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
