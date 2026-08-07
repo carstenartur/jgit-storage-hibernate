@@ -317,6 +317,8 @@ public class RepositoryAgingBenchmark {
       repository.close();
     }
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+    statistics.clear();
+    bytesBeforeInvocation = repository.getStorageByteMetrics();
   }
 
   private void verifyPersistedPackOrdering() {
