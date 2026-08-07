@@ -71,7 +71,7 @@ class DurableStripedWriteQueueTest {
       assertEquals(2, second.completion().get(5, TimeUnit.SECONDS));
       assertEquals(3, third.completion().get(5, TimeUnit.SECONDS));
       assertEquals(List.of(1, 2, 3), order);
-      assertEquals(3, queue.metrics().completed());
+      awaitCompleted(queue, 3);
       assertEquals(0, queue.metrics().failed());
     }
   }
@@ -178,8 +178,17 @@ class DurableStripedWriteQueueTest {
       release.countDown();
       assertEquals(1, first.completion().get(5, TimeUnit.SECONDS));
       assertThrows(CompletionException.class, queued.completion()::join);
-      assertEquals(1, queue.metrics().completed());
+      awaitCompleted(queue, 1);
       assertEquals(1, queue.metrics().rejected());
     }
+  }
+
+  private static void awaitCompleted(DurableStripedWriteQueue queue, long expected)
+      throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (queue.metrics().completed() != expected && System.nanoTime() < deadline) {
+      Thread.sleep(1);
+    }
+    assertEquals(expected, queue.metrics().completed());
   }
 }
