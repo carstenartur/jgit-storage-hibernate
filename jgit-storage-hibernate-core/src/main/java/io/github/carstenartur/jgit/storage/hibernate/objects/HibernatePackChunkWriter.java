@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,57 +39,68 @@ final class HibernatePackChunkWriter implements AutoCloseable {
   static final String STATEFUL_MODE = HibernateStorageSettings.STATEFUL_CHUNK_WRITER;
   static final String STATELESS_MODE = HibernateStorageSettings.STATELESS_CHUNK_WRITER;
 
-  private final Session statefulSession;
-  private final StatelessSession statelessSession;
+  private final Session parentSession;
   private final int batchSize;
+  private final long statelessMinPayloadBytes;
   private final List<GitPackChunkEntity> statelessPending;
+  private Selection selection;
+  private StatelessSession statelessSession;
   private int pendingCount;
   private boolean failed;
   private boolean closed;
 
   private HibernatePackChunkWriter(
-      Session statefulSession, StatelessSession statelessSession, int batchSize) {
-    this.statefulSession = statefulSession;
-    this.statelessSession = statelessSession;
+      Session parentSession,
+      int batchSize,
+      long statelessMinPayloadBytes,
+      Selection selection) {
+    this.parentSession = parentSession;
     this.batchSize = batchSize;
+    this.statelessMinPayloadBytes = statelessMinPayloadBytes;
+    this.selection = selection;
     this.statelessPending = new ArrayList<>(batchSize);
-  }
-
-  /** Open a writer for an unspecified small payload; retained for focused internal tests. */
-  static HibernatePackChunkWriter open(Session parentSession) {
-    return open(parentSession, 0L);
+    if (selection == Selection.STATELESS) {
+      openStatelessSession();
+    }
   }
 
   /**
-   * Open the configured writer for a parent session whose pending parent insert was flushed.
+   * Open a writer whose automatic mode resolves the payload size from the managed parent row.
    *
-   * <p>In {@code auto} mode, payloads at or above
-   * {@link HibernateStorageSettings#STATELESS_MIN_PAYLOAD_BYTES} use stateless insertion. The
-   * stateless path clears the parent persistence context before opening the child so parent and child
-   * never manage the same entity instance. Calling {@code connection()} on the child builder keeps
-   * parent, chunks and any later publication mutation in the same JDBC transaction.
+   * <p>The parent pack was persisted and flushed immediately before this call. On the first chunk,
+   * auto mode retrieves that already managed parent by identifier, so Hibernate normally serves the
+   * file size from the first-level persistence context without another SQL round trip.
+   */
+  static HibernatePackChunkWriter open(Session parentSession) {
+    return open(parentSession, null);
+  }
+
+  /**
+   * Open the configured writer with an already known complete staged extension size.
    *
    * @param parentSession active parent Hibernate session
-   * @param payloadBytes complete staged extension size used by automatic selection
+   * @param payloadBytes complete staged extension size, or {@code null} to resolve from the parent
    */
-  static HibernatePackChunkWriter open(Session parentSession, long payloadBytes) {
+  static HibernatePackChunkWriter open(Session parentSession, Long payloadBytes) {
     Objects.requireNonNull(parentSession, "parentSession");
-    if (payloadBytes < 0) {
+    if (payloadBytes != null && payloadBytes < 0) {
       throw new IllegalArgumentException("payloadBytes must not be negative");
     }
     Map<String, Object> properties = parentSession.getSessionFactory().getProperties();
     int batchSize = HibernateStorageSettings.resolvePackChunkBatchSize(properties);
-    if (useStateless(properties, payloadBytes)) {
-      parentSession.clear();
-      StatelessSession child =
-          parentSession
-              .statelessWithOptions()
-              .connection()
-              .initialCacheMode(CacheMode.IGNORE)
-              .open();
-      return new HibernatePackChunkWriter(null, child, batchSize);
-    }
-    return new HibernatePackChunkWriter(parentSession, null, batchSize);
+    long threshold = HibernateStorageSettings.resolveStatelessMinPayloadBytes(properties);
+    String mode = HibernateStorageSettings.resolvePackChunkWriter(properties);
+    Selection selection =
+        switch (mode) {
+          case STATEFUL_MODE -> Selection.STATEFUL;
+          case STATELESS_MODE -> Selection.STATELESS;
+          case AUTO_MODE ->
+              payloadBytes == null
+                  ? Selection.UNDECIDED
+                  : selectionForPayload(payloadBytes, threshold);
+          default -> throw new IllegalStateException("Validated chunk writer mode was " + mode);
+        };
+    return new HibernatePackChunkWriter(parentSession, batchSize, threshold, selection);
   }
 
   void insert(List<GitPackChunkEntity> chunks) {
@@ -98,6 +110,7 @@ final class HibernatePackChunkWriter implements AutoCloseable {
       return;
     }
     try {
+      resolveSelection(chunks.getFirst());
       for (GitPackChunkEntity chunk : chunks) {
         insertOne(Objects.requireNonNull(chunk, "chunk"));
       }
@@ -108,7 +121,7 @@ final class HibernatePackChunkWriter implements AutoCloseable {
   }
 
   boolean stateless() {
-    return statelessSession != null;
+    return selection == Selection.STATELESS;
   }
 
   int batchSize() {
@@ -134,11 +147,38 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     }
   }
 
+  private void resolveSelection(GitPackChunkEntity firstChunk) {
+    if (selection != Selection.UNDECIDED) {
+      return;
+    }
+    GitPackEntity parent = parentSession.find(GitPackEntity.class, firstChunk.getPackId());
+    if (parent == null) {
+      throw new IllegalStateException(
+          "Cannot resolve automatic chunk writer for missing pack " + firstChunk.getPackId());
+    }
+    selection = selectionForPayload(parent.getFileSize(), statelessMinPayloadBytes);
+    if (selection == Selection.STATELESS) {
+      openStatelessSession();
+    }
+  }
+
+  private void openStatelessSession() {
+    parentSession.clear();
+    statelessSession =
+        parentSession
+            .statelessWithOptions()
+            .connection()
+            .initialCacheMode(CacheMode.IGNORE)
+            .open();
+  }
+
   private void insertOne(GitPackChunkEntity chunk) {
-    if (statelessSession != null) {
+    if (selection == Selection.STATELESS) {
       statelessPending.add(chunk);
+    } else if (selection == Selection.STATEFUL) {
+      parentSession.persist(chunk);
     } else {
-      statefulSession.persist(chunk);
+      throw new IllegalStateException("Chunk writer selection was not resolved");
     }
     pendingCount++;
     if (pendingCount == batchSize) {
@@ -150,12 +190,14 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     if (pendingCount == 0) {
       return;
     }
-    if (statelessSession != null) {
+    if (selection == Selection.STATELESS) {
       statelessSession.insertMultiple(List.copyOf(statelessPending));
       statelessPending.clear();
+    } else if (selection == Selection.STATEFUL) {
+      parentSession.flush();
+      parentSession.clear();
     } else {
-      statefulSession.flush();
-      statefulSession.clear();
+      throw new IllegalStateException("Chunk writer selection was not resolved");
     }
     pendingCount = 0;
   }
@@ -166,14 +208,13 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     }
   }
 
-  private static boolean useStateless(Map<?, ?> properties, long payloadBytes) {
-    String mode = HibernateStorageSettings.resolvePackChunkWriter(properties);
-    return switch (mode) {
-      case STATEFUL_MODE -> false;
-      case STATELESS_MODE -> true;
-      case AUTO_MODE ->
-          payloadBytes >= HibernateStorageSettings.resolveStatelessMinPayloadBytes(properties);
-      default -> throw new IllegalStateException("Validated chunk writer mode was " + mode);
-    };
+  private static Selection selectionForPayload(long payloadBytes, long threshold) {
+    return payloadBytes >= threshold ? Selection.STATELESS : Selection.STATEFUL;
+  }
+
+  private enum Selection {
+    UNDECIDED,
+    STATEFUL,
+    STATELESS
   }
 }
