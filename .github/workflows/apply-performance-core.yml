@@ -1,19 +1,16 @@
 name: Apply core performance diagnostics
 
 on:
-  push:
-    branches:
-      - perf/issues-161-166
-    paths:
-      - .github/scripts/apply-performance-core.py
-      - .github/workflows/apply-performance-core.yml
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
