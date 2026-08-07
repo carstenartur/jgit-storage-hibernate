@@ -48,7 +48,7 @@ import org.openjdk.jmh.annotations.Warmup;
 /**
  * Compares the stateful and shared-transaction stateless chunk writers at explicit payload sizes.
  *
- * <p>Each invocation receives a fresh schema so 512 MiB samples do not accumulate in the database.
+ * <p>Each invocation receives a fresh schema so large samples do not accumulate in the database.
  * Payload creation, schema setup, close/reopen verification and schema cleanup are outside measured
  * time. The teardown streams the object through JGit and verifies type, size and SHA-256, avoiding a
  * second full-size heap copy. Run with JMH's {@code gc} profiler to capture allocation, GC count and
@@ -92,6 +92,10 @@ public class LargePackJdbcBatchBenchmark {
   @Param({"16"})
   public int payloadMiB;
 
+  /** Bounded one-MiB chunk arrays retained and submitted per writer flush. */
+  @Param({"8"})
+  public int chunkBatchSize;
+
   /** Result label distinguishing local Testcontainers from an external deployment. */
   @Param({LOCAL_TESTCONTAINERS})
   public String deployment;
@@ -120,6 +124,8 @@ public class LargePackJdbcBatchBenchmark {
             + writeMode
             + "-"
             + payloadMiB
+            + "-batch-"
+            + chunkBatchSize
             + "-"
             + invocationCounter.incrementAndGet()
             + "-"
@@ -182,7 +188,8 @@ public class LargePackJdbcBatchBenchmark {
         bytes,
         spills,
         selections,
-        payload.length);
+        payload.length,
+        chunkBatchSize);
     return publishedObjectId;
   }
 
@@ -210,9 +217,13 @@ public class LargePackJdbcBatchBenchmark {
     properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
     properties.put(
         "hibernate.session.events.auto", JdbcBatchMetricsSessionEventListener.class.getName());
-    if (STATEFUL_BATCHING_DISABLED.equals(writeMode)) {
-      properties.put(HibernateStorageSettings.JDBC_BATCH_SIZE, "0");
-    }
+    properties.put(
+        HibernateStorageSettings.PACK_CHUNK_BATCH_SIZE, Integer.toString(chunkBatchSize));
+    properties.put(
+        HibernateStorageSettings.JDBC_BATCH_SIZE,
+        STATEFUL_BATCHING_DISABLED.equals(writeMode)
+            ? "0"
+            : Integer.toString(chunkBatchSize));
     if (STATELESS.equals(writeMode)) {
       properties.put(CHUNK_WRITER_PROPERTY, STATELESS);
     }
@@ -277,6 +288,7 @@ public class LargePackJdbcBatchBenchmark {
   @AuxCounters(AuxCounters.Type.EVENTS)
   @State(Scope.Thread)
   public static class LargePackCounters {
+    public long configuredChunkBatchSize;
     public long jdbcBatchExecutions;
     public long jdbcStatementExecutions;
     public long preparedStatements;
@@ -296,6 +308,7 @@ public class LargePackJdbcBatchBenchmark {
 
     @Setup(Level.Invocation)
     public void reset() {
+      configuredChunkBatchSize = 0;
       jdbcBatchExecutions = 0;
       jdbcStatementExecutions = 0;
       preparedStatements = 0;
@@ -320,7 +333,9 @@ public class LargePackJdbcBatchBenchmark {
         StorageByteMetrics bytes,
         StagingSpillMetrics spills,
         PackPublicationSelectionMetrics selections,
-        long payloadBytes) {
+        long payloadBytes,
+        int chunkBatchSize) {
+      configuredChunkBatchSize = chunkBatchSize;
       jdbcBatchExecutions = jdbcEvents.batchExecutions();
       jdbcStatementExecutions = jdbcEvents.statementExecutions();
       preparedStatements = statistics.getPrepareStatementCount();
