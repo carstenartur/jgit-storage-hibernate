@@ -50,8 +50,7 @@ final class HibernatePackChunkWriter implements AutoCloseable {
     this.statefulSession = statefulSession;
     this.statelessSession = statelessSession;
     this.batchSize = batchSize;
-    this.statelessPending =
-        statelessSession == null ? List.of() : new ArrayList<>(batchSize);
+    this.statelessPending = new ArrayList<>(batchSize);
   }
 
   /**
