@@ -24,10 +24,15 @@ public final class HibernateStorageSettings {
       "jgit.storage.hibernate.pack.chunk_batch_size";
 
   /**
-   * Conservative default aligned with the pack writer's bounded eight-chunk persistence window.
-   * With one MiB chunks, one pending ORM batch retains at most roughly eight MiB of payload data.
+   * Evidence-based default selected from calibrated PostgreSQL/Toxiproxy measurements.
+   *
+   * <p>For a 48-MiB publication, increasing the bounded window from 8 to 16 removed three
+   * sequential JDBC batch executions while adding at most eight MiB of retained chunk payload per
+   * active writer. Larger values continued to improve high-RTT deployments, but with sharply
+   * diminishing saved round trips per additional retained MiB. Sixteen is therefore the portable
+   * default; latency-sensitive deployments may configure 32 or 50 explicitly.
    */
-  public static final int DEFAULT_JDBC_BATCH_SIZE = 8;
+  public static final int DEFAULT_JDBC_BATCH_SIZE = 16;
 
   /** Default bounded pack-chunk writer window. */
   public static final int DEFAULT_PACK_CHUNK_BATCH_SIZE = DEFAULT_JDBC_BATCH_SIZE;
@@ -41,9 +46,10 @@ public final class HibernateStorageSettings {
    * Resolve the bounded pack-chunk writer window from Hibernate properties.
    *
    * <p>An explicit library setting takes precedence. Otherwise a positive Hibernate JDBC batch size
-   * is reused so custom consumers do not accidentally request a larger JDBC batch than the writer
-   * can fill. Values above the hard safety ceiling require an explicit redesign rather than
-   * silently retaining unbounded payload arrays.
+   * is reused so custom consumers do not request a larger JDBC batch than the writer can fill. An
+   * explicitly configured pack window must remain within the hard safety ceiling. A larger generic
+   * Hibernate batch size is accepted for compatibility but the payload-retaining writer window is
+   * capped at that ceiling.
    *
    * @param properties Hibernate SessionFactory properties
    * @return validated chunk batch size
@@ -58,7 +64,7 @@ public final class HibernateStorageSettings {
     if (jdbcBatch != null && !jdbcBatch.toString().isBlank()) {
       int configuredJdbcBatch = parseInteger(jdbcBatch.toString(), JDBC_BATCH_SIZE);
       if (configuredJdbcBatch > 0) {
-        return validatePackChunkBatchSize(configuredJdbcBatch, JDBC_BATCH_SIZE);
+        return Math.min(configuredJdbcBatch, MAX_PACK_CHUNK_BATCH_SIZE);
       }
     }
     return DEFAULT_PACK_CHUNK_BATCH_SIZE;
