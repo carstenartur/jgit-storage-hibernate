@@ -1,0 +1,102 @@
+name: Performance Investigations
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Benchmark scope
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - full
+  schedule:
+    - cron: '23 5 * * 3'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/performance-investigations.yml'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/performance-investigations.yml'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  investigate:
+    name: ${{ matrix.investigation }} (${{ github.event.inputs.profile || 'smoke' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        investigation:
+          - write-queue
+          - read-ahead
+          - repository-aging
+          - concurrent-large-pack
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p "target/investigations/${{ matrix.investigation }}"
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee "target/investigations/${{ matrix.investigation }}/maven-build.log"
+
+      - name: Run selected investigation through Maven
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pperformance-investigations \
+            -Djgit.storage.benchmark.investigation="${{ matrix.investigation }}" \
+            -Djgit.storage.benchmark.investigation.profile="${{ github.event.inputs.profile || 'smoke' }}" \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/investigations/${{ matrix.investigation }}/jmh-result.json" 2>&1 \
+            | tee "target/investigations/${{ matrix.investigation }}/maven-benchmark.log"
+
+      - name: Upload raw investigation results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-investigation-${{ matrix.investigation }}-${{ github.event.inputs.profile || 'smoke' }}
+          path: |
+            target/investigations/${{ matrix.investigation }}/**
+            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
+          if-no-files-found: error
+
+      - name: Report retained evidence
+        if: always()
+        run: |
+          echo '### Performance investigation' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Investigation: `${{ matrix.investigation }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Profile: `${{ github.event.inputs.profile || 'smoke' }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Raw JMH JSON, console output, Maven logs and Failsafe reports are retained as one artifact.' >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ matrix.investigation }}" = 'write-queue' ]; then
+            echo '- This existing experiment measures striped scheduling and backpressure. Atomic receiver record batching is implemented separately by the production `DurableStripedWriteQueue` and its Hibernate adapter.' >> "$GITHUB_STEP_SUMMARY"
+          fi
