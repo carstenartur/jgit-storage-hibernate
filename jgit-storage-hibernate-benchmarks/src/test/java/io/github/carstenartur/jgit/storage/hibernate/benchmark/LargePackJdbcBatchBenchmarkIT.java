@@ -33,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class LargePackJdbcBatchBenchmarkIT {
 
   private static final String FULL_PROFILE = "full";
+  private static final String PRODUCTION_CHUNK_BATCH_SIZE = "16";
   private static final Set<String> EXPECTED_BACKENDS =
       Set.of(
           HibernateRepositoryBenchmark.POSTGRESQL,
@@ -46,7 +47,7 @@ class LargePackJdbcBatchBenchmarkIT {
           .withPassword("benchmark");
 
   @Test
-  void recordsWriterModePoolAndPayloadSizeInRawArtifacts() throws Exception {
+  void recordsWriterModePoolPayloadAndProductionBatchSizeInRawArtifacts() throws Exception {
     boolean full =
         FULL_PROFILE.equalsIgnoreCase(
             System.getProperty("jgit.storage.benchmark.large_pack.profile", "smoke"));
@@ -85,6 +86,7 @@ class LargePackJdbcBatchBenchmarkIT {
                 HibernateRepositoryBenchmark.POSTGRESQL,
                 HibernateRepositoryBenchmark.POSTGRESQL_HIKARI)
             .param("payloadMiB", payloadSizes)
+            .param("chunkBatchSize", PRODUCTION_CHUNK_BATCH_SIZE)
             .param("deployment", deployment)
             .addProfiler(GCProfiler.class)
             .shouldFailOnError(true)
@@ -124,6 +126,11 @@ class LargePackJdbcBatchBenchmarkIT {
         Set.copyOf(Arrays.asList(payloadSizes)),
         results.stream()
             .map(result -> result.getParams().getParam("payloadMiB"))
+            .collect(Collectors.toSet()));
+    assertEquals(
+        Set.of(PRODUCTION_CHUNK_BATCH_SIZE),
+        results.stream()
+            .map(result -> result.getParams().getParam("chunkBatchSize"))
             .collect(Collectors.toSet()));
     assertEquals(
         Set.of(deployment),
