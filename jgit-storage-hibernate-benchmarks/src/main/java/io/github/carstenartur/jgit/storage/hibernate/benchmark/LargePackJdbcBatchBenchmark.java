@@ -53,6 +53,10 @@ import org.openjdk.jmh.annotations.Warmup;
  * time. The teardown streams the object through JGit and verifies type, size and SHA-256, avoiding a
  * second full-size heap copy. Run with JMH's {@code gc} profiler to capture allocation, GC count and
  * GC time together with the secondary storage counters exposed here.
+ *
+ * <p>Every benchmark label pins the corresponding production mode explicitly. This prevents the
+ * evidence-based {@code auto} default from turning a future stateful reference measurement into an
+ * accidental second stateless measurement.
  */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -68,8 +72,6 @@ public class LargePackJdbcBatchBenchmark {
   static final String STATEFUL_BATCHING_REWRITE = "stateful-batching-rewrite";
   static final String STATELESS = "stateless";
   static final String LOCAL_TESTCONTAINERS = "local-testcontainers";
-  private static final String CHUNK_WRITER_PROPERTY =
-      "jgit.storage.hibernate.pack.chunk_writer";
   private static final int STREAM_BUFFER_BYTES = 128 * 1024;
 
   private final AtomicInteger invocationCounter = new AtomicInteger();
@@ -224,9 +226,11 @@ public class LargePackJdbcBatchBenchmark {
         STATEFUL_BATCHING_DISABLED.equals(writeMode)
             ? "0"
             : Integer.toString(chunkBatchSize));
-    if (STATELESS.equals(writeMode)) {
-      properties.put(CHUNK_WRITER_PROPERTY, STATELESS);
-    }
+    properties.put(
+        HibernateStorageSettings.PACK_CHUNK_WRITER,
+        STATELESS.equals(writeMode)
+            ? HibernateStorageSettings.STATELESS_CHUNK_WRITER
+            : HibernateStorageSettings.STATEFUL_CHUNK_WRITER);
     if (HibernateRepositoryBenchmark.POSTGRESQL_HIKARI.equals(backend)) {
       properties.put("hibernate.hikari.maximumPoolSize", "4");
       properties.put("hibernate.hikari.minimumIdle", "0");
