@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
@@ -62,11 +63,59 @@ class HibernatePackChunkWriterH2Test {
   }
 
   @Test
-  void defaultWriterRemainsStateful() {
+  void automaticWriterUsesStatefulSessionBelowMeasuredThreshold() {
     try (HibernateSessionFactoryProvider provider = provider(null);
         Session session = provider.getSessionFactory().openSession()) {
       session.beginTransaction();
+      try (HibernatePackChunkWriter writer =
+          HibernatePackChunkWriter.open(
+              session, HibernateStorageSettings.DEFAULT_STATELESS_MIN_PAYLOAD_BYTES - 1L)) {
+        assertFalse(writer.stateless());
+      }
+      session.getTransaction().rollback();
+    }
+  }
+
+  @Test
+  void automaticWriterUsesStatelessSessionAtMeasuredThreshold() {
+    try (HibernateSessionFactoryProvider provider = provider(null);
+        Session session = provider.getSessionFactory().openSession()) {
+      session.beginTransaction();
+      try (HibernatePackChunkWriter writer =
+          HibernatePackChunkWriter.open(
+              session, HibernateStorageSettings.DEFAULT_STATELESS_MIN_PAYLOAD_BYTES)) {
+        assertTrue(writer.stateless());
+      }
+      session.getTransaction().rollback();
+    }
+  }
+
+  @Test
+  void automaticWriterResolvesManagedParentSizeOnFirstChunk() {
+    Properties properties = h2Properties("auto-parent-" + UUID.randomUUID());
+    properties.put(HibernateStorageSettings.STATELESS_MIN_PAYLOAD_BYTES, "2097152");
+    try (HibernateSessionFactoryProvider provider =
+            new HibernateSessionFactoryProvider(properties);
+        Session session = provider.getSessionFactory().openSession()) {
+      Transaction transaction = session.beginTransaction();
+      Long packId = persistParent(session);
       try (HibernatePackChunkWriter writer = HibernatePackChunkWriter.open(session)) {
+        assertFalse(writer.stateless(), "Auto mode is unresolved before the first chunk");
+        writer.insert(chunks(packId, 3));
+        assertTrue(writer.stateless(), "Three-MiB parent must cross the two-MiB threshold");
+      }
+      transaction.rollback();
+    }
+  }
+
+  @Test
+  void explicitStatefulModeRemainsTheReferenceFallback() {
+    try (HibernateSessionFactoryProvider provider =
+            provider(HibernatePackChunkWriter.STATEFUL_MODE);
+        Session session = provider.getSessionFactory().openSession()) {
+      session.beginTransaction();
+      try (HibernatePackChunkWriter writer =
+          HibernatePackChunkWriter.open(session, Long.MAX_VALUE)) {
         assertFalse(writer.stateless());
       }
       session.getTransaction().rollback();
