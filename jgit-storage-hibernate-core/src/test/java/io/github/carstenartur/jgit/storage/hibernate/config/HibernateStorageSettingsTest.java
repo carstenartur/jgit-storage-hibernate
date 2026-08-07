@@ -17,6 +17,47 @@ import org.junit.jupiter.api.Test;
 class HibernateStorageSettingsTest {
 
   @Test
+  void automaticChunkWriterAndMeasuredThresholdAreDefaults() {
+    assertEquals(
+        HibernateStorageSettings.AUTO_CHUNK_WRITER,
+        HibernateStorageSettings.resolvePackChunkWriter(Map.of()));
+    assertEquals(
+        16L * 1024L * 1024L,
+        HibernateStorageSettings.resolveStatelessMinPayloadBytes(Map.of()));
+  }
+
+  @Test
+  void explicitChunkWriterAndThresholdAreResolved() {
+    Map<String, String> properties =
+        Map.of(
+            HibernateStorageSettings.PACK_CHUNK_WRITER,
+            " STATELESS ",
+            HibernateStorageSettings.STATELESS_MIN_PAYLOAD_BYTES,
+            "33554432");
+
+    assertEquals(
+        HibernateStorageSettings.STATELESS_CHUNK_WRITER,
+        HibernateStorageSettings.resolvePackChunkWriter(properties));
+    assertEquals(
+        32L * 1024L * 1024L,
+        HibernateStorageSettings.resolveStatelessMinPayloadBytes(properties));
+  }
+
+  @Test
+  void rejectsUnknownModeAndNegativeStatelessThreshold() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            HibernateStorageSettings.resolvePackChunkWriter(
+                Map.of(HibernateStorageSettings.PACK_CHUNK_WRITER, "mystery")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            HibernateStorageSettings.resolveStatelessMinPayloadBytes(
+                Map.of(HibernateStorageSettings.STATELESS_MIN_PAYLOAD_BYTES, "-1")));
+  }
+
+  @Test
   void explicitPackChunkBatchSizeTakesPrecedence() {
     assertEquals(
         50,
