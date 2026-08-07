@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.carstenartur.jgit.storage.hibernate.objects.ReadAheadPolicyBenchmark;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -19,7 +20,6 @@ import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -127,12 +127,8 @@ class PerformanceInvestigationsBenchmarkIT {
               .param(
                   "backend",
                   full
-                      ? new String[] {
-                        ReadAheadPolicyBenchmark.HSQLDB,
-                        ReadAheadPolicyBenchmark.POSTGRESQL,
-                        ReadAheadPolicyBenchmark.POSTGRESQL_HIKARI
-                      }
-                      : new String[] {ReadAheadPolicyBenchmark.HSQLDB})
+                      ? new String[] {"hsqldb", "postgresql", "postgresql-hikari"}
+                      : new String[] {"hsqldb"})
               .param("readAheadChunks", "1", "4", "16");
       case "repository-aging" ->
           builder
@@ -147,7 +143,9 @@ class PerformanceInvestigationsBenchmarkIT {
                         HibernateRepositoryBenchmark.POSTGRESQL_HIKARI
                       }
                       : new String[] {HibernateRepositoryBenchmark.HSQLDB})
-              .param("pushes", full ? new String[] {"1", "10", "100", "1000"} : new String[] {"1", "10"})
+              .param(
+                  "pushes",
+                  full ? new String[] {"1", "10", "100", "1000"} : new String[] {"1", "10"})
               .param(
                   "maintenanceMode",
                   RepositoryAgingBenchmark.NONE,
@@ -166,7 +164,8 @@ class PerformanceInvestigationsBenchmarkIT {
                   "writeMode",
                   ConcurrentPublicationBenchmark.STATEFUL,
                   ConcurrentPublicationBenchmark.STATELESS)
-              .param("payloadMiB", full ? new String[] {"16", "128"} : new String[] {"16"})
+              .param(
+                  "payloadMiB", full ? new String[] {"16", "128"} : new String[] {"16"})
               .param("deployment", deployment)
               .addProfiler(GCProfiler.class);
       default ->
