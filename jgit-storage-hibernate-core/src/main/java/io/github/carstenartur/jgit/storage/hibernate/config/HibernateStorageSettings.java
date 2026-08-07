@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.config;
 
+import java.util.Locale;
 import java.util.Map;
 
 /** Hibernate settings used by the storage backend's default bootstrap helper. */
@@ -22,6 +23,23 @@ public final class HibernateStorageSettings {
   /** Number of one-MiB pack chunks retained and submitted by one bounded writer batch. */
   public static final String PACK_CHUNK_BATCH_SIZE =
       "jgit.storage.hibernate.pack.chunk_batch_size";
+
+  /** Pack-chunk writer selection: {@code auto}, {@code stateful} or {@code stateless}. */
+  public static final String PACK_CHUNK_WRITER =
+      "jgit.storage.hibernate.pack.chunk_writer";
+
+  /** Minimum staged extension bytes at which {@code auto} selects the stateless writer. */
+  public static final String STATELESS_MIN_PAYLOAD_BYTES =
+      "jgit.storage.hibernate.pack.stateless_min_payload_bytes";
+
+  /** Automatic size-based writer selection. */
+  public static final String AUTO_CHUNK_WRITER = "auto";
+
+  /** Always use the ordinary stateful Hibernate session for chunk rows. */
+  public static final String STATEFUL_CHUNK_WRITER = "stateful";
+
+  /** Always use the shared-transaction child StatelessSession for chunk rows. */
+  public static final String STATELESS_CHUNK_WRITER = "stateless";
 
   /**
    * Evidence-based default selected from calibrated PostgreSQL/Toxiproxy measurements.
@@ -40,7 +58,54 @@ public final class HibernateStorageSettings {
   /** Hard safety ceiling for one writer's retained one-MiB chunk arrays. */
   public static final int MAX_PACK_CHUNK_BATCH_SIZE = 64;
 
+  /**
+   * Default automatic stateless threshold selected by the 16/128/512-MiB matrix.
+   *
+   * <p>At all three sizes stateless ORM reduced allocation by about 16–18%, reduced flush and GC
+   * work, preserved identical JDBC execution counts and byte integrity, and did not regress the
+   * elapsed-time point estimate. Sixteen MiB is therefore the lowest measured material crossover.
+   */
+  public static final long DEFAULT_STATELESS_MIN_PAYLOAD_BYTES = 16L * 1024L * 1024L;
+
   private HibernateStorageSettings() {}
+
+  /** Resolve and validate the pack chunk writer mode. */
+  public static String resolvePackChunkWriter(Map<?, ?> properties) {
+    Object configured = properties.get(PACK_CHUNK_WRITER);
+    if (configured == null || configured.toString().isBlank()) {
+      return AUTO_CHUNK_WRITER;
+    }
+    String mode = configured.toString().trim().toLowerCase(Locale.ROOT);
+    return switch (mode) {
+      case AUTO_CHUNK_WRITER, STATEFUL_CHUNK_WRITER, STATELESS_CHUNK_WRITER -> mode;
+      default ->
+          throw new IllegalArgumentException(
+              PACK_CHUNK_WRITER
+                  + " must be '"
+                  + AUTO_CHUNK_WRITER
+                  + "', '"
+                  + STATEFUL_CHUNK_WRITER
+                  + "' or '"
+                  + STATELESS_CHUNK_WRITER
+                  + "' but was '"
+                  + configured
+                  + "'");
+    };
+  }
+
+  /** Resolve the non-negative auto-selection threshold in payload bytes. */
+  public static long resolveStatelessMinPayloadBytes(Map<?, ?> properties) {
+    Object configured = properties.get(STATELESS_MIN_PAYLOAD_BYTES);
+    if (configured == null || configured.toString().isBlank()) {
+      return DEFAULT_STATELESS_MIN_PAYLOAD_BYTES;
+    }
+    long value = parseLong(configured.toString(), STATELESS_MIN_PAYLOAD_BYTES);
+    if (value < 0) {
+      throw new IllegalArgumentException(
+          STATELESS_MIN_PAYLOAD_BYTES + " must not be negative but was " + value);
+    }
+    return value;
+  }
 
   /**
    * Resolve the bounded pack-chunk writer window from Hibernate properties.
@@ -75,8 +140,16 @@ public final class HibernateStorageSettings {
   }
 
   private static int parseInteger(String configured, String propertyName) {
+    long value = parseLong(configured, propertyName);
+    if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException(propertyName + " exceeds the integer range: " + value);
+    }
+    return (int) value;
+  }
+
+  private static long parseLong(String configured, String propertyName) {
     try {
-      return Integer.parseInt(configured.trim());
+      return Long.parseLong(configured.trim());
     } catch (NumberFormatException exception) {
       throw new IllegalArgumentException(
           propertyName + " must be an integer but was '" + configured + "'", exception);
