@@ -7,9 +7,11 @@
 ```properties
 hibernate.jdbc.batch_size=16
 hibernate.order_inserts=true
+jgit.storage.hibernate.pack.chunk_writer=auto
+jgit.storage.hibernate.pack.stateless_min_payload_bytes=16777216
 ```
 
-The pack writer uses the same bounded window by default. It can be configured explicitly:
+The pack writer uses the same bounded chunk window by default. It can be configured explicitly:
 
 ```properties
 jgit.storage.hibernate.pack.chunk_batch_size=32
@@ -17,7 +19,7 @@ jgit.storage.hibernate.pack.chunk_batch_size=32
 
 When the bundled provider receives an explicit pack-chunk window but no explicit Hibernate JDBC batch size, it applies the same value to `hibernate.jdbc.batch_size`. Framework-managed applications that construct their own `SessionFactory` must configure both values consistently.
 
-Accepted pack windows are 1 through 64. Each chunk is at most one MiB, so the value is also the approximate maximum MiB of chunk arrays retained by one active writer before `flush()`/`clear()` or `insertMultiple()`. A generic Hibernate batch size above 64 remains valid, but the pack writer caps its payload-retaining window at 64.
+Accepted pack windows are 1 through 64. Each chunk is at most one MiB, so the value is also the approximate maximum MiB of final chunk arrays retained by one active writer before `flush()`/`clear()` or `insertMultiple()`. A generic Hibernate batch size above 64 remains valid, but the pack writer caps its payload-retaining window at 64.
 
 The default changed from 8 to 16 after a calibrated Toxiproxy matrix showed that 16 has the best saved-network-exchanges-per-additional-MiB ratio. See [Network latency and pack-chunk batching](network-latency-and-chunk-batching.md) for the complete measurements and deployment guidance for 8, 16, 32 and 50.
 
@@ -60,21 +62,42 @@ The follow-up selection matrix used 49 chunks and compared 8, 16, 32 and 50 at c
 
 Chunk batch executions fell from 7 to 4 to 2 to 1. Other JDBC statements stayed at five. Total normalized allocation remained essentially unchanged; the production trade-off is peak retained payload and concurrent writers. Sixteen removes three exchanges for only eight additional MiB compared with the old default. Values 32 and 50 remain useful explicit choices for higher RTT and controlled concurrency.
 
-## Stateful and stateless writers
+## Automatic stateful/stateless selection
 
-The default stateful path persists chunk entities in the normal Hibernate session, then flushes and clears at the configured bounded window.
+Only immutable, non-indexed `GitPackChunkEntity` rows are eligible for a child `StatelessSession`. Pack parents, publication metadata, locks, refs, reflogs and Hibernate Search projections remain stateful.
 
-Large immutable pack payloads may use the opt-in stateless ORM path:
+In the default `auto` mode, Core selects:
+
+- stateful insertion below 16 MiB of staged extension payload;
+- shared-transaction stateless insertion at or above 16 MiB.
+
+The parent row is already persisted and flushed before chunk insertion. Auto mode resolves its managed `fileSize` on the first chunk and normally needs no additional SQL query. The stateless child shares the active parent's JDBC connection and resource-local transaction, uses `CacheMode.IGNORE`, and submits the same bounded chunk groups.
+
+The focused PostgreSQL + HikariCP matrix used the production batch size of 16, one warmup and three measured invocations per point. Close/reopen integrity was verified by streaming SHA-256.
+
+| Payload | Stateful | Stateless | Stateless point estimate | Stateful allocation | Stateless allocation | Allocation saving | Flushes stateful/stateless |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 16 MiB | 657.2 ms | 640.1 ms | 2.6% faster | 93.85 MB/op | 76.97 MB/op | 18.0% | 5 / 3 |
+| 128 MiB | 4,893.4 ms | 4,806.9 ms | 1.8% faster | 844.15 MB/op | 709.70 MB/op | 15.9% | 12 / 3 |
+| 512 MiB | 19,548.3 ms | 19,280.8 ms | 1.4% faster | 3,315.52 MB/op | 2,777.63 MB/op | 16.2% | 36 / 3 |
+
+The latency confidence intervals overlap, so the implementation does not claim a statistically secure latency win. However, every measured stateless latency point was lower, the allocation reduction is repeatable at all three sizes, GC activity fell materially at 512 MiB, JDBC execution counts were unchanged, and payload integrity remained byte-identical. Sixteen MiB is the lowest measured material crossover and is therefore the automatic threshold.
+
+Applications may keep or change the policy explicitly:
 
 ```properties
+# Always use the ordinary reference path
+jgit.storage.hibernate.pack.chunk_writer=stateful
+
+# Always use StatelessSession for chunked payload rows
 jgit.storage.hibernate.pack.chunk_writer=stateless
+
+# Keep auto selection but move the crossover to 32 MiB
+jgit.storage.hibernate.pack.chunk_writer=auto
+jgit.storage.hibernate.pack.stateless_min_payload_bytes=33554432
 ```
 
-The child `StatelessSession` shares the active parent's JDBC connection and resource-local transaction. Parent and chunk inserts therefore commit or roll back together. `CacheMode.IGNORE` prevents raw one-MiB payload arrays from entering the second-level cache, and `insertMultiple()` submits the same bounded groups.
-
-Only non-indexed `GitPackChunkEntity` rows use the stateless session. Pack parents, publication metadata, refs, reflogs and Hibernate Search projections remain stateful.
-
-At 16 MiB, stateless ORM reduced allocation by about 18% and Hibernate flushes from six to three, while elapsed time and the network-latency slope remained nearly identical to stateful batching. It therefore remains an explicit heap/ORM optimization rather than a separate network batching mechanism. `stateful` remains the safe default until the 128/512-MiB and concurrent-publication matrices establish a robust automatic threshold.
+A negative threshold or unknown mode is rejected during writer construction. Explicit `stateful` remains the reference and troubleshooting fallback.
 
 ## Driver-specific options
 
@@ -112,14 +135,15 @@ Disposable `create-drop` schemas use the composite ORM key directly. Migration-b
 
 The normal Core tests verify that:
 
-- the evidence-based default JDBC batch size is active;
-- explicit consumer JDBC settings remain authoritative;
+- the evidence-based default JDBC batch size and automatic stateless threshold are active;
+- explicit consumer JDBC, writer-mode and threshold settings remain authoritative;
 - an explicit pack-chunk window configures JDBC batching when the bundled provider owns the default;
-- malformed or unbounded pack windows are rejected;
+- malformed or unbounded pack windows, unknown writer modes and negative thresholds are rejected;
 - real JDBC batch events occur for chunk inserts;
 - stateful and stateless paths flush the final partial batch;
+- automatic selection uses the managed parent payload size on the first chunk;
 - chunks remain addressable by `(pack_id, chunk_index)`;
 - parent and chunks share rollback and remain byte-identical after reopen;
 - Hibernate Search continues to use ordinary stateful projection persistence.
 
-The workflows retain the local writer matrix, the calibrated RTT matrix and the 8/16/32/50 selection matrix as raw JMH artifacts.
+The workflows retain the local writer matrix, calibrated RTT matrix, 8/16/32/50 selection matrix and 16/128/512-MiB stateful/stateless matrix as raw JMH artifacts.
