@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 
@@ -29,12 +30,14 @@ class HibernateDurableBatchProcessorH2Test {
   void oneQueueBatchCommitsThroughTheHibernateAdapterBeforeAcknowledgement() throws Exception {
     try (HibernateSessionFactoryProvider provider =
         new HibernateSessionFactoryProvider(h2Properties())) {
+      AtomicInteger observedJdbcBatchSize = new AtomicInteger();
       HibernateDurableBatchProcessor<String, String> processor =
           new HibernateDurableBatchProcessor<>(
               provider.getSessionFactory(),
               StorageOperationKind.OTHER,
               Locking.NONE,
               (session, repositoryName, names) -> {
+                observedJdbcBatchSize.set(session.getJdbcBatchSize());
                 for (String name : names) {
                   GitRepositoryLifecycleEntity entity = new GitRepositoryLifecycleEntity();
                   entity.setRepositoryName(name);
@@ -67,6 +70,7 @@ class HibernateDurableBatchProcessorH2Test {
               submissions.get(index).completion().get(5, TimeUnit.SECONDS));
           assertEquals(3, submissions.get(index).batchSize());
         }
+        assertEquals(3, observedJdbcBatchSize.get());
         assertEquals(3L, lifecycleCount(provider));
       }
     }
