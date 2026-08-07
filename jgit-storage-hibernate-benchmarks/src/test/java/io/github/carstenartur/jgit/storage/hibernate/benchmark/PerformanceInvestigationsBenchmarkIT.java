@@ -61,20 +61,17 @@ class PerformanceInvestigationsBenchmarkIT {
     Files.createDirectories(resultFile.getParent());
     Path outputFile = resultFile.resolveSibling(investigation + "-jmh-output.txt");
 
-    OptionsBuilder builder =
-        baseOptions(resultFile, outputFile, full)
-            .jvmArgsAppend(
-                "-Xms1g",
-                full ? "-Xmx3g" : "-Xmx1536m",
-                RepositoryBackendBenchmarkIT.systemProperty(
-                    HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
-                    POSTGRESQL.getJdbcUrl()),
-                RepositoryBackendBenchmarkIT.systemProperty(
-                    HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
-                    POSTGRESQL.getUsername()),
-                RepositoryBackendBenchmarkIT.systemProperty(
-                    HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
-                    POSTGRESQL.getPassword()));
+    OptionsBuilder builder = baseOptions(resultFile, outputFile, full);
+    builder.jvmArgsAppend(
+        "-Xms1g",
+        full ? "-Xmx3g" : "-Xmx1536m",
+        RepositoryBackendBenchmarkIT.systemProperty(
+            HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY, POSTGRESQL.getJdbcUrl()),
+        RepositoryBackendBenchmarkIT.systemProperty(
+            HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY, POSTGRESQL.getUsername()),
+        RepositoryBackendBenchmarkIT.systemProperty(
+            HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+            POSTGRESQL.getPassword()));
 
     configure(builder, investigation, full, deployment, threads);
     Collection<RunResult> results = new Runner(builder.build()).run();
@@ -86,7 +83,8 @@ class PerformanceInvestigationsBenchmarkIT {
   }
 
   private static OptionsBuilder baseOptions(Path resultFile, Path outputFile, boolean full) {
-    return new OptionsBuilder()
+    OptionsBuilder builder = new OptionsBuilder();
+    builder
         .shouldFailOnError(true)
         .forks(1)
         .warmupIterations(full ? 1 : 0)
@@ -96,6 +94,7 @@ class PerformanceInvestigationsBenchmarkIT {
         .resultFormat(ResultFormatType.JSON)
         .result(resultFile.toString())
         .output(outputFile.toString());
+    return builder;
   }
 
   private static void configure(
