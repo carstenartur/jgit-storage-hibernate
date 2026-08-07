@@ -10,6 +10,8 @@ Use the familiar JGit `Repository` API while storing packs, refs, reftables and 
 - completed PACK/IDX/Reftable extensions are persisted and published atomically per logical pack;
 - small committed extensions may remain inline while large extensions use ordered 1 MiB chunks;
 - chunk inserts use portable Hibernate JDBC batching without generated-key round trips per chunk;
+- calibrated network measurements select a bounded 16-chunk default while allowing explicit 32/50 tuning;
+- a production durable striped queue can persist up to 50 receiver records in one transaction or flush a partial batch after a configured collection window;
 - committed chunked extensions reuse an immutable pack-list metadata catalog instead of repeating the same open-time lookup;
 - local publication hands the exact committed pack list to JGit's post-commit scan without another database transaction;
 - existing inline BLOB, generated chunk-ID and legacy uncommitted rows remain readable after upgrade;
@@ -40,7 +42,7 @@ A concrete example is the [auditable approval-workflow service](../docs/use-case
 1. Apply the packaged Core Flyway migration for the selected database.
 2. Start Hibernate with `hibernate.hbm2ddl.auto=validate`.
 3. Register `CoreEntities.annotatedClasses()` in the application-managed persistence context.
-4. Configure JDBC batching when the application owns the `SessionFactory`; the bundled provider applies conservative non-overriding defaults.
+4. Configure JDBC batching when the application owns the `SessionFactory`; the bundled provider applies evidence-based non-overriding defaults.
 5. Construct `DefaultHibernateRepositoryFactory` from the native Hibernate `SessionFactory`.
 6. Open repositories through `RepositoryName` and use normal public JGit APIs.
 7. Monitor JVM temporary-disk capacity for concurrent pack construction.
@@ -92,13 +94,29 @@ Temporary-disk capacity must cover concurrent open extensions and completed exte
 `HibernateSessionFactoryProvider` applies these values only when the caller did not set them:
 
 ```properties
-hibernate.jdbc.batch_size=8
+hibernate.jdbc.batch_size=16
 hibernate.order_inserts=true
 ```
 
-The eight-row batch matches the bounded eight-chunk persistence window. `GitPackChunkEntity` uses `(pack_id, chunk_index)` as its Hibernate identity, so every identifier is known before SQL execution and chunk inserts can be sent through real JDBC batches. Existing Flyway-managed schemas may retain their generated `git_pack_chunks.id` column; it remains read-only compatibility data and published payloads are not rewritten. The provider deliberately does not change update ordering for unrelated application entities.
+The 16-row default has the best saved-network-exchanges-per-additional-MiB ratio in the calibrated 8/16/32/50 Toxiproxy matrix. `GitPackChunkEntity` uses `(pack_id, chunk_index)` as its Hibernate identity, so every identifier is known before SQL execution and chunk inserts can be sent through real JDBC batches.
 
-Applications constructing a framework-managed `SessionFactory` must configure batching themselves. PostgreSQL `reWriteBatchedInserts` and SQL Server `useBulkCopyForBatchInsert` are optional deployment-level experiments, not forced library defaults. See [JDBC batching and pack-chunk keys](../docs/operations/jdbc-batching.md).
+Latency-sensitive deployments may configure a larger bounded pack window:
+
+```properties
+jgit.storage.hibernate.pack.chunk_batch_size=32
+```
+
+The bundled provider applies the same value to `hibernate.jdbc.batch_size` when the generic Hibernate setting is absent. Framework-managed applications must configure both values consistently. Values 1 through 64 are accepted; one active writer retains at most approximately that many MiB of final chunk arrays. Existing Flyway-managed schemas may retain their generated `git_pack_chunks.id` column; it remains read-only compatibility data and published payloads are not rewritten. The provider deliberately does not change update ordering for unrelated application entities.
+
+PostgreSQL `reWriteBatchedInserts` and SQL Server `useBulkCopyForBatchInsert` remain optional deployment-level experiments, not forced library defaults. See [JDBC batching and pack-chunk writers](../docs/operations/jdbc-batching.md) and the complete [network latency and batch-size evidence](../docs/operations/network-latency-and-chunk-batching.md).
+
+## Durable receiver batching
+
+`DurableStripedWriteQueue<C, R>` is available for receiver records that can be persisted in repository-homogeneous atomic batches. Its production defaults collect at most 50 records or 64 MiB. Reaching a bound releases the batch immediately; otherwise every available record for that repository is released after the configurable two-millisecond collection window.
+
+`HibernateDurableBatchProcessor` wraps the complete batch in exactly one `HibernateTransactionContext` transaction and optionally acquires the repository coordination row. Submission futures complete only after commit. The queue is bounded by command count and bytes, preserves FIFO order per repository and allows independent stripes to progress concurrently.
+
+This component does not silently merge arbitrary complete JGit push/ref operations. Their compare-and-set, replacement and visibility semantics require a storage-specific batch processor. See [Durable striped receiver batching](../docs/operations/durable-striped-write-queue.md).
 
 ## Transaction guarantees
 
@@ -116,6 +134,7 @@ Core opens explicit Hibernate transactions for database mutations:
 | Normal `RefUpdate` | Reftable pack publication and the matching queryable `git_reflog` row share one repository-scoped Hibernate transaction. |
 | Failed optimistic ref update | No Reftable change and no queryable reflog row are committed. |
 | Manual reflog import | `HibernateReflogWriter` can append externally produced history in an independent transaction. |
+| Durable receiver batch | Every command in one repository-homogeneous batch commits in one transaction before any future reports success. |
 | Repository deletion | Optional projection cleanup, reflogs, pack chunks and pack/reftable metadata are removed in one transaction. |
 
 The practical outcome is that a repository reader sees committed repository state rather than a partially published set of database rows. This is the ACID storage benefit described in [eclipse-jgit/jgit discussion #251](https://github.com/eclipse-jgit/jgit/discussions/251).
@@ -183,4 +202,4 @@ Workflow, session, audit, outbox and other application-specific tables remain ow
 
 H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. The suites verify fresh installation, 0.1.4 upgrades where applicable, pre-library adoption with unchanged BLOB checksums and reflog rows, Hibernate validation, adaptive inline/chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
 
-Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion, legacy lease-aware cleanup, real JDBC batch execution, committed-pack catalog lifecycle, zero-query local pack-list handoff through normal `ObjectInserter.addPack()` and authoritative refresh after legacy publication. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. The optional `pack-capacity` Maven profile verifies 1 MiB, 16 MiB and 128 MiB payloads and is run manually and weekly by the existing performance workflow. A dedicated JMH comparison measures a twelve-MiB PostgreSQL pack with batching disabled and enabled.
+Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion, legacy lease-aware cleanup, real JDBC batch execution, committed-pack catalog lifecycle, zero-query local pack-list handoff through normal `ObjectInserter.addPack()` and authoritative refresh after legacy publication. Queue integration tests verify 50-record transactions, partial batches after the configured wait, repository isolation, rollback and post-commit acknowledgement. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. Dedicated workflows retain the local writer comparison, calibrated network RTT matrix, batch-size selection matrix and the remaining read-ahead, aging, queue-scheduling and concurrent-publication investigations.
