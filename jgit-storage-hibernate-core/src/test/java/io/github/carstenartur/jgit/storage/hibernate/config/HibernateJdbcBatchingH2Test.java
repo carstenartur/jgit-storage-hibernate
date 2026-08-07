@@ -37,12 +37,21 @@ class HibernateJdbcBatchingH2Test {
 
       Long packId = persistPack(provider);
       CountingSessionEventListener.reset();
-      persistChunks(provider, packId, 20);
+      int chunkCount = 20;
+      persistChunks(provider, packId, chunkCount);
 
-      assertEquals(20L, chunkCount(provider, packId));
+      assertEquals(chunkCount, chunkCount(provider, packId));
+      int minimumExpectedBatches =
+          Math.ceilDiv(chunkCount, HibernateStorageSettings.DEFAULT_JDBC_BATCH_SIZE);
       assertTrue(
-          CountingSessionEventListener.batchExecutions() >= 3,
-          "Twenty rows with batch size eight must execute multiple JDBC batches");
+          CountingSessionEventListener.batchExecutions() >= minimumExpectedBatches,
+          () ->
+              chunkCount
+                  + " rows with default batch size "
+                  + HibernateStorageSettings.DEFAULT_JDBC_BATCH_SIZE
+                  + " must execute at least "
+                  + minimumExpectedBatches
+                  + " JDBC batches");
       try (Session session = provider.getSessionFactory().openSession()) {
         assertNotNull(session.find(GitPackChunkEntity.class, new GitPackChunkId(packId, 7)));
       }
@@ -65,6 +74,20 @@ class HibernateJdbcBatchingH2Test {
       assertTrue(
           CountingSessionEventListener.batchExecutions() >= 3,
           "Seven rows with an explicit batch size of three must not use the default batch size");
+    }
+  }
+
+  @Test
+  void explicitPackChunkWindowAlsoConfiguresJdbcBatchingWhenNotOverridden() {
+    Properties overrides = new Properties();
+    overrides.put(HibernateStorageSettings.PACK_CHUNK_BATCH_SIZE, "50");
+
+    try (HibernateSessionFactoryProvider provider = provider(overrides)) {
+      assertEquals(50, provider.getSessionFactory().getSessionFactoryOptions().getJdbcBatchSize());
+      assertEquals(
+          50,
+          HibernateStorageSettings.resolvePackChunkBatchSize(
+              provider.getSessionFactory().getProperties()));
     }
   }
 

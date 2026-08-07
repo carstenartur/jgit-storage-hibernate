@@ -31,9 +31,12 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
 
     Properties effectiveProperties = new Properties();
     effectiveProperties.putAll(properties);
+    int defaultJdbcBatchSize =
+        hasText(effectiveProperties, HibernateStorageSettings.PACK_CHUNK_BATCH_SIZE)
+            ? HibernateStorageSettings.resolvePackChunkBatchSize(effectiveProperties)
+            : HibernateStorageSettings.DEFAULT_JDBC_BATCH_SIZE;
     effectiveProperties.putIfAbsent(
-        HibernateStorageSettings.JDBC_BATCH_SIZE,
-        Integer.toString(HibernateStorageSettings.DEFAULT_JDBC_BATCH_SIZE));
+        HibernateStorageSettings.JDBC_BATCH_SIZE, Integer.toString(defaultJdbcBatchSize));
     effectiveProperties.putIfAbsent(HibernateStorageSettings.ORDER_INSERTS, Boolean.TRUE.toString());
 
     Configuration configuration = new Configuration();
@@ -60,5 +63,10 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
     if (!sessionFactory.isClosed()) {
       sessionFactory.close();
     }
+  }
+
+  private static boolean hasText(Properties properties, String name) {
+    Object value = properties.get(name);
+    return value != null && !value.toString().isBlank();
   }
 }

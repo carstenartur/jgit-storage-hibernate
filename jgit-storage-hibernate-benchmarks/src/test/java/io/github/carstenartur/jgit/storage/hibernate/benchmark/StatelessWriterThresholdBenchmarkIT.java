@@ -28,74 +28,56 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Runs the focused stateful-versus-stateless large-pack threshold comparison. */
+/** Selects a large-pack stateful/stateless threshold at the production chunk batch size. */
 @Testcontainers(disabledWithoutDocker = true)
-class LargePackJdbcBatchBenchmarkIT {
+class StatelessWriterThresholdBenchmarkIT {
 
-  private static final String FULL_PROFILE = "full";
-  private static final String PRODUCTION_CHUNK_BATCH_SIZE = "16";
-  private static final Set<String> EXPECTED_BACKENDS =
-      Set.of(
-          HibernateRepositoryBenchmark.POSTGRESQL,
-          HibernateRepositoryBenchmark.POSTGRESQL_HIKARI);
+  private static final String[] WRITE_MODES = {
+    LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
+    LargePackJdbcBatchBenchmark.STATELESS
+  };
+  private static final String[] PAYLOAD_SIZES_MIB = {"16", "128", "512"};
+  private static final String CHUNK_BATCH_SIZE = "16";
+  private static final String DEPLOYMENT = "local-testcontainers-threshold";
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
       new PostgreSQLContainer<>("postgres:17.10-alpine")
-          .withDatabaseName("jgit_storage_batch_benchmark")
+          .withDatabaseName("jgit_storage_stateless_threshold")
           .withUsername("benchmark")
           .withPassword("benchmark");
 
   @Test
-  void recordsWriterModePoolPayloadAndProductionBatchSizeInRawArtifacts() throws Exception {
-    boolean full =
-        FULL_PROFILE.equalsIgnoreCase(
-            System.getProperty("jgit.storage.benchmark.large_pack.profile", "smoke"));
-    String[] modes =
-        full
-            ? new String[] {
-              LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_DISABLED,
-              LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
-              LargePackJdbcBatchBenchmark.STATEFUL_BATCHING_REWRITE,
-              LargePackJdbcBatchBenchmark.STATELESS
-            }
-            : new String[] {
-              LargePackJdbcBatchBenchmark.STATEFUL_BATCHING,
-              LargePackJdbcBatchBenchmark.STATELESS
-            };
-    String[] payloadSizes = full ? new String[] {"16", "128", "512"} : new String[] {"16"};
-    String deployment =
-        System.getProperty(
-            "jgit.storage.benchmark.deployment",
-            LargePackJdbcBatchBenchmark.LOCAL_TESTCONTAINERS);
-
+  void comparesStatefulAndStatelessAtSixteenOneHundredTwentyEightAndFiveHundredTwelveMiB()
+      throws Exception {
     Path resultFile =
         Path.of(
                 System.getProperty(
-                    "benchmark.resultFile", "target/benchmarks/jdbc-batch-jmh-result.json"))
+                    "benchmark.resultFile",
+                    "target/stateless-threshold/stateless-threshold-jmh-result.json"))
             .toAbsolutePath();
     Files.createDirectories(resultFile.getParent());
-    Path outputFile = resultFile.resolveSibling("jdbc-batch-jmh-output.txt");
+    Path outputFile = resultFile.resolveSibling("stateless-threshold-jmh-output.txt");
 
     Options options =
         new OptionsBuilder()
             .include(LargePackJdbcBatchBenchmark.class.getName())
-            .param("writeMode", modes)
-            .param(
-                "backend",
-                HibernateRepositoryBenchmark.POSTGRESQL,
-                HibernateRepositoryBenchmark.POSTGRESQL_HIKARI)
-            .param("payloadMiB", payloadSizes)
-            .param("chunkBatchSize", PRODUCTION_CHUNK_BATCH_SIZE)
-            .param("deployment", deployment)
+            .param("writeMode", WRITE_MODES)
+            .param("backend", HibernateRepositoryBenchmark.POSTGRESQL_HIKARI)
+            .param("payloadMiB", PAYLOAD_SIZES_MIB)
+            .param("chunkBatchSize", CHUNK_BATCH_SIZE)
+            .param("deployment", DEPLOYMENT)
+            .warmupIterations(1)
+            .measurementIterations(3)
+            .forks(1)
             .addProfiler(GCProfiler.class)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
             .result(resultFile.toString())
             .output(outputFile.toString())
             .jvmArgsAppend(
-                "-Xms1g",
-                full ? "-Xmx3g" : "-Xmx1536m",
+                "-Xms3g",
+                "-Xmx3g",
                 RepositoryBackendBenchmarkIT.systemProperty(
                     HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
                     POSTGRESQL.getJdbcUrl()),
@@ -108,36 +90,31 @@ class LargePackJdbcBatchBenchmarkIT {
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
+
     assertEquals(
-        modes.length * EXPECTED_BACKENDS.size() * payloadSizes.length,
+        WRITE_MODES.length * PAYLOAD_SIZES_MIB.length,
         results.size(),
-        "Every writer/pool/payload combination must produce a result");
+        "Every writer and payload combination must produce one result");
     assertEquals(
-        Set.copyOf(Arrays.asList(modes)),
+        Set.copyOf(Arrays.asList(WRITE_MODES)),
         results.stream()
             .map(result -> result.getParams().getParam("writeMode"))
             .collect(Collectors.toSet()));
     assertEquals(
-        EXPECTED_BACKENDS,
-        results.stream()
-            .map(result -> result.getParams().getParam("backend"))
-            .collect(Collectors.toSet()));
-    assertEquals(
-        Set.copyOf(Arrays.asList(payloadSizes)),
+        Set.copyOf(Arrays.asList(PAYLOAD_SIZES_MIB)),
         results.stream()
             .map(result -> result.getParams().getParam("payloadMiB"))
             .collect(Collectors.toSet()));
     assertEquals(
-        Set.of(PRODUCTION_CHUNK_BATCH_SIZE),
+        Set.of(CHUNK_BATCH_SIZE),
         results.stream()
             .map(result -> result.getParams().getParam("chunkBatchSize"))
             .collect(Collectors.toSet()));
-    assertEquals(
-        Set.of(deployment),
-        results.stream()
-            .map(result -> result.getParams().getParam("deployment"))
-            .collect(Collectors.toSet()));
+    assertTrue(
+        results.stream().allMatch(result -> result.getPrimaryResult().getScore() > 0.0),
+        "Every publication must have a positive elapsed time");
     assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
+    assertTrue(Files.size(resultFile) > 2, "JMH JSON result is empty");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
   }
 }

@@ -74,6 +74,7 @@ final class StagedPackExtensionStore {
   private final PrePublicationHook prePublicationHook;
   private final long minimumPrePersistedPayloadBytes;
   private final StorageByteCounters storageByteCounters;
+  private final PackPublicationSelectionCounters publicationSelectionCounters;
   private final Map<ExtensionKey, StagedExtension> staged = new ConcurrentHashMap<>();
   private final Map<String, String> preparedTokensByPackName = new ConcurrentHashMap<>();
 
@@ -130,6 +131,22 @@ final class StagedPackExtensionStore {
       PrePublicationHook prePublicationHook,
       long minimumPrePersistedPayloadBytes,
       StorageByteCounters storageByteCounters) {
+    this(
+        repositoryName,
+        transactionContext,
+        prePublicationHook,
+        minimumPrePersistedPayloadBytes,
+        storageByteCounters,
+        PackPublicationSelectionCounters.from(storageByteCounters));
+  }
+
+  private StagedPackExtensionStore(
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
+      PrePublicationHook prePublicationHook,
+      long minimumPrePersistedPayloadBytes,
+      StorageByteCounters storageByteCounters,
+      PackPublicationSelectionCounters publicationSelectionCounters) {
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
     this.transactionContext = Objects.requireNonNull(transactionContext, "transactionContext");
     this.prePublicationHook = Objects.requireNonNull(prePublicationHook, "prePublicationHook");
@@ -139,6 +156,8 @@ final class StagedPackExtensionStore {
     }
     this.minimumPrePersistedPayloadBytes = minimumPrePersistedPayloadBytes;
     this.storageByteCounters = Objects.requireNonNull(storageByteCounters, "storageByteCounters");
+    this.publicationSelectionCounters =
+        Objects.requireNonNull(publicationSelectionCounters, "publicationSelectionCounters");
   }
 
   DfsOutputStream open(DfsPackDescription description, PackExt extension) throws IOException {
@@ -157,8 +176,10 @@ final class StagedPackExtensionStore {
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
     List<Publication> publications = publications(descriptions);
+    boolean prePersisted = shouldPrePersist(publications, replaces);
+    publicationSelectionCounters.record(prePersisted, stagedPayloadBytes(publications));
     CommitResult commitResult =
-        shouldPrePersist(publications, replaces)
+        prePersisted
             ? commitPrePersisted(publications)
             : commitDirect(publications, replaces);
     discard(publications);
@@ -457,6 +478,20 @@ final class StagedPackExtensionStore {
     return storageByteCounters.snapshot();
   }
 
+  io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics
+      stagingSpillMetricsSnapshot() {
+    return storageByteCounters.stagingSpillSnapshot();
+  }
+
+  io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationSelectionMetrics
+      publicationSelectionMetricsSnapshot() {
+    return publicationSelectionCounters.snapshot();
+  }
+
+  long minimumPrePersistedPayloadBytes() {
+    return minimumPrePersistedPayloadBytes;
+  }
+
   private void register(StagedExtension extension) throws IOException {
     StagedExtension previous = staged.putIfAbsent(extension.key(), extension);
     if (previous != null) {
@@ -711,6 +746,18 @@ final class StagedPackExtensionStore {
         chunkWriter.insert(pendingChunks);
       }
     }
+  }
+
+  private static long stagedPayloadBytes(List<Publication> publications) {
+    long total = 0;
+    for (Publication publication : publications) {
+      for (ExpectedExtension expected : publication.extensions()) {
+        if (expected.staged() != null) {
+          total = saturatingAdd(total, expected.staged().fileSize());
+        }
+      }
+    }
+    return total;
   }
 
   private static long committedPayloadBytes(List<CommittedExtension> extensions) {

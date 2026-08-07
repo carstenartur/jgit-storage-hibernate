@@ -13,6 +13,8 @@ import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtension
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationSelectionMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -369,6 +371,21 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
    */
   public StorageByteMetrics storageByteMetricsSnapshot() {
     return storageByteCounters.snapshot();
+  }
+
+  /** @return current memory-to-file staging spill diagnostics */
+  public StagingSpillMetrics stagingSpillMetricsSnapshot() {
+    return stagedExtensions.stagingSpillMetricsSnapshot();
+  }
+
+  /** @return current direct-versus-pre-persisted publication selection diagnostics */
+  public PackPublicationSelectionMetrics publicationSelectionMetricsSnapshot() {
+    return stagedExtensions.publicationSelectionMetricsSnapshot();
+  }
+
+  /** @return deterministic staged-payload threshold used by the adaptive selector */
+  public long minimumPrePersistedPayloadBytes() {
+    return stagedExtensions.minimumPrePersistedPayloadBytes();
   }
 
   private CatalogState beginCatalogMutation(Collection<DfsPackDescription> replaces) {

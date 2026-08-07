@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
 import java.util.concurrent.atomic.LongAdder;
 import org.hibernate.SessionFactory;
@@ -25,6 +26,8 @@ final class StorageByteCounters {
   private final LongAdder readAheadBytesFetched;
   private final LongAdder readAheadBytesConsumed;
   private final LongAdder readAheadOverfetchBytes;
+  private final LongAdder memoryToFileSpills;
+  private final LongAdder spilledPrefixBytes;
 
   private StorageByteCounters(boolean enabled) {
     temporaryFileBytesWritten = enabled ? new LongAdder() : null;
@@ -34,6 +37,8 @@ final class StorageByteCounters {
     readAheadBytesFetched = enabled ? new LongAdder() : null;
     readAheadBytesConsumed = enabled ? new LongAdder() : null;
     readAheadOverfetchBytes = enabled ? new LongAdder() : null;
+    memoryToFileSpills = enabled ? new LongAdder() : null;
+    spilledPrefixBytes = enabled ? new LongAdder() : null;
   }
 
   static StorageByteCounters from(SessionFactory sessionFactory) {
@@ -79,6 +84,17 @@ final class StorageByteCounters {
     add(readAheadOverfetchBytes, bytes);
   }
 
+  void recordMemoryToFileSpill(long prefixBytes) {
+    if (memoryToFileSpills == null || prefixBytes == 0) {
+      return;
+    }
+    if (prefixBytes < 0) {
+      throw new IllegalArgumentException("prefixBytes must not be negative");
+    }
+    memoryToFileSpills.increment();
+    spilledPrefixBytes.add(prefixBytes);
+  }
+
   StorageByteMetrics snapshot() {
     if (!enabled()) {
       return StorageByteMetrics.ZERO;
@@ -91,6 +107,13 @@ final class StorageByteCounters {
         readAheadBytesFetched.sum(),
         readAheadBytesConsumed.sum(),
         readAheadOverfetchBytes.sum());
+  }
+
+  StagingSpillMetrics stagingSpillSnapshot() {
+    if (!enabled()) {
+      return StagingSpillMetrics.ZERO;
+    }
+    return new StagingSpillMetrics(memoryToFileSpills.sum(), spilledPrefixBytes.sum());
   }
 
   private static void add(LongAdder counter, long bytes) {

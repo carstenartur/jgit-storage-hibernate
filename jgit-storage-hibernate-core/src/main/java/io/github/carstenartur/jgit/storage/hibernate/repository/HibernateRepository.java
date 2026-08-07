@@ -17,6 +17,8 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationSelectionMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
@@ -131,6 +133,33 @@ public class HibernateRepository extends DfsRepository {
    */
   public StorageByteMetrics getStorageByteMetrics() {
     return objectDatabase.storageByteMetricsSnapshot();
+  }
+
+  /**
+   * Return monotone memory-to-file staging spill counters.
+   *
+   * @return current staging spill metrics, or zero counters when diagnostics are disabled
+   */
+  public StagingSpillMetrics getStagingSpillMetrics() {
+    return objectDatabase.stagingSpillMetricsSnapshot();
+  }
+
+  /**
+   * Return monotone direct-versus-pre-persisted pack publication selections.
+   *
+   * @return current selection metrics, or zero counters when diagnostics are disabled
+   */
+  public PackPublicationSelectionMetrics getPackPublicationSelectionMetrics() {
+    return objectDatabase.publicationSelectionMetricsSnapshot();
+  }
+
+  /**
+   * Return the deterministic staged-payload threshold for two-phase publication.
+   *
+   * @return minimum staged logical-pack bytes selected for pre-persistence
+   */
+  public long getMinimumPrePersistedPackPayloadBytes() {
+    return objectDatabase.minimumPrePersistedPayloadBytes();
   }
 
   /** Execute repository storage work in one shared transaction. */

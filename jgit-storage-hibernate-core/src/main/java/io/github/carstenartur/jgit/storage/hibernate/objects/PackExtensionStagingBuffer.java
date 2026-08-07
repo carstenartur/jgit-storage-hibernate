@@ -276,6 +276,7 @@ final class PackExtensionStagingBuffer extends DfsOutputStream {
         storageByteCounters.recordTemporaryFileBytesWritten(count);
         position += count;
       }
+      storageByteCounters.recordMemoryToFileSpill(fileSize);
       fileChannel = candidateChannel;
       temporaryFile = candidate;
       candidateChannel = null;
