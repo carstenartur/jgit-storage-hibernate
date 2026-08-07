@@ -9,16 +9,19 @@
 package io.github.carstenartur.jgit.storage.hibernate.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.queue.HibernateDurableBatchProcessor.Locking;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.hibernate.Session;
@@ -72,6 +75,53 @@ class HibernateDurableBatchProcessorH2Test {
         }
         assertEquals(3, observedJdbcBatchSize.get());
         assertEquals(3L, lifecycleCount(provider));
+      }
+    }
+  }
+
+  @Test
+  void invalidResultCountRollsBackTheWholeHibernateBatch() throws Exception {
+    try (HibernateSessionFactoryProvider provider =
+        new HibernateSessionFactoryProvider(h2Properties())) {
+      HibernateDurableBatchProcessor<String, String> processor =
+          new HibernateDurableBatchProcessor<>(
+              provider.getSessionFactory(),
+              StorageOperationKind.OTHER,
+              Locking.NONE,
+              (session, repositoryName, names) -> {
+                for (String name : names) {
+                  GitRepositoryLifecycleEntity entity = new GitRepositoryLifecycleEntity();
+                  entity.setRepositoryName(name);
+                  entity.setCreatedAt(Instant.now());
+                  session.persist(entity);
+                }
+                return List.of(names.getFirst());
+              });
+      DurableStripedWriteQueue.Limits limits =
+          new DurableStripedWriteQueue.Limits(
+              1,
+              10,
+              1024,
+              3,
+              1024,
+              Duration.ofSeconds(1),
+              Duration.ofSeconds(1));
+
+      try (DurableStripedWriteQueue<String, String> queue =
+          new DurableStripedWriteQueue<>(limits, processor)) {
+        List<DurableStripedWriteQueue.Submission<String>> submissions =
+            List.of(
+                queue.submit("logical-repository", 1, "rollback-1"),
+                queue.submit("logical-repository", 1, "rollback-2"),
+                queue.submit("logical-repository", 1, "rollback-3"));
+
+        for (DurableStripedWriteQueue.Submission<String> submission : submissions) {
+          CompletionException failure =
+              assertThrows(CompletionException.class, submission.completion()::join);
+          assertEquals(IOException.class, failure.getCause().getClass());
+        }
+        assertEquals(0L, lifecycleCount(provider));
+        assertEquals(3L, queue.metrics().failed());
       }
     }
   }
