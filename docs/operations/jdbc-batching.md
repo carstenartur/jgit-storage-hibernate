@@ -1,69 +1,84 @@
 # JDBC batching and pack-chunk writers
 
-## Default behavior
+## Production defaults
 
-`HibernateSessionFactoryProvider` applies the following defaults only when the consuming application has not supplied its own values:
+`HibernateSessionFactoryProvider` applies the following values only when the consuming application has not supplied its own settings:
 
 ```properties
-hibernate.jdbc.batch_size=8
+hibernate.jdbc.batch_size=16
 hibernate.order_inserts=true
 ```
 
-The batch size matches the default stateful writer's bounded eight-chunk `flush()`/`clear()` window. With one MiB chunks, the persistence context retains roughly eight MiB of chunk payload before flushing. Applications can override both settings explicitly. The provider deliberately does not change `hibernate.order_updates`, because update ordering would also affect unrelated application entities registered in the same persistence context.
-
-Framework-managed applications that construct their own `SessionFactory` do not pass through `HibernateSessionFactoryProvider` and must configure JDBC batching themselves.
-
-## Experimental stateless chunk writer
-
-Large immutable pack payloads may be benchmarked with a stateless ORM insert path:
+The pack writer uses the same bounded window by default. It can be configured explicitly:
 
 ```properties
-jgit.storage.hibernate.pack.chunk_writer=stateless
+jgit.storage.hibernate.pack.chunk_batch_size=32
 ```
 
-The default remains `stateful` until allocation, GC and elapsed-time measurements show a material advantage across the supported database matrix. The stateless writer is deliberately limited to `GitPackChunkEntity`, which is raw non-indexed payload data. Pack parents, publication metadata, reflogs and all Hibernate Search projections continue to use ordinary stateful sessions.
+When the bundled provider receives an explicit pack-chunk window but no explicit Hibernate JDBC batch size, it applies the same value to `hibernate.jdbc.batch_size`. Framework-managed applications that construct their own `SessionFactory` must configure both values consistently.
 
-The child `StatelessSession` is opened from the active parent session with `connection()`, so it shares the same JDBC connection and resource-local transaction. Parent and chunk inserts therefore roll back together. `CacheMode.IGNORE` prevents one-MiB payload arrays from entering the second-level cache, and explicit `insertMultiple()` batches preserve synchronous failure reporting without relying on stateless write-behind.
+Accepted pack windows are 1 through 64. Each chunk is at most one MiB, so the value is also the approximate maximum MiB of chunk arrays retained by one active writer before `flush()`/`clear()` or `insertMultiple()`. A generic Hibernate batch size above 64 remains valid, but the pack writer caps its payload-retaining window at 64.
 
-The focused PostgreSQL benchmark compares stateful insertion with batching disabled, portable stateful batching, PostgreSQL batch rewriting and the stateless shared-transaction writer. Its GC profiler records allocation and collection metrics in addition to elapsed time and JDBC counters.
+The default changed from 8 to 16 after a calibrated Toxiproxy matrix showed that 16 has the best saved-network-exchanges-per-additional-MiB ratio. See [Network latency and pack-chunk batching](network-latency-and-chunk-batching.md) for the complete measurements and deployment guidance for 8, 16, 32 and 50.
 
-## Chunk key strategy
+The provider deliberately does not change `hibernate.order_updates`, because update ordering would also affect unrelated application entities registered in the same persistence context.
 
-`GitPackChunkEntity` uses the existing logical key
+## What batching changes
+
+`GitPackChunkEntity` uses the logical key
 
 ```text
 (pack_id, chunk_index)
 ```
 
-as its Hibernate identity. This lets Hibernate know every chunk identifier before issuing SQL and therefore collect inserts into JDBC batches.
+as its Hibernate identity. Every chunk identifier is therefore known before SQL execution and Hibernate can collect the inserts into real JDBC batches.
 
-Flyway-managed databases created by earlier versions may still contain the generated `git_pack_chunks.id` column and its primary key. That column remains mapped read-only for compatibility, while the existing unique constraint on `(pack_id, chunk_index)` continues to protect the storage invariant. Upgrades do not rewrite published pack payloads or chunk rows.
+The pack parent keeps its narrow generated `Long` key. Hibernate must insert and flush that one parent row before chunk insertion begins. The large multiplicative cost was removed from the chunks, where one pack can create many rows.
 
-Disposable `create-drop` schemas use the composite ORM key directly. Migration-backed H2, HSQLDB, PostgreSQL and SQL Server schemas retain the legacy surrogate column and are validated by the integration suite.
+The writer retains chunks across the staging reader's smaller delivery groups until the configured window is full. Thus a configured value of 32 produces a real 32-row ORM/JDBC batch rather than four unrelated eight-row scheduling groups. A final partial group is flushed when the writer closes.
 
-## Pack key strategy
+## Calibrated network evidence
 
-`GitPackEntity` deliberately keeps its narrow generated `Long` key. Chunk rows reference that compact value, avoiding wide foreign keys containing repository name, pack name and extension.
+The first Toxiproxy experiment published a non-compressible 16-MiB object through PostgreSQL and HikariCP at calibrated RTTs from local to 50 ms. Batching disabled executed 22 individual JDBC statements. Batch size 8 reduced that shape to five individual statements plus three chunk batches.
 
-The pack key still uses `GenerationType.IDENTITY`, so Hibernate must insert and flush the parent pack row before it can persist chunk rows. The expensive repeated generated-key lookup was removed from the chunk rows, where one large pack can create many inserts. A cross-database pooled sequence for the parent key should be considered only if benchmark evidence shows that the remaining single parent-key round trip is material.
+| RTT | Batching disabled | Batch 8 | Saving |
+|---:|---:|---:|---:|
+| 5 ms | 861.5 ms | 765.2 ms | 96.3 ms / 11.2% |
+| 10 ms | 990.8 ms | 815.2 ms | 175.6 ms / 17.7% |
+| 20 ms | 1,240.7 ms | 922.9 ms | 317.9 ms / 25.6% |
+| 50 ms | 1,991.6 ms | 1,255.5 ms | 736.1 ms / 37.0% |
 
-## Existing stateful baseline
+Linear fits showed that batching removed roughly 57% of the latency-sensitive network-exchange slope.
 
-The measurements below predate the stateless writer and remain the stateful baseline. The focused JMH test publishes one non-compressible twelve-MiB blob to PostgreSQL. Every invocation creates exactly 13 chunk rows and 2 pack rows, uses 2 connections and performs 5 Hibernate flushes.
+The follow-up selection matrix used 49 chunks and compared 8, 16, 32 and 50 at calibrated 10, 20 and 50 ms RTT:
 
-| Mode | Time | JDBC batch executions | JDBC statement executions | Prepared statements |
-|---|---:|---:|---:|---:|
-| Batching disabled | 476.6 ms | 0 | 19 | 19 |
-| Portable Hibernate batching | 474.9 ms | 2 | 6 | 8 |
-| Batching plus PostgreSQL rewrite | 480.3 ms | 2 | 6 | 8 |
+| RTT | Batch 8 | Batch 16 | Batch 32 | Batch 50 |
+|---:|---:|---:|---:|---:|
+| 10 ms | 2,192.9 ms | 2,165.1 ms | 2,140.7 ms | 2,131.2 ms |
+| 20 ms | 2,335.5 ms | 2,266.6 ms | 2,234.0 ms | 2,210.1 ms |
+| 50 ms | 2,783.4 ms | 2,636.2 ms | 2,535.4 ms | 2,465.3 ms |
 
-Portable batching therefore reduces JDBC statement executions from 19 to 6 and prepared statements from 19 to 8 while persisting identical data. End-to-end latency is neutral in this local Testcontainers workload because pack creation, compression and transfer of the twelve-MiB payload dominate the remaining time.
+Chunk batch executions fell from 7 to 4 to 2 to 1. Other JDBC statements stayed at five. Total normalized allocation remained essentially unchanged; the production trade-off is peak retained payload and concurrent writers. Sixteen removes three exchanges for only eight additional MiB compared with the old default. Values 32 and 50 remain useful explicit choices for higher RTT and controlled concurrency.
 
-The standard protocol suite also remains stable: PostgreSQL incremental push measured 44.10 ms before and 44.07 ms after the batching change. Initial push improved by roughly three percent in that run, clone was unchanged and incremental fetch was slightly faster. These variations are consistent with normal run noise and show no small-workload regression.
+## Stateful and stateless writers
+
+The default stateful path persists chunk entities in the normal Hibernate session, then flushes and clears at the configured bounded window.
+
+Large immutable pack payloads may use the opt-in stateless ORM path:
+
+```properties
+jgit.storage.hibernate.pack.chunk_writer=stateless
+```
+
+The child `StatelessSession` shares the active parent's JDBC connection and resource-local transaction. Parent and chunk inserts therefore commit or roll back together. `CacheMode.IGNORE` prevents raw one-MiB payload arrays from entering the second-level cache, and `insertMultiple()` submits the same bounded groups.
+
+Only non-indexed `GitPackChunkEntity` rows use the stateless session. Pack parents, publication metadata, refs, reflogs and Hibernate Search projections remain stateful.
+
+At 16 MiB, stateless ORM reduced allocation by about 18% and Hibernate flushes from six to three, while elapsed time and the network-latency slope remained nearly identical to stateful batching. It therefore remains an explicit heap/ORM optimization rather than a separate network batching mechanism. `stateful` remains the safe default until the 128/512-MiB and concurrent-publication matrices establish a robust automatic threshold.
 
 ## Driver-specific options
 
-Portable Hibernate batching works without JDBC-URL extensions. Deployments may benchmark additional driver features separately.
+Portable Hibernate batching requires no JDBC URL extension.
 
 ### PostgreSQL
 
@@ -71,7 +86,7 @@ Portable Hibernate batching works without JDBC-URL extensions. Deployments may b
 reWriteBatchedInserts=true
 ```
 
-The focused binary-chunk benchmark found no benefit from this option: 480.3 ms with rewrite versus 474.9 ms with portable batching alone, with identical Hibernate/JDBC counters. The library therefore does not enable it. A deployment with different network latency, pack size or database placement may still test it explicitly.
+Both the local and calibrated network matrices found no advantage for the binary chunk path. Rewrite did not reduce the RTT slope and was slightly slower at each measured point. The library does not enable it.
 
 ### Microsoft SQL Server
 
@@ -79,21 +94,32 @@ The focused binary-chunk benchmark found no benefit from this option: 480.3 ms w
 useBulkCopyForBatchInsert=true
 ```
 
-The Microsoft JDBC driver may use bulk-copy execution for compatible parameterized batch inserts. Test the actual `varbinary(max)` chunk mapping, transaction rollback and error reporting before production use.
+The Microsoft driver may use bulk-copy execution for compatible parameterized batches. Deployments must test the actual `varbinary(max)` mapping, rollback behavior and error reporting before enabling it. The library does not force the option because the application owns the `DataSource`, driver version and operational policy.
 
-The library does not force either vendor option because the application owns the `DataSource`, JDBC URL, driver version and operational rollback policy.
+## P6Spy and diagnostics
+
+The timed benchmark path does not use P6Spy. Proxying and SQL logging would distort the result and still would not prove the exact PostgreSQL protocol round-trip count.
+
+A lightweight Hibernate `SessionEventListener` records `jdbcExecuteBatchStart()` and `jdbcExecuteStatementStart()`. Hibernate statistics add prepared statements, entity inserts, flushes and connections; Core metrics add transactions, repository locks, payload bytes and staging traffic. Together these counters explain the measured RTT response without inserting a JDBC logging proxy.
+
+## Schema compatibility
+
+Flyway-managed databases created by earlier versions may retain the generated `git_pack_chunks.id` column and its primary key. That column remains mapped read-only for compatibility, while `(pack_id, chunk_index)` protects the logical storage invariant. Upgrades do not rewrite published payloads.
+
+Disposable `create-drop` schemas use the composite ORM key directly. Migration-backed H2, HSQLDB, PostgreSQL and SQL Server schemas are covered by the integration suite.
 
 ## Verification
 
 The normal Core tests verify that:
 
-- the default batch size is active;
-- an explicit consumer batch size is preserved;
-- real `jdbcExecuteBatchStart()` events occur for chunk inserts;
+- the evidence-based default JDBC batch size is active;
+- explicit consumer JDBC settings remain authoritative;
+- an explicit pack-chunk window configures JDBC batching when the bundled provider owns the default;
+- malformed or unbounded pack windows are rejected;
+- real JDBC batch events occur for chunk inserts;
+- stateful and stateless paths flush the final partial batch;
 - chunks remain addressable by `(pack_id, chunk_index)`;
-- create-drop and migration-backed schemas remain valid;
-- stateless chunk inserts share the outer transaction and roll back with their parent pack;
-- a multi-MiB pack written statelessly remains byte-identical after repository reopen;
-- stateless raw chunk persistence coexists with ordinary Hibernate Search indexing and querying.
+- parent and chunks share rollback and remain byte-identical after reopen;
+- Hibernate Search continues to use ordinary stateful projection persistence.
 
-The performance workflow runs the established backend/protocol matrix and a separate focused PostgreSQL job for stateful batching disabled, portable stateful batching, batching plus driver rewrite and the stateless shared-transaction writer. On `main`, both raw JMH artifacts are combined into the published dashboard history without changing the standard performance badge contract.
+The workflows retain the local writer matrix, the calibrated RTT matrix and the 8/16/32/50 selection matrix as raw JMH artifacts.
