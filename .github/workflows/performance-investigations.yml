@@ -100,3 +100,54 @@ jobs:
           if [ "${{ matrix.investigation }}" = 'write-queue' ]; then
             echo '- This existing experiment measures striped scheduling and backpressure. Atomic receiver record batching is implemented separately by the production `DurableStripedWriteQueue` and its Hibernate adapter.' >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  stateless-threshold:
+    name: Stateful/stateless threshold at 16/128/512 MiB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p target/stateless-threshold
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/stateless-threshold/maven-build.log
+
+      - name: Compare stateful and stateless at production batch size
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pstateless-writer-threshold \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/stateless-threshold/jmh-result.json" 2>&1 \
+            | tee target/stateless-threshold/maven-benchmark.log
+
+      - name: Upload stateless threshold evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: stateless-writer-threshold-results
+          path: |
+            target/stateless-threshold/**
+            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
+          if-no-files-found: error
+
+      - name: Report stateless threshold matrix
+        if: always()
+        run: |
+          echo '### Stateful/stateless large-pack threshold' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'PostgreSQL + HikariCP publishes deterministic 16, 128 and 512 MiB payloads with the production 16-chunk batch window.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Raw JMH JSON includes elapsed time, allocation, GC, JDBC execution, flush and byte-integrity counters.' >> "$GITHUB_STEP_SUMMARY"
