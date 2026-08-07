@@ -100,6 +100,18 @@ public final class HibernateDurableBatchProcessor<C, R>
   private List<R> executeWork(
       Session session, String repositoryName, List<C> commands) throws IOException {
     session.setJdbcBatchSize(commands.size());
-    return work.execute(session, repositoryName, commands);
+    List<R> results =
+        Objects.requireNonNull(
+            work.execute(session, repositoryName, commands),
+            "Batch work returned null");
+    if (results.size() != commands.size()) {
+      throw new IOException(
+          "Batch work returned "
+              + results.size()
+              + " results for "
+              + commands.size()
+              + " commands");
+    }
+    return List.copyOf(results);
   }
 }
