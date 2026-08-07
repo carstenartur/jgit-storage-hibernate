@@ -9,6 +9,8 @@ The bundled `HibernateSessionFactoryProvider` now uses the following non-overrid
 ```properties
 hibernate.jdbc.batch_size=16
 hibernate.order_inserts=true
+jgit.storage.hibernate.pack.chunk_writer=auto
+jgit.storage.hibernate.pack.stateless_min_payload_bytes=16777216
 ```
 
 The pack writer derives its bounded one-MiB chunk window from the Hibernate batch size. It can also be configured explicitly:
@@ -75,6 +77,25 @@ Batch 32 saved 52.2, 101.5 and 248.0 ms respectively. Batch 50 saved 61.7, 125.4
 
 The preceding 16-MiB matrix also compared batching disabled, batch 8, PgJDBC rewrite and stateless ORM at 0, 1, 5, 10, 20 and 50 ms RTT. It established that ordinary batching removes roughly 57% of the latency-sensitive slope, while `reWriteBatchedInserts=true` does not improve this binary-payload path. Stateless ORM has nearly the same RTT slope as stateful batching and remains primarily a heap/ORM-overhead option.
 
+## Writer mode and payload size
+
+Network RTT does not materially change the difference between the stateful and stateless chunk writers: both have essentially the same JDBC statement and batch shape. The separate 16/128/512-MiB matrix instead found a stable memory-management benefit from stateless ORM:
+
+| Payload | Allocation reduction | Flushes stateful/stateless | Stateless elapsed point estimate |
+|---:|---:|---:|---:|
+| 16 MiB | 18.0% | 5 / 3 | 2.6% lower |
+| 128 MiB | 15.9% | 12 / 3 | 1.8% lower |
+| 512 MiB | 16.2% | 36 / 3 | 1.4% lower |
+
+Latency confidence intervals overlap, but every measured stateless point was lower and close/reopen SHA-256 integrity was identical. The production default is therefore size-based rather than RTT-based:
+
+```properties
+jgit.storage.hibernate.pack.chunk_writer=auto
+jgit.storage.hibernate.pack.stateless_min_payload_bytes=16777216
+```
+
+Below 16 MiB, Core uses the ordinary stateful reference path. At or above 16 MiB, only immutable raw chunk rows use a shared-transaction child `StatelessSession`. Applications may force `stateful` or `stateless`, or move the threshold when their heap and deployment evidence differs.
+
 ## Reproduction
 
 Run the calibrated batch-size matrix with Docker available:
@@ -84,6 +105,13 @@ mvn -pl jgit-storage-hibernate-benchmarks verify \
   -Pnetwork-batch-size-selection
 ```
 
-The `Network Latency Benchmarks` workflow retains combined JMH JSON, per-RTT JSON and text output, a calibration CSV, Maven logs and Failsafe reports. The evidence above comes from workflow run `31212270865`, artifact `network-chunk-batch-size-results`.
+Run the focused writer-threshold matrix with:
+
+```bash
+mvn -pl jgit-storage-hibernate-benchmarks verify \
+  -Pstateless-writer-threshold
+```
+
+The `Network Latency Benchmarks` workflow retains combined JMH JSON, per-RTT JSON and text output, a calibration CSV, Maven logs and Failsafe reports. The batch-size evidence comes from workflow run `31212270865`, artifact `network-chunk-batch-size-results`. The threshold workflow retains the corresponding 16/128/512-MiB raw data separately.
 
 The timed path does not use P6Spy. Hibernate `SessionEventListener` counters report real JDBC statement and batch executions without proxy or SQL-logging distortion.
