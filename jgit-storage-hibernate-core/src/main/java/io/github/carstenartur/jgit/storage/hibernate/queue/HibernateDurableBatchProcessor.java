@@ -24,6 +24,12 @@ import org.hibernate.SessionFactory;
  * locking enabled, one batch also participates in the same cross-SessionFactory lock protocol as
  * pack publication, refs and maintenance.
  *
+ * <p>The stateful Hibernate session receives the actual command count as its session-level JDBC
+ * batch size. A 50-record queue batch can therefore be emitted as one JDBC batch per compatible SQL
+ * statement shape instead of being split by a smaller SessionFactory default. Hibernate may still
+ * split work when commands produce different SQL, require identity-generated keys or explicitly
+ * flush inside the application work.
+ *
  * @param <C> queued command or record type
  * @param <R> durable result type
  */
@@ -44,7 +50,7 @@ public final class HibernateDurableBatchProcessor<C, R>
     /**
      * Persist or mutate every command and return one result per command in the same order.
      *
-     * @param session active Hibernate session
+     * @param session active Hibernate session whose JDBC batch size equals {@code commands.size()}
      * @param repositoryName repository and batch key
      * @param commands immutable repository-homogeneous command list
      * @return one result per command in the same order
@@ -75,15 +81,25 @@ public final class HibernateDurableBatchProcessor<C, R>
   public List<R> execute(String repositoryName, List<C> commands) throws IOException {
     Objects.requireNonNull(repositoryName, "repositoryName");
     Objects.requireNonNull(commands, "commands");
+    if (commands.isEmpty()) {
+      return List.of();
+    }
     return switch (locking) {
       case NONE ->
           transactionContext.execute(
-              operation, session -> work.execute(session, repositoryName, commands));
+              operation,
+              session -> executeWork(session, repositoryName, commands));
       case REPOSITORY ->
           transactionContext.executeWithRepositoryLock(
               operation,
               repositoryName,
-              session -> work.execute(session, repositoryName, commands));
+              session -> executeWork(session, repositoryName, commands));
     };
+  }
+
+  private List<R> executeWork(
+      Session session, String repositoryName, List<C> commands) throws IOException {
+    session.setJdbcBatchSize(commands.size());
+    return work.execute(session, repositoryName, commands);
   }
 }
