@@ -78,3 +78,54 @@ jobs:
           echo 'Toxiproxy applies deterministic upstream/downstream delays for 0, 1, 5, 10, 20 and 50 ms total RTT.' >> "$GITHUB_STEP_SUMMARY"
           echo 'The Maven profile compares batching disabled, Hibernate batching, PostgreSQL reWriteBatchedInserts and the stateless ORM writer for a 16 MiB non-compressible publication through HikariCP.' >> "$GITHUB_STEP_SUMMARY"
           echo 'The artifact contains raw JMH JSON, per-RTT output and a SELECT 1 calibration CSV.' >> "$GITHUB_STEP_SUMMARY"
+
+  batch-size-selection:
+    name: Select chunk batches 8/16/32/50 at 10/20/50 ms RTT
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p target/network-batch-size
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/network-batch-size/maven-build.log
+
+      - name: Compare bounded chunk batch sizes through Toxiproxy
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pnetwork-batch-size-selection \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/network-batch-size/jmh-result.json" 2>&1 \
+            | tee target/network-batch-size/maven-benchmark.log
+
+      - name: Upload chunk batch-size results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: network-chunk-batch-size-results
+          path: |
+            target/network-batch-size/**
+            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
+          if-no-files-found: error
+
+      - name: Report chunk batch-size matrix
+        if: always()
+        run: |
+          echo '### Bounded chunk batch-size selection' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A 48 MiB non-compressible publication compares 8, 16, 32 and 50 retained one-MiB chunks at calibrated 10, 20 and 50 ms RTT.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The artifact contains raw JMH JSON, GC/allocation counters, per-RTT output and a SELECT 1 calibration CSV.' >> "$GITHUB_STEP_SUMMARY"
