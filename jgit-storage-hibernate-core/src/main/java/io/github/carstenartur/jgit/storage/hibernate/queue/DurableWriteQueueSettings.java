@@ -67,7 +67,7 @@ public final class DurableWriteQueueSettings {
 
   private static int integer(Map<?, ?> properties, String name, int defaultValue) {
     long value = longValue(properties, name, defaultValue);
-    if (value > Integer.MAX_VALUE) {
+    if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) {
       throw new IllegalArgumentException(name + " exceeds the integer range: " + value);
     }
     return (int) value;
