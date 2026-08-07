@@ -160,7 +160,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
 
   private final Limits limits;
   private final DurableBatchProcessor<C, R> processor;
-  private final Stripe[] stripes;
+  private final List<Stripe> stripes;
   private final AtomicBoolean accepting = new AtomicBoolean(true);
   private final LongAdder submitted = new LongAdder();
   private final LongAdder completed = new LongAdder();
@@ -182,10 +182,11 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
       Limits limits, DurableBatchProcessor<C, R> processor) {
     this.limits = Objects.requireNonNull(limits, "limits");
     this.processor = Objects.requireNonNull(processor, "processor");
-    stripes = new DurableStripedWriteQueue.Stripe[limits.stripes()];
-    for (int index = 0; index < stripes.length; index++) {
-      stripes[index] = new Stripe(index);
+    List<Stripe> created = new ArrayList<>(limits.stripes());
+    for (int index = 0; index < limits.stripes(); index++) {
+      created.add(new Stripe(index));
     }
+    stripes = List.copyOf(created);
     for (Stripe stripe : stripes) {
       stripe.worker.start();
     }
@@ -220,7 +221,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
       rejected.increment();
       throw new RejectedExecutionException("Write queue is closed");
     }
-    return stripes[stripeIndex(repositoryName)].enqueue(
+    return stripes.get(stripeIndex(repositoryName)).enqueue(
         repositoryName, payloadBytes, command);
   }
 
@@ -292,7 +293,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
   int stripeIndex(String repositoryName) {
     int hash = repositoryName.hashCode();
     hash ^= hash >>> 16;
-    return Math.floorMod(hash, stripes.length);
+    return Math.floorMod(hash, stripes.size());
   }
 
   private void recordOccupancy(long queueDepth, long queuedBytes) {
@@ -345,8 +346,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
             repositoryQueues.computeIfAbsent(repositoryName, ignored -> new ArrayDeque<>());
         boolean wasEmpty = repositoryQueue.isEmpty();
         repositoryQueue.addLast(
-            new QueuedCommand(
-                repositoryName, payloadBytes, System.nanoTime(), command, submission));
+            new QueuedCommand(payloadBytes, System.nanoTime(), command, submission));
         if (wasEmpty) {
           readyRepositories.addLast(repositoryName);
         }
@@ -373,7 +373,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
           if (batch == null) {
             return;
           }
-          if (!batch.commands().isEmpty()) {
+          if (!batch.commands.isEmpty()) {
             execute(batch);
           }
         }
@@ -445,7 +445,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
           updateMaximum(maximumBatchSize, batch.size());
           updateMaximum(maximumBatchBytes, batchBytes);
         }
-        return new Batch(repositoryName, List.copyOf(batch), batchBytes);
+        return new Batch(repositoryName, List.copyOf(batch));
       } finally {
         lock.unlock();
       }
@@ -474,10 +474,10 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
     }
 
     private void execute(Batch batch) {
-      List<C> commands = new ArrayList<>(batch.commands().size());
-      int batchSize = batch.commands().size();
+      List<C> commands = new ArrayList<>(batch.commands.size());
+      int batchSize = batch.commands.size();
       long startedAt = System.nanoTime();
-      for (QueuedCommand queued : batch.commands()) {
+      for (QueuedCommand queued : batch.commands) {
         long wait = Math.max(0, startedAt - queued.enqueuedAtNanos);
         queued.submission.queueWaitNanos = wait;
         queued.submission.batchSize = batchSize;
@@ -489,7 +489,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
       try {
         List<R> results =
             Objects.requireNonNull(
-                processor.execute(batch.repositoryName(), List.copyOf(commands)),
+                processor.execute(batch.repositoryName, List.copyOf(commands)),
                 "Batch processor returned null");
         if (results.size() != batchSize) {
           throw new IllegalStateException(
@@ -500,7 +500,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
                   + " commands");
         }
         for (int index = 0; index < batchSize; index++) {
-          QueuedCommand queued = batch.commands().get(index);
+          QueuedCommand queued = batch.commands.get(index);
           if (queued.submission.completion.complete(results.get(index))) {
             completed.increment();
           } else if (queued.submission.completion.isCancelled()) {
@@ -509,7 +509,7 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
         }
       } catch (Throwable failure) {
         failedBatches.increment();
-        for (QueuedCommand queued : batch.commands()) {
+        for (QueuedCommand queued : batch.commands) {
           if (queued.submission.completion.completeExceptionally(failure)) {
             failed.increment();
           } else if (queued.submission.completion.isCancelled()) {
@@ -566,19 +566,13 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
   }
 
   private final class QueuedCommand {
-    private final String repositoryName;
     private final long payloadBytes;
     private final long enqueuedAtNanos;
     private final C command;
     private final Submission<R> submission;
 
     private QueuedCommand(
-        String repositoryName,
-        long payloadBytes,
-        long enqueuedAtNanos,
-        C command,
-        Submission<R> submission) {
-      this.repositoryName = repositoryName;
+        long payloadBytes, long enqueuedAtNanos, C command, Submission<R> submission) {
       this.payloadBytes = payloadBytes;
       this.enqueuedAtNanos = enqueuedAtNanos;
       this.command = command;
@@ -586,7 +580,15 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
     }
   }
 
-  private record Batch(String repositoryName, List<QueuedCommand> commands, long bytes) {}
+  private final class Batch {
+    private final String repositoryName;
+    private final List<QueuedCommand> commands;
+
+    private Batch(String repositoryName, List<QueuedCommand> commands) {
+      this.repositoryName = repositoryName;
+      this.commands = commands;
+    }
+  }
 
   private record Occupancy(long commands, long bytes) {}
 }
