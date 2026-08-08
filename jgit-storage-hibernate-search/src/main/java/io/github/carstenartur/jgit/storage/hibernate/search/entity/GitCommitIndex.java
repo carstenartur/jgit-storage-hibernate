@@ -80,7 +80,8 @@ public class GitCommitIndex {
   @Column(name = "id", insertable = false, updatable = false)
   private Long id;
 
-  /** Stable semantic profile that produced this projection. */
+  /** Stable semantic profile that produced this projection and its Lucene fields. */
+  @KeywordField
   @Column(name = "index_profile", nullable = false, length = 32)
   private String indexProfile = SearchIndexingProfile.DEFAULT.id();
 
