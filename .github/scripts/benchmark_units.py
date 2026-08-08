@@ -26,9 +26,9 @@ _THROUGHPUT_PERIOD_TO_MS = {
     "ops/min": 60_000.0,
 }
 
-# Some benchmark suites retain non-timing evidence that is still naturally
+# Some benchmark suites retain non-throughput evidence that is still naturally
 # smaller-is-better and can therefore share the existing history/alert model.
-PASSTHROUGH_UNITS = frozenset({"bytes", "segments", "miss %"})
+PASSTHROUGH_UNITS = frozenset({"bytes", "segments", "miss %", "ms", "count"})
 SUPPORTED_UNITS = frozenset(_TIME_PER_OPERATION_TO_MS | _THROUGHPUT_PERIOD_TO_MS)
 
 
@@ -79,9 +79,9 @@ def normalize_measurement(
 def normalize_benchmark(benchmark: dict[str, Any]) -> dict[str, Any]:
     """Normalize one custom benchmark entry without lying about its physical unit.
 
-    Timing and throughput inputs become ``ms/op``. Explicitly supported footprint
-    and miss-rate units stay unchanged because the benchmark dashboard already
-    models every series as smaller-is-better.
+    Timing and throughput inputs become ``ms/op``. Explicitly supported footprint,
+    latency, count and miss-rate units stay unchanged because the benchmark dashboard
+    already models every series as smaller-is-better.
     """
 
     normalized = dict(benchmark)
