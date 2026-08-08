@@ -1,0 +1,128 @@
+name: Temporary add module boundaries
+
+on:
+  push:
+    branches:
+      - ci/consumer-contracts
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-add-module-boundaries
+  cancel-in-progress: true
+
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/consumer-contracts
+          fetch-depth: 0
+
+      - name: Follow the consolidated consumer workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            git fetch origin ci/consumer-contracts
+            git reset --hard origin/ci/consumer-contracts
+            if grep -Fq 'same consumer commit twice' docs/operations/consumer-compatibility.md 2>/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo 'The consolidated consumer workflow did not appear.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Wire the module graph into the permanent gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/consumer-compatibility.yml')
+          text = path.read_text(encoding='utf-8')
+          trigger_anchor = "      - '.github/scripts/test_verify_consumer_dependency_tree.py'\n"
+          trigger_lines = (
+              trigger_anchor
+              + "      - '.github/scripts/verify-module-boundaries.py'\n"
+              + "      - '.github/scripts/test_verify_module_boundaries.py'\n"
+          )
+          occurrences = text.count(trigger_anchor)
+          if "verify-module-boundaries.py'" not in text:
+              if occurrences != 2:
+                  raise SystemExit(
+                      f'Expected two consumer workflow trigger anchors, found {occurrences}'
+                  )
+              text = text.replace(trigger_anchor, trigger_lines)
+
+          test_anchor = (
+              '          python3 .github/scripts/test_verify_consumer_dependency_tree.py\n'
+              '          bash -n .github/scripts/run-consumer-contract.sh\n'
+          )
+          test_replacement = (
+              '          python3 .github/scripts/test_verify_consumer_dependency_tree.py\n'
+              '          python3 .github/scripts/test_verify_module_boundaries.py\n'
+              '          bash -n .github/scripts/run-consumer-contract.sh\n'
+          )
+          if 'python3 .github/scripts/test_verify_module_boundaries.py' not in text:
+              if test_anchor not in text:
+                  raise SystemExit('Could not locate consumer tooling tests')
+              text = text.replace(test_anchor, test_replacement, 1)
+
+          step_anchor = '      - name: Resolve exact reactor identity\n'
+          boundary_step = '''      - name: Verify consumer-composable module boundaries
+        run: |
+          python3 .github/scripts/verify-module-boundaries.py \
+            --json-report target/consumer-compatibility/module-graph.json \
+            --markdown-report target/consumer-compatibility/module-graph.md
+          cat target/consumer-compatibility/module-graph.md
+
+'''
+          if 'name: Verify consumer-composable module boundaries' not in text:
+              if step_anchor not in text:
+                  raise SystemExit('Could not locate reactor identity step')
+              text = text.replace(step_anchor, boundary_step + step_anchor, 1)
+          path.write_text(text, encoding='utf-8')
+
+          docs = Path('docs/operations/consumer-compatibility.md')
+          doc_text = docs.read_text(encoding='utf-8')
+          graph_note = (
+              '\nThe same run emits `module-graph.json` and `module-graph.md`. '
+              'The graph enforces downward-only optional capability dependencies: Core does not '
+              'select Search or analysis; Search does not select Java Analysis or Architecture; '
+              'and no published production module selects the benchmark artifact.\n'
+          )
+          if 'module-graph.json' not in doc_text:
+              doc_text += graph_note
+          docs.write_text(doc_text, encoding='utf-8')
+
+          for temporary in Path('.github/workflows').glob('temporary-*.yml'):
+              temporary.unlink()
+          PY
+
+      - name: Verify and commit module-boundary integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          python3 .github/scripts/test_verify_consumer_dependency_tree.py
+          python3 .github/scripts/test_verify_module_boundaries.py
+          python3 .github/scripts/verify-module-boundaries.py \
+            --json-report target/module-graph.json \
+            --markdown-report target/module-graph.md
+          bash -n .github/scripts/run-consumer-contract.sh
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/consumer-compatibility.yml')"
+          git diff --check
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Enforce consumer capability module boundaries'
+          git push origin HEAD:ci/consumer-contracts
