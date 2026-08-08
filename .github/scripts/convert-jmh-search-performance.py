@@ -11,34 +11,13 @@ from typing import Any
 from benchmark_units import CANONICAL_UNIT, normalize_measurement
 
 SERIES = {
-    "incrementalIndexing": (
-        "Hibernate Search indexing",
-        "Batched incremental indexing",
-    ),
-    "projectionRebuild": (
-        "Hibernate Search rebuild",
-        "Bounded purge + batched rebuild",
-    ),
-    "fullTextEntityHits": (
-        "Hibernate Search full-text query",
-        "Entity hydration",
-    ),
-    "fullTextSummaryHits": (
-        "Hibernate Search full-text query",
-        "Lucene projection",
-    ),
-    "contentOnlySummaryHits": (
-        "Hibernate Search content query",
-        "Lucene projection",
-    ),
-    "pathLiteralSql": (
-        "Hibernate Search path query",
-        "SQL literal fragment",
-    ),
-    "pathTermsLucene": (
-        "Hibernate Search path query",
-        "Lucene analyzed terms",
-    ),
+    "incrementalIndexing": ("Hibernate Search indexing", "Batched incremental indexing"),
+    "projectionRebuild": ("Hibernate Search rebuild", "Bounded purge + batched rebuild"),
+    "fullTextEntityHits": ("Hibernate Search full-text query", "Entity hydration"),
+    "fullTextSummaryHits": ("Hibernate Search full-text query", "Lucene projection"),
+    "contentOnlySummaryHits": ("Hibernate Search content query", "Lucene projection"),
+    "pathLiteralSql": ("Hibernate Search path query", "SQL literal fragment"),
+    "pathTermsLucene": ("Hibernate Search path query", "Lucene analyzed terms"),
 }
 
 DEFAULT_PROFILE = "content-v1"
@@ -86,22 +65,19 @@ def _miss_rate(actual: float, expected: int) -> float:
     return 100.0 * (float(expected) - bounded_actual) / float(expected)
 
 
+def _backend(profile: str, implementation: str) -> str:
+    return f"{profile} / {implementation}"
+
+
 def _timing_entry(
-    result: dict[str, Any],
-    operation: str,
-    implementation: str,
-    profile: str,
+    result: dict[str, Any], operation: str, implementation: str, profile: str
 ) -> dict[str, Any]:
     params = result.get("params", {})
     metric = result["primaryMetric"]
     original_score = metric["score"]
     original_error = metric.get("scoreError", 0.0)
     original_unit = str(metric["scoreUnit"])
-    score, score_error = normalize_measurement(
-        original_score,
-        original_error,
-        original_unit,
-    )
+    score, score_error = normalize_measurement(original_score, original_error, original_unit)
     extra_lines = [
         f"Profile: {profile}",
         f"Implementation: {implementation}",
@@ -114,7 +90,7 @@ def _timing_entry(
     if original_unit != CANONICAL_UNIT:
         extra_lines.append(f"Original metric: {original_score} {original_unit}")
     return {
-        "name": f"{operation} — {profile} — {implementation}",
+        "name": f"{operation} — {_backend(profile, implementation)}",
         "unit": CANONICAL_UNIT,
         "value": score,
         "range": score_error,
@@ -134,21 +110,22 @@ def _footprint_entries(result: dict[str, Any], profile: str) -> list[dict[str, A
     segments, segments_error = _metric_value(result, "segmentCount")
     return [
         {
-            "name": f"Hibernate Search index footprint — {profile} — Lucene",
+            "name": f"Hibernate Search index footprint — {_backend(profile, 'Lucene')}",
             "unit": "bytes",
             "value": lucene_bytes,
             "range": lucene_error,
             "extra": common_extra,
         },
         {
-            "name": f"Hibernate Search SQL projection footprint — {profile} — PostgreSQL",
+            "name": "Hibernate Search SQL projection footprint — "
+            + _backend(profile, "PostgreSQL"),
             "unit": "bytes",
             "value": sql_bytes,
             "range": sql_error,
             "extra": common_extra,
         },
         {
-            "name": f"Hibernate Search segment count — {profile} — Lucene",
+            "name": f"Hibernate Search segment count — {_backend(profile, 'Lucene')}",
             "unit": "segments",
             "value": segments,
             "range": segments_error,
@@ -161,11 +138,10 @@ def _quality_entry(
     result: dict[str, Any], profile: str, quality_name: str, expected: int
 ) -> dict[str, Any]:
     actual, _ = _metric_value(result, "resultCount")
-    miss_rate = _miss_rate(actual, expected)
     return {
-        "name": f"{quality_name} — {profile} — miss rate",
+        "name": f"{quality_name} — {_backend(profile, 'miss rate')}",
         "unit": "miss %",
-        "value": miss_rate,
+        "value": _miss_rate(actual, expected),
         "range": 0.0,
         "extra": (
             f"Profile: {profile}\n"
@@ -183,12 +159,10 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     results_by_profile_method: dict[tuple[str, str], dict[str, Any]] = {}
 
     for result in results:
-        benchmark = str(result["benchmark"])
-        method = benchmark.rsplit(".", 1)[-1]
+        method = str(result["benchmark"]).rsplit(".", 1)[-1]
         if method not in SERIES:
             raise ValueError(f"Unsupported Hibernate Search benchmark method: {method!r}")
-        params = result.get("params", {})
-        profile = str(params.get("indexProfile", DEFAULT_PROFILE))
+        profile = str(result.get("params", {}).get("indexProfile", DEFAULT_PROFILE))
         operation, implementation = SERIES[method]
         entry = _timing_entry(result, operation, implementation, profile)
         if entry["name"] in seen:
@@ -210,8 +184,9 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 + ", ".join(sorted(missing))
             )
 
-        footprint_source = results_by_profile_method[(profile, FOOTPRINT_SOURCE)]
-        for entry in _footprint_entries(footprint_source, profile):
+        for entry in _footprint_entries(
+            results_by_profile_method[(profile, FOOTPRINT_SOURCE)], profile
+        ):
             if entry["name"] in seen:
                 raise ValueError(f"Duplicate converted Search benchmark series: {entry['name']}")
             seen.add(entry["name"])
@@ -219,19 +194,15 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         content_result = results_by_profile_method[(profile, "contentOnlySummaryHits")]
         content_params = content_result.get("params", {})
-        commit_count = _positive_int(content_params, "commitCount")
-        query_limit = _positive_int(content_params, "queryLimit")
-        expected_content_hits = min((commit_count + 4) // 5, query_limit)
+        expected_content_hits = min(
+            (_positive_int(content_params, "commitCount") + 4) // 5,
+            _positive_int(content_params, "queryLimit"),
+        )
         content_quality = _quality_entry(
-            content_result,
-            profile,
-            "Hibernate Search content quality",
-            expected_content_hits,
+            content_result, profile, "Hibernate Search content quality", expected_content_hits
         )
         if content_quality["name"] in seen:
-            raise ValueError(
-                f"Duplicate converted Search benchmark series: {content_quality['name']}"
-            )
+            raise ValueError(f"Duplicate converted Search benchmark series: {content_quality['name']}")
         seen.add(content_quality["name"])
         converted.append(content_quality)
 
@@ -242,15 +213,10 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
             _positive_int(path_params, "queryLimit"),
         )
         path_quality = _quality_entry(
-            path_result,
-            profile,
-            "Hibernate Search path quality",
-            expected_path_hits,
+            path_result, profile, "Hibernate Search path quality", expected_path_hits
         )
         if path_quality["name"] in seen:
-            raise ValueError(
-                f"Duplicate converted Search benchmark series: {path_quality['name']}"
-            )
+            raise ValueError(f"Duplicate converted Search benchmark series: {path_quality['name']}")
         seen.add(path_quality["name"])
         converted.append(path_quality)
 
