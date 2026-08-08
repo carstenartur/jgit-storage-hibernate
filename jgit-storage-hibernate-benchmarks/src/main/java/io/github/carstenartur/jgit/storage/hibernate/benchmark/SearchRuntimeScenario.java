@@ -75,12 +75,12 @@ record SearchRuntimeScenario(
       return new SearchRuntimeScenario("reference", "write-sync", 0, null, null, 50);
     }
     if (normalized.startsWith("sync-")) {
-      String[] parts = normalized.split("-");
-      if (parts.length != 3 || !parts[2].startsWith("r")) {
+      int refreshSeparator = normalized.lastIndexOf("-r");
+      if (refreshSeparator <= "sync-".length()) {
         throw new IllegalArgumentException("Invalid synchronization scenario " + id);
       }
-      String synchronization = parts[1];
-      int refresh = Integer.parseInt(parts[2].substring(1));
+      String synchronization = normalized.substring("sync-".length(), refreshSeparator);
+      int refresh = Integer.parseInt(normalized.substring(refreshSeparator + 2));
       return new SearchRuntimeScenario(normalized, synchronization, refresh, null, null, 50);
     }
     if (normalized.startsWith("writer-")) {
