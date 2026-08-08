@@ -68,19 +68,37 @@ class SearchRuntimeConverterTest(unittest.TestCase):
             ]["value"],
         )
         self.assertEqual(
-            "ms",
+            "ms/op",
             by_name[
                 "Hibernate Search runtime burst visibility observation wait — sync-write-sync-r500"
             ]["unit"],
         )
         self.assertEqual(
-            "count",
+            "ms/op",
+            by_name["Hibernate Search concurrent query p95 — sync-write-sync-r500"][
+                "unit"
+            ],
+        )
+        self.assertEqual(
+            "count/op",
             by_name[
                 "Hibernate Search runtime burst visibility polls — sync-write-sync-r500"
             ]["unit"],
         )
+        self.assertEqual(
+            "count/op",
+            by_name[
+                "Hibernate Search runtime burst transactions — sync-write-sync-r500"
+            ]["unit"],
+        )
         self.assertIn(
             "sync=write-sync; refresh=500ms",
+            by_name[
+                "Hibernate Search runtime burst ready p50 — sync-write-sync-r500"
+            ]["extra"],
+        )
+        self.assertIn(
+            "lower is better",
             by_name[
                 "Hibernate Search runtime burst ready p50 — sync-write-sync-r500"
             ]["extra"],
