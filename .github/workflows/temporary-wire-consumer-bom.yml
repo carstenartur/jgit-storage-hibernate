@@ -1,0 +1,220 @@
+name: Temporary wire consumer BOM
+
+on:
+  push:
+    branches:
+      - feat/consumer-bom
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-wire-consumer-bom
+  cancel-in-progress: true
+
+jobs:
+  wire:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/consumer-bom
+          fetch-depth: 0
+
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Add BOM to the reactor and anonymous consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          NS = 'http://maven.apache.org/POM/4.0.0'
+          M = '{' + NS + '}'
+          ET.register_namespace('', NS)
+          ET.register_namespace('xsi', 'http://www.w3.org/2001/XMLSchema-instance')
+
+          root_path = Path('pom.xml')
+          root_tree = ET.parse(root_path)
+          root = root_tree.getroot()
+          modules = root.find(M + 'modules')
+          if modules is None:
+              raise SystemExit('Root POM has no modules section')
+          module_names = [
+              module.text.strip()
+              for module in modules.findall(M + 'module')
+              if module.text
+          ]
+          if 'jgit-storage-hibernate-bom' not in module_names:
+              bom = ET.Element(M + 'module')
+              bom.text = 'jgit-storage-hibernate-bom'
+              insertion = len(modules)
+              if 'jgit-storage-hibernate-benchmarks' in module_names:
+                  insertion = module_names.index('jgit-storage-hibernate-benchmarks')
+              modules.insert(insertion, bom)
+              ET.indent(root_tree, space='  ')
+              root_tree.write(root_path, encoding='utf-8', xml_declaration=True)
+
+          consumer_path = Path('.github/public-repository-consumer/pom.xml')
+          consumer_tree = ET.parse(consumer_path)
+          consumer = consumer_tree.getroot()
+
+          def child_text(element, name):
+              found = element.find(M + name)
+              return found.text.strip() if found is not None and found.text else ''
+
+          project_dependencies = consumer.find(M + 'dependencies')
+          if project_dependencies is None:
+              raise SystemExit('Anonymous consumer POM has no dependencies')
+          project_modules = []
+          selected_version = ''
+          for dependency in project_dependencies.findall(M + 'dependency'):
+              group_id = child_text(dependency, 'groupId')
+              artifact_id = child_text(dependency, 'artifactId')
+              if group_id != 'io.github.carstenartur' or not artifact_id.startswith('jgit-storage-hibernate-'):
+                  continue
+              if artifact_id == 'jgit-storage-hibernate-benchmarks':
+                  raise SystemExit('Anonymous consumer must not select benchmarks')
+              project_modules.append(dependency)
+              version = child_text(dependency, 'version')
+              if version and not selected_version:
+                  selected_version = version
+
+          if not project_modules:
+              raise SystemExit('Anonymous consumer selects no jgit-storage-hibernate module')
+          if not selected_version:
+              existing_management = consumer.find(M + 'dependencyManagement')
+              if existing_management is not None:
+                  for dependency in existing_management.findall('.//' + M + 'dependency'):
+                      if child_text(dependency, 'groupId') == 'io.github.carstenartur':
+                          candidate = child_text(dependency, 'version')
+                          if candidate:
+                              selected_version = candidate
+                              break
+          if not selected_version:
+              raise SystemExit('Could not derive the anonymous consumer library version expression')
+
+          dependency_management = consumer.find(M + 'dependencyManagement')
+          if dependency_management is None:
+              dependency_management = ET.Element(M + 'dependencyManagement')
+              dependencies_index = list(consumer).index(project_dependencies)
+              consumer.insert(dependencies_index, dependency_management)
+          managed = dependency_management.find(M + 'dependencies')
+          if managed is None:
+              managed = ET.SubElement(dependency_management, M + 'dependencies')
+
+          imports = [
+              dependency
+              for dependency in managed.findall(M + 'dependency')
+              if child_text(dependency, 'groupId') == 'io.github.carstenartur'
+              and child_text(dependency, 'artifactId') == 'jgit-storage-hibernate-bom'
+          ]
+          if not imports:
+              dependency = ET.SubElement(managed, M + 'dependency')
+              ET.SubElement(dependency, M + 'groupId').text = 'io.github.carstenartur'
+              ET.SubElement(dependency, M + 'artifactId').text = 'jgit-storage-hibernate-bom'
+              ET.SubElement(dependency, M + 'version').text = selected_version
+              ET.SubElement(dependency, M + 'type').text = 'pom'
+              ET.SubElement(dependency, M + 'scope').text = 'import'
+          elif len(imports) > 1:
+              raise SystemExit('Anonymous consumer imports the BOM more than once')
+
+          for dependency in project_modules:
+              version = dependency.find(M + 'version')
+              if version is not None:
+                  dependency.remove(version)
+
+          ET.indent(consumer_tree, space='  ')
+          consumer_tree.write(consumer_path, encoding='utf-8', xml_declaration=True)
+
+          maven_workflow = Path('.github/workflows/maven.yml')
+          workflow_text = maven_workflow.read_text(encoding='utf-8')
+          compile_anchor = '.github/scripts/test_release_workflow_trigger.py'
+          if '.github/scripts/verify-bom-contract.py' not in workflow_text:
+              if compile_anchor in workflow_text:
+                  workflow_text = workflow_text.replace(
+                      compile_anchor,
+                      compile_anchor + ' .github/scripts/verify-bom-contract.py',
+                      1,
+                  )
+              else:
+                  py_compile = 'python3 -m py_compile '
+                  index = workflow_text.find(py_compile)
+                  if index < 0:
+                      raise SystemExit('Could not locate Maven workflow Python compile gate')
+                  end = workflow_text.find('\n', index)
+                  workflow_text = (
+                      workflow_text[:end]
+                      + ' .github/scripts/verify-bom-contract.py'
+                      + workflow_text[end:]
+                  )
+          test_anchor = 'python3 .github/scripts/test_release_workflow_trigger.py'
+          verification = (
+              'python3 .github/scripts/verify-bom-contract.py '
+              '--report target/bom-contract.json'
+          )
+          if verification not in workflow_text:
+              if test_anchor in workflow_text:
+                  workflow_text = workflow_text.replace(
+                      test_anchor,
+                      test_anchor + '\n          ' + verification,
+                      1,
+                  )
+              else:
+                  block = '      - name: Verify release and security consistency\n'
+                  if block not in workflow_text:
+                      raise SystemExit('Could not locate Maven workflow verification block')
+                  workflow_text = workflow_text.replace(
+                      block,
+                      '      - name: Verify consumer BOM contract\n'
+                      '        run: ' + verification + '\n'
+                      + block,
+                      1,
+                  )
+          maven_workflow.write_text(workflow_text, encoding='utf-8')
+
+          Path('.github/workflows/temporary-wire-consumer-bom.yml').unlink()
+          PY
+          git diff --check
+
+      - name: Verify the static BOM contract
+        run: |
+          python3 .github/scripts/verify-bom-contract.py \
+            --report target/bom-contract.json
+          cat target/bom-contract.json
+
+      - name: Verify reactor and anonymous repository contract
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B verify 2>&1 | tee target/bom-reactor-verify.log
+
+      - name: Commit the verified BOM wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Wire the consumer BOM into reactor and release contracts'
+          git push origin HEAD:feat/consumer-bom
+
+      - name: Upload BOM evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consumer-bom-contract
+          path: |
+            target/bom-contract.json
+            target/bom-reactor-verify.log
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: error
