@@ -21,9 +21,10 @@ SPEC.loader.exec_module(CONVERTER)
 class SearchPerformanceConverterTest(unittest.TestCase):
 
     def test_groups_alternative_query_implementations_into_stable_operations(self) -> None:
-        results = [self.result(method, score) for method, score in enumerate(
-            CONVERTER.SERIES, start=1
-        )]
+        results = [
+            self.result(method, score)
+            for score, method in enumerate(CONVERTER.SERIES, start=1)
+        ]
         converted = CONVERTER.convert(results)
 
         self.assertEqual(6, len(converted))
@@ -45,9 +46,7 @@ class SearchPerformanceConverterTest(unittest.TestCase):
 
     def test_missing_series_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing Search benchmark series"):
-            CONVERTER.convert(
-                [self.result("fullTextSummaryHits", 1.0)]
-            )
+            CONVERTER.convert([self.result("fullTextSummaryHits", 1.0)])
 
     @staticmethod
     def result(method: str, score: float) -> dict:
