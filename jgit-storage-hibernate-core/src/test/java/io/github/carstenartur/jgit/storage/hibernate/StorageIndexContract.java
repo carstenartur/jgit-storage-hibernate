@@ -22,7 +22,8 @@ final class StorageIndexContract {
           "IDX_PACK_REPO_NAME",
           "IDX_PACK_CHUNK_PACK",
           "IDX_REFLOG_REPO",
-          "IDX_REFLOG_REPO_REF");
+          "IDX_REFLOG_REPO_REF",
+          "IDX_REFLOG_REPO_REF_ID");
 
   private StorageIndexContract() {}
 
@@ -40,7 +41,7 @@ final class StorageIndexContract {
     }
     assertTrue(packIndexes.contains("IDX_PACK_REPO_COMMITTED"));
     assertTrue(packIndexes.contains("IDX_PACK_REPO_LEASE"));
-    assertTrue(reflogIndexes.contains("IDX_REFLOG_REPO_REF_ID"));
+    assertTrue(reflogIndexes.contains("IDX_REFLOG_REPO_REF_KEY_ID"));
   }
 
   static Set<String> indexNames(Connection connection, String tableName) throws Exception {
