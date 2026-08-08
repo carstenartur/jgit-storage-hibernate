@@ -34,6 +34,8 @@ import org.junit.jupiter.api.Test;
 
 class DurableStripedWriteQueueTest {
 
+  private static final Duration EXACT_BATCH_WAIT = Duration.ofMinutes(1);
+
   @Test
   void persistsFiftyRecordsInOneTransactionAndAcknowledgesOnlyAfterCommit() throws Exception {
     Properties properties = h2Properties();
@@ -52,7 +54,7 @@ class DurableStripedWriteQueueTest {
               1024,
               50,
               1024,
-              Duration.ofSeconds(1),
+              EXACT_BATCH_WAIT,
               Duration.ofSeconds(1));
       try (DurableStripedWriteQueue<Record, String> queue =
           new DurableStripedWriteQueue<>(
@@ -186,7 +188,7 @@ class DurableStripedWriteQueueTest {
             1024,
             3,
             1024,
-            Duration.ofSeconds(1),
+            EXACT_BATCH_WAIT,
             Duration.ofSeconds(1));
 
     try (DurableStripedWriteQueue<Integer, Integer> queue =
