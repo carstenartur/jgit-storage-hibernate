@@ -38,7 +38,7 @@ class HistoryQueryCrossoverBenchmarkIT {
           HistoryQueryCrossoverBenchmark.HIBERNATE_JGIT,
           HistoryQueryCrossoverBenchmark.INDEXED_PROJECTION);
 
-  private static final Set<String> EXPECTED_QUERIES =
+  private static final Set<String> SUPPORTED_QUERIES =
       Set.of(
           HistoryQueryCrossoverBenchmark.AUTHOR_TIME,
           HistoryQueryCrossoverBenchmark.PATH_TIME,
@@ -63,6 +63,7 @@ class HistoryQueryCrossoverBenchmarkIT {
     Files.createDirectories(resultFile.getParent());
     Path outputFile = resultFile.resolveSibling("jmh-output.txt");
     String[] commitCounts = commitCounts();
+    String[] queryKinds = queryKinds();
 
     Options options =
         new OptionsBuilder()
@@ -74,13 +75,7 @@ class HistoryQueryCrossoverBenchmarkIT {
                 HistoryQueryCrossoverBenchmark.FILESYSTEM_JGIT,
                 HistoryQueryCrossoverBenchmark.HIBERNATE_JGIT,
                 HistoryQueryCrossoverBenchmark.INDEXED_PROJECTION)
-            .param(
-                "queryKind",
-                HistoryQueryCrossoverBenchmark.AUTHOR_TIME,
-                HistoryQueryCrossoverBenchmark.PATH_TIME,
-                HistoryQueryCrossoverBenchmark.MESSAGE_TEXT,
-                HistoryQueryCrossoverBenchmark.PATH_CONTENT,
-                HistoryQueryCrossoverBenchmark.COMPOUND)
+            .param("queryKind", queryKinds)
             .addProfiler(GCProfiler.class)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
@@ -101,7 +96,7 @@ class HistoryQueryCrossoverBenchmarkIT {
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
-    int expectedPerCommitCount = EXPECTED_ENGINES.size() * EXPECTED_QUERIES.size() + 1;
+    int expectedPerCommitCount = EXPECTED_ENGINES.size() * queryKinds.length + 1;
     assertEquals(expectedPerCommitCount * commitCounts.length, results.size());
 
     Set<String> queryEngines =
@@ -111,12 +106,12 @@ class HistoryQueryCrossoverBenchmarkIT {
             .collect(Collectors.toSet());
     assertEquals(EXPECTED_ENGINES, queryEngines);
 
-    Set<String> queryKinds =
+    Set<String> actualQueryKinds =
         results.stream()
             .filter(result -> operation(result).equals("query"))
             .map(result -> result.getParams().getParam("queryKind"))
             .collect(Collectors.toSet());
-    assertEquals(EXPECTED_QUERIES, queryKinds);
+    assertEquals(Set.of(queryKinds), actualQueryKinds);
 
     long projectionBuilds =
         results.stream().filter(result -> operation(result).equals("projectionBuild")).count();
@@ -131,14 +126,7 @@ class HistoryQueryCrossoverBenchmarkIT {
 
   private static String[] commitCounts() {
     String configured = System.getProperty("benchmark.history.commitCounts", "1000");
-    String[] values =
-        Arrays.stream(configured.split(","))
-            .map(String::trim)
-            .filter(value -> !value.isEmpty())
-            .toArray(String[]::new);
-    if (values.length == 0) {
-      throw new IllegalArgumentException("benchmark.history.commitCounts must not be empty");
-    }
+    String[] values = splitProperty(configured, "benchmark.history.commitCounts");
     for (String value : values) {
       int count;
       try {
@@ -151,6 +139,36 @@ class HistoryQueryCrossoverBenchmarkIT {
         throw new IllegalArgumentException(
             "benchmark.history.commitCounts values must be between 1 and 100000: " + value);
       }
+    }
+    return values;
+  }
+
+  private static String[] queryKinds() {
+    String configured =
+        System.getProperty(
+            "benchmark.history.queryKinds",
+            String.join(",", SUPPORTED_QUERIES.stream().sorted().toList()));
+    String[] values = splitProperty(configured, "benchmark.history.queryKinds");
+    for (String value : values) {
+      if (!SUPPORTED_QUERIES.contains(value)) {
+        throw new IllegalArgumentException(
+            "Unsupported benchmark.history.queryKinds value '"
+                + value
+                + "'; supported values are "
+                + SUPPORTED_QUERIES.stream().sorted().toList());
+      }
+    }
+    return Arrays.stream(values).distinct().toArray(String[]::new);
+  }
+
+  private static String[] splitProperty(String configured, String propertyName) {
+    String[] values =
+        Arrays.stream(configured.split(","))
+            .map(String::trim)
+            .filter(value -> !value.isEmpty())
+            .toArray(String[]::new);
+    if (values.length == 0) {
+      throw new IllegalArgumentException(propertyName + " must not be empty");
     }
     return values;
   }
