@@ -131,12 +131,12 @@ class SearchSqlServerQueryIntegrationTest {
         assertEquals(
             InterruptedIOException.class.getName(),
             interruptedProgress.getLast().failureType());
-        assertEquals(2, countRows(provider, PRIMARY_REPOSITORY));
+        assertEquals(5, countRows(provider, PRIMARY_REPOSITORY));
 
         RebuildResult primaryResult =
             rebuilder.rebuild(primary, new RepositoryName(PRIMARY_REPOSITORY));
         assertEquals(RebuildState.COMPLETED, primaryResult.state());
-        assertEquals(2, primaryResult.removedProjections());
+        assertEquals(5, primaryResult.removedProjections());
         assertEquals(2, primaryResult.refTips());
         assertEquals(5, primaryResult.visitedCommits());
         assertEquals(5, primaryResult.indexedCommits());
