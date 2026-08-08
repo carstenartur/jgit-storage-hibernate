@@ -16,6 +16,8 @@ import java.util.Objects;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.search.engine.search.common.BooleanOperator;
+import org.hibernate.search.engine.search.predicate.SearchPredicate;
+import org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFactory;
 import org.hibernate.search.mapper.orm.Search;
 import org.hibernate.search.mapper.orm.session.SearchSession;
 
@@ -114,11 +116,8 @@ public class GitHistorySearchService {
     }
   }
 
-  private static org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFinalStep
-      fullTextPredicate(
-          org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFactory f,
-          CommitHistoryQuery query,
-          String timeField) {
+  private static SearchPredicate fullTextPredicate(
+      SearchPredicateFactory f, CommitHistoryQuery query, String timeField) {
     var predicate =
         f.bool()
             .filter(f.match().field("repositoryName").matching(query.repositoryName()))
@@ -148,7 +147,7 @@ public class GitHistorySearchService {
     if (query.to() != null) {
       predicate.filter(f.range().field(timeField).atMost(query.to()));
     }
-    return predicate;
+    return predicate.toPredicate();
   }
 
   private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
