@@ -2,7 +2,7 @@
 
 Add a rebuildable relational and Lucene query model over Git history.
 
-The module moves revision traversal, first-parent diffing, changed-text extraction and index construction from every request to commit-ingestion or explicit rebuild time. Request-time work is then handled by relational indexes and Hibernate Search/Lucene.
+The module moves revision traversal, first-parent diffing, profile-selected changed-path/content extraction and index construction from every request to commit-ingestion or explicit rebuild time. Request-time work is then handled by relational indexes and Hibernate Search/Lucene.
 
 ## Why indexing matters
 
@@ -16,7 +16,7 @@ query -> RevWalk -> parent diff -> path/content filtering -> result
 With this module:
 
 ```text
-commit/rebuild -> RevWalk + first-parent diff + text extraction + index update
+commit/rebuild -> RevWalk + first-parent diff + profile-selected extraction + index update
 query          -> relational predicates and/or Lucene full-text search
 query          -> relational predicates and/or Lucene full-text search
 ```
@@ -114,14 +114,36 @@ The progress contract reports:
 
 A failed or interrupted rebuild can leave partial derived state. The next invocation clears that state before starting again, making retries deterministic. Concurrent projection writers for the same repository must be stopped during rebuild.
 
+## Indexing profiles
+
+Search work and recall can be selected explicitly:
+
+```properties
+jgit.storage.hibernate.search.index_profile=content-v1
+```
+
+| Stable profile | Paths | Changed-file text | Typical purpose |
+|---|---|---|---|
+| `metadata-v1` | no | no | commit-message/person/time audit |
+| `paths-v1` | yes | no | path-aware history without blob extraction |
+| `content-v1` | yes | bounded current text | backward-compatible general profile |
+| `diff-hunks-v1` | yes | added/modified lines | experimental reduced-repetition content profile |
+
+Omitting the property remains equivalent to `content-v1`. Existing projection rows are migrated to that stable profile ID because it represents the pre-profile semantics.
+
+A profile change is not mixed silently with existing projections. The stable profile is persisted relationally and indexed in Lucene; a mismatch (including a change back to the implicit default) raises `SearchIndexProfileMismatchException` and requires `CommitProjectionRebuilder` for that repository.
+
+The content profile can additionally bound/filter changed blobs by extension, deterministic path-derived MIME type, per-file/per-commit size, binary/UTF-8 validity, generated paths and minified content. See [Search indexing profiles](../docs/operations/search-indexing-profiles.md) for the complete configuration and the retained performance/quality charts.
+
 ## Analysis model
 
 The generic projection deliberately assigns analyzers by field semantics:
 
 - short and full commit messages use the configurable natural-language slot `GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER`;
-- changed-file content and the backward-compatible aggregate `changedPaths` field use the fixed language-neutral `standard` analyzer;
-- compound path filters target the derived `changedPathTerms` field using the built-in `simple` analyzer;
+- changed-file content, when enabled by the profile, uses the fixed language-neutral `standard` analyzer;
+- analyzed path search targets the derived `changedPathTerms` field using the built-in `simple` analyzer;
 - each path is also indexed separately as the exact keyword field `changedPathExact`;
+- the aggregate relational `changed_paths` value is **not** stored as a third Lucene path representation;
 - author/committer names and email addresses use keyword semantics;
 - author and committer timestamps are generic sortable/range fields.
 
@@ -177,15 +199,16 @@ List<GitCommitIndex> hits =
 Full-text search covers:
 
 - short and full commit messages;
-- actual first-parent changed paths;
-- indexed content of added or modified changed files.
+- actual first-parent changed paths when the active indexing profile includes paths;
+- selected changed-file content when the active indexing profile includes content.
 
-Deleted files remain represented by path. Large or non-blob content is intentionally not loaded into the text projection.
+Deleted files remain represented by path in path-enabled profiles. Large, filtered or non-blob content is intentionally not loaded into the text projection.
 
 ## What it adds
 
-- materialize repository, object ID, messages, author, committer, both timestamps and actual changed paths;
-- extract selected changed-file text during indexing rather than during every query;
+- materialize repository, object ID, messages, author, committer, both timestamps and profile-selected changed history;
+- choose explicit `metadata-v1`, `paths-v1`, `content-v1` or experimental `diff-hunks-v1` indexing semantics;
+- bound/filter changed-file extraction before expensive blob materialization where possible;
 - combine full text, author email, committer email, changed path and inclusive time bounds through `CommitHistoryQuery`;
 - provide deterministic offset/limit pages for structured history queries;
 - choose author or committer time deliberately;
@@ -241,7 +264,7 @@ The consuming application owns that directory, must prevent uncoordinated concur
 - `CommitIndexer` upserts each `GitCommitIndex` row in an explicit Hibernate transaction.
 - Search indexing is not the same transaction as Core pack publication or a JGit ref update.
 - A failed index update is retried or rebuilt; it does not invalidate a successfully published commit.
-- Rebuild after analyzer-profile changes, changed-path semantic changes, or the 0.1.14 author/committer metadata migration.
+- Rebuild after analyzer-profile changes, Search indexing-profile changes, changed-path semantic changes, or the 0.1.14 author/committer metadata migration.
 - Register `SearchRepositoryDeletionParticipant` when Core repository deletion must remove Search rows and Lucene documents in the same deletion transaction.
 
 ## Database ownership
@@ -250,8 +273,10 @@ Search owns `git_commit_index` and `jgit_storage_hibernate_search_schema_history
 
 ## Verification
 
-H2 integration tests exercise compound query, analyzer, timestamp, rebuild progress and interrupted-retry semantics on every build.
+H2 integration tests exercise compound query, analyzer, timestamp, rebuild progress, indexing-profile/content-policy semantics, fail-closed profile migration and interrupted-retry semantics on every build.
 
 With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. SQL Server evidence covers Core-plus-Search migration, Hibernate `validate`, Unicode root/normal/merge indexing, first-parent added/modified/deleted path semantics, author/committer/path/time/compound queries, stable pagination, two logical repositories, interrupted rebuild retry, transactional repository deletion, projection-failure isolation and full-text search after a persistent Lucene restart.
+
+The dedicated Hibernate Search performance workflow compares all four indexing profiles on PostgreSQL plus local-filesystem Lucene and retains indexing/rebuild time, query time, GC/ORM evidence, Lucene/PostgreSQL footprint, segment count and content/path miss rates. See [Hibernate Search performance](../docs/operations/hibernate-search-performance.md).
 
 See the [change-audit and Java-usage use case](../docs/use-cases/change-audit-and-java-usage.md) for the complete architectural comparison and [SQL Server Search operations](../docs/operations/sql-server-search.md) for deployment and rollback.
