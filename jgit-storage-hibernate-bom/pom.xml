@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.carstenartur</groupId>
+    <artifactId>jgit-storage-hibernate-parent</artifactId>
+    <version>0.9.1-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>jgit-storage-hibernate-bom</artifactId>
+  <packaging>pom</packaging>
+  <name>jgit-storage-hibernate Consumer BOM</name>
+  <description>
+    Version alignment for the independently selectable jgit-storage-hibernate production modules.
+  </description>
+
+  <properties>
+    <jacoco.skip>true</jacoco.skip>
+    <japicmp.skip>true</japicmp.skip>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>jgit-storage-hibernate-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>jgit-storage-hibernate-search</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>jgit-storage-hibernate-architecture</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>
