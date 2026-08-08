@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import math
+import statistics
 import sys
 from pathlib import Path
 from typing import Any
@@ -43,9 +45,43 @@ def _secondary_metric(result: dict[str, Any], field: str) -> dict[str, Any]:
     return matches[0]
 
 
-def _metric_value(result: dict[str, Any], field: str) -> tuple[float, float]:
+def _counter_samples(result: dict[str, Any], field: str) -> list[float]:
+    """Return per-measurement AuxCounters values rather than JMH's EVENTS aggregate.
+
+    ``@AuxCounters(Type.EVENTS)`` exposes a convenient aggregate ``score``, but JMH sums
+    those events across measurement iterations. Footprint and result-count evidence is a
+    per-invocation property, so using that aggregate would multiply values by the number of
+    measurements and can even hide partial recall losses when the result is later bounded.
+    The retained rawData contains exactly the per-measurement values needed here.
+    """
+
     metric = _secondary_metric(result, field)
-    return float(metric["score"]), float(metric.get("scoreError", 0.0))
+    raw = metric.get("rawData")
+    if not isinstance(raw, list) or not raw:
+        raise ValueError(f"JMH secondary metric {field!r} is missing rawData")
+
+    samples: list[float] = []
+    for fork in raw:
+        if not isinstance(fork, list):
+            raise ValueError(f"JMH secondary metric {field!r} rawData must contain fork arrays")
+        for value in fork:
+            numeric = float(value)
+            if not math.isfinite(numeric):
+                raise ValueError(
+                    f"JMH secondary metric {field!r} contains non-finite rawData {value!r}"
+                )
+            samples.append(numeric)
+    if not samples:
+        raise ValueError(f"JMH secondary metric {field!r} rawData contains no measurements")
+    return samples
+
+
+def _metric_value(result: dict[str, Any], field: str) -> tuple[float, float]:
+    samples = _counter_samples(result, field)
+    # Keep raw evidence in JMH JSON. Dashboard counter ranges use one standard deviation to
+    # communicate run-to-run variation without pretending it is a JMH confidence interval.
+    spread = statistics.stdev(samples) if len(samples) > 1 else 0.0
+    return statistics.fmean(samples), spread
 
 
 def _positive_int(params: dict[str, Any], name: str) -> int:
@@ -103,7 +139,8 @@ def _footprint_entries(result: dict[str, Any], profile: str) -> list[dict[str, A
     common_extra = (
         f"Profile: {profile}\n"
         f"Commits: {params.get('commitCount', 'unknown')}\n"
-        "Measured after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+        "Per-invocation mean from JMH AuxCounters rawData after a complete "
+        "PostgreSQL + local-filesystem Lucene projection rebuild"
     )
     lucene_bytes, lucene_error = _metric_value(result, "luceneBytes")
     sql_bytes, sql_error = _metric_value(result, "sqlProjectionBytes")
@@ -137,7 +174,7 @@ def _footprint_entries(result: dict[str, Any], profile: str) -> list[dict[str, A
 def _quality_entry(
     result: dict[str, Any], profile: str, quality_name: str, expected: int
 ) -> dict[str, Any]:
-    actual, _ = _metric_value(result, "resultCount")
+    actual, actual_spread = _metric_value(result, "resultCount")
     return {
         "name": f"{quality_name} — {_backend(profile, 'miss rate')}",
         "unit": "miss %",
@@ -146,7 +183,8 @@ def _quality_entry(
         "extra": (
             f"Profile: {profile}\n"
             f"Expected relevant hits within query limit: {expected}\n"
-            f"Observed relevant hits: {actual:g}\n"
+            f"Mean observed relevant hits per invocation: {actual:g}\n"
+            f"Observed result-count standard deviation: {actual_spread:g}\n"
             "0% miss is best; reduced-content profiles may intentionally trade recall for cost"
         ),
     }
