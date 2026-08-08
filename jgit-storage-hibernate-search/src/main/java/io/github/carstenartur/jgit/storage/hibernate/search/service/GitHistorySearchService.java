@@ -135,7 +135,11 @@ public class GitHistorySearchService {
     if (query.text() != null) {
       predicate.must(
           f.simpleQueryString()
-              .fields("shortMessage", "fullMessage", "changedPaths", "changedText")
+              .fields(
+                  "shortMessage",
+                  "fullMessage",
+                  GitCommitIndex.CHANGED_PATH_TERMS_FIELD,
+                  "changedText")
               .matching(query.text()));
     }
     if (query.hasObjectIdRestriction()) {
