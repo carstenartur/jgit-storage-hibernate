@@ -17,7 +17,13 @@ class BenchmarkUnitsTest(unittest.TestCase):
         self.assertAlmostEqual(0.04, error)
 
     def test_smaller_is_better_non_timing_units_are_preserved(self) -> None:
-        for unit, value in (("bytes", 1024.0), ("segments", 3.0), ("miss %", 25.0)):
+        for unit, value in (
+            ("bytes", 1024.0),
+            ("segments", 3.0),
+            ("miss %", 25.0),
+            ("ms", 12.5),
+            ("count", 4.0),
+        ):
             normalized = benchmark_units.normalize_benchmark(
                 {"name": "metric", "unit": unit, "value": value, "range": 1.0}
             )
@@ -32,7 +38,7 @@ class BenchmarkUnitsTest(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "negative"):
             benchmark_units.normalize_benchmark(
-                {"name": "metric", "unit": "miss %", "value": 0.0, "range": -1.0}
+                {"name": "metric", "unit": "ms", "value": 0.0, "range": -1.0}
             )
 
     def test_unknown_non_timing_unit_is_not_silently_accepted(self) -> None:
