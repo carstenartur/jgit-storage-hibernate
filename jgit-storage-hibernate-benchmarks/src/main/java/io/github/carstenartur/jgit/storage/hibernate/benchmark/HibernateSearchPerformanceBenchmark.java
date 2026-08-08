@@ -60,11 +60,17 @@ import org.openjdk.jmh.infra.BenchmarkParams;
 /**
  * Measures commit-projection indexing, rebuild and representative Search query paths.
  *
- * <p>Every invocation receives a fresh PostgreSQL schema, logical Git repository and local-filesystem
- * Lucene directory outside measured time. Query benchmarks receive a fully built projection. The
- * incremental-indexing benchmark starts with no projection, while rebuild starts with one complete
- * generation so purge and recreation are both measured. Deterministic result checksums prevent the
- * JVM from discarding query work and make divergent query semantics visible in raw results.
+ * <p>Every invocation receives a fresh PostgreSQL schema, logical Git repository and
+ * local-filesystem Lucene directory outside measured time. Query benchmarks receive a fully built
+ * projection. The incremental-indexing benchmark starts with no projection, while rebuild starts
+ * with one complete generation so purge and recreation are both measured. Deterministic result
+ * checksums prevent the JVM from discarding query work and make divergent query semantics visible
+ * in raw results.
+ *
+ * <p>The fixture deliberately models repeated small edits to one approximately 8 KiB text file.
+ * Only one fixed-width marker line changes per commit. This makes CONTENT index the complete current
+ * file repeatedly while DIFF_HUNKS can retain only the changed line, which is the workload the
+ * profile is intended to optimize.
  */
 @BenchmarkMode(Mode.SingleShotTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -78,9 +84,11 @@ public class HibernateSearchPerformanceBenchmark {
   private static final AtomicInteger INVOCATION = new AtomicInteger();
   private static final String NEEDLE = "needle";
   private static final String CONTENT_NEEDLE = "payloadneedle";
+  private static final String BENCHMARK_PATH = "services/payments/fraud/rules.txt";
   private static final String PATH_FRAGMENT = "payments/fraud";
   private static final String PATH_TERMS = "services payments fraud";
   private static final int CONTENT_BYTES = 8 * 1024;
+  private static final int STABLE_LINE_PAYLOAD = 48;
 
   @Param({"100"})
   public int commitCount;
@@ -254,12 +262,10 @@ public class HibernateSearchPerformanceBenchmark {
     ObjectId parent = null;
     try (ObjectInserter inserter = repository.newObjectInserter()) {
       for (int index = 0; index < commitCount; index++) {
-        String path =
-            "services/payments/fraud/rule-" + String.format("%03d", index % 20) + ".txt";
-        byte[] content = deterministicContent(index, path);
+        byte[] content = deterministicContent(index);
         ObjectId blob = inserter.insert(Constants.OBJ_BLOB, content);
         TreeFormatter tree = new TreeFormatter();
-        tree.append(path, FileMode.REGULAR_FILE, blob);
+        tree.append(BENCHMARK_PATH, FileMode.REGULAR_FILE, blob);
 
         CommitBuilder commit = new CommitBuilder();
         commit.setTreeId(inserter.insert(tree));
@@ -291,22 +297,27 @@ public class HibernateSearchPerformanceBenchmark {
     return parent;
   }
 
-  private static byte[] deterministicContent(int index, String path) {
-    String prefix =
-        (index % 5 == 0 ? CONTENT_NEEDLE : "ordinary")
-            + " content for "
-            + path
-            + " at commit "
-            + index
-            + "\n";
-    StringBuilder content = new StringBuilder(CONTENT_BYTES);
-    content.append(prefix);
-    int value = index ^ 0x53454152;
+  /**
+   * Create an ASCII file whose size and all lines except the first remain identical between commits.
+   */
+  private static byte[] deterministicContent(int index) {
+    String marker = index % 5 == 0 ? CONTENT_NEEDLE : "ordinary";
+    StringBuilder content = new StringBuilder(CONTENT_BYTES + 128);
+    content.append(String.format("%-13s revision %06d\n", marker, index));
+
+    int line = 0;
     while (content.length() < CONTENT_BYTES) {
-      value = value * 1664525 + 1013904223;
-      content.append((char) ('a' + Math.floorMod(value, 26)));
+      content.append(String.format("stable-line-%04d: ", line));
+      int value = line ^ 0x53454152;
+      for (int column = 0; column < STABLE_LINE_PAYLOAD; column++) {
+        value = value * 1664525 + 1013904223;
+        content.append((char) ('a' + Math.floorMod(value, 26)));
+      }
+      content.append('\n');
+      line++;
     }
-    return content.substring(0, CONTENT_BYTES).getBytes(StandardCharsets.UTF_8);
+    content.setLength(CONTENT_BYTES);
+    return content.toString().getBytes(StandardCharsets.UTF_8);
   }
 
   private Properties properties() {
@@ -359,7 +370,10 @@ public class HibernateSearchPerformanceBenchmark {
       return 0L;
     }
     try (var paths = Files.walk(root)) {
-      return paths.filter(Files::isRegularFile).mapToLong(HibernateSearchPerformanceBenchmark::size).sum();
+      return paths
+          .filter(Files::isRegularFile)
+          .mapToLong(HibernateSearchPerformanceBenchmark::size)
+          .sum();
     }
   }
 
