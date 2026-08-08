@@ -21,8 +21,7 @@ class BenchmarkUnitsTest(unittest.TestCase):
             ("bytes", 1024.0),
             ("segments", 3.0),
             ("miss %", 25.0),
-            ("ms", 12.5),
-            ("count", 4.0),
+            ("count/op", 4.0),
         ):
             normalized = benchmark_units.normalize_benchmark(
                 {"name": "metric", "unit": unit, "value": value, "range": 1.0}
@@ -31,6 +30,18 @@ class BenchmarkUnitsTest(unittest.TestCase):
             self.assertEqual(value, normalized["value"])
             self.assertEqual(1.0, normalized["range"])
 
+    def test_time_like_custom_metrics_must_use_ms_per_operation(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unsupported benchmark unit"):
+            benchmark_units.normalize_benchmark(
+                {"name": "metric", "unit": "ms", "value": 12.5, "range": 1.0}
+            )
+
+    def test_unscoped_counts_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unsupported benchmark unit"):
+            benchmark_units.normalize_benchmark(
+                {"name": "metric", "unit": "count", "value": 4.0}
+            )
+
     def test_passthrough_units_still_reject_non_finite_or_negative_ranges(self) -> None:
         with self.assertRaisesRegex(ValueError, "finite"):
             benchmark_units.normalize_benchmark(
@@ -38,7 +49,7 @@ class BenchmarkUnitsTest(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "negative"):
             benchmark_units.normalize_benchmark(
-                {"name": "metric", "unit": "ms", "value": 0.0, "range": -1.0}
+                {"name": "metric", "unit": "count/op", "value": 0.0, "range": -1.0}
             )
 
     def test_unknown_non_timing_unit_is_not_silently_accepted(self) -> None:
