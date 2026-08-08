@@ -24,7 +24,7 @@ class SearchRuntimeConverterTest(unittest.TestCase):
         converted = CONVERTER.convert(self.scenario_results("sync-write-sync-r500"))
         by_name = {entry["name"]: entry for entry in converted}
 
-        self.assertEqual(19, len(converted))
+        self.assertEqual(21, len(converted))
         self.assertEqual(
             12.0,
             by_name[
@@ -46,7 +46,13 @@ class SearchRuntimeConverterTest(unittest.TestCase):
         self.assertEqual(
             6.0,
             by_name[
-                "Hibernate Search runtime burst visibility lag — sync-write-sync-r500"
+                "Hibernate Search runtime burst visibility observation wait — sync-write-sync-r500"
+            ]["value"],
+        )
+        self.assertEqual(
+            11.0,
+            by_name[
+                "Hibernate Search runtime burst visibility polls — sync-write-sync-r500"
             ]["value"],
         )
         self.assertEqual(
@@ -64,7 +70,13 @@ class SearchRuntimeConverterTest(unittest.TestCase):
         self.assertEqual(
             "ms",
             by_name[
-                "Hibernate Search runtime burst visibility lag — sync-write-sync-r500"
+                "Hibernate Search runtime burst visibility observation wait — sync-write-sync-r500"
+            ]["unit"],
+        )
+        self.assertEqual(
+            "count",
+            by_name[
+                "Hibernate Search runtime burst visibility polls — sync-write-sync-r500"
             ]["unit"],
         )
         self.assertIn(
@@ -84,6 +96,7 @@ class SearchRuntimeConverterTest(unittest.TestCase):
         self.assertIn("Hibernate Search runtime burst submission p50 — batch-250", names)
         self.assertIn("Hibernate Search concurrent query p99 — reference", names)
         self.assertIn("Hibernate Search concurrent query p99 — batch-250", names)
+        self.assertIn("Hibernate Search runtime burst visibility polls — reference", names)
 
     def test_missing_operation_is_rejected(self) -> None:
         results = [
@@ -101,7 +114,7 @@ class SearchRuntimeConverterTest(unittest.TestCase):
             for result in results
             if result["benchmark"].endswith("incrementalBurstReady")
         )
-        del ready["secondaryMetrics"]["visibilityWaitMicros"]["rawData"]
+        del ready["secondaryMetrics"]["visibilityPolls"]["rawData"]
         with self.assertRaisesRegex(ValueError, "rawData"):
             CONVERTER.convert(results)
 
@@ -145,6 +158,7 @@ class SearchRuntimeConverterTest(unittest.TestCase):
             },
             "secondaryMetrics": {
                 "visibilityWaitMicros": cls.counter([5_000.0, 7_000.0]),
+                "visibilityPolls": cls.counter([10.0, 12.0]),
                 "preparedStatements": cls.counter([10.0, 12.0]),
                 "transactions": cls.counter([5.0, 5.0]),
                 "queryP50Micros": cls.counter([1_000.0, 1_200.0]),
