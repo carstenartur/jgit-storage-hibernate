@@ -1,0 +1,135 @@
+name: Temporary post-finalize consumer contracts
+
+on:
+  push:
+    branches:
+      - ci/consumer-contracts
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-post-finalize-consumer-contracts
+  cancel-in-progress: true
+
+jobs:
+  correct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/consumer-contracts
+          fetch-depth: 0
+
+      - name: Follow the consolidating commit and correct classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            git fetch origin ci/consumer-contracts
+            git reset --hard origin/ci/consumer-contracts
+            if grep -Fq 'same consumer commit twice' docs/operations/consumer-compatibility.md 2>/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo 'The consolidating consumer-contract commit did not appear.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/consumer-compatibility.yml')
+          text = path.read_text(encoding='utf-8')
+          start_marker = '      - name: Classify baseline and candidate outcomes\n'
+          end_marker = '      - name: Report consumer contract\n'
+          start = text.find(start_marker)
+          end = text.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('Could not locate the consumer outcome classification block')
+
+          replacement = r'''      - name: Classify baseline and candidate outcomes
+        id: classification
+        if: always()
+        shell: bash
+        env:
+          BASELINE_RESOLUTION: ${{ steps.baseline_resolution.outcome }}
+          BASELINE_CONTRACT: ${{ steps.baseline_contract.outcome }}
+          CURRENT_RESOLUTION: ${{ steps.current_resolution.outcome }}
+          CURRENT_CONTRACT: ${{ steps.current_contract.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/consumer-compatibility
+          baseline=failed
+          if [ "$BASELINE_RESOLUTION" = success ] && [ "$BASELINE_CONTRACT" = success ]; then
+            baseline=success
+          fi
+          current=failed
+          if [ "$CURRENT_RESOLUTION" = success ] && [ "$CURRENT_CONTRACT" = success ]; then
+            current=success
+          fi
+
+          if [ "$current" = success ]; then
+            classification=current-compatible
+            conclusion=success
+          elif [ "$baseline" = success ]; then
+            classification=library-regression
+            conclusion=failure
+          else
+            classification=consumer-baseline-failing
+            conclusion=warning
+          fi
+
+          export CLASSIFICATION="$classification"
+          export CONCLUSION="$conclusion"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          data = {
+              'baselineResolution': os.environ['BASELINE_RESOLUTION'],
+              'baselineContract': os.environ['BASELINE_CONTRACT'],
+              'currentResolution': os.environ['CURRENT_RESOLUTION'],
+              'currentContract': os.environ['CURRENT_CONTRACT'],
+              'classification': os.environ['CLASSIFICATION'],
+              'conclusion': os.environ['CONCLUSION'],
+          }
+          Path('target/consumer-compatibility/classification.json').write_text(
+              json.dumps(data, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          if [ "$conclusion" = failure ]; then
+            echo "::error::The declared consumer baseline passes, but the exact current library reactor fails."
+            exit 1
+          fi
+          if [ "$conclusion" = warning ]; then
+            echo "::warning::The consumer baseline is already failing; current-reactor failure is retained but not attributed automatically."
+          fi
+
+'''
+          path.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
+
+          for temporary in Path('.github/workflows').glob('temporary-*.yml'):
+              temporary.unlink()
+          PY
+
+      - name: Verify and commit the clean permanent workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          python3 .github/scripts/test_verify_consumer_dependency_tree.py
+          bash -n .github/scripts/run-consumer-contract.sh
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/consumer-compatibility.yml')"
+          git diff --check
+          test -z "$(find .github/workflows -maxdepth 1 -name 'temporary-*.yml' -print -quit)"
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Finalize and clean consumer compatibility classification'
+          git push origin HEAD:ci/consumer-contracts
