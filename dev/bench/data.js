@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786205580650,
+  "lastUpdate": 1786206302889,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -18766,6 +18766,72 @@ window.BENCHMARK_DATA = {
             "unit": "ms/op",
             "value": 181.31259599999998,
             "range": 494.3752830764481,
+            "extra": "Implementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "5de50630b2213bc8abc94fec63135d19058aaf8b",
+          "message": "Merge pull request #213 from carstenartur/perf/search-document-id-compatibility\n\nRebuild incompatible persistent Hibernate Search document IDs on upgrade",
+          "timestamp": "2026-08-08T18:23:03+02:00",
+          "tree_id": "92ba8f6d6dbbb2a5c7ce7055a2a226b4f58b6742",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/5de50630b2213bc8abc94fec63135d19058aaf8b"
+        },
+        "date": 1786206302889,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Hibernate Search full-text query — Entity hydration",
+            "unit": "ms/op",
+            "value": 22.200575999999998,
+            "range": 68.58034873250571,
+            "extra": "Implementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — Lucene projection",
+            "unit": "ms/op",
+            "value": 20.96343,
+            "range": 51.83498012112429,
+            "extra": "Implementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search indexing — Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 219.026881,
+            "range": 491.82888169641706,
+            "extra": "Implementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 20.900842333333333,
+            "range": 63.36734108634637,
+            "extra": "Implementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — SQL literal fragment",
+            "unit": "ms/op",
+            "value": 8.447392333333333,
+            "range": 36.513722841663736,
+            "extra": "Implementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search rebuild — Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 204.68715266666663,
+            "range": 279.9052707270803,
             "extra": "Implementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
           }
         ]
