@@ -16,6 +16,8 @@ Every retained query is answered from the same deterministic linear Git history 
 
 The comparison is deliberately **not** “Lucene versus an intentionally slow filesystem scan”. The on-demand implementation uses one `ObjectReader` and one `RevWalk` per query, applies cheap author/time/message predicates before tree access, stops after crossing a lower time bound, and restricts tree inspection to the exact requested path. Blob content is loaded only for queries that actually ask about changed content.
 
+The fixture itself is an ordinary Git hierarchy: `README.md`, `docs/operations.txt`, `services/payments/core.txt` and `services/payments/fraud/rules.txt` are written through an in-memory JGit `DirCache`, which creates canonical nested trees. This matters for the path benchmarks because JGit must traverse the same tree hierarchy that a normal repository would contain.
+
 The benchmark also verifies the indexed result set against the on-demand JGit result set on the same Hibernate repository before timing begins. A semantic mismatch fails the benchmark instead of producing an attractive but invalid speedup.
 
 ## Retained application questions
@@ -82,19 +84,21 @@ The calculation is shown independently against `FileRepository / JGit` and `Hibe
 
 This is deliberately conservative. A real application normally maintains the projection incrementally as commits arrive; it does not rebuild the complete index before every reporting query. The full rebuild is used here as an easily reproducible upper-bound startup cost.
 
-## First measured smoke evidence
+## First canonical smoke evidence
 
-The first green PostgreSQL/FileRepository smoke run used 1,000 commits and a fully rebuilt `content-v1` projection. The projection build point estimate was 900.0 ms. Query point estimates were:
+The first green run using canonical nested Git trees used 1,000 commits, PostgreSQL 17 and a fully rebuilt local-filesystem Lucene `content-v1` projection. The complete projection-build point estimate was **840.0 ms**.
 
 | Query | FileRepository + JGit | HibernateRepository + JGit | Indexed projection | Indexed vs filesystem | Full-build break-even vs filesystem |
 |---|---:|---:|---:|---:|---:|
-| Author + time | 34.0 ms | 14.1 ms | 2.42 ms | 14.0× | 28.6 queries |
-| Exact path + time | 67.6 ms | 16.4 ms | 2.77 ms | 24.4× | 13.9 queries |
-| Commit-message text | 30.2 ms | 12.6 ms | 4.28 ms | 7.1× | 34.7 queries |
-| Exact path + changed content | 69.0 ms | 22.7 ms | 3.60 ms | 19.2× | 13.8 queries |
-| Compound audit | 25.7 ms | 11.2 ms | 5.97 ms | 4.3× | 45.6 queries |
+| Author + time | 23.93 ms | 8.64 ms | 2.62 ms | 9.14× | 39.4 queries |
+| Exact path + time | 66.86 ms | 17.29 ms | 3.10 ms | 21.59× | 13.2 queries |
+| Commit-message text | 39.85 ms | 15.99 ms | 4.03 ms | 9.89× | 23.5 queries |
+| Exact path + changed content | 96.20 ms | 22.02 ms | 3.47 ms | 27.73× | 9.1 queries |
+| Compound audit | 36.31 ms | 10.22 ms | 2.62 ms | 13.86× | 24.9 queries |
 
-These are **workload point estimates, not universal speedup claims**. The retained smoke run deliberately uses only three SingleShot measurements, so JMH's high-confidence error intervals are broad. The individual raw samples nevertheless preserved the same qualitative ordering for the strongest path queries: filesystem path+content was 58.3–88.5 ms while the indexed query was 3.01–4.00 ms; filesystem path+time was 47.0–78.8 ms while the indexed query was 2.58–3.09 ms. The scheduled scale profiles exist to establish whether this gap grows predictably with history size before any headline multiplier is treated as a general result.
+The indexed path-and-content query is also **6.35×** faster than executing the same on-demand JGit algorithm over the Hibernate-backed repository. Exact path plus time is **5.58×** faster than HibernateRepository/JGit. Those comparisons isolate the benefit of the materialized read model from the difference between filesystem and database object storage.
+
+These are **workload point estimates, not universal speedup claims**. The smoke run deliberately uses only three SingleShot measurements, so JMH's high-confidence error intervals are broad. The raw samples nevertheless preserve the same qualitative ordering for every retained query. For the strongest path+content comparison, FileRepository/JGit measured 122.41, 82.00 and 84.20 ms while the indexed query measured 2.85, 4.78 and 2.78 ms. For path+time, FileRepository/JGit measured 69.30, 68.09 and 63.18 ms while the indexed query measured 2.59, 2.58 and 4.12 ms.
 
 The work counters explain the architectural difference. For path+content at 1,000 commits, JGit visited 1,000 commits and performed 1,000 exact-path tree inspections before loading four matching changed blobs. The indexed query visited no Git commits or trees at query time. For path+time, JGit visited 901 commits and performed 800 exact-path inspections, while the indexed query again used the precomputed path field.
 
@@ -141,9 +145,9 @@ This benchmark represents a long-running application with warm host/database cac
 
 PostgreSQL runs in Testcontainers on the same GitHub Actions host; the filesystem baseline also uses local temporary storage. Network RTT is therefore not part of this comparison. Remote-database latency is measured separately by the network benchmark and should not be mixed into the indexing crossover until a dedicated deployment matrix is added.
 
-## What a strong result would mean
+## What a strong result means
 
-A large indexed-query speedup would not mean that relational storage makes Git object access inherently faster. The three-way comparison is designed to make that distinction visible:
+A large indexed-query speedup does not mean that relational storage makes Git object access inherently faster. The three-way comparison is designed to make that distinction visible:
 
 ```text
 FileRepository + JGit on demand
@@ -153,7 +157,7 @@ HibernateRepository + JGit on demand
 HibernateRepository + indexed projection
 ```
 
-If the first two remain comparable while the third becomes substantially faster as history grows, the gain comes from moving repeated history analysis from query time to incremental/index time. That is the architectural capability the Search module adds on top of ordinary JGit.
+The canonical smoke evidence already shows the expected mechanism: the on-demand variants revisit commit/tree state for every query, while the indexed query avoids that work. The 10,000- and 100,000-commit profiles exist to establish the scaling curve before treating any single multiplier as a general project claim.
 
 ## Reproduce locally
 
