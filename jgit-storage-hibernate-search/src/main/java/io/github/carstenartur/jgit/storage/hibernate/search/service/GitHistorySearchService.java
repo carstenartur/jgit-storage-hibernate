@@ -19,6 +19,7 @@ import org.hibernate.search.engine.search.common.BooleanOperator;
 import org.hibernate.search.engine.search.predicate.SearchPredicate;
 import org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFactory;
 import org.hibernate.search.mapper.orm.Search;
+import org.hibernate.search.mapper.orm.scope.SearchScope;
 import org.hibernate.search.mapper.orm.session.SearchSession;
 
 /** Query service for indexed Git history. */
@@ -97,9 +98,11 @@ public class GitHistorySearchService {
     String timeField = searchTimeField(query);
     try (Session session = sessionFactory.openSession()) {
       SearchSession searchSession = Search.session(session);
+      SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
+      SearchPredicate predicate = fullTextPredicate(scope.predicate(), query, timeField);
       return searchSession
-          .search(GitCommitIndex.class)
-          .where(f -> fullTextPredicate(f, query, timeField))
+          .search(scope)
+          .where(predicate)
           .fetchHits(query.offset(), query.limit());
     }
   }
@@ -108,10 +111,12 @@ public class GitHistorySearchService {
     String timeField = searchTimeField(query);
     try (Session session = sessionFactory.openSession()) {
       SearchSession searchSession = Search.session(session);
+      SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
+      SearchPredicate predicate = fullTextPredicate(scope.predicate(), query, timeField);
       return searchSession
-          .search(GitCommitIndex.class)
+          .search(scope)
           .select(CommitSearchHit.class)
-          .where(f -> fullTextPredicate(f, query, timeField))
+          .where(predicate)
           .fetchHits(query.offset(), query.limit());
     }
   }
