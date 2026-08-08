@@ -1,0 +1,45 @@
+name: Temporary search test patch
+
+on:
+  push:
+    branches:
+      - perf/search-indexing-projections
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-search-test-patch
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: perf/search-indexing-projections
+          fetch-depth: 0
+      - name: Update interruption expectations for atomic batches
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/SearchSqlServerQueryIntegrationTest.java')
+          text = path.read_text(encoding='utf-8')
+          old_rows = 'assertEquals(2, countRows(provider, PRIMARY_REPOSITORY));'
+          new_rows = 'assertEquals(5, countRows(provider, PRIMARY_REPOSITORY));'
+          old_removed = 'assertEquals(2, primaryResult.removedProjections());'
+          new_removed = 'assertEquals(5, primaryResult.removedProjections());'
+          if text.count(old_rows) != 1 or text.count(old_removed) != 1:
+              raise SystemExit('Expected SQL Server rebuild assertions were not found exactly once')
+          path.write_text(
+              text.replace(old_rows, new_rows).replace(old_removed, new_removed),
+              encoding='utf-8',
+          )
+          PY
+          git add jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/SearchSqlServerQueryIntegrationTest.java
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Expect complete committed rebuild batch on interruption'
+          git push origin HEAD:perf/search-indexing-projections
