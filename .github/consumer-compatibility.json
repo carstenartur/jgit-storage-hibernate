@@ -11,7 +11,7 @@
     {
       "id": "audio-analyzer",
       "repository": "carstenartur/audio-analyzer",
-      "ref": "72b31843faa40ea73d95ad104ea29c7b22aa10f9",
+      "ref": "862b9344373e44dfdcc7c76462a23b495fa1bf6f",
       "defaultBranch": "master",
       "upstreamModules": [
         "jgit-storage-hibernate-core",
