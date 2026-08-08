@@ -21,20 +21,22 @@ If the property is omitted, `content-v1` remains the default and preserves the p
 
 `diff-hunks-v1` uses first-parent semantics, like the rest of the generic commit projection. A root commit treats the complete current file as added text. Deleted files contribute their changed path but no deleted blob text.
 
-These profiles are **not semantically interchangeable**. A lower indexing time or smaller Lucene directory is not automatically better if the application needs a field that the profile intentionally omits. The retained benchmark therefore records both cost and miss-rate evidence.
+These profiles are **not semantically interchangeable**. A lower indexing time or smaller Lucene directory is not automatically better if the application needs a field that the profile intentionally omits. In particular, `diff-hunks-v1` can find text that was added or modified by a commit, but it does not promise that unchanged surrounding file content remains searchable for that commit. The retained benchmark therefore records both cost and miss-rate evidence.
 
 ## Stable profile identity and rebuild boundary
 
 Every `git_commit_index` row stores `index_profile`. Flyway migration `0.9.1.1` backfills existing rows to `content-v1`, because that is the semantic profile used by releases before profiles existed.
 
-When an application explicitly selects a profile, Search reads and incremental writes fail closed if an existing repository contains another profile or a mixture of profiles. `SearchIndexProfileMismatchException` reports:
+Search reads and incremental writes fail closed if an existing repository contains another profile, a mixture of profiles, or Lucene documents without the current profile marker. `SearchIndexProfileMismatchException` reports:
 
 - the logical repository;
 - the configured stable profile ID;
 - the persisted profile IDs;
 - the required `CommitProjectionRebuilder` action.
 
-A profile migration is therefore performed by rebuilding that logical repository from authoritative Git history:
+The normal compatibility probe runs against the small Lucene `indexProfile` keyword field so it does not add an ORM SQL query to ordinary Search query counters. Relational profile IDs are loaded only for the mismatch diagnostic.
+
+A profile migration is performed by rebuilding that logical repository from authoritative Git history:
 
 ```java
 new CommitProjectionRebuilder(sessionFactory)
@@ -81,7 +83,24 @@ Free-text commit search uses `changedPathTerms`. Exact path search uses `changed
 
 ## Measured evidence
 
-The `Hibernate Search Performance` workflow runs PostgreSQL plus local-filesystem Lucene for all four profiles. The fixture retains raw JMH JSON, ORM/GC counters and grouped history for:
+The `Hibernate Search Performance` workflow runs PostgreSQL plus local-filesystem Lucene for all four profiles. The PR smoke fixture contains 100 deterministic commits that repeatedly modify the **same approximately 8 KiB text file**. Apart from one fixed-width marker line, the file stays unchanged. This intentionally exposes the cost difference between storing the complete current file for every commit and storing only changed lines.
+
+The current retained point estimates are:
+
+| Profile | Incremental indexing | Rebuild | Lucene footprint | PostgreSQL projection | Content miss | Path miss |
+|---|---:|---:|---:|---:|---:|---:|
+| `metadata-v1` | 146.6 ms | 130.2 ms | 71.0 KiB | 208 KiB | 100% | 100% |
+| `paths-v1` | 143.4 ms | 123.3 ms | 73.6 KiB | 208 KiB | 100% | 0% |
+| `content-v1` | 218.1 ms | 193.5 ms | 227.0 KiB | 1,096 KiB | 0% | 0% |
+| `diff-hunks-v1` | 156.7 ms | 137.3 ms | 90.0 KiB | 296 KiB | 0% | 0% |
+
+In this repeated-small-edit workload, `diff-hunks-v1` versus `content-v1` reduces the mean per-invocation Lucene footprint by about **60.4%** and the PostgreSQL projection footprint by about **73.0%**. Its indexing point estimate is about **28.2%** lower and its rebuild point estimate about **29.0%** lower. All three raw timing samples for both indexing and rebuild are below the corresponding `content-v1` samples, but this is still a small single-shot fixture with broad timing confidence intervals. It is evidence for the expected cost mechanism, not a universal latency guarantee.
+
+The zero content-miss result for `diff-hunks-v1` is also deliberately narrow: the curated content query targets the line that changes in the benchmark commits. It proves that changed-line recall is retained in that workload. It does **not** make `diff-hunks-v1` semantically equivalent to `content-v1` for queries targeting unchanged surrounding context. For that reason `content-v1` remains the production default and `diff-hunks-v1` remains explicit/experimental.
+
+JMH `@AuxCounters(Type.EVENTS)` reports an aggregate score across measurement iterations. The chart converter therefore derives footprint, segment and result-count evidence from the per-measurement `rawData` and averages those values per invocation. This prevents three-iteration runs from tripling byte counts or masking partial recall loss.
+
+The workflow retains raw JMH JSON, ORM/GC counters and grouped history for:
 
 - incremental indexing time;
 - complete projection purge/rebuild time;
@@ -93,18 +112,18 @@ The `Hibernate Search Performance` workflow runs PostgreSQL plus local-filesyste
 - Lucene segment count;
 - content and path miss rates against deterministic relevant-result sets.
 
-Stable chart groups:
+Stable public chart groups:
 
-- `#benchmark-hibernate-search-indexing`
-- `#benchmark-hibernate-search-rebuild`
-- `#benchmark-hibernate-search-full-text-query`
-- `#benchmark-hibernate-search-content-query`
-- `#benchmark-hibernate-search-path-query`
-- `#benchmark-hibernate-search-index-footprint`
-- `#benchmark-hibernate-search-sql-projection-footprint`
-- `#benchmark-hibernate-search-segment-count`
-- `#benchmark-hibernate-search-content-quality`
-- `#benchmark-hibernate-search-path-quality`
+- [Indexing](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-indexing)
+- [Rebuild](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-rebuild)
+- [Full-text query](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-full-text-query)
+- [Content query](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-content-query)
+- [Path query](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-path-query)
+- [Lucene footprint](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-index-footprint)
+- [SQL projection footprint](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-sql-projection-footprint)
+- [Segment count](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-segment-count)
+- [Content quality](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-content-quality)
+- [Path quality](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-path-quality)
 
 A miss rate of `0%` is best. `metadata-v1` is expected to miss path/content-only fixtures by design; `paths-v1` is expected to miss content-only fixtures. Those points make the cost/semantics trade-off visible instead of comparing unlike profiles only by elapsed time.
 
