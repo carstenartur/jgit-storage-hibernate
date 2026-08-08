@@ -80,7 +80,9 @@ record SearchRuntimeScenario(
         throw new IllegalArgumentException("Invalid synchronization scenario " + id);
       }
       String synchronization = normalized.substring("sync-".length(), refreshSeparator);
-      int refresh = Integer.parseInt(normalized.substring(refreshSeparator + 2));
+      int refresh =
+          parseScenarioInteger(
+              normalized.substring(refreshSeparator + 2), "refresh interval", id);
       return new SearchRuntimeScenario(normalized, synchronization, refresh, null, null, 50);
     }
     if (normalized.startsWith("writer-")) {
@@ -90,15 +92,33 @@ record SearchRuntimeScenario(
           || !parts[2].startsWith("t")) {
         throw new IllegalArgumentException("Invalid writer scenario " + id);
       }
-      int ram = Integer.parseInt(parts[1].substring(3));
-      int threads = Integer.parseInt(parts[2].substring(1));
+      int ram = parseScenarioInteger(parts[1].substring(3), "writer RAM buffer", id);
+      int threads = parseScenarioInteger(parts[2].substring(1), "backend thread count", id);
       return new SearchRuntimeScenario(normalized, "write-sync", 0, ram, threads, 50);
     }
     if (normalized.startsWith("batch-")) {
-      int batch = Integer.parseInt(normalized.substring("batch-".length()));
+      int batch =
+          parseScenarioInteger(
+              normalized.substring("batch-".length()), "projection batch size", id);
       return new SearchRuntimeScenario(normalized, "write-sync", 0, null, null, batch);
     }
     throw new IllegalArgumentException("Unknown Search runtime scenario " + id);
+  }
+
+  private static int parseScenarioInteger(String value, String field, String scenarioId) {
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException exception) {
+      throw new IllegalArgumentException(
+          "Invalid Search runtime scenario '"
+              + scenarioId
+              + "': "
+              + field
+              + " must be an integer but was '"
+              + value
+              + "'",
+          exception);
+    }
   }
 
   /** Fast PR/push evidence spanning every tuning family. */
