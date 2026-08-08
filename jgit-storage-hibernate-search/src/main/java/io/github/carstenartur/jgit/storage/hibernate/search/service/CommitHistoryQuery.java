@@ -19,8 +19,10 @@ import java.util.Objects;
  *
  * <p>The optional predicates are combined with logical {@code AND}. Path matching applies to paths
  * changed by the commit relative to its first parent; every path in a root commit is considered
- * changed. When {@link #text()} is present, path text is interpreted by the full-text analyzer;
- * otherwise path matching retains its literal, case-insensitive fragment semantics.
+ * changed. {@link PathMatch#LITERAL_FRAGMENT} preserves the original case-insensitive SQL fragment
+ * behavior for path-only structured queries. {@link PathMatch#ANALYZED_TERMS} and {@link
+ * PathMatch#EXACT} explicitly select the Lucene path fields and therefore avoid a leading-wildcard
+ * relational query even when no free-text expression is present.
  *
  * <p>Time predicates and newest-first ordering use committer time by default. Call {@link
  * Builder#usingAuthorTime()} when the question concerns when the original author wrote the change
@@ -38,6 +40,16 @@ public final class CommitHistoryQuery {
     COMMITTER
   }
 
+  /** Path predicate semantics selected by the caller. */
+  public enum PathMatch {
+    /** Literal, case-insensitive path substring through the relational compatibility query. */
+    LITERAL_FRAGMENT,
+    /** Lowercased path components/terms through the analyzed Lucene path field. */
+    ANALYZED_TERMS,
+    /** One complete changed path through the exact multivalued Lucene keyword field. */
+    EXACT
+  }
+
   private static final int DEFAULT_LIMIT = 100;
 
   private final String repositoryName;
@@ -45,6 +57,7 @@ public final class CommitHistoryQuery {
   private final String authorEmail;
   private final String committerEmail;
   private final String pathFragment;
+  private final PathMatch pathMatch;
   private final Instant from;
   private final Instant to;
   private final TimestampField timestampField;
@@ -59,6 +72,7 @@ public final class CommitHistoryQuery {
     authorEmail = normalize(builder.authorEmail);
     committerEmail = normalize(builder.committerEmail);
     pathFragment = normalize(builder.pathFragment);
+    pathMatch = Objects.requireNonNull(builder.pathMatch, "pathMatch");
     from = builder.from;
     to = builder.to;
     timestampField = Objects.requireNonNull(builder.timestampField, "timestampField");
@@ -103,6 +117,10 @@ public final class CommitHistoryQuery {
     return pathFragment;
   }
 
+  public PathMatch pathMatch() {
+    return pathMatch;
+  }
+
   public Instant from() {
     return from;
   }
@@ -131,6 +149,11 @@ public final class CommitHistoryQuery {
     return limit;
   }
 
+  /** Whether this query explicitly requires an indexed Search path. */
+  boolean requiresSearchBackend() {
+    return text != null || (pathFragment != null && pathMatch != PathMatch.LITERAL_FRAGMENT);
+  }
+
   /** Builder for {@link CommitHistoryQuery}. */
   public static final class Builder {
 
@@ -139,6 +162,7 @@ public final class CommitHistoryQuery {
     private String authorEmail;
     private String committerEmail;
     private String pathFragment;
+    private PathMatch pathMatch = PathMatch.LITERAL_FRAGMENT;
     private Instant from;
     private Instant to;
     private TimestampField timestampField = TimestampField.COMMITTER;
@@ -166,8 +190,31 @@ public final class CommitHistoryQuery {
       return this;
     }
 
+    /**
+     * Match a literal, case-insensitive path substring.
+     *
+     * <p>For a path-only query this retains the original relational compatibility semantics. When a
+     * free-text expression is also present the full-text query already runs through Lucene and this
+     * path value is interpreted as analyzed terms, preserving the pre-existing compound-query
+     * behavior.
+     */
     public Builder touchingPath(String pathFragment) {
       this.pathFragment = pathFragment;
+      pathMatch = PathMatch.LITERAL_FRAGMENT;
+      return this;
+    }
+
+    /** Match all analyzed path components/terms through Lucene. */
+    public Builder touchingPathTerms(String pathTerms) {
+      pathFragment = pathTerms;
+      pathMatch = PathMatch.ANALYZED_TERMS;
+      return this;
+    }
+
+    /** Match one complete changed path through the exact Lucene keyword field. */
+    public Builder touchingExactPath(String path) {
+      pathFragment = path;
+      pathMatch = PathMatch.EXACT;
       return this;
     }
 

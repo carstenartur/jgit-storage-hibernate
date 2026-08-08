@@ -11,8 +11,6 @@ package io.github.carstenartur.jgit.storage.hibernate.search.entity;
 import io.github.carstenartur.jgit.storage.hibernate.search.analysis.GitTextAnalysis;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
@@ -20,8 +18,11 @@ import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.search.engine.backend.analysis.AnalyzerNames;
+import org.hibernate.search.engine.backend.types.Projectable;
+import org.hibernate.search.engine.backend.types.Sortable;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.GenericField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
@@ -43,6 +44,7 @@ import org.hibernate.search.mapper.pojo.mapping.definition.annotation.PropertyVa
       @Index(name = "idx_commit_repo_committer", columnList = "repository_name, committer_email")
     },
     uniqueConstraints = {
+      @UniqueConstraint(name = "uk_commit_projection_key", columnNames = "projection_key"),
       @UniqueConstraint(
           name = "uk_commit_repo_object",
           columnNames = {"repository_name", "object_id"})
@@ -55,8 +57,26 @@ public class GitCommitIndex {
   /** Keyword field containing one exact value per changed path. */
   public static final String CHANGED_PATH_EXACT_FIELD = "changedPathExact";
 
+  /**
+   * Assigned ORM and Hibernate Search document identifier.
+   *
+   * <p>Assigning this value before persistence allows Hibernate to collect projection inserts into
+   * real JDBC batches. Existing migration-backed rows receive a stable {@code legacy-<id>} value;
+   * new rows use UUIDs. The historical numeric identity column remains readable for compatibility
+   * but is no longer the ORM identifier.
+   */
   @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @Column(name = "projection_key", nullable = false, updatable = false, length = 36)
+  private String projectionKey = UUID.randomUUID().toString();
+
+  /**
+   * Historical database identity retained as read-only compatibility metadata.
+   *
+   * <p>Migration-backed databases continue generating this column. Disposable Hibernate-created
+   * schemas may leave it {@code null}; application logic must use {@link #getProjectionKey()} or the
+   * repository/object-id key instead.
+   */
+  @Column(name = "id", insertable = false, updatable = false)
   private Long id;
 
   @KeywordField
@@ -64,13 +84,14 @@ public class GitCommitIndex {
   @Column(name = "repository_name", nullable = false, length = 255)
   private String repositoryName;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES, sortable = Sortable.YES)
   @Column(name = "object_id", nullable = false, length = 40)
   private String objectId;
 
   @FullTextField(
       analyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER,
-      searchAnalyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER)
+      searchAnalyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER,
+      projectable = Projectable.YES)
   @Nationalized
   @Column(name = "short_message", length = 2048)
   private String shortMessage;
@@ -82,26 +103,26 @@ public class GitCommitIndex {
   @Column(name = "full_message", length = 8192)
   private String fullMessage;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "author_name")
   private String authorName;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "author_email")
   private String authorEmail;
 
-  @GenericField
+  @GenericField(projectable = Projectable.YES, sortable = Sortable.YES)
   @Column(name = "author_time")
   private Instant authorTime;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "committer_name")
   private String committerName;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "committer_email")
   private String committerEmail;
@@ -111,7 +132,7 @@ public class GitCommitIndex {
    *
    * <p>The database column retains its historic {@code commit_time} name for schema compatibility.
    */
-  @GenericField
+  @GenericField(projectable = Projectable.YES, sortable = Sortable.YES)
   @Column(name = "commit_time")
   private Instant committerTime;
 
@@ -124,6 +145,22 @@ public class GitCommitIndex {
   @Nationalized
   @Column(name = "changed_text", length = 262144)
   private String changedText;
+
+  public String getProjectionKey() {
+    return projectionKey;
+  }
+
+  /**
+   * Replace the assigned projection key when importing or testing an existing projection.
+   *
+   * @param projectionKey nonblank persisted projection key
+   */
+  public void setProjectionKey(String projectionKey) {
+    if (projectionKey == null || projectionKey.isBlank()) {
+      throw new IllegalArgumentException("projectionKey must not be blank");
+    }
+    this.projectionKey = projectionKey;
+  }
 
   public Long getId() {
     return id;
