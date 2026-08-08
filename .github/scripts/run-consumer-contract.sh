@@ -86,13 +86,22 @@ echo "No repository-owned contract for $consumer; running the documented central
       )
       ;;
     sandbox)
-      command=(
-        xvfb-run -a
-        "${maven[@]}" -B -ntp -nsu
-        "${maven_repository_argument[@]}"
-        -DskipTests
-        verify
-      )
+      # Sandbox currently consumes upstream Core only through these two modules. Do not
+      # turn the complete Eclipse cleanup reactor or copied Search/Java-analysis code into
+      # an accidental library contract.
+      set -o pipefail
+      "${maven[@]}" -B -ntp -nsu \
+        "${maven_repository_argument[@]}" \
+        -N -f pom.xml install
+      "${maven[@]}" -B -ntp -nsu \
+        "${maven_repository_argument[@]}" \
+        -f sandbox-jgit-storage-hibernate/pom.xml install
+      "${maven[@]}" -B -ntp -nsu \
+        "${maven_repository_argument[@]}" \
+        -f sandbox-jgit-server-webapp/pom.xml package
+      test -s sandbox-jgit-storage-hibernate/target/classes/META-INF/MANIFEST.MF
+      test -s sandbox-jgit-server-webapp/target/jgit-server.jar
+      exit 0
       ;;
     *)
       usage
