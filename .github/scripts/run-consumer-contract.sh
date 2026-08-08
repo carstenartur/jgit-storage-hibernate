@@ -13,43 +13,79 @@ checkout=$2
 log_file=$3
 
 [[ -d "$checkout" ]] || { echo "Missing consumer checkout: $checkout" >&2; exit 66; }
+checkout=$(cd "$checkout" && pwd)
 mkdir -p "$(dirname "$log_file")"
+log_file=$(cd "$(dirname "$log_file")" && pwd)/$(basename "$log_file")
+
+maven_repository=${MAVEN_REPO_LOCAL:-}
+maven_repository_argument=()
+if [[ -n "$maven_repository" ]]; then
+  mkdir -p "$maven_repository"
+  maven_repository_argument=("-Dmaven.repo.local=$maven_repository")
+fi
+
+export JGIT_STORAGE_HIBERNATE_CONSUMER=${consumer}
+export JGIT_STORAGE_HIBERNATE_CONTRACT_MODE=${JGIT_STORAGE_HIBERNATE_CONTRACT_MODE:-candidate}
+export JGIT_STORAGE_HIBERNATE_CANDIDATE_VERSION=${JGIT_STORAGE_HIBERNATE_CANDIDATE_VERSION:-}
+
+if [[ -n "$maven_repository" ]]; then
+  # Repository-owned contracts receive the same isolated repository even when they invoke
+  # Maven themselves. The explicit fallback commands below pass it again as a normal option.
+  export MAVEN_ARGS="${MAVEN_ARGS:+$MAVEN_ARGS }-Dmaven.repo.local=$maven_repository"
+fi
 
 if [[ -x "$checkout/.github/jgit-storage-hibernate-contract.sh" ]]; then
   echo "Running repository-owned contract for $consumer"
   (
     cd "$checkout"
     set -o pipefail
-    .github/jgit-storage-hibernate-contract.sh 2>&1 | tee "$OLDPWD/$log_file"
+    .github/jgit-storage-hibernate-contract.sh 2>&1 | tee "$log_file"
   )
   exit 0
 fi
 
 echo "No repository-owned contract for $consumer; running the documented central fallback."
-if [[ -x "$checkout/mvnw" ]]; then
-  maven=("$checkout/mvnw")
-else
-  maven=(mvn)
-fi
-
-case "$consumer" in
-  audio-analyzer)
-    command=("${maven[@]}" -B -DskipITs verify)
-    ;;
-  Taxonomy)
-    docker info >/dev/null
-    command=("${maven[@]}" -B verify)
-    ;;
-  sandbox)
-    command=(xvfb-run -a "${maven[@]}" -B -DskipTests verify)
-    ;;
-  *)
-    usage
-    ;;
-esac
-
 (
   cd "$checkout"
+  if [[ -x ./mvnw ]]; then
+    maven=(./mvnw)
+  else
+    maven=(mvn)
+  fi
+
+  case "$consumer" in
+    audio-analyzer)
+      command=(
+        "${maven[@]}" -B
+        "${maven_repository_argument[@]}"
+        -DskipITs
+        verify
+      )
+      ;;
+    Taxonomy)
+      docker info >/dev/null
+      command=(
+        "${maven[@]}" -B
+        "${maven_repository_argument[@]}"
+        -Dtaxonomy.model.download.skip=true
+        -Dtaxonomy.embedding.allow-download=false
+        verify
+      )
+      ;;
+    sandbox)
+      command=(
+        xvfb-run -a
+        "${maven[@]}" -B
+        "${maven_repository_argument[@]}"
+        -DskipTests
+        verify
+      )
+      ;;
+    *)
+      usage
+      ;;
+  esac
+
   set -o pipefail
-  "${command[@]}" 2>&1 | tee "$OLDPWD/$log_file"
+  "${command[@]}" 2>&1 | tee "$log_file"
 )

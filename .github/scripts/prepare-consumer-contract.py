@@ -4,6 +4,10 @@
 The script deliberately edits only version text belonging to
 io.github.carstenartur:jgit-storage-hibernate-* dependencies. It supports direct,
 dependency-managed and property-backed versions without reformatting complete POM files.
+
+Property-backed substitutions are fail-closed: project identity placeholders and properties
+shared with unrelated Maven coordinates are rejected rather than changing a consumer's own
+version or dependency stack accidentally.
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ GROUP = re.compile(r"<groupId>\s*([^<]+?)\s*</groupId>", re.DOTALL)
 ARTIFACT = re.compile(r"<artifactId>\s*([^<]+?)\s*</artifactId>", re.DOTALL)
 VERSION = re.compile(r"(<version>\s*)([^<]+?)(\s*</version>)", re.DOTALL)
 PROPERTY_REFERENCE = re.compile(r"^\$\{([A-Za-z0-9_.-]+)}$")
+RESERVED_PROJECT_VERSION_PROPERTIES = {"revision", "sha1", "changelist"}
 
 
 @dataclass(frozen=True)
@@ -37,6 +42,14 @@ class PropertyChange:
     pom: str
     property_name: str
     previous_value: str
+
+
+@dataclass(frozen=True)
+class PropertySafety:
+    property_name: str
+    target_references: int
+    total_version_references: int
+    definitions: int
 
 
 def pom_files(root: Path) -> list[Path]:
@@ -105,11 +118,7 @@ def replace_literal_versions(path: Path, target_version: str) -> int:
         if PROPERTY_REFERENCE.fullmatch(current) is not None or current == target_version:
             return block
         replacements += 1
-        return (
-            block[: version.start(2)]
-            + target_version
-            + block[version.end(2) :]
-        )
+        return block[: version.start(2)] + target_version + block[version.end(2) :]
 
     updated = DEPENDENCY_BLOCK.sub(dependency_replacement, text)
     if updated != text:
@@ -118,20 +127,75 @@ def replace_literal_versions(path: Path, target_version: str) -> int:
 
 
 def referenced_properties(uses: Iterable[DependencyUse]) -> set[str]:
-    result: set[str] = set()
-    for use in uses:
-        if use.source.startswith("property:"):
-            result.add(use.source.removeprefix("property:"))
-    return result
+    return {
+        use.source.removeprefix("property:")
+        for use in uses
+        if use.source.startswith("property:")
+    }
+
+
+def property_definition_pattern(property_name: str) -> re.Pattern[str]:
+    return re.compile(
+        rf"(<{re.escape(property_name)}>\s*)([^<]+?)(\s*</{re.escape(property_name)}>)",
+        re.DOTALL,
+    )
+
+
+def validate_property_substitution(
+    poms: Iterable[Path],
+    uses: Iterable[DependencyUse],
+    property_name: str,
+) -> PropertySafety:
+    pom_list = list(poms)
+    use_list = list(uses)
+    if property_name in RESERVED_PROJECT_VERSION_PROPERTIES:
+        raise ValueError(
+            f"Refusing to replace reserved project identity property {property_name!r}"
+        )
+
+    expected_reference = "${" + property_name + "}"
+    target_references = sum(
+        1
+        for use in use_list
+        if use.source == f"property:{property_name}"
+    )
+    total_version_references = 0
+    definitions = 0
+    definition_pattern = property_definition_pattern(property_name)
+
+    for path in pom_list:
+        text = path.read_text(encoding="utf-8")
+        total_version_references += sum(
+            1
+            for match in VERSION.finditer(text)
+            if match.group(2).strip() == expected_reference
+        )
+        definitions += len(definition_pattern.findall(text))
+
+    if total_version_references != target_references:
+        raise ValueError(
+            f"Property {property_name!r} is shared outside "
+            f"{GROUP_ID}:{ARTIFACT_PREFIX}* dependency versions: "
+            f"target references={target_references}, "
+            f"all Maven <version> references={total_version_references}"
+        )
+    if definitions != 1:
+        raise ValueError(
+            f"Property {property_name!r} must have exactly one deterministic definition; "
+            f"found {definitions}"
+        )
+    return PropertySafety(
+        property_name=property_name,
+        target_references=target_references,
+        total_version_references=total_version_references,
+        definitions=definitions,
+    )
 
 
 def replace_property(
     poms: Iterable[Path], root: Path, property_name: str, target_version: str
 ) -> list[PropertyChange]:
-    element = re.compile(
-        rf"(<{re.escape(property_name)}>\s*)([^<]+?)(\s*</{re.escape(property_name)}>)",
-        re.DOTALL,
-    )
+    element = property_definition_pattern(property_name)
     changes: list[PropertyChange] = []
     for path in poms:
         text = path.read_text(encoding="utf-8")
@@ -177,6 +241,14 @@ def main() -> None:
             f"{args.consumer} declares no {GROUP_ID}:{ARTIFACT_PREFIX}* dependency"
         )
 
+    property_safety: list[PropertySafety] = []
+    for property_name in sorted(referenced_properties(uses)):
+        try:
+            safety = validate_property_substitution(poms, uses, property_name)
+        except ValueError as exception:
+            raise SystemExit(str(exception)) from exception
+        property_safety.append(safety)
+
     literal_replacements = sum(
         replace_literal_versions(path, args.version) for path in poms
     )
@@ -185,7 +257,8 @@ def main() -> None:
         changes = replace_property(poms, root, property_name, args.version)
         if not changes:
             raise SystemExit(
-                f"Referenced property {property_name!r} was not found in any consumer POM"
+                f"Referenced property {property_name!r} was not changed; "
+                "the target version may already be active"
             )
         property_changes.extend(changes)
 
@@ -204,11 +277,10 @@ def main() -> None:
         "dependencyUses": [asdict(use) for use in uses],
         "literalReplacements": literal_replacements,
         "propertyChanges": [asdict(change) for change in property_changes],
+        "propertySafety": [asdict(item) for item in property_safety],
         "managedWithoutLocalVersion": unresolved,
         "changedPoms": sorted(
-            {
-                change.pom for change in property_changes
-            }
+            {change.pom for change in property_changes}
             | {
                 use.pom
                 for use in uses

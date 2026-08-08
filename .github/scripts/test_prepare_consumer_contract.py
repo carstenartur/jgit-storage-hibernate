@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,14 +16,38 @@ SPEC = importlib.util.spec_from_file_location("prepare_consumer_contract", SCRIP
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"Could not load {SCRIPT}")
 PREPARE = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = PREPARE
 SPEC.loader.exec_module(PREPARE)
 
 
 class ConsumerContractPreparationTest(unittest.TestCase):
 
-    def test_literal_and_property_versions_change_without_reformatting_poms(self) -> None:
+    def run_main(
+        self, root: Path, report: Path, consumer: str = "sandbox"
+    ) -> None:
+        previous = os.sys.argv
+        os.sys.argv = [
+            str(SCRIPT),
+            "--consumer",
+            consumer,
+            "--root",
+            str(root),
+            "--version",
+            "0.9.1-consumer-deadbeef-SNAPSHOT",
+            "--report",
+            str(report),
+        ]
+        try:
+            PREPARE.main()
+        finally:
+            os.sys.argv = previous
+
+    def test_literal_and_exclusive_property_versions_change_without_reformatting(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            report = root / "target" / "consumer-contract.json"
             parent = root / "pom.xml"
             child = root / "module" / "pom.xml"
             child.parent.mkdir()
@@ -68,23 +93,32 @@ class ConsumerContractPreparationTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            poms = PREPARE.pom_files(root)
-            uses = [use for pom in poms for use in PREPARE.dependency_uses(pom, root)]
-            literal_count = sum(
-                PREPARE.replace_literal_versions(pom, "0.9.1-SNAPSHOT") for pom in poms
-            )
-            property_changes = PREPARE.replace_property(
-                poms, root, "jgit.storage.version", "0.9.1-SNAPSHOT"
-            )
+            self.run_main(root, report, consumer="audio-analyzer")
 
-            self.assertEqual(1, literal_count)
-            self.assertEqual(1, len(property_changes))
+            data = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(1, data["literalReplacements"])
+            self.assertEqual(1, len(data["propertyChanges"]))
             self.assertEqual(
-                {"jgit-storage-hibernate-core", "jgit-storage-hibernate-search"},
-                {use.artifact for use in uses},
+                {
+                    "jgit-storage-hibernate-core",
+                    "jgit-storage-hibernate-search",
+                },
+                set(data["modules"]),
+            )
+            self.assertEqual(
+                [
+                    {
+                        "property_name": "jgit.storage.version",
+                        "target_references": 1,
+                        "total_version_references": 1,
+                        "definitions": 1,
+                    }
+                ],
+                data["propertySafety"],
             )
             self.assertIn(
-                "<jgit.storage.version>0.9.1-SNAPSHOT</jgit.storage.version>",
+                "<jgit.storage.version>0.9.1-consumer-deadbeef-SNAPSHOT"
+                "</jgit.storage.version>",
                 parent.read_text(encoding="utf-8"),
             )
             self.assertIn(
@@ -92,7 +126,10 @@ class ConsumerContractPreparationTest(unittest.TestCase):
                 parent.read_text(encoding="utf-8"),
             )
             child_text = child.read_text(encoding="utf-8")
-            self.assertIn("<version>0.9.1-SNAPSHOT</version>", child_text)
+            self.assertIn(
+                "<version>0.9.1-consumer-deadbeef-SNAPSHOT</version>",
+                child_text,
+            )
             self.assertIn("<groupId>org.example</groupId>", child_text)
             self.assertIn("<version>0.9.0</version>", child_text)
 
@@ -113,32 +150,113 @@ class ConsumerContractPreparationTest(unittest.TestCase):
 """,
                 encoding="utf-8",
             )
-            previous = os.sys.argv
-            os.sys.argv = [
-                str(SCRIPT),
-                "--consumer",
-                "sandbox",
-                "--root",
-                str(root),
-                "--version",
-                "0.9.1-SNAPSHOT",
-                "--report",
-                str(report),
-            ]
-            try:
-                PREPARE.main()
-            finally:
-                os.sys.argv = previous
+
+            self.run_main(root, report)
 
             data = json.loads(report.read_text(encoding="utf-8"))
             self.assertEqual("sandbox", data["consumer"])
-            self.assertEqual("0.9.1-SNAPSHOT", data["targetVersion"])
+            self.assertEqual(
+                "0.9.1-consumer-deadbeef-SNAPSHOT", data["targetVersion"]
+            )
             self.assertEqual(
                 ["jgit-storage-hibernate-java-analysis"], data["modules"]
             )
             self.assertEqual(1, data["literalReplacements"])
 
-    def test_non_consumer_fails_instead_of_silently_passing(self) -> None:
+    def test_reserved_project_identity_property_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "contract.json"
+            (root / "pom.xml").write_text(
+                """<project>
+  <version>${revision}</version>
+  <properties><revision>1.0.0-SNAPSHOT</revision></properties>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-core</artifactId>
+      <version>${revision}</version>
+    </dependency>
+  </dependencies>
+</project>
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                SystemExit, "reserved project identity property 'revision'"
+            ):
+                self.run_main(root, report)
+
+            self.assertIn(
+                "<revision>1.0.0-SNAPSHOT</revision>",
+                (root / "pom.xml").read_text(encoding="utf-8"),
+            )
+
+    def test_property_shared_with_unrelated_dependency_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "contract.json"
+            (root / "pom.xml").write_text(
+                """<project>
+  <properties><stack.version>1.0.0</stack.version></properties>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-core</artifactId>
+      <version>${stack.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.example</groupId>
+      <artifactId>shared-stack-member</artifactId>
+      <version>${stack.version}</version>
+    </dependency>
+  </dependencies>
+</project>
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                SystemExit, "shared outside io.github.carstenartur"
+            ):
+                self.run_main(root, report)
+
+            self.assertIn(
+                "<stack.version>1.0.0</stack.version>",
+                (root / "pom.xml").read_text(encoding="utf-8"),
+            )
+
+    def test_duplicate_property_definitions_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "contract.json"
+            (root / "pom.xml").write_text(
+                """<project>
+  <properties><jgit.version>1.0.0</jgit.version></properties>
+  <profiles>
+    <profile>
+      <properties><jgit.version>2.0.0</jgit.version></properties>
+    </profile>
+  </profiles>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-core</artifactId>
+      <version>${jgit.version}</version>
+    </dependency>
+  </dependencies>
+</project>
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                SystemExit, "exactly one deterministic definition"
+            ):
+                self.run_main(root, report)
+
+    def test_non_consumer_has_no_matching_uses(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "pom.xml").write_text(

@@ -10,6 +10,14 @@ on:
       - '.github/workflows/consumer-compatibility.yml'
       - '.github/scripts/prepare-consumer-contract.py'
       - '.github/scripts/test_prepare_consumer_contract.py'
+      - '.github/scripts/run-consumer-contract.sh'
+      - '.github/scripts/verify-consumer-dependency-tree.py'
+      - '.github/scripts/test_verify_consumer_dependency_tree.py'
+      - '.github/scripts/verify-module-boundaries.py'
+      - '.github/scripts/test_verify_module_boundaries.py'
+      - '.github/scripts/verify-no-temporary-workflows.py'
+      - '.github/scripts/test_verify_no_temporary_workflows.py'
+      - 'docs/operations/consumer-compatibility.md'
       - 'pom.xml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
@@ -21,6 +29,13 @@ on:
       - '.github/workflows/consumer-compatibility.yml'
       - '.github/scripts/prepare-consumer-contract.py'
       - '.github/scripts/test_prepare_consumer_contract.py'
+      - '.github/scripts/run-consumer-contract.sh'
+      - '.github/scripts/verify-consumer-dependency-tree.py'
+      - '.github/scripts/test_verify_consumer_dependency_tree.py'
+      - '.github/scripts/verify-module-boundaries.py'
+      - '.github/scripts/test_verify_module_boundaries.py'
+      - '.github/scripts/verify-no-temporary-workflows.py'
+      - '.github/scripts/test_verify_no_temporary_workflows.py'
       - 'pom.xml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
@@ -38,8 +53,9 @@ jobs:
   current-library:
     name: Build exact current reactor
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     outputs:
+      base-version: ${{ steps.version.outputs.base }}
       version: ${{ steps.version.outputs.value }}
       commit: ${{ steps.version.outputs.commit }}
 
@@ -56,28 +72,68 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Test consumer preparation tooling
-        run: python3 .github/scripts/test_prepare_consumer_contract.py
+      - name: Verify permanent compatibility tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/consumer-compatibility
+          bash -n .github/scripts/run-consumer-contract.sh
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          python3 .github/scripts/test_verify_consumer_dependency_tree.py
+          python3 .github/scripts/test_verify_module_boundaries.py
+          python3 .github/scripts/test_verify_no_temporary_workflows.py
+          python3 .github/scripts/verify-no-temporary-workflows.py
+          python3 .github/scripts/verify-module-boundaries.py \
+            --json-report target/consumer-compatibility/module-boundaries.json \
+            --markdown-report target/consumer-compatibility/module-boundaries.md
 
-      - name: Resolve exact reactor identity
+      - name: Resolve commit-qualified reactor identity
         id: version
         shell: bash
         run: |
           set -euo pipefail
-          version="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
-          test -n "$version"
-          echo "value=$version" >> "$GITHUB_OUTPUT"
+          base_version="$(mvn -q -DforceStdout help:evaluate \
+            -Dexpression=project.version | tail -n 1)"
+          test -n "$base_version"
+          release_base="${base_version%-SNAPSHOT}"
+          candidate_version="${release_base}-consumer-${GITHUB_SHA:0:12}-SNAPSHOT"
+
+          mvn -B \
+            -DgenerateBackupPoms=false \
+            -DprocessAllModules=true \
+            versions:set \
+            -DnewVersion="$candidate_version"
+
+          resolved_version="$(mvn -q -DforceStdout help:evaluate \
+            -Dexpression=project.version | tail -n 1)"
+          test "$resolved_version" = "$candidate_version"
+
+          printf '%s\n' "$base_version" \
+            > target/consumer-compatibility/base-version.txt
+          printf '%s\n' "$candidate_version" \
+            > target/consumer-compatibility/candidate-version.txt
+          printf '%s\n' "$GITHUB_SHA" \
+            > target/consumer-compatibility/library-commit.txt
+          git diff -- pom.xml '*/pom.xml' \
+            > target/consumer-compatibility/candidate-version.patch
+          test -s target/consumer-compatibility/candidate-version.patch
+
+          echo "base=$base_version" >> "$GITHUB_OUTPUT"
+          echo "value=$candidate_version" >> "$GITHUB_OUTPUT"
           echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-          echo "Building consumer contract artifacts for $version at $GITHUB_SHA"
+          echo "Building exact consumer artifacts as $candidate_version"
 
       - name: Install current reactor into an isolated repository
         shell: bash
         run: |
           set -euo pipefail
-          repository="${RUNNER_TEMP}/consumer-m2"
+          repository="${RUNNER_TEMP}/candidate-m2"
           mkdir -p "$repository" target/consumer-compatibility
           set -o pipefail
-          mvn -B -DskipTests -Dmaven.repo.local="$repository" install 2>&1 \
+          mvn -B \
+            -DskipTests \
+            -Dmaven.repo.local="$repository" \
+            install 2>&1 \
             | tee target/consumer-compatibility/library-build.log
           test -d "$repository/io/github/carstenartur"
 
@@ -86,10 +142,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p target/consumer-reactor-repository/io/github
-          cp -R "${RUNNER_TEMP}/consumer-m2/io/github/carstenartur" \
+          cp -R "${RUNNER_TEMP}/candidate-m2/io/github/carstenartur" \
             target/consumer-reactor-repository/io/github/
           find target/consumer-reactor-repository -type f | sort \
             > target/consumer-compatibility/reactor-artifacts.txt
+          grep -F '${{ steps.version.outputs.value }}' \
+            target/consumer-compatibility/reactor-artifacts.txt
           test -s target/consumer-compatibility/reactor-artifacts.txt
 
       - name: Upload current reactor repository
@@ -119,15 +177,15 @@ jobs:
           - consumer: audio-analyzer
             repository: carstenartur/audio-analyzer
             contract: runtime package and unit linkage
-            timeout: 45
+            timeout: 50
           - consumer: Taxonomy
             repository: carstenartur/Taxonomy
             contract: PostgreSQL, migrations and indexed history
-            timeout: 60
+            timeout: 70
           - consumer: sandbox
             repository: carstenartur/sandbox
             contract: Java 21, Tycho/OSGi and Java analysis packaging
-            timeout: 60
+            timeout: 70
 
     steps:
       - name: Checkout compatibility tooling
@@ -157,19 +215,24 @@ jobs:
         uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
         with:
           name: current-consumer-reactor
-          path: ${{ runner.temp }}/consumer-m2
+          path: ${{ runner.temp }}/candidate-m2
 
       - name: Record consumer and library identities
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p target/consumer-compatibility
-          git -C consumer rev-parse HEAD > target/consumer-compatibility/consumer-commit.txt
+          git -C consumer rev-parse HEAD \
+            > target/consumer-compatibility/consumer-commit.txt
+          git -C consumer rev-parse --abbrev-ref HEAD \
+            > target/consumer-compatibility/consumer-branch.txt
           printf '%s\n' '${{ needs.current-library.outputs.commit }}' \
             > target/consumer-compatibility/library-commit.txt
+          printf '%s\n' '${{ needs.current-library.outputs.base-version }}' \
+            > target/consumer-compatibility/library-base-version.txt
           printf '%s\n' '${{ needs.current-library.outputs.version }}' \
-            > target/consumer-compatibility/library-version.txt
-          find "${RUNNER_TEMP}/consumer-m2/io/github/carstenartur" -type f | sort \
+            > target/consumer-compatibility/library-candidate-version.txt
+          find "${RUNNER_TEMP}/candidate-m2/io/github/carstenartur" -type f | sort \
             > target/consumer-compatibility/restored-artifacts.txt
 
       - name: Substitute only jgit-storage-hibernate versions
@@ -181,85 +244,125 @@ jobs:
             --root consumer \
             --version '${{ needs.current-library.outputs.version }}' \
             --report target/consumer-compatibility/contract.json
+
           git -C consumer diff -- pom.xml '**/pom.xml' \
             > target/consumer-compatibility/pom.patch
+          git -C consumer diff --name-only \
+            > target/consumer-compatibility/changed-files.txt
+          test -s target/consumer-compatibility/pom.patch
+
+          unexpected="$(
+            grep -Ev '(^|/)pom\.xml$' \
+              target/consumer-compatibility/changed-files.txt || true
+          )"
+          if [[ -n "$unexpected" ]]; then
+            echo "Consumer preparation changed non-POM files:" >&2
+            printf '%s\n' "$unexpected" >&2
+            exit 1
+          fi
           cat target/consumer-compatibility/contract.json
 
-      - name: Verify Docker for integration-capable consumers
-        if: matrix.consumer == 'Taxonomy'
-        run: docker info
-
-      - name: Resolve repository-owned dependency tree
+      - name: Resolve exact candidate dependencies and run contract
+        id: contract
         shell: bash
-        working-directory: consumer
+        env:
+          CANDIDATE_VERSION: ${{ needs.current-library.outputs.version }}
+          CONSUMER: ${{ matrix.consumer }}
+          MAVEN_REPO_LOCAL: ${{ runner.temp }}/candidate-m2
+          JGIT_STORAGE_HIBERNATE_CANDIDATE_VERSION: ${{ needs.current-library.outputs.version }}
+          JGIT_STORAGE_HIBERNATE_CONTRACT_MODE: candidate
+          GEMINI_API_KEY: ''
+          OPENAI_API_KEY: ''
+          ANTHROPIC_API_KEY: ''
+          TAXONOMY_MODEL_DOWNLOAD_SKIP: 'true'
+          TAXONOMY_EMBEDDING_ALLOW_DOWNLOAD: 'false'
         run: |
-          set -euo pipefail
-          if [ -x ./mvnw ]; then
-            maven=(./mvnw)
-          else
-            maven=(mvn)
+          set -uo pipefail
+          evidence="target/consumer-compatibility"
+          candidate_status=0
+          baseline_status="not-run"
+          classification="candidate-compatible"
+
+          (
+            cd consumer
+            if [[ -x ./mvnw ]]; then
+              maven=(./mvnw)
+            else
+              maven=(mvn)
+            fi
+            set -o pipefail
+            "${maven[@]}" -B \
+              -Dmaven.repo.local="${RUNNER_TEMP}/candidate-m2" \
+              -Dincludes=io.github.carstenartur \
+              dependency:tree 2>&1 \
+              | tee "../${evidence}/candidate-dependency-tree.log"
+          ) || candidate_status=$?
+
+          if [[ $candidate_status -eq 0 ]]; then
+            python3 library/.github/scripts/verify-consumer-dependency-tree.py \
+              --tree "${evidence}/candidate-dependency-tree.log" \
+              --version "$CANDIDATE_VERSION" \
+              --forbid jgit-storage-hibernate-benchmarks \
+              --report "${evidence}/candidate-dependency-resolution.json" \
+              || candidate_status=$?
           fi
-          mkdir -p ../target/consumer-compatibility
-          set -o pipefail
-          "${maven[@]}" -B \
-            -Dmaven.repo.local="${RUNNER_TEMP}/consumer-m2" \
-            -Dincludes=io.github.carstenartur \
-            dependency:tree 2>&1 \
-            | tee ../target/consumer-compatibility/dependency-tree.log
-          grep -F 'io.github.carstenartur:jgit-storage-hibernate-' \
-            ../target/consumer-compatibility/dependency-tree.log
-          grep -F ':${{ needs.current-library.outputs.version }}' \
-            ../target/consumer-compatibility/dependency-tree.log
 
-      - name: Run audio-analyzer runtime contract
-        if: matrix.consumer == 'audio-analyzer'
-        shell: bash
-        working-directory: consumer
-        run: |
-          set -euo pipefail
-          if [ -x ./mvnw ]; then maven=(./mvnw); else maven=(mvn); fi
-          set -o pipefail
-          "${maven[@]}" -B \
-            -Dmaven.repo.local="${RUNNER_TEMP}/consumer-m2" \
-            -DskipITs \
-            verify 2>&1 \
-            | tee ../target/consumer-compatibility/consumer-build.log
-          if grep -Fq 'jgit-storage-hibernate-benchmarks' \
-              ../target/consumer-compatibility/dependency-tree.log; then
-            echo 'audio-analyzer must not depend on the benchmark artifact' >&2
-            exit 1
+          if [[ $candidate_status -eq 0 ]]; then
+            MAVEN_REPO_LOCAL="${RUNNER_TEMP}/candidate-m2" \
+            JGIT_STORAGE_HIBERNATE_CANDIDATE_VERSION="$CANDIDATE_VERSION" \
+            JGIT_STORAGE_HIBERNATE_CONTRACT_MODE=candidate \
+              bash library/.github/scripts/run-consumer-contract.sh \
+                "$CONSUMER" consumer \
+                "${evidence}/candidate-consumer-build.log" \
+              || candidate_status=$?
           fi
 
-      - name: Run Taxonomy PostgreSQL and indexed-history contract
-        if: matrix.consumer == 'Taxonomy'
-        shell: bash
-        working-directory: consumer
-        run: |
-          set -euo pipefail
-          if [ -x ./mvnw ]; then maven=(./mvnw); else maven=(mvn); fi
-          set -o pipefail
-          "${maven[@]}" -B \
-            -Dmaven.repo.local="${RUNNER_TEMP}/consumer-m2" \
-            verify 2>&1 \
-            | tee ../target/consumer-compatibility/consumer-build.log
+          if [[ $candidate_status -ne 0 ]]; then
+            echo "Candidate failed; executing the unchanged consumer baseline for attribution."
+            git -C consumer reset --hard HEAD
+            git -C consumer clean -fdx
+            baseline_status=0
+            MAVEN_REPO_LOCAL="${RUNNER_TEMP}/baseline-m2" \
+            JGIT_STORAGE_HIBERNATE_CONTRACT_MODE=baseline \
+              bash library/.github/scripts/run-consumer-contract.sh \
+                "$CONSUMER" consumer \
+                "${evidence}/baseline-consumer-build.log" \
+              || baseline_status=$?
 
-      - name: Run sandbox Tycho/OSGi and Java-analysis contract
-        if: matrix.consumer == 'sandbox'
-        shell: bash
-        working-directory: consumer
-        run: |
-          set -euo pipefail
-          if [ -x ./mvnw ]; then maven=(./mvnw); else maven=(mvn); fi
-          set -o pipefail
-          xvfb-run -a "${maven[@]}" -B \
-            -Dmaven.repo.local="${RUNNER_TEMP}/consumer-m2" \
-            -DskipTests \
-            verify 2>&1 \
-            | tee ../target/consumer-compatibility/consumer-build.log
-          if grep -Fq 'jgit-storage-hibernate-benchmarks' \
-              ../target/consumer-compatibility/dependency-tree.log; then
-            echo 'sandbox must not package the benchmark artifact' >&2
-            exit 1
+            if [[ $baseline_status -eq 0 ]]; then
+              classification="candidate-regression"
+            else
+              classification="consumer-baseline-failure"
+            fi
+          fi
+
+          CANDIDATE_STATUS="$candidate_status" \
+          BASELINE_STATUS="$baseline_status" \
+          CLASSIFICATION="$classification" \
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = {
+              "candidateStatus": os.environ["CANDIDATE_STATUS"],
+              "baselineStatus": os.environ["BASELINE_STATUS"],
+              "classification": os.environ["CLASSIFICATION"],
+          }
+          path = Path("target/consumer-compatibility/result.json")
+          path.write_text(
+              json.dumps(report, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          echo "candidate-status=$candidate_status" >> "$GITHUB_OUTPUT"
+          echo "baseline-status=$baseline_status" >> "$GITHUB_OUTPUT"
+          cat "${evidence}/result.json"
+
+          if [[ $candidate_status -ne 0 ]]; then
+            exit "$candidate_status"
           fi
 
       - name: Summarize consumer contract
@@ -269,29 +372,49 @@ jobs:
           CONSUMER: ${{ matrix.consumer }}
           CONTRACT: ${{ matrix.contract }}
           LIBRARY_VERSION: ${{ needs.current-library.outputs.version }}
+          JOB_STATUS: ${{ job.status }}
         run: |
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          report_path = Path('target/consumer-compatibility/contract.json')
-          data = json.loads(report_path.read_text(encoding='utf-8')) if report_path.is_file() else {}
-          consumer_commit = Path('target/consumer-compatibility/consumer-commit.txt')
-          commit = consumer_commit.read_text(encoding='utf-8').strip() if consumer_commit.is_file() else 'unavailable'
-          modules = ', '.join(data.get('modules', [])) or 'unavailable'
+          root = Path("target/consumer-compatibility")
+          contract_path = root / "contract.json"
+          result_path = root / "result.json"
+          contract = (
+              json.loads(contract_path.read_text(encoding="utf-8"))
+              if contract_path.is_file()
+              else {}
+          )
+          result = (
+              json.loads(result_path.read_text(encoding="utf-8"))
+              if result_path.is_file()
+              else {}
+          )
+          consumer_commit_path = root / "consumer-commit.txt"
+          commit = (
+              consumer_commit_path.read_text(encoding="utf-8").strip()
+              if consumer_commit_path.is_file()
+              else "unavailable"
+          )
+          modules = ", ".join(contract.get("modules", [])) or "unavailable"
+          classification = result.get("classification", "incomplete")
           lines = [
               f"### {os.environ['CONSUMER']} consumer contract",
-              '',
+              "",
               f"- Consumer commit: `{commit}`",
-              f"- Current library version: `{os.environ['LIBRARY_VERSION']}`",
+              f"- Exact library candidate: `{os.environ['LIBRARY_VERSION']}`",
               f"- Consumed modules: {modules}",
               f"- Contract: {os.environ['CONTRACT']}",
-              f"- Job status: `{os.environ.get('JOB_STATUS', '${{ job.status }}')}`",
-              '',
+              f"- Classification: `{classification}`",
+              f"- Job status: `{os.environ['JOB_STATUS']}`",
+              "",
           ]
-          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as summary:
-              summary.write('\n'.join(lines))
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open(
+              "a", encoding="utf-8"
+          ) as summary:
+              summary.write("\n".join(lines))
           PY
 
       - name: Upload ${{ matrix.consumer }} compatibility evidence
@@ -306,3 +429,19 @@ jobs:
             consumer/**/target/*.log
             consumer/**/target/repository/**
           if-no-files-found: error
+
+  gate:
+    name: Consumer compatibility gate
+    if: always()
+    needs:
+      - current-library
+      - consumers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the library and all three consumers
+        shell: bash
+        run: |
+          echo "current-library=${{ needs.current-library.result }}"
+          echo "consumers=${{ needs.consumers.result }}"
+          test "${{ needs.current-library.result }}" = "success"
+          test "${{ needs.consumers.result }}" = "success"
