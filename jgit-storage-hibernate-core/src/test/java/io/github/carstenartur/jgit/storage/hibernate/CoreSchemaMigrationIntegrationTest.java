@@ -53,7 +53,15 @@ class CoreSchemaMigrationIntegrationTest {
   private static final String H2_LEGACY_SCHEMA =
       "/db/legacy/jgit-storage-hibernate/core/0.1.4/h2/schema.sql";
   private static final List<String> EXPECTED_MIGRATIONS =
-      List.of("0.1.4", "0.1.5", "0.1.14", "0.1.14.1", "0.1.14.2", "0.1.17", "0.1.18");
+      List.of(
+          "0.1.4",
+          "0.1.5",
+          "0.1.14",
+          "0.1.14.1",
+          "0.1.14.2",
+          "0.1.17",
+          "0.1.18",
+          "0.9.1");
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
