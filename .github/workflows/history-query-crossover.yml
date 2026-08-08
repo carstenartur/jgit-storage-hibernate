@@ -11,6 +11,7 @@ on:
         options:
           - smoke
           - full
+          - large
   schedule:
     - cron: '17 5 * * 4'
   pull_request:
@@ -64,7 +65,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Select bounded history sizes
+      - name: Select bounded history matrix
         id: matrix
         shell: bash
         run: |
@@ -75,14 +76,28 @@ jobs:
           elif [[ "${GITHUB_EVENT_NAME}" == 'workflow_dispatch' ]]; then
             profile='${{ inputs.profile }}'
           fi
+          all_queries='author-time,path-time,message-text,path-content,compound'
           case "$profile" in
-            smoke) commit_counts='1000' ;;
-            full) commit_counts='1000,10000,100000' ;;
+            smoke)
+              commit_counts='1000'
+              query_kinds="$all_queries"
+              ;;
+            full)
+              commit_counts='1000,10000'
+              query_kinds="$all_queries"
+              ;;
+            large)
+              commit_counts='100000'
+              query_kinds='path-content,compound'
+              ;;
             *) echo "Unsupported profile: $profile" >&2; exit 1 ;;
           esac
           echo "profile=$profile" >> "$GITHUB_OUTPUT"
           echo "commit_counts=$commit_counts" >> "$GITHUB_OUTPUT"
-          echo "History-query profile: $profile ($commit_counts commits)" >> "$GITHUB_STEP_SUMMARY"
+          echo "query_kinds=$query_kinds" >> "$GITHUB_OUTPUT"
+          echo "History-query profile: $profile" >> "$GITHUB_STEP_SUMMARY"
+          echo "- commits: $commit_counts" >> "$GITHUB_STEP_SUMMARY"
+          echo "- queries: $query_kinds" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test crossover chart conversion
         run: |
@@ -104,6 +119,7 @@ jobs:
           mvn -B -pl jgit-storage-hibernate-benchmarks verify \
             -Phistory-query-crossover \
             -Dbenchmark.history.commitCounts='${{ steps.matrix.outputs.commit_counts }}' \
+            -Dbenchmark.history.queryKinds='${{ steps.matrix.outputs.query_kinds }}' \
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/history-query-crossover/jmh-result.json" 2>&1 \
             | tee target/history-query-crossover/maven-benchmark.log
 
@@ -115,16 +131,20 @@ jobs:
           cat target/history-query-crossover/comparison.json
 
       - name: Verify stable chart operations
+        shell: bash
         run: |
+          set -euo pipefail
           test -s .github/benchmark-dashboard/index.html
           test -s .github/benchmark-dashboard/dashboard.js
-          grep -F 'Git history author + time query' target/history-query-crossover/comparison.json
-          grep -F 'Git history path + time query' target/history-query-crossover/comparison.json
-          grep -F 'Git history commit-message query' target/history-query-crossover/comparison.json
           grep -F 'Git history path + changed-content query' target/history-query-crossover/comparison.json
           grep -F 'Git history compound audit query' target/history-query-crossover/comparison.json
           grep -F 'Git history indexed projection build' target/history-query-crossover/comparison.json
           grep -F 'Break-even vs FileRepository/JGit' target/history-query-crossover/comparison.json
+          if [[ '${{ steps.matrix.outputs.profile }}' != 'large' ]]; then
+            grep -F 'Git history author + time query' target/history-query-crossover/comparison.json
+            grep -F 'Git history path + time query' target/history-query-crossover/comparison.json
+            grep -F 'Git history commit-message query' target/history-query-crossover/comparison.json
+          fi
 
       - name: Upload crossover evidence
         if: always()
