@@ -58,7 +58,7 @@
         "H2 smoke and SQL Server adoption contracts stay explicit",
         "copied Search and Java-analysis migration is not falsely treated as complete"
       ],
-      "smokeCommand": "mvn -B -f consumer/sandbox-jgit-storage-hibernate/pom.xml install -Djgit-storage-hibernate.version=${candidate.version} && mvn -B -f consumer/sandbox-jgit-server-webapp/pom.xml package -Djgit-storage-hibernate.version=${candidate.version}"
+      "smokeCommand": "mvn -B -N -f consumer/pom.xml install && mvn -B -f consumer/sandbox-jgit-storage-hibernate/pom.xml install -Djgit-storage-hibernate.version=${candidate.version} && mvn -B -f consumer/sandbox-jgit-server-webapp/pom.xml package -Djgit-storage-hibernate.version=${candidate.version}"
     }
   ]
 }
