@@ -50,6 +50,23 @@ class HistoryQueryCrossoverConverterTest(unittest.TestCase):
         self.assertIn("Commits visited on demand: 900", filesystem["extra"])
         self.assertIn("Changed blobs read: 4", filesystem["extra"])
 
+    def test_accepts_bounded_large_query_subset(self) -> None:
+        results = [self.build_result()]
+        for query_kind in ("path-content", "compound"):
+            results.extend(
+                [
+                    self.query_result(query_kind, "filesystem-jgit", 50.0, 900.0, 4.0),
+                    self.query_result(query_kind, "hibernate-jgit", 60.0, 900.0, 4.0),
+                    self.query_result(query_kind, "indexed-projection", 2.0, 0.0, 0.0),
+                ]
+            )
+        converted = CONVERTER.convert(results)
+        self.assertEqual(7, len(converted))
+        names = {entry["name"] for entry in converted}
+        self.assertTrue(any("path + changed-content" in name for name in names))
+        self.assertTrue(any("compound audit" in name for name in names))
+        self.assertFalse(any("author + time" in name for name in names))
+
     def test_reports_no_break_even_when_projection_query_is_slower(self) -> None:
         results = self.complete_results()
         for result in results:
