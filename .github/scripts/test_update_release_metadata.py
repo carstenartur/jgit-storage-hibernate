@@ -147,7 +147,7 @@ Security fixes are provided for the latest released `0.1.x` version.
 
             policy = (root / "SECURITY.md").read_text(encoding="utf-8")
             self.assertNotIn("0.1.x", policy)
-            self.assertEqual(3, policy.count("0.9.x"))
+            self.assertEqual(4, policy.count("0.9.x"))
             self.assertIn("`0.9.x-SNAPSHOT`", policy)
 
     def test_snapshot_is_rejected_as_public_release_version(self) -> None:
