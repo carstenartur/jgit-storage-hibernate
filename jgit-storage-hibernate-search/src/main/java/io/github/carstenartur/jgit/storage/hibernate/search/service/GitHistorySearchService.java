@@ -37,6 +37,7 @@ public class GitHistorySearchService {
 
   public GitHistorySearchService(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
+    SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(this.sessionFactory);
   }
 
   public List<GitCommitIndex> searchCommitText(String repositoryName, String query, int limit) {
