@@ -1,0 +1,45 @@
+name: Temporary Search migration-test correction
+
+on:
+  push:
+    branches:
+      - perf/search-indexing-projections
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-search-migration-test-correction
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: perf/search-indexing-projections
+          fetch-depth: 0
+      - name: Correct current schema baseline constant names and remove this workflow
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/SearchSchemaMigrationIntegrationTest.java')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'CoreSchemaMigrations.LEGACY_BASELINE_VERSION': 'CoreSchemaMigrations.LEGACY_SCHEMA_VERSION',
+              'SearchSchemaMigrations.LEGACY_BASELINE_VERSION': 'SearchSchemaMigrations.LEGACY_SCHEMA_VERSION',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'Expected {old} exactly once')
+              text = text.replace(old, new)
+          path.write_text(text, encoding='utf-8')
+          Path('.github/workflows/temporary-fix-search-migration-test.yml').unlink()
+          PY
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Use current schema baseline constants in Search migration tests'
+          git push origin HEAD:perf/search-indexing-projections
