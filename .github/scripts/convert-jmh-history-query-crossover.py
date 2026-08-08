@@ -35,7 +35,7 @@ INDEXED_IMPLEMENTATION = {
 }
 
 REQUIRED_ENGINES = frozenset(ENGINES)
-REQUIRED_QUERIES = frozenset(QUERY_TITLES)
+SUPPORTED_QUERIES = frozenset(QUERY_TITLES)
 
 
 def _secondary_metric(result: dict[str, Any], field: str) -> dict[str, Any]:
@@ -212,7 +212,7 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif operation == "query":
             query_kind = str(params.get("queryKind", ""))
             engine = str(params.get("engine", ""))
-            if query_kind not in REQUIRED_QUERIES:
+            if query_kind not in SUPPORTED_QUERIES:
                 raise ValueError(f"Unsupported history query kind: {query_kind!r}")
             if engine not in REQUIRED_ENGINES:
                 raise ValueError(f"Unsupported history query engine: {engine!r}")
@@ -237,12 +237,9 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     for count in commit_counts:
         kinds = {kind for query_count, kind in queries if query_count == count}
-        missing_queries = REQUIRED_QUERIES - kinds
-        if missing_queries:
-            raise ValueError(
-                f"Missing query kinds for {count} commits: {', '.join(sorted(missing_queries))}"
-            )
-        for query_kind in REQUIRED_QUERIES:
+        if not kinds:
+            raise ValueError(f"No history queries were recorded for {count} commits")
+        for query_kind in kinds:
             engines = set(queries[(count, query_kind)])
             missing_engines = REQUIRED_ENGINES - engines
             if missing_engines:
@@ -256,7 +253,10 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         build_result = builds[count]
         build_ms, _, _ = _timing(build_result)
         converted.append(_build_entry(build_result))
+        kinds = {kind for query_count, kind in queries if query_count == count}
         for query_kind in QUERY_TITLES:
+            if query_kind not in kinds:
+                continue
             peers = queries[(count, query_kind)]
             for engine in ENGINES:
                 converted.append(_query_entry(peers[engine], build_ms, peers))
