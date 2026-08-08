@@ -298,24 +298,11 @@ public class GitCommitIndex {
   }
 
   /**
-   * Preserve the historical aggregate Lucene path field only for path-enabled profiles.
+   * Return individual changed paths for full-text component matching and exact keyword matching.
    *
-   * <p>The relational {@code changed_paths} column remains populated for compatibility and literal
-   * SQL lookup even when the METADATA profile deliberately omits path fields from Lucene.
-   */
-  @Transient
-  @FullTextField(name = "changedPaths", analyzer = GitTextAnalysis.STRUCTURED_TEXT_ANALYZER)
-  @IndexingDependency(
-      derivedFrom = {
-        @ObjectPath(@PropertyValue(propertyName = "changedPaths")),
-        @ObjectPath(@PropertyValue(propertyName = "indexProfile"))
-      })
-  public String getIndexedChangedPaths() {
-    return indexingProfile().indexesPaths() ? changedPaths : null;
-  }
-
-  /**
-   * Return individual changed paths for field-specific full-text and exact indexing.
+   * <p>The historic aggregate {@code changed_paths} value remains relational for literal SQL
+   * fragment queries and result detail, but it is no longer indexed as an additional Lucene field.
+   * This avoids storing the same path information in three Lucene representations.
    *
    * @return immutable path values, excluding blank lines
    */
