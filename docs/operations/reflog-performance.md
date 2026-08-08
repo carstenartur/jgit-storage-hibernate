@@ -37,7 +37,7 @@ The physical access path is:
 (repository_name, ref_name_key, id descending)
 ```
 
-SQL Server includes the complete `ref_name` after the bounded key columns. The 128-character nationalized prefix keeps repository + ref key + identity within conservative SQL Server nonclustered-index key limits. PostgreSQL, H2 and HSQLDB use the same logical layout so query behavior and diagnostics remain portable.
+The 128-character nationalized prefix keeps repository + ref key + identity within conservative SQL Server nonclustered-index key limits. SQL Server evaluates the complete `ref_name` as the collision-safe residual predicate after the bounded-key lookup. PostgreSQL, H2 and HSQLDB use the same logical layout so query behavior and diagnostics remain portable.
 
 ## Migration behavior
 
@@ -51,6 +51,16 @@ The 0.9.1 Core migrations:
 Existing reflog identities, messages, timestamps and ordering are unchanged. Writers derive the key whenever `ref_name` is assigned; callers do not configure it.
 
 Pre-library adoption tests explicitly remove the new column and index while recreating the historical schema. This prevents a current Entity model from accidentally making an old-schema fixture look newer than the Flyway baseline.
+
+## Consumer compatibility
+
+This is a physical Core schema change, so downstream compilation alone is not sufficient.
+
+- **Audio Analyzer** consumes Core and Search but does not own an exact Core schema classifier. Its critical check is that repository and workflow-history behavior still works after migration; the new column is internal to Core.
+- **Taxonomy** intentionally classifies exact Core columns, indexes and Flyway versions before Hibernate starts. It must explicitly accept `REF_NAME_KEY`, the new index access path and schema version `0.9.1`. The upstream change must not be released while Taxonomy still rejects the candidate as an unknown schema.
+- **Sandbox** currently emphasizes SQL Server, read-only legacy preflight, adoption, repository lifecycle and shaded/OSGi packaging. Its SQL Server adoption tests and migration ledger must be validated against the candidate; copied Search code is a separate later migration and is not part of this reflog change.
+
+The pinned downstream matrix is described in `docs/consumer-compatibility.md`. When a consumer requires an intentional adaptation, the upstream pull request remains open until the coordinated consumer change is available and referenced.
 
 ## Retained database comparison
 
