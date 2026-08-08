@@ -1,0 +1,203 @@
+name: Hibernate Search Performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 4 * * 2'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/search-performance.yml'
+      - '.github/scripts/benchmark_units.py'
+      - '.github/scripts/convert-jmh-search-performance.py'
+      - '.github/scripts/test_convert_jmh_search_performance.py'
+      - '.github/scripts/publish-benchmark-history.py'
+      - '.github/benchmark-dashboard/**'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/search-performance.yml'
+      - '.github/scripts/benchmark_units.py'
+      - '.github/scripts/convert-jmh-search-performance.py'
+      - '.github/scripts/test_convert_jmh_search_performance.py'
+      - '.github/scripts/publish-benchmark-history.py'
+      - '.github/benchmark-dashboard/**'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  search-performance:
+    name: PostgreSQL + Lucene indexing, rebuild and query comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Test Search chart conversion
+        run: python3 .github/scripts/test_convert_jmh_search_performance.py
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p target/search-performance
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/search-performance/maven-build.log
+
+      - name: Run PostgreSQL and Lucene Search comparison
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Psearch-performance \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/search-performance/jmh-result.json" 2>&1 \
+            | tee target/search-performance/maven-benchmark.log
+
+      - name: Convert results for grouped charts
+        run: |
+          python3 .github/scripts/convert-jmh-search-performance.py \
+            target/search-performance/jmh-result.json \
+            target/search-performance/comparison.json
+          cat target/search-performance/comparison.json
+
+      - name: Verify dashboard and stable chart operations
+        run: |
+          test -s .github/benchmark-dashboard/index.html
+          test -s .github/benchmark-dashboard/dashboard.js
+          grep -F 'Hibernate Search full-text query' target/search-performance/comparison.json
+          grep -F 'Hibernate Search path query' target/search-performance/comparison.json
+          grep -F 'Hibernate Search indexing' target/search-performance/comparison.json
+          grep -F 'Hibernate Search rebuild' target/search-performance/comparison.json
+
+      - name: Upload Search performance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hibernate-search-performance-results
+          path: |
+            target/search-performance/**
+            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
+          if-no-files-found: error
+
+      - name: Report Search performance charts
+        if: always()
+        run: |
+          echo '### Hibernate Search performance' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The retained PostgreSQL + local-filesystem Lucene fixture compares bounded incremental indexing, purge/rebuild, entity hydration versus direct Lucene projections, and SQL versus Lucene path lookup.' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Full-text query chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-full-text-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Path query chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-path-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Indexing chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-indexing)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Rebuild chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-rebuild)' >> "$GITHUB_STEP_SUMMARY"
+
+  publish-search-history:
+    name: Publish Hibernate Search benchmark history
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: search-performance
+    runs-on: ubuntu-latest
+    concurrency:
+      group: repository-pages-publication-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download Search benchmark evidence outside the worktree
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: hibernate-search-performance-results
+          path: ${{ runner.temp }}/search-benchmark-artifact
+
+      - name: Publish generated Search benchmark pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_root="${RUNNER_TEMP}/search-benchmark-artifact"
+          benchmark_source="$(find "$artifact_root" -type f -name comparison.json -print -quit)"
+          dashboard_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/index.html"
+          dashboard_script_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/dashboard.js"
+          test -s "$benchmark_source"
+          test -s "$dashboard_source"
+          test -s "$dashboard_script_source"
+
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            empty_tree="$(git mktree </dev/null)"
+            initial_commit="$(printf '%s\n' 'Initialize generated project pages' | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$empty_tree")"
+            git push origin "$initial_commit:refs/heads/gh-pages"
+          fi
+
+          pages_dir="${RUNNER_TEMP}/generated-pages-search"
+          summary_file="${RUNNER_TEMP}/search-benchmark-summary.md"
+          published_at="$(date +%s%3N)"
+
+          for attempt in 1 2 3; do
+            git fetch origin gh-pages
+            git worktree remove --force "$pages_dir" >/dev/null 2>&1 || true
+            git worktree prune
+            git worktree add --detach "$pages_dir" origin/gh-pages
+            rm -f "$summary_file"
+
+            python3 .github/scripts/publish-benchmark-history.py \
+              --data-file "$pages_dir/dev/bench/data.js" \
+              --benchmark-file "$benchmark_source" \
+              --repository-dir "$GITHUB_WORKSPACE" \
+              --repository-url "https://github.com/${GITHUB_REPOSITORY}" \
+              --commit "$GITHUB_SHA" \
+              --actor "$GITHUB_ACTOR" \
+              --suite-name 'Hibernate Search performance' \
+              --timestamp-ms "$published_at" \
+              --summary-file "$summary_file" \
+              --alert-threshold 1.5
+
+            mkdir -p "$pages_dir/dev/bench"
+            cp "$dashboard_source" "$pages_dir/dev/bench/index.html"
+            cp "$dashboard_script_source" "$pages_dir/dev/bench/dashboard.js"
+            git -C "$pages_dir" add \
+              dev/bench/index.html \
+              dev/bench/dashboard.js \
+              dev/bench/data.js
+
+            if git -C "$pages_dir" diff --cached --quiet; then
+              cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+              echo 'Search benchmark history and dashboard unchanged'
+              exit 0
+            fi
+
+            git -C "$pages_dir" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Add Hibernate Search benchmark result for ${GITHUB_SHA}"
+            if git -C "$pages_dir" push origin HEAD:gh-pages; then
+              cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+
+          echo 'Could not publish Hibernate Search benchmark history after three attempts' >&2
+          exit 1
