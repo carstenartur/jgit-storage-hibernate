@@ -78,6 +78,7 @@ public class GitHistorySearchService {
     if (matchesNothing(query)) {
       return List.of();
     }
+    SearchIndexProfileCompatibility.requireCompatible(sessionFactory, query.repositoryName());
     return query.requiresSearchBackend() ? findIndexedChanges(query) : findStructuredChanges(query);
   }
 
@@ -93,6 +94,7 @@ public class GitHistorySearchService {
     if (matchesNothing(query)) {
       return List.of();
     }
+    SearchIndexProfileCompatibility.requireCompatible(sessionFactory, query.repositoryName());
     return query.requiresSearchBackend()
         ? findIndexedSummaries(query)
         : findStructuredSummaries(query);
