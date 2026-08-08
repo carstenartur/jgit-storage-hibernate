@@ -25,7 +25,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -81,7 +80,7 @@ import org.openjdk.jmh.annotations.Warmup;
  * <p>Three query engines are retained:
  *
  * <ul>
- *   <li>{@code filesystem-jgit}: normal {@link org.eclipse.jgit.storage.file.FileRepository};
+ *   <li>{@code filesystem-jgit}: normal JGit filesystem repository;
  *   <li>{@code hibernate-jgit}: the same on-demand JGit algorithm over database-backed Git objects;
  *   <li>{@code indexed-projection}: compact result projection through the repository's Search/SQL
  *       history read model.
@@ -530,7 +529,8 @@ public class HistoryQueryCrossoverBenchmark {
     properties.put("hibernate.format_sql", "false");
     properties.put("hibernate.generate_statistics", "true");
     properties.put("hibernate.connection.pool_size", "4");
-    properties.put("hibernate.jdbc.batch_size", Integer.toString(CommitIndexer.DEFAULT_INDEX_BATCH_SIZE));
+    properties.put(
+        "hibernate.jdbc.batch_size", Integer.toString(CommitIndexer.DEFAULT_INDEX_BATCH_SIZE));
     properties.put("hibernate.order_inserts", "true");
 
     if (searchEnabled) {
