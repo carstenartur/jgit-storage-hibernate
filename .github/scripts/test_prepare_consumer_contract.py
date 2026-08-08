@@ -110,8 +110,10 @@ class ConsumerContractPreparationTest(unittest.TestCase):
                     {
                         "property_name": "jgit.storage.version",
                         "target_references": 1,
-                        "total_version_references": 1,
+                        "total_references": 1,
                         "definitions": 1,
+                        "definition_poms": ["pom.xml"],
+                        "mode": "single-definition",
                     }
                 ],
                 data["propertySafety"],
@@ -132,6 +134,52 @@ class ConsumerContractPreparationTest(unittest.TestCase):
             )
             self.assertIn("<groupId>org.example</groupId>", child_text)
             self.assertIn("<version>0.9.0</version>", child_text)
+
+    def test_module_local_duplicate_property_names_are_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "contract.json"
+            (root / "pom.xml").write_text("<project/>\n", encoding="utf-8")
+            for module, artifact in (
+                ("storage", "jgit-storage-hibernate-core"),
+                ("server", "jgit-storage-hibernate-core"),
+            ):
+                pom = root / module / "pom.xml"
+                pom.parent.mkdir()
+                pom.write_text(
+                    f"""<project>
+  <properties>
+    <jgit-storage-hibernate.version>0.1.18</jgit-storage-hibernate.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>{artifact}</artifactId>
+      <version>${{jgit-storage-hibernate.version}}</version>
+    </dependency>
+  </dependencies>
+</project>
+""",
+                    encoding="utf-8",
+                )
+
+            self.run_main(root, report)
+            data = json.loads(report.read_text(encoding="utf-8"))
+
+            self.assertEqual(2, len(data["propertyChanges"]))
+            self.assertEqual(
+                "module-local-definitions",
+                data["propertySafety"][0]["mode"],
+            )
+            self.assertEqual(
+                ["server/pom.xml", "storage/pom.xml"],
+                data["propertySafety"][0]["definition_poms"],
+            )
+            for module in ("storage", "server"):
+                self.assertIn(
+                    "0.9.1-consumer-deadbeef-SNAPSHOT",
+                    (root / module / "pom.xml").read_text(encoding="utf-8"),
+                )
 
     def test_main_writes_a_machine_readable_contract_report(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -227,7 +275,7 @@ class ConsumerContractPreparationTest(unittest.TestCase):
                 (root / "pom.xml").read_text(encoding="utf-8"),
             )
 
-    def test_duplicate_property_definitions_are_rejected(self) -> None:
+    def test_duplicate_property_definitions_in_one_pom_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             report = root / "contract.json"
@@ -252,9 +300,74 @@ class ConsumerContractPreparationTest(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(
-                SystemExit, "exactly one deterministic definition"
+                SystemExit, "multiple definitions in one POM"
             ):
                 self.run_main(root, report)
+
+    def test_multiple_nonlocal_definitions_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "contract.json"
+            (root / "pom.xml").write_text(
+                """<project>
+  <properties><jgit.version>1.0.0</jgit.version></properties>
+</project>
+""",
+                encoding="utf-8",
+            )
+            child = root / "module" / "pom.xml"
+            child.parent.mkdir()
+            child.write_text(
+                """<project>
+  <properties><jgit.version>1.0.0</jgit.version></properties>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-core</artifactId>
+      <version>${jgit.version}</version>
+    </dependency>
+  </dependencies>
+</project>
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                SystemExit, "every referencing POM owns exactly one local definition"
+            ):
+                self.run_main(root, report)
+
+    def test_commented_property_references_are_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "contract.json"
+            pom = root / "pom.xml"
+            pom.write_text(
+                """<project>
+  <!-- <version>${jgit.version}</version> -->
+  <properties><jgit.version>1.0.0</jgit.version></properties>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-core</artifactId>
+      <version>${jgit.version}</version>
+    </dependency>
+  </dependencies>
+</project>
+""",
+                encoding="utf-8",
+            )
+
+            self.run_main(root, report)
+            text = pom.read_text(encoding="utf-8")
+            self.assertIn(
+                "<!-- <version>${jgit.version}</version> -->", text
+            )
+            self.assertIn(
+                "<jgit.version>0.9.1-consumer-deadbeef-SNAPSHOT"
+                "</jgit.version>",
+                text,
+            )
 
     def test_non_consumer_has_no_matching_uses(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

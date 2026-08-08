@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Prepare a consumer checkout to resolve the exact current library reactor.
 
-The script deliberately edits only version text belonging to
-io.github.carstenartur:jgit-storage-hibernate-* dependencies. It supports direct,
-dependency-managed and property-backed versions without reformatting complete POM files.
+Only io.github.carstenartur:jgit-storage-hibernate-* dependency versions are
+changed. Literal, dependency-managed and property-backed declarations are
+supported without reformatting complete POM files.
 
-Property-backed substitutions are fail-closed: project identity placeholders and properties
-shared with unrelated Maven coordinates are rejected rather than changing a consumer's own
-version or dependency stack accidentally.
+Property substitution is fail-closed:
+* project identity placeholders such as revision/sha1/changelist are forbidden;
+* a property referenced by unrelated POM content is forbidden;
+* one inherited/global definition is allowed;
+* multiple definitions are allowed only when every referencing POM owns exactly
+  one local definition (the Sandbox multi-module layout).
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from typing import Iterable
 
 GROUP_ID = "io.github.carstenartur"
 ARTIFACT_PREFIX = "jgit-storage-hibernate-"
+COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 DEPENDENCY_BLOCK = re.compile(r"<dependency\b[^>]*>.*?</dependency>", re.DOTALL)
 GROUP = re.compile(r"<groupId>\s*([^<]+?)\s*</groupId>", re.DOTALL)
 ARTIFACT = re.compile(r"<artifactId>\s*([^<]+?)\s*</artifactId>", re.DOTALL)
@@ -48,8 +52,10 @@ class PropertyChange:
 class PropertySafety:
     property_name: str
     target_references: int
-    total_version_references: int
+    total_references: int
     definitions: int
+    definition_poms: tuple[str, ...]
+    mode: str
 
 
 def pom_files(root: Path) -> list[Path]:
@@ -60,18 +66,27 @@ def pom_files(root: Path) -> list[Path]:
     )
 
 
+def uncommented(text: str) -> str:
+    return COMMENT.sub("", text)
+
+
+def non_comment_segments(text: str) -> list[str]:
+    return re.split(r"(<!--.*?-->)", text, flags=re.DOTALL)
+
+
 def dependency_uses(path: Path, root: Path) -> list[DependencyUse]:
-    text = path.read_text(encoding="utf-8")
+    text = uncommented(path.read_text(encoding="utf-8"))
     uses: list[DependencyUse] = []
-    for block_match in DEPENDENCY_BLOCK.finditer(text):
-        block = block_match.group(0)
+    for block in DEPENDENCY_BLOCK.findall(text):
         group = GROUP.search(block)
         artifact = ARTIFACT.search(block)
         if group is None or artifact is None:
             continue
-        group_id = group.group(1).strip()
         artifact_id = artifact.group(1).strip()
-        if group_id != GROUP_ID or not artifact_id.startswith(ARTIFACT_PREFIX):
+        if (
+            group.group(1).strip() != GROUP_ID
+            or not artifact_id.startswith(ARTIFACT_PREFIX)
+        ):
             continue
         version = VERSION.search(block)
         if version is None:
@@ -120,7 +135,10 @@ def replace_literal_versions(path: Path, target_version: str) -> int:
         replacements += 1
         return block[: version.start(2)] + target_version + block[version.end(2) :]
 
-    updated = DEPENDENCY_BLOCK.sub(dependency_replacement, text)
+    parts = non_comment_segments(text)
+    for index in range(0, len(parts), 2):
+        parts[index] = DEPENDENCY_BLOCK.sub(dependency_replacement, parts[index])
+    updated = "".join(parts)
     if updated != text:
         path.write_text(updated, encoding="utf-8")
     return replacements
@@ -144,6 +162,7 @@ def property_definition_pattern(property_name: str) -> re.Pattern[str]:
 def validate_property_substitution(
     poms: Iterable[Path],
     uses: Iterable[DependencyUse],
+    root: Path,
     property_name: str,
 ) -> PropertySafety:
     pom_list = list(poms)
@@ -153,42 +172,69 @@ def validate_property_substitution(
             f"Refusing to replace reserved project identity property {property_name!r}"
         )
 
-    expected_reference = "${" + property_name + "}"
-    target_references = sum(
-        1
-        for use in use_list
-        if use.source == f"property:{property_name}"
-    )
-    total_version_references = 0
-    definitions = 0
+    reference = "${" + property_name + "}"
+    target_by_pom: dict[str, int] = {}
+    for use in use_list:
+        if use.source == f"property:{property_name}":
+            target_by_pom[use.pom] = target_by_pom.get(use.pom, 0) + 1
+
+    total_by_pom: dict[str, int] = {}
+    definitions_by_pom: dict[str, int] = {}
     definition_pattern = property_definition_pattern(property_name)
-
     for path in pom_list:
-        text = path.read_text(encoding="utf-8")
-        total_version_references += sum(
-            1
-            for match in VERSION.finditer(text)
-            if match.group(2).strip() == expected_reference
-        )
-        definitions += len(definition_pattern.findall(text))
+        relative = path.relative_to(root).as_posix()
+        text = uncommented(path.read_text(encoding="utf-8"))
+        references = text.count(reference)
+        definitions = len(definition_pattern.findall(text))
+        if references:
+            total_by_pom[relative] = references
+        if definitions:
+            definitions_by_pom[relative] = definitions
 
-    if total_version_references != target_references:
+    target_references = sum(target_by_pom.values())
+    total_references = sum(total_by_pom.values())
+    definitions = sum(definitions_by_pom.values())
+
+    if total_references != target_references:
         raise ValueError(
             f"Property {property_name!r} is shared outside "
             f"{GROUP_ID}:{ARTIFACT_PREFIX}* dependency versions: "
             f"target references={target_references}, "
-            f"all Maven <version> references={total_version_references}"
+            f"all POM references={total_references}"
         )
-    if definitions != 1:
-        raise ValueError(
-            f"Property {property_name!r} must have exactly one deterministic definition; "
-            f"found {definitions}"
+    if definitions == 0:
+        raise ValueError(f"Property {property_name!r} has no definition")
+
+    definition_poms = tuple(sorted(definitions_by_pom))
+    if definitions == 1:
+        mode = "single-definition"
+    else:
+        duplicate_poms = sorted(
+            pom for pom, count in definitions_by_pom.items() if count != 1
         )
+        if duplicate_poms:
+            raise ValueError(
+                f"Property {property_name!r} has multiple definitions in one POM: "
+                + ", ".join(duplicate_poms)
+            )
+        target_poms = set(target_by_pom)
+        defined_poms = set(definitions_by_pom)
+        if target_poms != defined_poms:
+            raise ValueError(
+                f"Property {property_name!r} has multiple definitions, but they are "
+                "safe only when every referencing POM owns exactly one local definition; "
+                f"referencing POMs={sorted(target_poms)}, "
+                f"definition POMs={sorted(defined_poms)}"
+            )
+        mode = "module-local-definitions"
+
     return PropertySafety(
         property_name=property_name,
         target_references=target_references,
-        total_version_references=total_version_references,
+        total_references=total_references,
         definitions=definitions,
+        definition_poms=definition_poms,
+        mode=mode,
     )
 
 
@@ -213,7 +259,10 @@ def replace_property(
             )
             return match.group(1) + target_version + match.group(3)
 
-        updated = element.sub(property_replacement, text)
+        parts = non_comment_segments(text)
+        for index in range(0, len(parts), 2):
+            parts[index] = element.sub(property_replacement, parts[index])
+        updated = "".join(parts)
         if updated != text:
             path.write_text(updated, encoding="utf-8")
     return changes
@@ -244,7 +293,9 @@ def main() -> None:
     property_safety: list[PropertySafety] = []
     for property_name in sorted(referenced_properties(uses)):
         try:
-            safety = validate_property_substitution(poms, uses, property_name)
+            safety = validate_property_substitution(
+                poms, uses, root, property_name
+            )
         except ValueError as exception:
             raise SystemExit(str(exception)) from exception
         property_safety.append(safety)
@@ -254,17 +305,19 @@ def main() -> None:
     )
     property_changes: list[PropertyChange] = []
     for property_name in sorted(referenced_properties(uses)):
-        changes = replace_property(poms, root, property_name, args.version)
-        if not changes:
-            raise SystemExit(
-                f"Referenced property {property_name!r} was not changed; "
-                "the target version may already be active"
-            )
-        property_changes.extend(changes)
+        property_changes.extend(
+            replace_property(poms, root, property_name, args.version)
+        )
 
-    # A managed dependency is acceptable only when another matching declaration supplies a
-    # literal or property-backed version. Maven's dependency tree is the final resolution proof.
-    managed_artifacts = {use.artifact for use in uses if use.declared_version == "(managed)"}
+    if literal_replacements == 0 and not property_changes:
+        raise SystemExit(
+            "No consumer dependency version changed; the candidate version may already "
+            "be active or all matching dependencies may be unresolved management entries"
+        )
+
+    managed_artifacts = {
+        use.artifact for use in uses if use.declared_version == "(managed)"
+    }
     versioned_artifacts = {
         use.artifact for use in uses if use.declared_version != "(managed)"
     }
