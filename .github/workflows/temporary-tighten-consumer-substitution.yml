@@ -1,0 +1,127 @@
+name: Temporary tighten consumer substitution
+
+on:
+  push:
+    branches:
+      - ci/consumer-contracts
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-tighten-consumer-substitution
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/consumer-contracts
+          fetch-depth: 0
+      - name: Tighten exact-version substitution and verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          script_path = Path('.github/scripts/prepare-consumer-contract.py')
+          script = script_path.read_text(encoding='utf-8')
+          property_anchor = 'PROPERTY_REFERENCE = re.compile(r"^\\$\\{([A-Za-z0-9_.-]+)}$")\n'
+          unsafe_definition = (
+              'UNSAFE_VERSION_PROPERTIES = {\n'
+              '    "revision",\n'
+              '    "sha1",\n'
+              '    "changelist",\n'
+              '    "project.version",\n'
+              '    "pom.version",\n'
+              '}\n'
+          )
+          if 'UNSAFE_VERSION_PROPERTIES' not in script:
+              if property_anchor not in script:
+                  raise SystemExit('Could not locate property-reference definition')
+              script = script.replace(
+                  property_anchor,
+                  property_anchor + unsafe_definition,
+                  1,
+              )
+
+          main_anchor = (
+              '    property_changes: list[PropertyChange] = []\n'
+              '    for property_name in sorted(referenced_properties(uses)):\n'
+          )
+          main_replacement = (
+              '    property_changes: list[PropertyChange] = []\n'
+              '    properties = referenced_properties(uses)\n'
+              '    unsafe_properties = sorted(properties & UNSAFE_VERSION_PROPERTIES)\n'
+              '    if unsafe_properties:\n'
+              '        raise SystemExit(\n'
+              '            "Refusing to rewrite general project version properties: "\n'
+              '            + ", ".join(unsafe_properties)\n'
+              '        )\n'
+              '    for property_name in sorted(properties):\n'
+          )
+          if 'unsafe_properties = sorted(' not in script:
+              if main_anchor not in script:
+                  raise SystemExit('Could not locate property substitution loop')
+              script = script.replace(main_anchor, main_replacement, 1)
+          script_path.write_text(script, encoding='utf-8')
+
+          test_path = Path('.github/scripts/test_prepare_consumer_contract.py')
+          tests = test_path.read_text(encoding='utf-8')
+          insertion_anchor = '    def test_non_consumer_fails_instead_of_silently_passing(self) -> None:\n'
+          unsafe_test = '''    def test_general_project_revision_is_classified_as_unsafe(self) -> None:
+        use = PREPARE.DependencyUse(
+            pom="pom.xml",
+            artifact="jgit-storage-hibernate-core",
+            declared_version="${revision}",
+            source="property:revision",
+        )
+        properties = PREPARE.referenced_properties([use])
+        self.assertEqual({"revision"}, properties)
+        self.assertEqual(
+            {"revision"}, properties & PREPARE.UNSAFE_VERSION_PROPERTIES
+        )
+
+'''
+          if 'test_general_project_revision_is_classified_as_unsafe' not in tests:
+              if insertion_anchor not in tests:
+                  raise SystemExit('Could not locate consumer test insertion point')
+              tests = tests.replace(insertion_anchor, unsafe_test + insertion_anchor, 1)
+          test_path.write_text(tests, encoding='utf-8')
+
+          workflow_path = Path('.github/workflows/consumer-compatibility.yml')
+          workflow = workflow_path.read_text(encoding='utf-8')
+          old = '''          grep -F 'io.github.carstenartur:jgit-storage-hibernate-' \
+            ../target/consumer-compatibility/dependency-tree.log
+          grep -F ':${{ needs.current-library.outputs.version }}' \
+            ../target/consumer-compatibility/dependency-tree.log
+'''
+          new = '''          matching="$(grep -F 'io.github.carstenartur:jgit-storage-hibernate-' \
+            ../target/consumer-compatibility/dependency-tree.log)"
+          test -n "$matching"
+          printf '%s\n' "$matching"
+          if printf '%s\n' "$matching" \
+              | grep -Fv ':${{ needs.current-library.outputs.version }}:'; then
+            echo 'At least one consumed jgit-storage-hibernate artifact did not resolve to the current reactor version.' >&2
+            exit 1
+          fi
+'''
+          if old in workflow:
+              workflow = workflow.replace(old, new, 1)
+          elif 'At least one consumed jgit-storage-hibernate artifact' not in workflow:
+              raise SystemExit('Could not tighten dependency-tree verification')
+          workflow_path.write_text(workflow, encoding='utf-8')
+
+          Path('.github/workflows/temporary-tighten-consumer-substitution.yml').unlink()
+          PY
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          git diff --check
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Reject unsafe consumer version substitutions'
+          git push origin HEAD:ci/consumer-contracts
