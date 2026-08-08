@@ -12,8 +12,10 @@ import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitInde
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -36,8 +38,23 @@ import org.hibernate.Transaction;
  * <p>Changed paths and changed text use first-parent diff semantics. Every path in a root commit is
  * considered changed. For merge commits, the projection describes the result relative to the first
  * parent.
+ *
+ * <p>Reachable-history indexing uses bounded groups. One existence query covers the complete group,
+ * only missing commits are extracted, and all new projections are written in one transaction. The
+ * same {@link RevWalk} and {@link ObjectReader} remain open for the walk, avoiding reparsing and
+ * reopening Git storage once per commit.
  */
 public class CommitIndexer {
+
+  /** Configurable number of commit projections handled by one bounded indexing transaction. */
+  public static final String INDEX_BATCH_SIZE_PROPERTY =
+      "jgit.storage.hibernate.search.index_batch_size";
+
+  /** Balanced default for incremental indexing and rebuilds. */
+  public static final int DEFAULT_INDEX_BATCH_SIZE = 50;
+
+  /** Safety ceiling for SQL {@code IN} lists and one persistence context. */
+  public static final int MAX_INDEX_BATCH_SIZE = 1_000;
 
   private static final int MAX_INDEXED_BLOB_BYTES = 256 * 1024;
   private static final int MAX_CHANGED_TEXT_CHARS = 250_000;
@@ -45,6 +62,7 @@ public class CommitIndexer {
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
+  private final int batchSize;
 
   /**
    * Create an indexer.
@@ -55,6 +73,7 @@ public class CommitIndexer {
   public CommitIndexer(SessionFactory sessionFactory, String repositoryName) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
+    batchSize = resolveBatchSize(sessionFactory);
   }
 
   /**
@@ -66,9 +85,12 @@ public class CommitIndexer {
    * @throws IOException if the commit cannot be read
    */
   public GitCommitIndex indexCommit(Repository repository, ObjectId commitId) throws IOException {
-    try (RevWalk revWalk = new RevWalk(repository)) {
+    Objects.requireNonNull(repository, "repository");
+    Objects.requireNonNull(commitId, "commitId");
+    try (RevWalk revWalk = new RevWalk(repository);
+        ObjectReader reader = repository.newObjectReader()) {
       RevCommit commit = revWalk.parseCommit(commitId);
-      GitCommitIndex projection = toProjection(repository, revWalk, commit);
+      GitCommitIndex projection = toProjection(reader, revWalk, commit);
       upsert(projection);
       return projection;
     }
@@ -84,25 +106,92 @@ public class CommitIndexer {
    * @throws IOException if the repository cannot be read
    */
   public int indexCommitsFrom(Repository repository, ObjectId start, int limit) throws IOException {
+    Objects.requireNonNull(repository, "repository");
+    Objects.requireNonNull(start, "start");
     int indexed = 0;
     int visited = 0;
-    try (RevWalk revWalk = new RevWalk(repository)) {
+    List<RevCommit> pending = new ArrayList<>(batchSize);
+    try (RevWalk revWalk = new RevWalk(repository);
+        ObjectReader reader = repository.newObjectReader()) {
       revWalk.markStart(revWalk.parseCommit(start));
       for (RevCommit commit : revWalk) {
         if (limit >= 0 && visited++ >= limit) {
           break;
         }
-        if (findExisting(commit.name()) == null) {
-          upsert(toProjection(repository, revWalk, commit));
-          indexed++;
+        pending.add(commit);
+        if (pending.size() == batchSize) {
+          indexed += indexParsedBatch(reader, revWalk, pending, false);
+          pending.clear();
         }
+      }
+      if (!pending.isEmpty()) {
+        indexed += indexParsedBatch(reader, revWalk, pending, false);
       }
     }
     return indexed;
   }
 
+  /**
+   * Persist parsed commits that are known to be absent, normally after a projection purge.
+   *
+   * <p>The method is package-private so {@link CommitProjectionRebuilder} can preserve one Git walk
+   * and one object reader while still delegating extraction and transactional persistence here.
+   */
+  int indexKnownMissingBatch(
+      ObjectReader reader, RevWalk revWalk, List<RevCommit> commits) throws IOException {
+    return indexParsedBatch(reader, revWalk, commits, true);
+  }
+
+  int batchSize() {
+    return batchSize;
+  }
+
+  static int resolveBatchSize(SessionFactory sessionFactory) {
+    Object configured = sessionFactory.getProperties().get(INDEX_BATCH_SIZE_PROPERTY);
+    if (configured == null || configured.toString().isBlank()) {
+      return DEFAULT_INDEX_BATCH_SIZE;
+    }
+    int value;
+    try {
+      value = Integer.parseInt(configured.toString().trim());
+    } catch (NumberFormatException exception) {
+      throw new IllegalArgumentException(
+          INDEX_BATCH_SIZE_PROPERTY + " must be an integer but was '" + configured + "'",
+          exception);
+    }
+    if (value <= 0 || value > MAX_INDEX_BATCH_SIZE) {
+      throw new IllegalArgumentException(
+          INDEX_BATCH_SIZE_PROPERTY
+              + " must be between 1 and "
+              + MAX_INDEX_BATCH_SIZE
+              + " but was "
+              + value);
+    }
+    return value;
+  }
+
+  private int indexParsedBatch(
+      ObjectReader reader,
+      RevWalk revWalk,
+      List<RevCommit> commits,
+      boolean knownMissing)
+      throws IOException {
+    if (commits.isEmpty()) {
+      return 0;
+    }
+    Set<String> existing = knownMissing ? Set.of() : findExistingObjectIds(commits);
+    List<GitCommitIndex> projections = new ArrayList<>(commits.size());
+    for (RevCommit commit : commits) {
+      if (!existing.contains(commit.name())) {
+        projections.add(toProjection(reader, revWalk, commit));
+      }
+    }
+    persistNewBatch(projections);
+    return projections.size();
+  }
+
   private GitCommitIndex toProjection(
-      Repository repository, RevWalk revWalk, RevCommit commit) throws IOException {
+      ObjectReader reader, RevWalk revWalk, RevCommit commit) throws IOException {
     GitCommitIndex projection = new GitCommitIndex();
     projection.setRepositoryName(repositoryName);
     projection.setObjectId(commit.name());
@@ -123,19 +212,18 @@ public class CommitIndexer {
       projection.setCommitterTime(committer.getWhenAsInstant());
     }
 
-    TreeText treeText = readChangedTreeText(repository, revWalk, commit);
+    TreeText treeText = readChangedTreeText(reader, revWalk, commit);
     projection.setChangedPaths(String.join("\n", treeText.paths()));
     projection.setChangedText(treeText.text());
     return projection;
   }
 
   private TreeText readChangedTreeText(
-      Repository repository, RevWalk revWalk, RevCommit commit) throws IOException {
+      ObjectReader reader, RevWalk revWalk, RevCommit commit) throws IOException {
     List<String> paths = new ArrayList<>();
     StringBuilder text = new StringBuilder();
 
-    try (ObjectReader reader = repository.newObjectReader();
-        TreeWalk treeWalk = new TreeWalk(reader)) {
+    try (TreeWalk treeWalk = new TreeWalk(reader)) {
       if (commit.getParentCount() == 0) {
         treeWalk.addTree(new EmptyTreeIterator());
       } else {
@@ -173,15 +261,38 @@ public class CommitIndexer {
     return value.length() <= maxLength ? value : value.substring(0, maxLength);
   }
 
-  private GitCommitIndex findExisting(String objectId) {
+  private Set<String> findExistingObjectIds(List<RevCommit> commits) {
+    List<String> objectIds = commits.stream().map(RevCommit::name).toList();
     try (Session session = sessionFactory.openSession()) {
-      return session
-          .createQuery(
-              "FROM GitCommitIndex c WHERE c.repositoryName = :repo AND c.objectId = :objectId",
-              GitCommitIndex.class)
-          .setParameter("repo", repositoryName)
-          .setParameter("objectId", objectId)
-          .uniqueResult();
+      return new HashSet<>(
+          session
+              .createQuery(
+                  "SELECT c.objectId FROM GitCommitIndex c WHERE c.repositoryName = :repo "
+                      + "AND c.objectId IN :objectIds",
+                  String.class)
+              .setParameter("repo", repositoryName)
+              .setParameter("objectIds", objectIds)
+              .getResultList());
+    }
+  }
+
+  private void persistNewBatch(List<GitCommitIndex> projections) {
+    if (projections.isEmpty()) {
+      return;
+    }
+    try (Session session = sessionFactory.openSession()) {
+      Transaction transaction = session.beginTransaction();
+      try {
+        session.setJdbcBatchSize(Math.min(batchSize, projections.size()));
+        for (GitCommitIndex projection : projections) {
+          session.persist(projection);
+        }
+        session.flush();
+        transaction.commit();
+      } catch (RuntimeException exception) {
+        transaction.rollback();
+        throw exception;
+      }
     }
   }
 
@@ -200,23 +311,28 @@ public class CommitIndexer {
         if (existing == null) {
           session.persist(projection);
         } else {
-          existing.setShortMessage(projection.getShortMessage());
-          existing.setFullMessage(projection.getFullMessage());
-          existing.setAuthorName(projection.getAuthorName());
-          existing.setAuthorEmail(projection.getAuthorEmail());
-          existing.setAuthorTime(projection.getAuthorTime());
-          existing.setCommitterName(projection.getCommitterName());
-          existing.setCommitterEmail(projection.getCommitterEmail());
-          existing.setCommitterTime(projection.getCommitterTime());
-          existing.setChangedPaths(projection.getChangedPaths());
-          existing.setChangedText(projection.getChangedText());
+          copyMutableProjection(existing, projection);
         }
         transaction.commit();
-      } catch (RuntimeException e) {
+      } catch (RuntimeException exception) {
         transaction.rollback();
-        throw e;
+        throw exception;
       }
     }
+  }
+
+  private static void copyMutableProjection(
+      GitCommitIndex target, GitCommitIndex source) {
+    target.setShortMessage(source.getShortMessage());
+    target.setFullMessage(source.getFullMessage());
+    target.setAuthorName(source.getAuthorName());
+    target.setAuthorEmail(source.getAuthorEmail());
+    target.setAuthorTime(source.getAuthorTime());
+    target.setCommitterName(source.getCommitterName());
+    target.setCommitterEmail(source.getCommitterEmail());
+    target.setCommitterTime(source.getCommitterTime());
+    target.setChangedPaths(source.getChangedPaths());
+    target.setChangedText(source.getChangedText());
   }
 
   private record TreeText(List<String> paths, String text) {}
