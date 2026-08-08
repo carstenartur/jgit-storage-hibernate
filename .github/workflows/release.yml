@@ -30,6 +30,8 @@ on:
   push:
     branches:
       - 'release-request/**'
+    paths:
+      - '.github/release-request'
 
 permissions:
   contents: write

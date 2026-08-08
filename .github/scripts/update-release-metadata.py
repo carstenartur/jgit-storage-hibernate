@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update citation, software, and public documentation release metadata."""
+"""Update citation, software, security, and public documentation release metadata."""
 
 from __future__ import annotations
 
@@ -12,8 +12,11 @@ from pathlib import Path
 PROJECT_GROUP_ID = "io.github.carstenartur"
 PROJECT_ARTIFACT_PREFIX = "jgit-storage-hibernate-"
 DOCUMENTATION_VERSION_FILE = Path("docs/current-release-version.txt")
+SECURITY_POLICY_FILE = Path("SECURITY.md")
 RELEASE_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?$")
+SUPPORTED_RELEASE_LINE = re.compile(r"`[0-9]+\.[0-9]+\.x`")
+SUPPORTED_SNAPSHOT_LINE = re.compile(r"`[0-9]+\.[0-9]+\.x-SNAPSHOT`")
 DEPENDENCY_BLOCK = re.compile(r"<dependency>.*?</dependency>", re.DOTALL)
 PROJECT_COORDINATE = re.compile(
     r"(io\.github\.carstenartur:jgit-storage-hibernate-[A-Za-z0-9_.-]+:)"
@@ -83,6 +86,29 @@ def update_json(path_name: str, version: str, release: bool, today: str, date_ke
     else:
         data.pop(date_key, None)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def update_security_policy(version: str) -> None:
+    """Advance the single supported major/minor release line."""
+    if not RELEASE_SEMVER.fullmatch(version):
+        raise SystemExit(
+            f"Security policy requires a release version X.Y.Z, but received {version!r}"
+        )
+    if not SECURITY_POLICY_FILE.is_file():
+        raise SystemExit(f"Missing security policy: {SECURITY_POLICY_FILE}")
+
+    major, minor, _ = version.split(".")
+    release_line = f"{major}.{minor}.x"
+    text = SECURITY_POLICY_FILE.read_text(encoding="utf-8")
+    if SUPPORTED_RELEASE_LINE.search(text) is None:
+        raise SystemExit("SECURITY.md contains no supported X.Y.x release line")
+    if SUPPORTED_SNAPSHOT_LINE.search(text) is None:
+        raise SystemExit("SECURITY.md contains no supported X.Y.x-SNAPSHOT line")
+
+    updated = SUPPORTED_SNAPSHOT_LINE.sub(f"`{release_line}-SNAPSHOT`", text)
+    updated = SUPPORTED_RELEASE_LINE.sub(f"`{release_line}`", updated)
+    SECURITY_POLICY_FILE.write_text(updated, encoding="utf-8")
+    print(f"Supported security release line advanced to {release_line}")
 
 
 def markdown_files() -> list[Path]:
@@ -199,6 +225,7 @@ def main() -> None:
     update_json(".zenodo.json", args.version, args.release, today, "publication_date")
     update_json("codemeta.json", args.version, args.release, today, "datePublished")
     if args.release:
+        update_security_policy(args.version)
         update_public_documentation(args.version)
 
 

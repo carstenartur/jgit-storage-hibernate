@@ -121,6 +121,35 @@ The legacy migration baseline remains 0.1.4.
                 release_note,
             )
 
+    def test_release_advances_the_supported_security_line(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(
+                root / "SECURITY.md",
+                """# Security Policy
+
+Security fixes are provided for the latest released `0.1.x` version.
+
+| Version | Supported |
+|---|---|
+| Latest released `0.1.x` | Yes |
+| Older `0.1.x` releases | Upgrade required |
+| `0.1.x-SNAPSHOT` builds | No security support guarantee |
+""",
+            )
+
+            previous_directory = Path.cwd()
+            os.chdir(root)
+            try:
+                UPDATE_RELEASE_METADATA.update_security_policy("0.9.0")
+            finally:
+                os.chdir(previous_directory)
+
+            policy = (root / "SECURITY.md").read_text(encoding="utf-8")
+            self.assertNotIn("0.1.x", policy)
+            self.assertEqual(4, policy.count("0.9.x"))
+            self.assertIn("`0.9.x-SNAPSHOT`", policy)
+
     def test_snapshot_is_rejected_as_public_release_version(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
