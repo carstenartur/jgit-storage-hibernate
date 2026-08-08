@@ -31,6 +31,8 @@ import org.junit.jupiter.api.Test;
 
 class HibernateDurableBatchProcessorH2Test {
 
+  private static final Duration EXACT_BATCH_WAIT = Duration.ofMinutes(1);
+
   @Test
   void oneQueueBatchCommitsThroughTheHibernateAdapterBeforeAcknowledgement() throws Exception {
     try (HibernateSessionFactoryProvider provider =
@@ -53,7 +55,7 @@ class HibernateDurableBatchProcessorH2Test {
               1024,
               3,
               1024,
-              Duration.ofSeconds(1),
+              EXACT_BATCH_WAIT,
               Duration.ofSeconds(1));
 
       try (DurableStripedWriteQueue<String, String> queue =
@@ -98,7 +100,7 @@ class HibernateDurableBatchProcessorH2Test {
               1024,
               50,
               1024,
-              Duration.ofSeconds(2),
+              EXACT_BATCH_WAIT,
               Duration.ofSeconds(1));
 
       BatchCountingSessionEventListener.reset();
@@ -143,7 +145,7 @@ class HibernateDurableBatchProcessorH2Test {
               1024,
               3,
               1024,
-              Duration.ofSeconds(1),
+              EXACT_BATCH_WAIT,
               Duration.ofSeconds(1));
 
       try (DurableStripedWriteQueue<String, String> queue =

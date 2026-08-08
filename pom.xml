@@ -21,6 +21,7 @@
     <module>jgit-storage-hibernate-search</module>
     <module>jgit-storage-hibernate-java-analysis</module>
     <module>jgit-storage-hibernate-architecture</module>
+    <module>jgit-storage-hibernate-bom</module>
     <module>jgit-storage-hibernate-benchmarks</module>
   </modules>
 
