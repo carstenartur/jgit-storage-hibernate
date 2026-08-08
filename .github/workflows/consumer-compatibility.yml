@@ -248,6 +248,8 @@ jobs:
           CANDIDATE_VERSION: ${{ steps.candidate.outputs.version }}
         run: |
           set -o pipefail
+          mvn -B -N -f consumer/pom.xml install 2>&1 \
+            | tee evidence/sandbox/parent-install.log
           mvn -B -f consumer/sandbox-jgit-storage-hibernate/pom.xml install \
             -Djgit-storage-hibernate.version="$CANDIDATE_VERSION" 2>&1 \
             | tee evidence/sandbox/bridge-build.log
