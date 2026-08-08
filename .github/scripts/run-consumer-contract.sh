@@ -56,26 +56,39 @@ echo "No repository-owned contract for $consumer; running the documented central
   case "$consumer" in
     audio-analyzer)
       command=(
-        "${maven[@]}" -B
+        "${maven[@]}" -B -ntp -nsu
         "${maven_repository_argument[@]}"
-        -DskipITs
+        -pl audio-app -am
+        -DskipITs=true
         verify
       )
       ;;
     Taxonomy)
       docker info >/dev/null
+      export GEMINI_API_KEY=
+      export OPENAI_API_KEY=
+      export ANTHROPIC_API_KEY=
+      export TAXONOMY_EMBEDDING_ALLOW_DOWNLOAD=false
       command=(
-        "${maven[@]}" -B
+        "${maven[@]}" -B -ntp -nsu
         "${maven_repository_argument[@]}"
+        -pl taxonomy-app -am
+        -DskipITs=false
+        -DexcludedGroups=real-llm,onnx,db-mssql,db-oracle
         -Dtaxonomy.model.download.skip=true
-        -Dtaxonomy.embedding.allow-download=false
+        -Dtaxonomy.ui.skip=true
+        -Dtaxonomy.quality.skip=true
+        -Dtest=JgitStorageHibernateIntegrationTest,JgitStorageOptimizedIndexContractTest,JgitStorageSchemaIndexValidationTest,JgitStorageSchemaMigrationConfigTest,CommitIndexHibernateSearchTest
+        -Dit.test=JgitStoragePostgresMigrationIT,TaxonomyPostgresValidateStartupIT,TaxonomySchemaPostgresMigrationIT
+        -Dsurefire.failIfNoSpecifiedTests=false
+        -Dfailsafe.failIfNoSpecifiedTests=false
         verify
       )
       ;;
     sandbox)
       command=(
         xvfb-run -a
-        "${maven[@]}" -B
+        "${maven[@]}" -B -ntp -nsu
         "${maven_repository_argument[@]}"
         -DskipTests
         verify
