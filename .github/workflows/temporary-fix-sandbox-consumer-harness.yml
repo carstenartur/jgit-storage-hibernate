@@ -1,0 +1,65 @@
+name: Temporary Sandbox consumer harness repair
+
+on:
+  push:
+    branches:
+      - ci/consumer-compatibility
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-sandbox-consumer-harness-repair
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/consumer-compatibility
+          fetch-depth: 0
+      - name: Install the Sandbox reactor parent before isolated modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/consumer-compatibility.yml')
+          text = workflow.read_text(encoding='utf-8')
+          old = '''        run: |
+          set -o pipefail
+          mvn -B -f consumer/sandbox-jgit-storage-hibernate/pom.xml install \\
+            -Djgit-storage-hibernate.version="$CANDIDATE_VERSION" 2>&1 \\
+            | tee evidence/sandbox/bridge-build.log
+'''
+          new = '''        run: |
+          set -o pipefail
+          mvn -B -N -f consumer/pom.xml install 2>&1 \\
+            | tee evidence/sandbox/parent-install.log
+          mvn -B -f consumer/sandbox-jgit-storage-hibernate/pom.xml install \\
+            -Djgit-storage-hibernate.version="$CANDIDATE_VERSION" 2>&1 \\
+            | tee evidence/sandbox/bridge-build.log
+'''
+          if text.count(old) != 1:
+              raise SystemExit('Expected Sandbox bridge step was not found exactly once')
+          workflow.write_text(text.replace(old, new), encoding='utf-8')
+
+          contract = Path('.github/consumer-compatibility.json')
+          text = contract.read_text(encoding='utf-8')
+          old = '"smokeCommand": "mvn -B -f consumer/sandbox-jgit-storage-hibernate/pom.xml install -Djgit-storage-hibernate.version=${candidate.version} && mvn -B -f consumer/sandbox-jgit-server-webapp/pom.xml package -Djgit-storage-hibernate.version=${candidate.version}"'
+          new = '"smokeCommand": "mvn -B -N -f consumer/pom.xml install && mvn -B -f consumer/sandbox-jgit-storage-hibernate/pom.xml install -Djgit-storage-hibernate.version=${candidate.version} && mvn -B -f consumer/sandbox-jgit-server-webapp/pom.xml package -Djgit-storage-hibernate.version=${candidate.version}"'
+          if text.count(old) != 1:
+              raise SystemExit('Expected Sandbox smoke command was not found exactly once')
+          contract.write_text(text.replace(old, new), encoding='utf-8')
+
+          Path('.github/workflows/temporary-fix-sandbox-consumer-harness.yml').unlink()
+          PY
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Install the Sandbox parent before isolated consumer modules'
+          git push origin HEAD:ci/consumer-compatibility
