@@ -1,0 +1,40 @@
+name: Consumer BOM Contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify production-module alignment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify static BOM and anonymous-consumer contract
+        run: |
+          set -euo pipefail
+          mkdir -p target
+          python3 -m py_compile .github/scripts/verify-bom-contract.py
+          python3 .github/scripts/verify-bom-contract.py \
+            --report target/bom-contract.json
+          cat target/bom-contract.json
+
+      - name: Upload BOM evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consumer-bom-contract
+          path: target/bom-contract.json
+          if-no-files-found: error
