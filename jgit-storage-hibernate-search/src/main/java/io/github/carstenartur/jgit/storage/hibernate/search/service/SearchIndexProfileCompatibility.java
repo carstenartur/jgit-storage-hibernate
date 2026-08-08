@@ -29,6 +29,19 @@ final class SearchIndexProfileCompatibility {
   static void requireCompatible(SessionFactory sessionFactory, String repositoryName) {
     Objects.requireNonNull(sessionFactory, "sessionFactory");
     Objects.requireNonNull(repositoryName, "repositoryName");
+
+    /*
+     * An omitted property means the historical CONTENT semantics. The migration backfills every
+     * existing projection to exactly that stable profile, so probing here would add one SQL query to
+     * every existing application's first Search request without protecting against an operator
+     * initiated profile change. Explicit configuration opts into the fail-closed profile contract.
+     */
+    Object configuredProperty =
+        sessionFactory.getProperties().get(SearchIndexingProfile.PROFILE_PROPERTY);
+    if (configuredProperty == null || configuredProperty.toString().isBlank()) {
+      return;
+    }
+
     SearchIndexingProfile configured = SearchIndexingProfile.resolve(sessionFactory);
     String verificationKey = repositoryName + "\u0000" + configured.id();
 
