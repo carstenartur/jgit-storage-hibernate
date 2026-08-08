@@ -21,6 +21,8 @@ import org.hibernate.search.mapper.orm.session.SearchSession;
 /** One-time compatibility guard for persistent Hibernate Search commit indexes. */
 final class SearchIndexCompatibility {
 
+  private static final String DIRECTORY_TYPE_PROPERTY = "hibernate.search.backend.directory.type";
+  private static final String PERSISTENT_DIRECTORY_TYPE = "local-filesystem";
   private static final String LEGACY_PROJECTION_PATTERN = "legacy-%";
 
   /**
@@ -42,9 +44,16 @@ final class SearchIndexCompatibility {
    * index still contains the old numeric identifiers. A single probe of one migrated row detects
    * that mismatch without hydrating entities. The mass indexer then purges and recreates the derived
    * index from the authoritative relational projections.
+   *
+   * <p>The check is deliberately limited to the persistent local-filesystem backend. In-memory
+   * indexes cannot survive a mapping upgrade, and probing them would add an unnecessary SQL query to
+   * ordinary reads and writes.
    */
   static void ensureCurrentDocumentIdentifiers(SessionFactory sessionFactory) {
     Objects.requireNonNull(sessionFactory, "sessionFactory");
+    if (!usesPersistentLocalFilesystem(sessionFactory)) {
+      return;
+    }
     synchronized (VERIFIED_FACTORIES) {
       if (VERIFIED_FACTORIES.contains(sessionFactory)) {
         return;
@@ -54,6 +63,11 @@ final class SearchIndexCompatibility {
       }
       VERIFIED_FACTORIES.add(sessionFactory);
     }
+  }
+
+  private static boolean usesPersistentLocalFilesystem(SessionFactory sessionFactory) {
+    Object configured = sessionFactory.getProperties().get(DIRECTORY_TYPE_PROPERTY);
+    return configured != null && PERSISTENT_DIRECTORY_TYPE.equals(configured.toString().trim());
   }
 
   private static boolean requiresRebuild(SessionFactory sessionFactory) {
