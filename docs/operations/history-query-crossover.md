@@ -82,6 +82,22 @@ The calculation is shown independently against `FileRepository / JGit` and `Hibe
 
 This is deliberately conservative. A real application normally maintains the projection incrementally as commits arrive; it does not rebuild the complete index before every reporting query. The full rebuild is used here as an easily reproducible upper-bound startup cost.
 
+## First measured smoke evidence
+
+The first green PostgreSQL/FileRepository smoke run used 1,000 commits and a fully rebuilt `content-v1` projection. The projection build point estimate was 900.0 ms. Query point estimates were:
+
+| Query | FileRepository + JGit | HibernateRepository + JGit | Indexed projection | Indexed vs filesystem | Full-build break-even vs filesystem |
+|---|---:|---:|---:|---:|---:|
+| Author + time | 34.0 ms | 14.1 ms | 2.42 ms | 14.0× | 28.6 queries |
+| Exact path + time | 67.6 ms | 16.4 ms | 2.77 ms | 24.4× | 13.9 queries |
+| Commit-message text | 30.2 ms | 12.6 ms | 4.28 ms | 7.1× | 34.7 queries |
+| Exact path + changed content | 69.0 ms | 22.7 ms | 3.60 ms | 19.2× | 13.8 queries |
+| Compound audit | 25.7 ms | 11.2 ms | 5.97 ms | 4.3× | 45.6 queries |
+
+These are **workload point estimates, not universal speedup claims**. The retained smoke run deliberately uses only three SingleShot measurements, so JMH's high-confidence error intervals are broad. The individual raw samples nevertheless preserved the same qualitative ordering for the strongest path queries: filesystem path+content was 58.3–88.5 ms while the indexed query was 3.01–4.00 ms; filesystem path+time was 47.0–78.8 ms while the indexed query was 2.58–3.09 ms. The scheduled scale profiles exist to establish whether this gap grows predictably with history size before any headline multiplier is treated as a general result.
+
+The work counters explain the architectural difference. For path+content at 1,000 commits, JGit visited 1,000 commits and performed 1,000 exact-path tree inspections before loading four matching changed blobs. The indexed query visited no Git commits or trees at query time. For path+time, JGit visited 901 commits and performed 800 exact-path inspections, while the indexed query again used the precomputed path field.
+
 ## Work-amplification evidence
 
 The raw JMH secondary counters retain, per query:
@@ -97,23 +113,27 @@ These counters distinguish a genuine indexing crossover from unrelated storage n
 
 ## Scale matrix
 
-Pull requests and normal pushes run the bounded smoke profile:
+Pull requests and normal pushes run the bounded smoke profile with every retained query:
 
 ```text
-1,000 commits
+smoke: 1,000 commits × all five query kinds × all three engines
 ```
 
-The scheduled/manual full profile runs:
+The scheduled/manual `full` profile keeps the same broad query coverage while adding the next history scale:
 
 ```text
-1,000
-10,000
-100,000 commits
+full: 1,000 and 10,000 commits × all five query kinds × all three engines
+```
+
+A separate manual `large` profile reaches 100,000 commits without rebuilding the same large deterministic history for all five query families. It retains the two queries where materialization avoids the most Git tree/content work:
+
+```text
+large: 100,000 commits × path+changed-content and compound × all three engines
 ```
 
 All variants use a query limit of 500. The deterministic sparse fixture is validated so the complete result set remains below that limit at every supported size; this avoids comparing JGit's chronological truncation with Hibernate Search relevance-ranked truncation.
 
-The full matrix can be run manually with the `Git History Query Crossover` workflow and `profile=full`.
+The weekly schedule runs `full`. The `large` profile is explicit/manual because constructing a 100,000-commit authoritative history is benchmark setup evidence rather than useful pull-request latency.
 
 ## Cache and deployment interpretation
 
@@ -145,10 +165,11 @@ mkdir -p target/history-query-crossover
 mvn -B -pl jgit-storage-hibernate-benchmarks verify \
   -Phistory-query-crossover \
   -Dbenchmark.history.commitCounts=1000 \
+  -Dbenchmark.history.queryKinds=author-time,path-time,message-text,path-content,compound \
   -Dbenchmark.resultFile="$(pwd)/target/history-query-crossover/jmh-result.json"
 python3 .github/scripts/convert-jmh-history-query-crossover.py \
   target/history-query-crossover/jmh-result.json \
   target/history-query-crossover/comparison.json
 ```
 
-Use `-Dbenchmark.history.commitCounts=1000,10000,100000` for the full bounded matrix.
+Use `-Dbenchmark.history.commitCounts=1000,10000` for the broad full matrix. For the bounded large matrix use `-Dbenchmark.history.commitCounts=100000 -Dbenchmark.history.queryKinds=path-content,compound`.
