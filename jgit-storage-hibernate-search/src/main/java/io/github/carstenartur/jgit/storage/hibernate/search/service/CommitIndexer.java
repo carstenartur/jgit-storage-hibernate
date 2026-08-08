@@ -73,6 +73,7 @@ public class CommitIndexer {
   public CommitIndexer(SessionFactory sessionFactory, String repositoryName) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
+    SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(this.sessionFactory);
     batchSize = resolveBatchSize(sessionFactory);
   }
 
