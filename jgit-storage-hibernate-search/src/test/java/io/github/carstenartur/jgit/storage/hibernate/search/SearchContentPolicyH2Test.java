@@ -24,10 +24,12 @@ import org.junit.jupiter.api.Test;
 class SearchContentPolicyH2Test {
 
   @Test
-  void appliesExtensionTextGeneratedBinaryAndMinifiedFilters() {
+  void appliesExtensionMimeTextGeneratedBinaryAndMinifiedFilters() {
     Properties properties = baseProperties();
     properties.put(SearchContentPolicy.ALLOW_EXTENSIONS_PROPERTY, "java,js,txt");
     properties.put(SearchContentPolicy.DENY_EXTENSIONS_PROPERTY, ".txt");
+    properties.put(SearchContentPolicy.ALLOW_MIME_TYPES_PROPERTY, "text/*");
+    properties.put(SearchContentPolicy.DENY_MIME_TYPES_PROPERTY, "text/javascript");
     properties.put(SearchContentPolicy.REJECT_BINARY_PROPERTY, "true");
     properties.put(SearchContentPolicy.REJECT_INVALID_UTF8_PROPERTY, "true");
     properties.put(SearchContentPolicy.SKIP_GENERATED_PROPERTY, "true");
@@ -37,6 +39,8 @@ class SearchContentPolicyH2Test {
       SearchContentPolicy policy = SearchContentPolicy.resolve(provider.getSessionFactory());
 
       assertTrue(policy.acceptsPath("src/Main.java"));
+      assertEquals("text/x-java-source", policy.mimeType("src/Main.java"));
+      assertFalse(policy.acceptsPath("web/app.js"));
       assertFalse(policy.acceptsPath("docs/readme.txt"));
       assertFalse(policy.acceptsPath("src/generated/Generated.java"));
       assertFalse(policy.acceptsPath("assets/logo.png"));
@@ -60,17 +64,27 @@ class SearchContentPolicyH2Test {
       assertFalse(policy.rejectBinary());
       assertFalse(policy.rejectInvalidUtf8());
       assertTrue(policy.acceptsPath("anything/data.bin"));
+      assertEquals(
+          "application/octet-stream", policy.mimeType("anything/data.bin"));
       assertEquals("a\u0000b", policy.decode("anything/data.bin", new byte[] {'a', 0, 'b'}));
     }
   }
 
   @Test
-  void configuredBoundsRemainHardBounded() {
+  void configuredBoundsAndMimeRulesRemainFailClosed() {
     Properties properties = baseProperties();
     properties.put(
         SearchContentPolicy.MAX_FILE_BYTES_PROPERTY,
         Integer.toString(SearchContentPolicy.ABSOLUTE_MAX_FILE_BYTES + 1));
     try (HibernateSessionFactoryProvider provider = provider(properties)) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> SearchContentPolicy.resolve(provider.getSessionFactory()));
+    }
+
+    Properties invalidMime = baseProperties();
+    invalidMime.put(SearchContentPolicy.ALLOW_MIME_TYPES_PROPERTY, "text/*/invalid");
+    try (HibernateSessionFactoryProvider provider = provider(invalidMime)) {
       assertThrows(
           IllegalArgumentException.class,
           () -> SearchContentPolicy.resolve(provider.getSessionFactory()));
