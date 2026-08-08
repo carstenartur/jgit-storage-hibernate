@@ -26,33 +26,33 @@ class SearchPerformanceConverterTest(unittest.TestCase):
         self.assertEqual(12, len(converted))
         by_name = {entry["name"]: entry for entry in converted}
         self.assertIn(
-            "Hibernate Search full-text query — content-v1 — Entity hydration", by_name
+            "Hibernate Search full-text query — content-v1 / Entity hydration", by_name
         )
         self.assertIn(
-            "Hibernate Search full-text query — content-v1 — Lucene projection", by_name
+            "Hibernate Search full-text query — content-v1 / Lucene projection", by_name
         )
         self.assertIn(
-            "Hibernate Search content query — content-v1 — Lucene projection", by_name
+            "Hibernate Search content query — content-v1 / Lucene projection", by_name
         )
         self.assertEqual(
             "bytes",
-            by_name["Hibernate Search index footprint — content-v1 — Lucene"]["unit"],
+            by_name["Hibernate Search index footprint — content-v1 / Lucene"]["unit"],
         )
         self.assertEqual(
             123456.0,
-            by_name["Hibernate Search index footprint — content-v1 — Lucene"]["value"],
+            by_name["Hibernate Search index footprint — content-v1 / Lucene"]["value"],
         )
         self.assertEqual(
             "segments",
-            by_name["Hibernate Search segment count — content-v1 — Lucene"]["unit"],
+            by_name["Hibernate Search segment count — content-v1 / Lucene"]["unit"],
         )
         self.assertEqual(
             0.0,
-            by_name["Hibernate Search content quality — content-v1 — miss rate"]["value"],
+            by_name["Hibernate Search content quality — content-v1 / miss rate"]["value"],
         )
         self.assertEqual(
             0.0,
-            by_name["Hibernate Search path quality — content-v1 — miss rate"]["value"],
+            by_name["Hibernate Search path quality — content-v1 / miss rate"]["value"],
         )
         timing = [entry for entry in converted if entry["unit"] == "ms/op"]
         self.assertEqual(7, len(timing))
@@ -67,18 +67,18 @@ class SearchPerformanceConverterTest(unittest.TestCase):
         by_name = {entry["name"]: entry for entry in converted}
         self.assertEqual(
             100.0,
-            by_name["Hibernate Search content quality — metadata-v1 — miss rate"]["value"],
+            by_name["Hibernate Search content quality — metadata-v1 / miss rate"]["value"],
         )
         self.assertEqual(
             100.0,
-            by_name["Hibernate Search path quality — metadata-v1 — miss rate"]["value"],
+            by_name["Hibernate Search path quality — metadata-v1 / miss rate"]["value"],
         )
         self.assertIn(
-            "Hibernate Search indexing — metadata-v1 — Batched incremental indexing",
+            "Hibernate Search indexing — metadata-v1 / Batched incremental indexing",
             by_name,
         )
         self.assertIn(
-            "Hibernate Search indexing — content-v1 — Batched incremental indexing",
+            "Hibernate Search indexing — content-v1 / Batched incremental indexing",
             by_name,
         )
 
