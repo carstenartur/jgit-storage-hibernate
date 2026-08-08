@@ -111,6 +111,7 @@ def _extra(result: dict[str, Any], scenario: str) -> str:
             f"JDK: {result.get('jdkVersion', 'unknown')}",
             f"Mode: {result.get('mode', 'unknown')}",
             f"Forks: {result.get('forks', 'unknown')}",
+            "Chart direction: lower is better; higher is slower or more expensive.",
         ]
     )
 
@@ -201,7 +202,7 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "visibilityWaitMicros",
                 "Hibernate Search runtime burst visibility observation wait",
                 scenario,
-                "ms",
+                "ms/op",
                 0.001,
             ),
             _mean_counter_entry(
@@ -209,14 +210,14 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "visibilityPolls",
                 "Hibernate Search runtime burst visibility polls",
                 scenario,
-                "count",
+                "count/op",
             ),
             _mean_counter_entry(
                 rebuild,
                 "visibilityWaitMicros",
                 "Hibernate Search runtime rebuild visibility observation wait",
                 scenario,
-                "ms",
+                "ms/op",
                 0.001,
             ),
             _mean_counter_entry(
@@ -224,21 +225,21 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "visibilityPolls",
                 "Hibernate Search runtime rebuild visibility polls",
                 scenario,
-                "count",
+                "count/op",
             ),
             _mean_counter_entry(
                 ready,
                 "preparedStatements",
                 "Hibernate Search runtime burst prepared statements",
                 scenario,
-                "count",
+                "count/op",
             ),
             _mean_counter_entry(
                 ready,
                 "transactions",
                 "Hibernate Search runtime burst transactions",
                 scenario,
-                "count",
+                "count/op",
             ),
         ]
         for field, label in (
@@ -252,7 +253,7 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     field,
                     f"Hibernate Search concurrent query {label}",
                     scenario,
-                    "ms",
+                    "ms/op",
                     0.001,
                 )
             )
