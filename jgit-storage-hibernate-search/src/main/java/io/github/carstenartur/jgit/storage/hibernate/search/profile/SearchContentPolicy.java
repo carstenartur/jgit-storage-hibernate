@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.hibernate.SessionFactory;
@@ -30,6 +31,10 @@ public final class SearchContentPolicy {
       "jgit.storage.hibernate.search.content.allow_extensions";
   public static final String DENY_EXTENSIONS_PROPERTY =
       "jgit.storage.hibernate.search.content.deny_extensions";
+  public static final String ALLOW_MIME_TYPES_PROPERTY =
+      "jgit.storage.hibernate.search.content.allow_mime_types";
+  public static final String DENY_MIME_TYPES_PROPERTY =
+      "jgit.storage.hibernate.search.content.deny_mime_types";
   public static final String REJECT_BINARY_PROPERTY =
       "jgit.storage.hibernate.search.content.reject_binary";
   public static final String REJECT_INVALID_UTF8_PROPERTY =
@@ -54,11 +59,41 @@ public final class SearchContentPolicy {
   private static final int BINARY_SAMPLE_BYTES = 8 * 1024;
   private static final int MINIFIED_LONGEST_LINE = 2_000;
   private static final int MINIFIED_AVERAGE_LINE = 500;
+  private static final String UNKNOWN_MIME_TYPE = "application/octet-stream";
+  private static final Map<String, String> MIME_BY_EXTENSION =
+      Map.ofEntries(
+          Map.entry(".c", "text/x-c"),
+          Map.entry(".cc", "text/x-c++"),
+          Map.entry(".cpp", "text/x-c++"),
+          Map.entry(".css", "text/css"),
+          Map.entry(".csv", "text/csv"),
+          Map.entry(".go", "text/x-go"),
+          Map.entry(".h", "text/x-c"),
+          Map.entry(".hpp", "text/x-c++"),
+          Map.entry(".html", "text/html"),
+          Map.entry(".java", "text/x-java-source"),
+          Map.entry(".js", "text/javascript"),
+          Map.entry(".json", "application/json"),
+          Map.entry(".kt", "text/x-kotlin"),
+          Map.entry(".kts", "text/x-kotlin"),
+          Map.entry(".md", "text/markdown"),
+          Map.entry(".properties", "text/plain"),
+          Map.entry(".py", "text/x-python"),
+          Map.entry(".rs", "text/x-rust"),
+          Map.entry(".sh", "application/x-sh"),
+          Map.entry(".sql", "application/sql"),
+          Map.entry(".ts", "text/typescript"),
+          Map.entry(".txt", "text/plain"),
+          Map.entry(".xml", "application/xml"),
+          Map.entry(".yaml", "application/yaml"),
+          Map.entry(".yml", "application/yaml"));
 
   private final int maxFileBytes;
   private final int maxCommitChars;
   private final Set<String> allowedExtensions;
   private final Set<String> deniedExtensions;
+  private final Set<String> allowedMimeTypes;
+  private final Set<String> deniedMimeTypes;
   private final boolean rejectBinary;
   private final boolean rejectInvalidUtf8;
   private final boolean skipGenerated;
@@ -69,6 +104,8 @@ public final class SearchContentPolicy {
       int maxCommitChars,
       Set<String> allowedExtensions,
       Set<String> deniedExtensions,
+      Set<String> allowedMimeTypes,
+      Set<String> deniedMimeTypes,
       boolean rejectBinary,
       boolean rejectInvalidUtf8,
       boolean skipGenerated,
@@ -77,6 +114,8 @@ public final class SearchContentPolicy {
     this.maxCommitChars = maxCommitChars;
     this.allowedExtensions = Set.copyOf(allowedExtensions);
     this.deniedExtensions = Set.copyOf(deniedExtensions);
+    this.allowedMimeTypes = Set.copyOf(allowedMimeTypes);
+    this.deniedMimeTypes = Set.copyOf(deniedMimeTypes);
     this.rejectBinary = rejectBinary;
     this.rejectInvalidUtf8 = rejectInvalidUtf8;
     this.skipGenerated = skipGenerated;
@@ -100,6 +139,8 @@ public final class SearchContentPolicy {
             MAX_COMMIT_CHARS_PROPERTY),
         extensions(properties.get(ALLOW_EXTENSIONS_PROPERTY)),
         extensions(properties.get(DENY_EXTENSIONS_PROPERTY)),
+        mimeTypes(properties.get(ALLOW_MIME_TYPES_PROPERTY)),
+        mimeTypes(properties.get(DENY_MIME_TYPES_PROPERTY)),
         bool(properties.get(REJECT_BINARY_PROPERTY), false, REJECT_BINARY_PROPERTY),
         bool(properties.get(REJECT_INVALID_UTF8_PROPERTY), false, REJECT_INVALID_UTF8_PROPERTY),
         bool(properties.get(SKIP_GENERATED_PROPERTY), false, SKIP_GENERATED_PROPERTY),
@@ -122,6 +163,14 @@ public final class SearchContentPolicy {
     return deniedExtensions;
   }
 
+  public Set<String> allowedMimeTypes() {
+    return allowedMimeTypes;
+  }
+
+  public Set<String> deniedMimeTypes() {
+    return deniedMimeTypes;
+  }
+
   public boolean rejectBinary() {
     return rejectBinary;
   }
@@ -138,6 +187,12 @@ public final class SearchContentPolicy {
     return skipMinified;
   }
 
+  /** Return the deterministic path-derived MIME type used by the allow/deny policy. */
+  public String mimeType(String path) {
+    Objects.requireNonNull(path, "path");
+    return MIME_BY_EXTENSION.getOrDefault(extension(path.toLowerCase(Locale.ROOT)), UNKNOWN_MIME_TYPE);
+  }
+
   /** Return whether the path is eligible before loading its blob. */
   public boolean acceptsPath(String path) {
     Objects.requireNonNull(path, "path");
@@ -149,7 +204,15 @@ public final class SearchContentPolicy {
     if (deniedExtensions.contains(extension)) {
       return false;
     }
-    return allowedExtensions.isEmpty() || allowedExtensions.contains(extension);
+    if (!allowedExtensions.isEmpty() && !allowedExtensions.contains(extension)) {
+      return false;
+    }
+
+    String mimeType = MIME_BY_EXTENSION.getOrDefault(extension, UNKNOWN_MIME_TYPE);
+    if (matchesMimeRule(deniedMimeTypes, mimeType)) {
+      return false;
+    }
+    return allowedMimeTypes.isEmpty() || matchesMimeRule(allowedMimeTypes, mimeType);
   }
 
   /** Decode a bounded candidate blob, or return {@code null} when the configured policy rejects it. */
@@ -194,10 +257,12 @@ public final class SearchContentPolicy {
     try {
       value = Integer.parseInt(configured.toString().trim());
     } catch (NumberFormatException exception) {
-      throw new IllegalArgumentException(name + " must be an integer but was '" + configured + "'", exception);
+      throw new IllegalArgumentException(
+          name + " must be an integer but was '" + configured + "'", exception);
     }
     if (value <= 0 || value > maximum) {
-      throw new IllegalArgumentException(name + " must be between 1 and " + maximum + " but was " + value);
+      throw new IllegalArgumentException(
+          name + " must be between 1 and " + maximum + " but was " + value);
     }
     return value;
   }
@@ -228,6 +293,46 @@ public final class SearchContentPolicy {
         .map(value -> value.startsWith(".") ? value : "." + value)
         .forEach(result::add);
     return result;
+  }
+
+  private static Set<String> mimeTypes(Object configured) {
+    if (configured == null || configured.toString().isBlank()) {
+      return Set.of();
+    }
+    Set<String> result = new LinkedHashSet<>();
+    Arrays.stream(configured.toString().split(","))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .map(value -> value.toLowerCase(Locale.ROOT))
+        .peek(SearchContentPolicy::validateMimeRule)
+        .forEach(result::add);
+    return result;
+  }
+
+  private static void validateMimeRule(String rule) {
+    int slash = rule.indexOf('/');
+    if (slash <= 0 || slash == rule.length() - 1 || rule.indexOf('/', slash + 1) >= 0) {
+      throw new IllegalArgumentException("Invalid MIME rule '" + rule + "'");
+    }
+    if (rule.contains("*") && !rule.endsWith("/*")) {
+      throw new IllegalArgumentException(
+          "MIME wildcard is supported only as a subtype wildcard, for example text/*: '"
+              + rule
+              + "'");
+    }
+  }
+
+  private static boolean matchesMimeRule(Set<String> rules, String mimeType) {
+    for (String rule : rules) {
+      if (rule.equals(mimeType)) {
+        return true;
+      }
+      if (rule.endsWith("/*")
+          && mimeType.startsWith(rule.substring(0, rule.length() - 1))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static String extension(String path) {
