@@ -37,8 +37,12 @@ class HibernateSearchPerformanceBenchmarkIT {
           "projectionRebuild",
           "fullTextEntityHits",
           "fullTextSummaryHits",
+          "contentOnlySummaryHits",
           "pathLiteralSql",
           "pathTermsLucene");
+
+  private static final Set<String> EXPECTED_PROFILES =
+      Set.of("metadata-v1", "paths-v1", "content-v1", "diff-hunks-v1");
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -48,7 +52,7 @@ class HibernateSearchPerformanceBenchmarkIT {
           .withPassword("benchmark");
 
   @Test
-  void recordsIndexingRebuildAndQueryComparisons() throws Exception {
+  void recordsIndexingRebuildQueryFootprintAndQualityComparisons() throws Exception {
     Path resultFile =
         Path.of(
                 System.getProperty(
@@ -62,6 +66,12 @@ class HibernateSearchPerformanceBenchmarkIT {
             .include(HibernateSearchPerformanceBenchmark.class.getName())
             .param("commitCount", "100")
             .param("queryLimit", "50")
+            .param(
+                "indexProfile",
+                "metadata-v1",
+                "paths-v1",
+                "content-v1",
+                "diff-hunks-v1")
             .addProfiler(GCProfiler.class)
             .shouldFailOnError(true)
             .resultFormat(ResultFormatType.JSON)
@@ -82,11 +92,16 @@ class HibernateSearchPerformanceBenchmarkIT {
             .build();
 
     Collection<RunResult> results = new Runner(options).run();
-    assertEquals(EXPECTED_OPERATIONS.size(), results.size());
+    assertEquals(EXPECTED_OPERATIONS.size() * EXPECTED_PROFILES.size(), results.size());
     assertEquals(
         EXPECTED_OPERATIONS,
         results.stream()
             .map(result -> operation(result.getParams().getBenchmark()))
+            .collect(Collectors.toSet()));
+    assertEquals(
+        EXPECTED_PROFILES,
+        results.stream()
+            .map(result -> result.getParams().getParam("indexProfile"))
             .collect(Collectors.toSet()));
     assertTrue(
         results.stream().allMatch(result -> result.getPrimaryResult().getScore() > 0.0),
