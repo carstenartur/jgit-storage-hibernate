@@ -116,7 +116,8 @@ jobs:
           grep -F 'Hibernate Search runtime burst ready p95' target/search-runtime/comparison.json
           grep -F 'Hibernate Search runtime rebuild ready p99' target/search-runtime/comparison.json
           grep -F 'Hibernate Search concurrent query p95' target/search-runtime/comparison.json
-          grep -F 'Hibernate Search runtime burst visibility lag' target/search-runtime/comparison.json
+          grep -F 'Hibernate Search runtime burst visibility observation wait' target/search-runtime/comparison.json
+          grep -F 'Hibernate Search runtime burst visibility polls' target/search-runtime/comparison.json
           grep -F 'Hibernate Search runtime burst prepared statements' target/search-runtime/comparison.json
 
       - name: Upload Search runtime evidence
@@ -141,7 +142,8 @@ jobs:
           echo '- [Burst submission p50](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-submission-p-50)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Burst ready p95](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-ready-p-95)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Concurrent query p95](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-concurrent-query-p-95)' >> "$GITHUB_STEP_SUMMARY"
-          echo '- [Burst visibility lag](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-visibility-lag)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Burst visibility polls](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-visibility-polls)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Burst visibility observation wait](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-visibility-observation-wait)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Rebuild ready p95](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-rebuild-ready-p-95)' >> "$GITHUB_STEP_SUMMARY"
 
   publish-runtime-history:
