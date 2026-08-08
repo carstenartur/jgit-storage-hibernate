@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import io.github.carstenartur.jgit.storage.hibernate.search.schema.SearchSchemaMigrations;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -90,6 +91,7 @@ class SearchSchemaMigrationIntegrationTest {
         assertEquals("legacy-author@example.invalid", indexed.getAuthorEmail());
         assertNotNull(indexed.getProjectionKey());
         assertTrue(indexed.getProjectionKey().startsWith("legacy-"));
+        assertEquals(SearchIndexingProfile.CONTENT.id(), indexed.getIndexProfile());
       }
     }
   }
@@ -213,7 +215,7 @@ class SearchSchemaMigrationIntegrationTest {
             "0.9.1"),
         migrationVersions(database, CoreSchemaMigrations.SCHEMA_HISTORY_TABLE));
     assertEquals(
-        List.of("0.1.4", "0.1.5", "0.1.14", "0.9.1"),
+        List.of("0.1.4", "0.1.5", "0.1.14", "0.9.1", "0.9.1.1"),
         migrationVersions(database, SearchSchemaMigrations.SCHEMA_HISTORY_TABLE));
   }
 
