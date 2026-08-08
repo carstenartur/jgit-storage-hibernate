@@ -104,14 +104,17 @@ def main() -> None:
         if required not in workflow:
             fail(f"workflow is missing required contract fragment {required!r}")
 
-    floating_refs = re.findall(
+    checkout_refs = re.findall(
         r"repository:\s*carstenartur/(?:audio-analyzer|Taxonomy|sandbox)\s*\n"
-        r"\s*ref:\s*(?![0-9a-f]{40}\s*$)([^\n]+)",
+        r"\s*ref:\s*([^\n]+)",
         workflow,
         flags=re.MULTILINE,
     )
+    floating_refs = [value.strip() for value in checkout_refs if SHA.fullmatch(value.strip()) is None]
     if floating_refs:
         fail(f"consumer checkout uses floating refs: {floating_refs}")
+    if len(checkout_refs) != 3:
+        fail(f"workflow must contain exactly three pinned consumer checkouts, found {len(checkout_refs)}")
 
     print(
         "Consumer compatibility contract verified: "
