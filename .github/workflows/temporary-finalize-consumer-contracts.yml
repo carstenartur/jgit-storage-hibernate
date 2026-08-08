@@ -1,0 +1,636 @@
+name: Temporary finalize consumer contracts
+
+on:
+  push:
+    branches:
+      - ci/consumer-contracts
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-finalize-consumer-contracts
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/consumer-contracts
+          fetch-depth: 0
+
+      - name: Consolidate the consumer contract implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          helper = Path('.github/scripts/run-consumer-contract.sh')
+          helper.write_text(r'''#!/usr/bin/env bash
+# Run one consumer's repository-owned jgit-storage-hibernate contract or its bounded fallback.
+set -euo pipefail
+
+usage() {
+  echo "usage: run-consumer-contract.sh <audio-analyzer|Taxonomy|sandbox> <checkout> <log-file>" >&2
+  exit 64
+}
+
+[[ $# -eq 3 ]] || usage
+consumer=$1
+checkout=$(cd "$2" && pwd)
+log_file=$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$3")
+
+[[ -d "$checkout" ]] || { echo "Missing consumer checkout: $checkout" >&2; exit 66; }
+mkdir -p "$(dirname "$log_file")"
+
+if [[ -x "$checkout/.github/jgit-storage-hibernate-contract.sh" ]]; then
+  echo "Running repository-owned contract for $consumer"
+  (
+    cd "$checkout"
+    set -o pipefail
+    .github/jgit-storage-hibernate-contract.sh 2>&1 | tee "$log_file"
+  )
+  exit 0
+fi
+
+echo "No repository-owned contract for $consumer; running the documented central fallback."
+if [[ -x "$checkout/mvnw" ]]; then
+  maven=("$checkout/mvnw")
+else
+  maven=(mvn)
+fi
+repository_args=()
+if [[ -n "${MAVEN_REPO_LOCAL:-}" ]]; then
+  repository_args=(-Dmaven.repo.local="$MAVEN_REPO_LOCAL")
+fi
+
+case "$consumer" in
+  audio-analyzer)
+    command=("${maven[@]}" -B "${repository_args[@]}" -DskipITs verify)
+    ;;
+  Taxonomy)
+    docker info >/dev/null
+    command=("${maven[@]}" -B "${repository_args[@]}" verify)
+    ;;
+  sandbox)
+    command=(xvfb-run -a "${maven[@]}" -B "${repository_args[@]}" -DskipTests verify)
+    ;;
+  *)
+    usage
+    ;;
+esac
+
+(
+  cd "$checkout"
+  set -o pipefail
+  "${command[@]}" 2>&1 | tee "$log_file"
+)
+''', encoding='utf-8')
+          helper.chmod(0o755)
+
+          prepare = Path('.github/scripts/prepare-consumer-contract.py')
+          text = prepare.read_text(encoding='utf-8')
+          property_anchor = 'PROPERTY_REFERENCE = re.compile(r"^\\$\\{([A-Za-z0-9_.-]+)}$")\n'
+          unsafe_definition = '''UNSAFE_VERSION_PROPERTIES = {
+    "revision",
+    "sha1",
+    "changelist",
+    "project.version",
+    "pom.version",
+}
+'''
+          if 'UNSAFE_VERSION_PROPERTIES' not in text:
+            if property_anchor not in text:
+              raise SystemExit('Could not locate property-reference definition')
+            text = text.replace(property_anchor, property_anchor + unsafe_definition, 1)
+
+          old_loop = '''    property_changes: list[PropertyChange] = []
+    for property_name in sorted(referenced_properties(uses)):
+'''
+          new_loop = '''    property_changes: list[PropertyChange] = []
+    properties = referenced_properties(uses)
+    unsafe_properties = sorted(properties & UNSAFE_VERSION_PROPERTIES)
+    if unsafe_properties:
+        raise SystemExit(
+            "Refusing to rewrite general project version properties: "
+            + ", ".join(unsafe_properties)
+        )
+    for property_name in sorted(properties):
+'''
+          if 'unsafe_properties = sorted(' not in text:
+            if old_loop not in text:
+              raise SystemExit('Could not locate property substitution loop')
+            text = text.replace(old_loop, new_loop, 1)
+          prepare.write_text(text, encoding='utf-8')
+
+          tests = Path('.github/scripts/test_prepare_consumer_contract.py')
+          test_text = tests.read_text(encoding='utf-8')
+          if 'import sys\n' not in test_text:
+            test_text = test_text.replace('import os\n', 'import os\nimport sys\n', 1)
+          module_anchor = 'PREPARE = importlib.util.module_from_spec(SPEC)\nSPEC.loader.exec_module(PREPARE)'
+          if 'sys.modules[SPEC.name] = PREPARE' not in test_text:
+            if module_anchor not in test_text:
+              raise SystemExit('Could not locate dynamic module loading')
+            test_text = test_text.replace(
+                module_anchor,
+                'PREPARE = importlib.util.module_from_spec(SPEC)\n'
+                'sys.modules[SPEC.name] = PREPARE\n'
+                'SPEC.loader.exec_module(PREPARE)',
+                1,
+            )
+          unsafe_test_anchor = '    def test_non_consumer_fails_instead_of_silently_passing(self) -> None:\n'
+          unsafe_test = '''    def test_general_project_revision_is_classified_as_unsafe(self) -> None:
+        use = PREPARE.DependencyUse(
+            pom="pom.xml",
+            artifact="jgit-storage-hibernate-core",
+            declared_version="${revision}",
+            source="property:revision",
+        )
+        properties = PREPARE.referenced_properties([use])
+        self.assertEqual({"revision"}, properties)
+        self.assertEqual(
+            {"revision"}, properties & PREPARE.UNSAFE_VERSION_PROPERTIES
+        )
+
+'''
+          if 'test_general_project_revision_is_classified_as_unsafe' not in test_text:
+            if unsafe_test_anchor not in test_text:
+              raise SystemExit('Could not locate consumer test insertion point')
+            test_text = test_text.replace(
+                unsafe_test_anchor, unsafe_test + unsafe_test_anchor, 1
+            )
+          tests.write_text(test_text, encoding='utf-8')
+
+          workflow = Path('.github/workflows/consumer-compatibility.yml')
+          workflow.write_text(r'''name: Consumer Compatibility
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 3 * * 3'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/consumer-compatibility.yml'
+      - '.github/scripts/prepare-consumer-contract.py'
+      - '.github/scripts/test_prepare_consumer_contract.py'
+      - '.github/scripts/run-consumer-contract.sh'
+      - '.github/scripts/verify-consumer-dependency-tree.py'
+      - '.github/scripts/test_verify_consumer_dependency_tree.py'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-java-analysis/**'
+      - 'jgit-storage-hibernate-architecture/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/consumer-compatibility.yml'
+      - '.github/scripts/prepare-consumer-contract.py'
+      - '.github/scripts/test_prepare_consumer_contract.py'
+      - '.github/scripts/run-consumer-contract.sh'
+      - '.github/scripts/verify-consumer-dependency-tree.py'
+      - '.github/scripts/test_verify_consumer_dependency_tree.py'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-java-analysis/**'
+      - 'jgit-storage-hibernate-architecture/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  current-library:
+    name: Build exact current reactor
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      commit: ${{ steps.identity.outputs.commit }}
+
+    steps:
+      - name: Checkout current library commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Test consumer compatibility tooling
+        run: |
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          python3 .github/scripts/test_verify_consumer_dependency_tree.py
+          bash -n .github/scripts/run-consumer-contract.sh
+
+      - name: Resolve exact reactor identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\ncommit=%s\n' "$version" "$GITHUB_SHA"
+
+      - name: Install current reactor into an isolated repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="${RUNNER_TEMP}/library-reactor-m2"
+          mkdir -p "$repository" target/consumer-compatibility
+          set -o pipefail
+          mvn -B -DskipTests -Dmaven.repo.local="$repository" install 2>&1 \
+            | tee target/consumer-compatibility/library-build.log
+          test -d "$repository/io/github/carstenartur"
+
+      - name: Retain only repository-owned Maven artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/consumer-reactor-repository/io/github
+          cp -R "${RUNNER_TEMP}/library-reactor-m2/io/github/carstenartur" \
+            target/consumer-reactor-repository/io/github/
+          find target/consumer-reactor-repository -type f | sort \
+            > target/consumer-compatibility/reactor-artifacts.txt
+          test -s target/consumer-compatibility/reactor-artifacts.txt
+
+      - name: Upload current reactor repository
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: current-consumer-reactor
+          path: target/consumer-reactor-repository/**
+          if-no-files-found: error
+
+      - name: Upload library build evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consumer-library-build-evidence
+          path: target/consumer-compatibility/**
+          if-no-files-found: error
+
+  consumers:
+    name: ${{ matrix.consumer }} — ${{ matrix.contract }}
+    needs: current-library
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - consumer: audio-analyzer
+            repository: carstenartur/audio-analyzer
+            contract: runtime package and unit linkage
+            timeout: 90
+            forbidden: jgit-storage-hibernate-benchmarks
+          - consumer: Taxonomy
+            repository: carstenartur/Taxonomy
+            contract: PostgreSQL, migrations and indexed history
+            timeout: 120
+            forbidden: ''
+          - consumer: sandbox
+            repository: carstenartur/sandbox
+            contract: Java 21, Tycho/OSGi and Java analysis packaging
+            timeout: 120
+            forbidden: jgit-storage-hibernate-benchmarks
+
+    steps:
+      - name: Checkout compatibility tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: library
+          fetch-depth: 1
+
+      - name: Checkout declared-release baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ matrix.repository }}
+          path: consumer-baseline
+          fetch-depth: 1
+
+      - name: Checkout current-reactor candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ matrix.repository }}
+          path: consumer-current
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: |
+            library/pom.xml
+            consumer-baseline/**/pom.xml
+            consumer-current/**/pom.xml
+
+      - name: Restore current reactor artifacts
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: current-consumer-reactor
+          path: ${{ runner.temp }}/consumer-current-m2
+
+      - name: Record immutable inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/consumer-compatibility
+          baseline_commit="$(git -C consumer-baseline rev-parse HEAD)"
+          current_commit="$(git -C consumer-current rev-parse HEAD)"
+          test "$baseline_commit" = "$current_commit"
+          printf '%s\n' "$baseline_commit" \
+            > target/consumer-compatibility/consumer-commit.txt
+          printf '%s\n' '${{ needs.current-library.outputs.commit }}' \
+            > target/consumer-compatibility/library-commit.txt
+          printf '%s\n' '${{ needs.current-library.outputs.version }}' \
+            > target/consumer-compatibility/library-version.txt
+          find "${RUNNER_TEMP}/consumer-current-m2/io/github/carstenartur" -type f | sort \
+            > target/consumer-compatibility/restored-artifacts.txt
+
+      - name: Resolve declared-release baseline dependencies
+        id: baseline_resolution
+        continue-on-error: true
+        shell: bash
+        working-directory: consumer-baseline
+        run: |
+          set -euo pipefail
+          if [ -x ./mvnw ]; then maven=(./mvnw); else maven=(mvn); fi
+          set -o pipefail
+          "${maven[@]}" -B \
+            -Dincludes=io.github.carstenartur \
+            dependency:tree 2>&1 \
+            | tee ../target/consumer-compatibility/baseline-dependency-tree.log
+
+      - name: Run declared-release baseline contract
+        id: baseline_contract
+        continue-on-error: true
+        shell: bash
+        env:
+          JGIT_STORAGE_HIBERNATE_CONTRACT_MODE: baseline
+          JGIT_STORAGE_HIBERNATE_VERSION: declared
+          JGIT_STORAGE_HIBERNATE_COMMIT: ''
+        run: |
+          library/.github/scripts/run-consumer-contract.sh \
+            '${{ matrix.consumer }}' \
+            consumer-baseline \
+            target/consumer-compatibility/baseline-build.log
+
+      - name: Substitute only jgit-storage-hibernate versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 library/.github/scripts/prepare-consumer-contract.py \
+            --consumer '${{ matrix.consumer }}' \
+            --root consumer-current \
+            --version '${{ needs.current-library.outputs.version }}' \
+            --report target/consumer-compatibility/contract.json
+          git -C consumer-current diff -- pom.xml '**/pom.xml' \
+            > target/consumer-compatibility/pom.patch
+          cat target/consumer-compatibility/contract.json
+
+      - name: Resolve and verify the exact current reactor
+        id: current_resolution
+        continue-on-error: true
+        shell: bash
+        env:
+          FORBIDDEN_ARTIFACT: ${{ matrix.forbidden }}
+        working-directory: consumer-current
+        run: |
+          set -euo pipefail
+          if [ -x ./mvnw ]; then maven=(./mvnw); else maven=(mvn); fi
+          set -o pipefail
+          "${maven[@]}" -B \
+            -Dmaven.repo.local="${RUNNER_TEMP}/consumer-current-m2" \
+            -Dincludes=io.github.carstenartur \
+            dependency:tree 2>&1 \
+            | tee ../target/consumer-compatibility/current-dependency-tree.log
+          args=(
+            --tree ../target/consumer-compatibility/current-dependency-tree.log
+            --version '${{ needs.current-library.outputs.version }}'
+            --report ../target/consumer-compatibility/resolution.json
+          )
+          if [ -n "$FORBIDDEN_ARTIFACT" ]; then
+            args+=(--forbid "$FORBIDDEN_ARTIFACT")
+          fi
+          python3 ../library/.github/scripts/verify-consumer-dependency-tree.py "${args[@]}"
+
+      - name: Run current-reactor consumer contract
+        id: current_contract
+        if: always() && steps.current_resolution.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env:
+          JGIT_STORAGE_HIBERNATE_CONTRACT_MODE: current
+          JGIT_STORAGE_HIBERNATE_VERSION: ${{ needs.current-library.outputs.version }}
+          JGIT_STORAGE_HIBERNATE_COMMIT: ${{ needs.current-library.outputs.commit }}
+          MAVEN_REPO_LOCAL: ${{ runner.temp }}/consumer-current-m2
+        run: |
+          library/.github/scripts/run-consumer-contract.sh \
+            '${{ matrix.consumer }}' \
+            consumer-current \
+            target/consumer-compatibility/current-build.log
+
+      - name: Classify baseline and candidate outcomes
+        id: classification
+        if: always()
+        shell: bash
+        env:
+          BASELINE_RESOLUTION: ${{ steps.baseline_resolution.outcome }}
+          BASELINE_CONTRACT: ${{ steps.baseline_contract.outcome }}
+          CURRENT_RESOLUTION: ${{ steps.current_resolution.outcome }}
+          CURRENT_CONTRACT: ${{ steps.current_contract.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/consumer-compatibility
+          baseline=failed
+          if [ "$BASELINE_RESOLUTION" = success ] && [ "$BASELINE_CONTRACT" = success ]; then
+            baseline=success
+          fi
+          current=failed
+          if [ "$CURRENT_RESOLUTION" = success ] && [ "$CURRENT_CONTRACT" = success ]; then
+            current=success
+          fi
+
+          if [ "$current" = success ]; then
+            classification=current-compatible
+            conclusion=success
+          elif [ "$baseline" = success ]; then
+            classification=library-regression
+            conclusion=failure
+          else
+            classification=consumer-baseline-failing
+            conclusion=warning
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          data = {
+              'baselineResolution': os.environ['BASELINE_RESOLUTION'],
+              'baselineContract': os.environ['BASELINE_CONTRACT'],
+              'currentResolution': os.environ['CURRENT_RESOLUTION'],
+              'currentContract': os.environ['CURRENT_CONTRACT'],
+              'classification': os.environ['CLASSIFICATION'],
+              'conclusion': os.environ['CONCLUSION'],
+          }
+          Path('target/consumer-compatibility/classification.json').write_text(
+              json.dumps(data, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          if [ "$conclusion" = failure ]; then
+            echo "::error::The declared consumer baseline passes, but the exact current library reactor fails."
+            exit 1
+          fi
+          if [ "$conclusion" = warning ]; then
+            echo "::warning::The consumer baseline is already failing; current-reactor failure is retained but not attributed automatically."
+          fi
+        env:
+          BASELINE_RESOLUTION: ${{ steps.baseline_resolution.outcome }}
+          BASELINE_CONTRACT: ${{ steps.baseline_contract.outcome }}
+          CURRENT_RESOLUTION: ${{ steps.current_resolution.outcome }}
+          CURRENT_CONTRACT: ${{ steps.current_contract.outcome }}
+          CLASSIFICATION: ${{ steps.classification.outputs.classification }}
+          CONCLUSION: pending
+
+      - name: Report consumer contract
+        if: always()
+        shell: bash
+        env:
+          CONSUMER: ${{ matrix.consumer }}
+          CONTRACT: ${{ matrix.contract }}
+          LIBRARY_VERSION: ${{ needs.current-library.outputs.version }}
+          BASELINE_RESOLUTION: ${{ steps.baseline_resolution.outcome }}
+          BASELINE_CONTRACT: ${{ steps.baseline_contract.outcome }}
+          CURRENT_RESOLUTION: ${{ steps.current_resolution.outcome }}
+          CURRENT_CONTRACT: ${{ steps.current_contract.outcome }}
+          CLASSIFICATION: ${{ steps.classification.outputs.classification }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path('target/consumer-compatibility/contract.json')
+          data = json.loads(report_path.read_text(encoding='utf-8')) if report_path.is_file() else {}
+          commit_path = Path('target/consumer-compatibility/consumer-commit.txt')
+          commit = commit_path.read_text(encoding='utf-8').strip() if commit_path.is_file() else 'unavailable'
+          modules = ', '.join(f"`{module}`" for module in data.get('modules', [])) or 'unavailable'
+          literal_versions = {
+              use.get('declared_version')
+              for use in data.get('dependencyUses', [])
+              if use.get('declared_version') not in {None, '(managed)'}
+              and not str(use.get('declared_version')).startswith('${')
+          }
+          property_versions = {
+              change.get('previous_value')
+              for change in data.get('propertyChanges', [])
+              if change.get('previous_value')
+          }
+          original_versions = sorted(literal_versions | property_versions)
+          original = ', '.join(f'`{version}`' for version in original_versions) or 'managed/unavailable'
+          owned = Path('consumer-current/.github/jgit-storage-hibernate-contract.sh').is_file()
+          lines = [
+              f"### {os.environ['CONSUMER']} consumer contract",
+              '',
+              f"- Consumer commit: `{commit}`",
+              f"- Declared library version(s): {original}",
+              f"- Substituted library version: `{os.environ['LIBRARY_VERSION']}`",
+              f"- Consumed modules: {modules}",
+              f"- Contract: {os.environ['CONTRACT']}",
+              f"- Repository-owned contract: `{owned}`",
+              f"- Baseline resolution/contract: `{os.environ['BASELINE_RESOLUTION']}` / `{os.environ['BASELINE_CONTRACT']}`",
+              f"- Current resolution/contract: `{os.environ['CURRENT_RESOLUTION']}` / `{os.environ['CURRENT_CONTRACT']}`",
+              f"- Classification: `{os.environ.get('CLASSIFICATION') or 'unavailable'}`",
+              '',
+          ]
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as summary:
+              summary.write('\n'.join(lines))
+          PY
+
+      - name: Upload ${{ matrix.consumer }} compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consumer-${{ matrix.consumer }}-compatibility
+          path: |
+            target/consumer-compatibility/**
+            consumer-baseline/**/target/surefire-reports/**
+            consumer-baseline/**/target/failsafe-reports/**
+            consumer-current/**/target/surefire-reports/**
+            consumer-current/**/target/failsafe-reports/**
+          if-no-files-found: error
+''', encoding='utf-8')
+
+          docs = Path('docs/operations/consumer-compatibility.md')
+          doc_text = docs.read_text(encoding='utf-8').replace('`\\.github/', '`.github/')
+          ownership = (
+              '\nEach consumer may provide an executable '
+              '`.github/jgit-storage-hibernate-contract.sh`. The central matrix passes '
+              '`JGIT_STORAGE_HIBERNATE_VERSION`, `JGIT_STORAGE_HIBERNATE_COMMIT`, '
+              '`JGIT_STORAGE_HIBERNATE_CONTRACT_MODE` and `MAVEN_REPO_LOCAL`, and prefers '
+              'that repository-owned contract. The central commands are transitional fallbacks; '
+              'test ownership remains with the consumer repository.\n'
+          )
+          if 'JGIT_STORAGE_HIBERNATE_CONTRACT_MODE' not in doc_text:
+            anchor = (
+                'No compatibility run commits changes to a consumer repository. '
+                'A missing dependency or a version that cannot be substituted deterministically '
+                'is a failure rather than a silent skip.\n'
+            )
+            if anchor not in doc_text:
+              raise SystemExit('Could not locate contract ownership documentation anchor')
+            doc_text = doc_text.replace(anchor, anchor + ownership, 1)
+          baseline_note = (
+              '\nFor pull-request attribution, the matrix runs the same consumer commit twice: '
+              'first with its declared library release and then with the exact current reactor. '
+              'A current-reactor failure is classified as a library regression only when the '
+              'declared baseline succeeds. When both fail, the evidence is retained and reported '
+              'as an already-failing consumer baseline instead of being silently discarded.\n'
+          )
+          if 'same consumer commit twice' not in doc_text:
+            doc_text += baseline_note
+          docs.write_text(doc_text, encoding='utf-8')
+
+          for temporary in Path('.github/workflows').glob('temporary-*.yml'):
+            temporary.unlink()
+          PY
+
+      - name: Verify the consolidated implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          python3 .github/scripts/test_verify_consumer_dependency_tree.py
+          bash -n .github/scripts/run-consumer-contract.sh
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/consumer-compatibility.yml')"
+          git diff --check
+          test -z "$(find .github/workflows -maxdepth 1 -name 'temporary-*.yml' -print -quit)"
+
+      - name: Commit consolidated consumer contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Finalize baseline-aware consumer compatibility contracts'
+          git push origin HEAD:ci/consumer-contracts
