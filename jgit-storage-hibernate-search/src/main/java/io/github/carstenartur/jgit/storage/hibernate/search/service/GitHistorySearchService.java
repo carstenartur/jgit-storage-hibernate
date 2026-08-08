@@ -22,6 +22,12 @@ import org.hibernate.search.mapper.orm.session.SearchSession;
 /** Query service for indexed Git history. */
 public class GitHistorySearchService {
 
+  private static final String SUMMARY_PROJECTION =
+      "SELECT new "
+          + CommitSearchHit.class.getName()
+          + "(c.objectId, c.shortMessage, c.authorName, c.authorEmail, "
+          + "c.committerName, c.committerEmail, c.authorTime, c.committerTime) ";
+
   private final SessionFactory sessionFactory;
 
   public GitHistorySearchService(SessionFactory sessionFactory) {
@@ -37,6 +43,22 @@ public class GitHistorySearchService {
   }
 
   /**
+   * Search commit text and return compact values directly from the index.
+   *
+   * <p>Unlike {@link #searchCommitText(String, String, int)}, this method does not hydrate matching
+   * {@link GitCommitIndex} entities and therefore does not materialize the large changed-text and
+   * changed-path columns.
+   */
+  public List<CommitSearchHit> searchCommitTextSummaries(
+      String repositoryName, String query, int limit) {
+    return findChangeSummaries(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .matchingText(query)
+            .limit(limit)
+            .build());
+  }
+
+  /**
    * Find commits matching all supplied full-text, identity, changed-path, time and candidate
    * predicates.
    *
@@ -45,11 +67,28 @@ public class GitHistorySearchService {
    * to committer time. Offset and limit are always applied after ordering.
    */
   public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
-    Objects.requireNonNull(query, "query");
-    if (query.hasObjectIdRestriction() && query.objectIds().isEmpty()) {
+    validateQuery(query);
+    if (matchesNothing(query)) {
       return List.of();
     }
     return query.text() == null ? findStructuredChanges(query) : findFullTextChanges(query);
+  }
+
+  /**
+   * Find compact commit summaries without loading the large projection entity payload.
+   *
+   * <p>Full-text hits are projected directly from Lucene. Structured-only hits use a bounded HQL
+   * constructor projection, so both paths return the same immutable result type without loading the
+   * changed text column.
+   */
+  public List<CommitSearchHit> findChangeSummaries(CommitHistoryQuery query) {
+    validateQuery(query);
+    if (matchesNothing(query)) {
+      return List.of();
+    }
+    return query.text() == null
+        ? findStructuredSummaries(query)
+        : findFullTextSummaries(query);
   }
 
   private List<GitCommitIndex> findFullTextChanges(CommitHistoryQuery query) {
@@ -58,55 +97,99 @@ public class GitHistorySearchService {
       SearchSession searchSession = Search.session(session);
       return searchSession
           .search(GitCommitIndex.class)
-          .where(
-              f -> {
-                var predicate =
-                    f.bool()
-                        .filter(
-                            f.match()
-                                .field("repositoryName")
-                                .matching(query.repositoryName()))
-                        .must(
-                            f.simpleQueryString()
-                                .fields(
-                                    "shortMessage",
-                                    "fullMessage",
-                                    "changedPaths",
-                                    "changedText")
-                                .matching(query.text()));
-                if (query.hasObjectIdRestriction()) {
-                  predicate.filter(f.terms().field("objectId").matchingAny(query.objectIds()));
-                }
-                if (query.authorEmail() != null) {
-                  predicate.filter(f.match().field("authorEmail").matching(query.authorEmail()));
-                }
-                if (query.committerEmail() != null) {
-                  predicate.filter(
-                      f.match().field("committerEmail").matching(query.committerEmail()));
-                }
-                if (query.pathFragment() != null) {
-                  predicate.filter(
-                      f.simpleQueryString()
-                          .field(GitCommitIndex.CHANGED_PATH_TERMS_FIELD)
-                          .matching(query.pathFragment())
-                          .defaultOperator(BooleanOperator.AND));
-                }
-                if (query.from() != null) {
-                  predicate.filter(f.range().field(timeField).atLeast(query.from()));
-                }
-                if (query.to() != null) {
-                  predicate.filter(f.range().field(timeField).atMost(query.to()));
-                }
-                return predicate;
-              })
+          .where(f -> fullTextPredicate(f, query, timeField))
           .fetchHits(query.offset(), query.limit());
     }
+  }
+
+  private List<CommitSearchHit> findFullTextSummaries(CommitHistoryQuery query) {
+    String timeField = searchTimeField(query);
+    try (Session session = sessionFactory.openSession()) {
+      SearchSession searchSession = Search.session(session);
+      return searchSession
+          .search(GitCommitIndex.class)
+          .select(CommitSearchHit.class)
+          .where(f -> fullTextPredicate(f, query, timeField))
+          .fetchHits(query.offset(), query.limit());
+    }
+  }
+
+  private static org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFinalStep
+      fullTextPredicate(
+          org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFactory f,
+          CommitHistoryQuery query,
+          String timeField) {
+    var predicate =
+        f.bool()
+            .filter(f.match().field("repositoryName").matching(query.repositoryName()))
+            .must(
+                f.simpleQueryString()
+                    .fields("shortMessage", "fullMessage", "changedPaths", "changedText")
+                    .matching(query.text()));
+    if (query.hasObjectIdRestriction()) {
+      predicate.filter(f.terms().field("objectId").matchingAny(query.objectIds()));
+    }
+    if (query.authorEmail() != null) {
+      predicate.filter(f.match().field("authorEmail").matching(query.authorEmail()));
+    }
+    if (query.committerEmail() != null) {
+      predicate.filter(f.match().field("committerEmail").matching(query.committerEmail()));
+    }
+    if (query.pathFragment() != null) {
+      predicate.filter(
+          f.simpleQueryString()
+              .field(GitCommitIndex.CHANGED_PATH_TERMS_FIELD)
+              .matching(query.pathFragment())
+              .defaultOperator(BooleanOperator.AND));
+    }
+    if (query.from() != null) {
+      predicate.filter(f.range().field(timeField).atLeast(query.from()));
+    }
+    if (query.to() != null) {
+      predicate.filter(f.range().field(timeField).atMost(query.to()));
+    }
+    return predicate;
   }
 
   private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
     String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
         new StringBuilder("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+    appendStructuredPredicates(hql, query, timeProperty);
+    appendStructuredOrder(hql, timeProperty);
+
+    try (Session session = sessionFactory.openSession()) {
+      var selection =
+          session
+              .createQuery(hql.toString(), GitCommitIndex.class)
+              .setFirstResult(query.offset())
+              .setMaxResults(query.limit());
+      bindStructuredParameters(selection, query);
+      return selection.getResultList();
+    }
+  }
+
+  private List<CommitSearchHit> findStructuredSummaries(CommitHistoryQuery query) {
+    String timeProperty = hqlTimeProperty(query);
+    StringBuilder hql =
+        new StringBuilder(SUMMARY_PROJECTION)
+            .append("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+    appendStructuredPredicates(hql, query, timeProperty);
+    appendStructuredOrder(hql, timeProperty);
+
+    try (Session session = sessionFactory.openSession()) {
+      var selection =
+          session
+              .createQuery(hql.toString(), CommitSearchHit.class)
+              .setFirstResult(query.offset())
+              .setMaxResults(query.limit());
+      bindStructuredParameters(selection, query);
+      return selection.getResultList();
+    }
+  }
+
+  private static void appendStructuredPredicates(
+      StringBuilder hql, CommitHistoryQuery query, String timeProperty) {
     if (query.hasObjectIdRestriction()) {
       hql.append(" AND c.objectId IN :objectIds");
     }
@@ -125,36 +208,42 @@ public class GitHistorySearchService {
     if (query.to() != null) {
       hql.append(" AND c.").append(timeProperty).append(" <= :to");
     }
-    hql.append(" ORDER BY c.").append(timeProperty).append(" DESC, c.objectId ASC");
+  }
 
-    try (Session session = sessionFactory.openSession()) {
-      var selection =
-          session
-              .createQuery(hql.toString(), GitCommitIndex.class)
-              .setParameter("repo", query.repositoryName())
-              .setFirstResult(query.offset())
-              .setMaxResults(query.limit());
-      if (query.hasObjectIdRestriction()) {
-        selection.setParameter("objectIds", query.objectIds());
-      }
-      if (query.authorEmail() != null) {
-        selection.setParameter("authorEmail", query.authorEmail());
-      }
-      if (query.committerEmail() != null) {
-        selection.setParameter("committerEmail", query.committerEmail());
-      }
-      if (query.pathFragment() != null) {
-        selection.setParameter(
-            "path", "%" + escapeLikePattern(query.pathFragment().toLowerCase(Locale.ROOT)) + "%");
-      }
-      if (query.from() != null) {
-        selection.setParameter("from", query.from());
-      }
-      if (query.to() != null) {
-        selection.setParameter("to", query.to());
-      }
-      return selection.getResultList();
+  private static void appendStructuredOrder(StringBuilder hql, String timeProperty) {
+    hql.append(" ORDER BY c.").append(timeProperty).append(" DESC, c.objectId ASC");
+  }
+
+  private static void bindStructuredParameters(
+      org.hibernate.query.SelectionQuery<?> selection, CommitHistoryQuery query) {
+    selection.setParameter("repo", query.repositoryName());
+    if (query.hasObjectIdRestriction()) {
+      selection.setParameter("objectIds", query.objectIds());
     }
+    if (query.authorEmail() != null) {
+      selection.setParameter("authorEmail", query.authorEmail());
+    }
+    if (query.committerEmail() != null) {
+      selection.setParameter("committerEmail", query.committerEmail());
+    }
+    if (query.pathFragment() != null) {
+      selection.setParameter(
+          "path", "%" + escapeLikePattern(query.pathFragment().toLowerCase(Locale.ROOT)) + "%");
+    }
+    if (query.from() != null) {
+      selection.setParameter("from", query.from());
+    }
+    if (query.to() != null) {
+      selection.setParameter("to", query.to());
+    }
+  }
+
+  private static void validateQuery(CommitHistoryQuery query) {
+    Objects.requireNonNull(query, "query");
+  }
+
+  private static boolean matchesNothing(CommitHistoryQuery query) {
+    return query.hasObjectIdRestriction() && query.objectIds().isEmpty();
   }
 
   private static String hqlTimeProperty(CommitHistoryQuery query) {
