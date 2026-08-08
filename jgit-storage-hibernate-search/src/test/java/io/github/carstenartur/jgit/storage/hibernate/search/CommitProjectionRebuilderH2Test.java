@@ -116,7 +116,7 @@ class CommitProjectionRebuilderH2Test {
   }
 
   @Test
-  void reportsInterruptionAndClearsPartialProjectionOnRetry() throws Exception {
+  void reportsCommittedBatchOnInterruptionAndClearsItOnRetry() throws Exception {
     ObjectId first = createCommit("First rebuild step", "first.txt", "one", null);
     ObjectId second = createCommit("Second rebuild step", "second.txt", "two", first);
     ObjectId third = createCommit("Third rebuild step", "third.txt", "three", second);
@@ -142,15 +142,15 @@ class CommitProjectionRebuilderH2Test {
     assertTrue(Thread.interrupted(), "The interrupted status must be observable and then cleared");
     RebuildProgress interrupted = progress.getLast();
     assertEquals(RebuildState.INTERRUPTED, interrupted.state());
-    assertEquals(1, interrupted.indexedCommits());
+    assertEquals(2, interrupted.indexedCommits());
     assertEquals(InterruptedIOException.class.getName(), interrupted.failureType());
     assertTrue(interrupted.failureMessage().contains("interrupted"));
-    assertEquals(1, projectedObjectIds().size());
+    assertEquals(2, projectedObjectIds().size());
 
     RebuildResult retry =
         rebuilder.rebuild(repository, new RepositoryName(repositoryName));
     assertEquals(RebuildState.COMPLETED, retry.state());
-    assertEquals(1, retry.removedProjections());
+    assertEquals(2, retry.removedProjections());
     assertEquals(3, retry.indexedCommits());
     assertEquals(
         List.of(first.name(), second.name(), third.name()).stream().sorted().toList(),
@@ -209,6 +209,8 @@ class CommitProjectionRebuilderH2Test {
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.search.backend.type", "lucene");
     properties.put("hibernate.search.backend.directory.type", "local-heap");
+    properties.put(CommitIndexer.INDEX_BATCH_SIZE_PROPERTY, "2");
+    properties.put(CommitProjectionRebuilder.PURGE_BATCH_SIZE_PROPERTY, "2");
     return properties;
   }
 }
