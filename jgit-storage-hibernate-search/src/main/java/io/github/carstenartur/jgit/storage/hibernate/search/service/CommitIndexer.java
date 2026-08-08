@@ -9,6 +9,9 @@
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchContentPolicy;
+import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
+import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile.ContentMode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -16,6 +19,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.eclipse.jgit.diff.Edit;
+import org.eclipse.jgit.diff.EditList;
+import org.eclipse.jgit.diff.HistogramDiff;
+import org.eclipse.jgit.diff.RawText;
+import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -56,13 +64,14 @@ public class CommitIndexer {
   /** Safety ceiling for SQL {@code IN} lists and one persistence context. */
   public static final int MAX_INDEX_BATCH_SIZE = 1_000;
 
-  private static final int MAX_INDEXED_BLOB_BYTES = 256 * 1024;
-  private static final int MAX_CHANGED_TEXT_CHARS = 250_000;
+  private static final int PREVIOUS_TREE = 0;
   private static final int CURRENT_TREE = 1;
 
   private final SessionFactory sessionFactory;
   private final String repositoryName;
   private final int batchSize;
+  private final SearchIndexingProfile indexingProfile;
+  private final SearchContentPolicy contentPolicy;
 
   /**
    * Create an indexer.
@@ -74,7 +83,20 @@ public class CommitIndexer {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
     SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(this.sessionFactory);
+    indexingProfile = SearchIndexingProfile.resolve(sessionFactory);
+    contentPolicy = SearchContentPolicy.resolve(sessionFactory);
+    SearchIndexProfileCompatibility.requireCompatible(this.sessionFactory, repositoryName);
     batchSize = resolveBatchSize(sessionFactory);
+  }
+
+  /** Return the semantic profile used by this indexer. */
+  public SearchIndexingProfile indexingProfile() {
+    return indexingProfile;
+  }
+
+  /** Return the bounded content policy used by this indexer. */
+  public SearchContentPolicy contentPolicy() {
+    return contentPolicy;
   }
 
   /**
@@ -194,6 +216,7 @@ public class CommitIndexer {
   private GitCommitIndex toProjection(
       ObjectReader reader, RevWalk revWalk, RevCommit commit) throws IOException {
     GitCommitIndex projection = new GitCommitIndex();
+    projection.setIndexProfile(indexingProfile.id());
     projection.setRepositoryName(repositoryName);
     projection.setObjectId(commit.name());
     projection.setShortMessage(commit.getShortMessage());
@@ -221,6 +244,10 @@ public class CommitIndexer {
 
   private TreeText readChangedTreeText(
       ObjectReader reader, RevWalk revWalk, RevCommit commit) throws IOException {
+    if (!indexingProfile.indexesPaths()) {
+      return new TreeText(List.of(), null);
+    }
+
     List<String> paths = new ArrayList<>();
     StringBuilder text = new StringBuilder();
 
@@ -238,28 +265,70 @@ public class CommitIndexer {
         String path = treeWalk.getPathString();
         paths.add(path);
 
-        if (text.length() >= MAX_CHANGED_TEXT_CHARS
-            || FileMode.MISSING.equals(treeWalk.getFileMode(CURRENT_TREE))) {
+        if (!indexingProfile.indexesContent()
+            || text.length() >= contentPolicy.maxCommitChars()
+            || FileMode.MISSING.equals(treeWalk.getFileMode(CURRENT_TREE))
+            || !contentPolicy.acceptsPath(path)) {
           continue;
         }
 
-        ObjectId objectId = treeWalk.getObjectId(CURRENT_TREE);
-        ObjectLoader loader = reader.open(objectId);
-        if (loader.getType() != Constants.OBJ_BLOB || loader.getSize() > MAX_INDEXED_BLOB_BYTES) {
+        String currentText = readTextCandidate(reader, treeWalk, CURRENT_TREE, path);
+        if (currentText == null) {
           continue;
         }
 
-        byte[] bytes = loader.getBytes();
-        text.append('\n').append("--- ").append(path).append(" ---\n");
-        text.append(new String(bytes, StandardCharsets.UTF_8));
+        String indexedText = currentText;
+        if (indexingProfile.contentMode() == ContentMode.DIFF_HUNKS) {
+          String previousText =
+              FileMode.MISSING.equals(treeWalk.getFileMode(PREVIOUS_TREE))
+                  ? ""
+                  : readTextCandidate(reader, treeWalk, PREVIOUS_TREE, path);
+          if (previousText == null) {
+            continue;
+          }
+          indexedText = addedOrModifiedLines(previousText, currentText);
+          if (indexedText.isEmpty()) {
+            continue;
+          }
+        }
+
+        appendBounded(text, "\n--- " + path + " ---\n", contentPolicy.maxCommitChars());
+        appendBounded(text, indexedText, contentPolicy.maxCommitChars());
       }
     }
 
-    return new TreeText(paths, truncate(text.toString(), MAX_CHANGED_TEXT_CHARS));
+    return new TreeText(paths, text.isEmpty() ? null : text.toString());
   }
 
-  private static String truncate(String value, int maxLength) {
-    return value.length() <= maxLength ? value : value.substring(0, maxLength);
+  private String readTextCandidate(
+      ObjectReader reader, TreeWalk treeWalk, int treeIndex, String path) throws IOException {
+    ObjectId objectId = treeWalk.getObjectId(treeIndex);
+    ObjectLoader loader = reader.open(objectId);
+    if (loader.getType() != Constants.OBJ_BLOB || loader.getSize() > contentPolicy.maxFileBytes()) {
+      return null;
+    }
+    return contentPolicy.decode(path, loader.getBytes());
+  }
+
+  private static String addedOrModifiedLines(String previous, String current) {
+    RawText before = new RawText(previous.getBytes(StandardCharsets.UTF_8));
+    RawText after = new RawText(current.getBytes(StandardCharsets.UTF_8));
+    EditList edits = new HistogramDiff().diff(RawTextComparator.DEFAULT, before, after);
+    StringBuilder result = new StringBuilder();
+    for (Edit edit : edits) {
+      for (int line = edit.getBeginB(); line < edit.getEndB(); line++) {
+        result.append(after.getString(line)).append('\n');
+      }
+    }
+    return result.toString();
+  }
+
+  private static void appendBounded(StringBuilder target, String value, int maximum) {
+    if (value == null || value.isEmpty() || target.length() >= maximum) {
+      return;
+    }
+    int remaining = maximum - target.length();
+    target.append(value, 0, Math.min(value.length(), remaining));
   }
 
   private Set<String> findExistingObjectIds(List<RevCommit> commits) {
@@ -324,6 +393,7 @@ public class CommitIndexer {
 
   private static void copyMutableProjection(
       GitCommitIndex target, GitCommitIndex source) {
+    target.setIndexProfile(source.getIndexProfile());
     target.setShortMessage(source.getShortMessage());
     target.setFullMessage(source.getFullMessage());
     target.setAuthorName(source.getAuthorName());
