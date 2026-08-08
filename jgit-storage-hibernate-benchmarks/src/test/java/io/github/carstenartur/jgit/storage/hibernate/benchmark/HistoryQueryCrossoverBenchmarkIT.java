@@ -28,23 +28,23 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Runs the JGit/FileRepository versus indexed-history comparison with real PostgreSQL. */
+/** Runs the JGit/filesystem versus indexed-history comparison with real PostgreSQL. */
 @Testcontainers(disabledWithoutDocker = true)
 class HistoryQueryCrossoverBenchmarkIT {
 
   private static final Set<String> EXPECTED_ENGINES =
       Set.of(
-          HistoryQueryCrossoverBenchmark.FILESYSTEM_JGIT,
-          HistoryQueryCrossoverBenchmark.HIBERNATE_JGIT,
-          HistoryQueryCrossoverBenchmark.INDEXED_PROJECTION);
+          CanonicalHistoryQueryCrossoverBenchmark.FILESYSTEM_JGIT,
+          CanonicalHistoryQueryCrossoverBenchmark.HIBERNATE_JGIT,
+          CanonicalHistoryQueryCrossoverBenchmark.INDEXED_PROJECTION);
 
   private static final Set<String> SUPPORTED_QUERIES =
       Set.of(
-          HistoryQueryCrossoverBenchmark.AUTHOR_TIME,
-          HistoryQueryCrossoverBenchmark.PATH_TIME,
-          HistoryQueryCrossoverBenchmark.MESSAGE_TEXT,
-          HistoryQueryCrossoverBenchmark.PATH_CONTENT,
-          HistoryQueryCrossoverBenchmark.COMPOUND);
+          CanonicalHistoryQueryCrossoverBenchmark.AUTHOR_TIME,
+          CanonicalHistoryQueryCrossoverBenchmark.PATH_TIME,
+          CanonicalHistoryQueryCrossoverBenchmark.MESSAGE_TEXT,
+          CanonicalHistoryQueryCrossoverBenchmark.PATH_CONTENT,
+          CanonicalHistoryQueryCrossoverBenchmark.COMPOUND);
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -67,14 +67,14 @@ class HistoryQueryCrossoverBenchmarkIT {
 
     Options options =
         new OptionsBuilder()
-            .include(HistoryQueryCrossoverBenchmark.class.getName())
+            .include(CanonicalHistoryQueryCrossoverBenchmark.class.getName())
             .param("commitCount", commitCounts)
             .param("queryLimit", "500")
             .param(
                 "engine",
-                HistoryQueryCrossoverBenchmark.FILESYSTEM_JGIT,
-                HistoryQueryCrossoverBenchmark.HIBERNATE_JGIT,
-                HistoryQueryCrossoverBenchmark.INDEXED_PROJECTION)
+                CanonicalHistoryQueryCrossoverBenchmark.FILESYSTEM_JGIT,
+                CanonicalHistoryQueryCrossoverBenchmark.HIBERNATE_JGIT,
+                CanonicalHistoryQueryCrossoverBenchmark.INDEXED_PROJECTION)
             .param("queryKind", queryKinds)
             .addProfiler(GCProfiler.class)
             .shouldFailOnError(true)
