@@ -9,6 +9,7 @@ on:
     paths:
       - '.github/workflows/search-performance.yml'
       - '.github/scripts/benchmark_units.py'
+      - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-performance.py'
       - '.github/scripts/test_convert_jmh_search_performance.py'
       - '.github/scripts/publish-benchmark-history.py'
@@ -22,6 +23,7 @@ on:
     paths:
       - '.github/workflows/search-performance.yml'
       - '.github/scripts/benchmark_units.py'
+      - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-performance.py'
       - '.github/scripts/test_convert_jmh_search_performance.py'
       - '.github/scripts/publish-benchmark-history.py'
@@ -42,7 +44,7 @@ jobs:
   search-performance:
     name: PostgreSQL + Lucene indexing, rebuild and query comparison
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55
 
     steps:
       - name: Checkout
@@ -55,8 +57,10 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Test Search chart conversion
-        run: python3 .github/scripts/test_convert_jmh_search_performance.py
+      - name: Test Search chart conversion and benchmark units
+        run: |
+          python3 .github/scripts/test_benchmark_units.py
+          python3 .github/scripts/test_convert_jmh_search_performance.py
 
       - name: Build benchmark module with Maven
         shell: bash
@@ -87,9 +91,15 @@ jobs:
           test -s .github/benchmark-dashboard/index.html
           test -s .github/benchmark-dashboard/dashboard.js
           grep -F 'Hibernate Search full-text query' target/search-performance/comparison.json
+          grep -F 'Hibernate Search content query' target/search-performance/comparison.json
           grep -F 'Hibernate Search path query' target/search-performance/comparison.json
           grep -F 'Hibernate Search indexing' target/search-performance/comparison.json
           grep -F 'Hibernate Search rebuild' target/search-performance/comparison.json
+          grep -F 'Hibernate Search index footprint' target/search-performance/comparison.json
+          grep -F 'Hibernate Search SQL projection footprint' target/search-performance/comparison.json
+          grep -F 'Hibernate Search segment count' target/search-performance/comparison.json
+          grep -F 'Hibernate Search content quality' target/search-performance/comparison.json
+          grep -F 'Hibernate Search path quality' target/search-performance/comparison.json
 
       - name: Upload Search performance evidence
         if: always()
@@ -106,12 +116,18 @@ jobs:
         run: |
           echo '### Hibernate Search performance' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo 'The retained PostgreSQL + local-filesystem Lucene fixture compares bounded incremental indexing, purge/rebuild, entity hydration versus direct Lucene projections, and SQL versus Lucene path lookup.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The retained PostgreSQL + local-filesystem Lucene fixture compares all versioned indexing profiles across indexing/rebuild cost, query latency, footprint and intentional recall trade-offs.' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Full-text query chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-full-text-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Content query chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-content-query)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Path query chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-path-query)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Indexing chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-indexing)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Rebuild chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-rebuild)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Lucene footprint chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-index-footprint)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [SQL projection footprint chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-sql-projection-footprint)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Segment-count chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-segment-count)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Content miss-rate chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-content-quality)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Path miss-rate chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-path-quality)' >> "$GITHUB_STEP_SUMMARY"
 
   publish-search-history:
     name: Publish Hibernate Search benchmark history

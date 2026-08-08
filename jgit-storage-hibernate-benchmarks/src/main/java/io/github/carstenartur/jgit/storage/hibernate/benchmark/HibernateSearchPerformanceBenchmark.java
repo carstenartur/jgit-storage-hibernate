@@ -13,6 +13,7 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.search.SearchEntities;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistoryQuery;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitIndexer;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitProjectionRebuilder;
@@ -37,6 +38,7 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.TreeFormatter;
+import org.hibernate.Session;
 import org.hibernate.stat.Statistics;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -75,6 +77,7 @@ public class HibernateSearchPerformanceBenchmark {
 
   private static final AtomicInteger INVOCATION = new AtomicInteger();
   private static final String NEEDLE = "needle";
+  private static final String CONTENT_NEEDLE = "payloadneedle";
   private static final String PATH_FRAGMENT = "payments/fraud";
   private static final String PATH_TERMS = "services payments fraud";
   private static final int CONTENT_BYTES = 8 * 1024;
@@ -85,6 +88,9 @@ public class HibernateSearchPerformanceBenchmark {
   @Param({"50"})
   public int queryLimit;
 
+  @Param({"content-v1"})
+  public String indexProfile;
+
   private HibernateSessionFactoryProvider provider;
   private HibernateRepository repository;
   private GitHistorySearchService searchService;
@@ -93,6 +99,9 @@ public class HibernateSearchPerformanceBenchmark {
   private ObjectId headCommit;
   private Path indexRoot;
   private String operation;
+  private long prebuiltLuceneBytes;
+  private long prebuiltSqlBytes;
+  private long prebuiltSegmentCount;
 
   @Setup(Level.Invocation)
   public void setupInvocation(BenchmarkParams params) throws Exception {
@@ -101,12 +110,13 @@ public class HibernateSearchPerformanceBenchmark {
         "jmh-search-"
             + operation
             + "-"
+            + indexProfile.replace('-', '_')
+            + "-"
             + INVOCATION.incrementAndGet()
             + "-"
             + Long.toHexString(System.nanoTime());
     indexRoot = Files.createTempDirectory("jgit-storage-search-jmh-");
-    provider =
-        new HibernateSessionFactoryProvider(properties(), SearchEntities.annotatedClasses());
+    provider = new HibernateSessionFactoryProvider(properties(), SearchEntities.annotatedClasses());
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     repository.create(true);
     headCommit = createHistory();
@@ -115,6 +125,13 @@ public class HibernateSearchPerformanceBenchmark {
     if (!"incrementalIndexing".equals(operation)) {
       new CommitProjectionRebuilder(provider.getSessionFactory())
           .rebuild(repository, new RepositoryName(repositoryName));
+      prebuiltLuceneBytes = directoryBytes(indexRoot);
+      prebuiltSqlBytes = postgresProjectionBytes();
+      prebuiltSegmentCount = luceneSegmentCount(indexRoot);
+    } else {
+      prebuiltLuceneBytes = 0L;
+      prebuiltSqlBytes = 0L;
+      prebuiltSegmentCount = 0L;
     }
     statistics = provider.getSessionFactory().getStatistics();
     statistics.clear();
@@ -146,7 +163,7 @@ public class HibernateSearchPerformanceBenchmark {
     int indexed =
         new CommitIndexer(provider.getSessionFactory(), repositoryName)
             .indexCommitsFrom(repository, headCommit, -1);
-    counters.capture(statistics, indexed);
+    counters.capture(statistics, indexed, 0L, 0L, 0L);
     if (indexed != commitCount) {
       throw new IllegalStateException(
           "Expected to index " + commitCount + " commits, indexed " + indexed);
@@ -160,7 +177,12 @@ public class HibernateSearchPerformanceBenchmark {
     var result =
         new CommitProjectionRebuilder(provider.getSessionFactory())
             .rebuild(repository, new RepositoryName(repositoryName));
-    counters.capture(statistics, result.indexedCommits());
+    counters.capture(
+        statistics,
+        result.indexedCommits(),
+        prebuiltLuceneBytes,
+        prebuiltSqlBytes,
+        prebuiltSegmentCount);
     if (result.indexedCommits() != commitCount || result.removedProjections() != commitCount) {
       throw new IllegalStateException(
           "Unexpected rebuild result: indexed="
@@ -174,9 +196,9 @@ public class HibernateSearchPerformanceBenchmark {
   /** Full-text result list through managed-entity hydration. */
   @Benchmark
   public int fullTextEntityHits(SearchCounters counters) {
-    List<GitCommitIndex> hits =
-        searchService.searchCommitText(repositoryName, NEEDLE, queryLimit);
-    counters.capture(statistics, hits.size());
+    List<GitCommitIndex> hits = searchService.searchCommitText(repositoryName, NEEDLE, queryLimit);
+    counters.capture(
+        statistics, hits.size(), prebuiltLuceneBytes, prebuiltSqlBytes, prebuiltSegmentCount);
     return entityChecksum(hits);
   }
 
@@ -185,7 +207,18 @@ public class HibernateSearchPerformanceBenchmark {
   public int fullTextSummaryHits(SearchCounters counters) {
     List<CommitSearchHit> hits =
         searchService.searchCommitTextSummaries(repositoryName, NEEDLE, queryLimit);
-    counters.capture(statistics, hits.size());
+    counters.capture(
+        statistics, hits.size(), prebuiltLuceneBytes, prebuiltSqlBytes, prebuiltSegmentCount);
+    return summaryChecksum(hits);
+  }
+
+  /** Content-only recall probe; metadata/path profiles intentionally return no hits. */
+  @Benchmark
+  public int contentOnlySummaryHits(SearchCounters counters) {
+    List<CommitSearchHit> hits =
+        searchService.searchCommitTextSummaries(repositoryName, CONTENT_NEEDLE, queryLimit);
+    counters.capture(
+        statistics, hits.size(), prebuiltLuceneBytes, prebuiltSqlBytes, prebuiltSegmentCount);
     return summaryChecksum(hits);
   }
 
@@ -198,7 +231,8 @@ public class HibernateSearchPerformanceBenchmark {
                 .touchingPath(PATH_FRAGMENT)
                 .limit(queryLimit)
                 .build());
-    counters.capture(statistics, hits.size());
+    counters.capture(
+        statistics, hits.size(), prebuiltLuceneBytes, prebuiltSqlBytes, prebuiltSegmentCount);
     return summaryChecksum(hits);
   }
 
@@ -211,7 +245,8 @@ public class HibernateSearchPerformanceBenchmark {
                 .touchingPathTerms(PATH_TERMS)
                 .limit(queryLimit)
                 .build());
-    counters.capture(statistics, hits.size());
+    counters.capture(
+        statistics, hits.size(), prebuiltLuceneBytes, prebuiltSqlBytes, prebuiltSegmentCount);
     return summaryChecksum(hits);
   }
 
@@ -240,9 +275,7 @@ public class HibernateSearchPerformanceBenchmark {
         commit.setAuthor(identity);
         commit.setCommitter(identity);
         commit.setMessage(
-            (index % 5 == 0 ? "Needle " : "Routine ")
-                + "projection commit "
-                + index);
+            (index % 5 == 0 ? "Needle " : "Routine ") + "projection commit " + index);
         parent = inserter.insert(commit);
       }
       inserter.flush();
@@ -260,7 +293,7 @@ public class HibernateSearchPerformanceBenchmark {
 
   private static byte[] deterministicContent(int index, String path) {
     String prefix =
-        (index % 5 == 0 ? NEEDLE : "ordinary")
+        (index % 5 == 0 ? CONTENT_NEEDLE : "ordinary")
             + " content for "
             + path
             + " at commit "
@@ -293,12 +326,14 @@ public class HibernateSearchPerformanceBenchmark {
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.format_sql", "false");
     properties.put("hibernate.generate_statistics", "true");
-    properties.put("hibernate.jdbc.batch_size", Integer.toString(CommitIndexer.DEFAULT_INDEX_BATCH_SIZE));
+    properties.put(
+        "hibernate.jdbc.batch_size", Integer.toString(CommitIndexer.DEFAULT_INDEX_BATCH_SIZE));
     properties.put("hibernate.order_inserts", "true");
     properties.put("hibernate.search.backend.type", "lucene");
     properties.put("hibernate.search.backend.directory.type", "local-filesystem");
     properties.put("hibernate.search.backend.directory.root", indexRoot.toString());
     properties.put("hibernate.search.automatic_indexing.synchronization.strategy", "sync");
+    properties.put(SearchIndexingProfile.PROFILE_PROPERTY, indexProfile);
     properties.put(
         CommitIndexer.INDEX_BATCH_SIZE_PROPERTY,
         Integer.toString(CommitIndexer.DEFAULT_INDEX_BATCH_SIZE));
@@ -306,6 +341,47 @@ public class HibernateSearchPerformanceBenchmark {
         CommitProjectionRebuilder.PURGE_BATCH_SIZE_PROPERTY,
         Integer.toString(CommitProjectionRebuilder.DEFAULT_PURGE_BATCH_SIZE));
     return properties;
+  }
+
+  private long postgresProjectionBytes() {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      Number value =
+          (Number)
+              session
+                  .createNativeQuery("select pg_total_relation_size('git_commit_index')")
+                  .getSingleResult();
+      return value.longValue();
+    }
+  }
+
+  private static long directoryBytes(Path root) throws IOException {
+    if (root == null || !Files.exists(root)) {
+      return 0L;
+    }
+    try (var paths = Files.walk(root)) {
+      return paths.filter(Files::isRegularFile).mapToLong(HibernateSearchPerformanceBenchmark::size).sum();
+    }
+  }
+
+  private static long luceneSegmentCount(Path root) throws IOException {
+    if (root == null || !Files.exists(root)) {
+      return 0L;
+    }
+    try (var paths = Files.walk(root)) {
+      return paths
+          .filter(Files::isRegularFile)
+          .map(path -> path.getFileName().toString())
+          .filter(name -> name.startsWith("_") && name.endsWith(".si"))
+          .count();
+    }
+  }
+
+  private static long size(Path path) {
+    try {
+      return Files.size(path);
+    } catch (IOException exception) {
+      throw new IllegalStateException("Could not measure Lucene file " + path, exception);
+    }
   }
 
   private static String requiredSystemProperty(String name) {
@@ -320,7 +396,8 @@ public class HibernateSearchPerformanceBenchmark {
     int checksum = hits.size();
     for (GitCommitIndex hit : hits) {
       checksum = 31 * checksum + hit.getObjectId().hashCode();
-      checksum = 31 * checksum + hit.getChangedText().length();
+      String changedText = hit.getChangedText();
+      checksum = 31 * checksum + (changedText == null ? 0 : changedText.length());
     }
     return checksum;
   }
@@ -345,7 +422,7 @@ public class HibernateSearchPerformanceBenchmark {
     }
   }
 
-  /** ORM/database event counts attributed to one measured Search operation. */
+  /** ORM/database and footprint counters attributed to one measured Search operation. */
   @AuxCounters(AuxCounters.Type.EVENTS)
   @State(Scope.Thread)
   public static class SearchCounters {
@@ -356,6 +433,9 @@ public class HibernateSearchPerformanceBenchmark {
     public long transactions;
     public long successfulTransactions;
     public long flushes;
+    public long luceneBytes;
+    public long sqlProjectionBytes;
+    public long segmentCount;
 
     @Setup(Level.Invocation)
     public void reset() {
@@ -366,9 +446,17 @@ public class HibernateSearchPerformanceBenchmark {
       transactions = 0;
       successfulTransactions = 0;
       flushes = 0;
+      luceneBytes = 0;
+      sqlProjectionBytes = 0;
+      segmentCount = 0;
     }
 
-    private void capture(Statistics statistics, long results) {
+    private void capture(
+        Statistics statistics,
+        long results,
+        long luceneBytes,
+        long sqlProjectionBytes,
+        long segmentCount) {
       resultCount = results;
       queryExecutions = statistics.getQueryExecutionCount();
       entityLoads = statistics.getEntityLoadCount();
@@ -376,6 +464,9 @@ public class HibernateSearchPerformanceBenchmark {
       transactions = statistics.getTransactionCount();
       successfulTransactions = statistics.getSuccessfulTransactionCount();
       flushes = statistics.getFlushCount();
+      this.luceneBytes = luceneBytes;
+      this.sqlProjectionBytes = sqlProjectionBytes;
+      this.segmentCount = segmentCount;
     }
   }
 }

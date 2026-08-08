@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.search.entity;
 
 import io.github.carstenartur.jgit.storage.hibernate.search.analysis.GitTextAnalysis;
+import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -79,6 +80,11 @@ public class GitCommitIndex {
   @Column(name = "id", insertable = false, updatable = false)
   private Long id;
 
+  /** Stable semantic profile that produced this projection and its Lucene fields. */
+  @KeywordField
+  @Column(name = "index_profile", nullable = false, length = 32)
+  private String indexProfile = SearchIndexingProfile.DEFAULT.id();
+
   @KeywordField
   @Nationalized
   @Column(name = "repository_name", nullable = false, length = 255)
@@ -136,12 +142,10 @@ public class GitCommitIndex {
   @Column(name = "commit_time")
   private Instant committerTime;
 
-  @FullTextField(analyzer = GitTextAnalysis.STRUCTURED_TEXT_ANALYZER)
   @Nationalized
   @Column(name = "changed_paths", length = 16384)
   private String changedPaths;
 
-  @FullTextField(analyzer = GitTextAnalysis.STRUCTURED_TEXT_ANALYZER)
   @Nationalized
   @Column(name = "changed_text", length = 262144)
   private String changedText;
@@ -168,6 +172,20 @@ public class GitCommitIndex {
 
   public void setId(Long id) {
     this.id = id;
+  }
+
+  public String getIndexProfile() {
+    return indexProfile;
+  }
+
+  public void setIndexProfile(String indexProfile) {
+    this.indexProfile = SearchIndexingProfile.fromId(indexProfile).id();
+  }
+
+  /** Return the parsed semantic profile that controls derived Lucene fields. */
+  @Transient
+  public SearchIndexingProfile indexingProfile() {
+    return SearchIndexingProfile.fromId(indexProfile);
   }
 
   public String getRepositoryName() {
@@ -281,7 +299,11 @@ public class GitCommitIndex {
   }
 
   /**
-   * Return individual changed paths for field-specific full-text and exact indexing.
+   * Return individual changed paths for full-text component matching and exact keyword matching.
+   *
+   * <p>The historic aggregate {@code changed_paths} value remains relational for literal SQL
+   * fragment queries and result detail, but it is no longer indexed as an additional Lucene field.
+   * This avoids storing the same path information in three Lucene representations.
    *
    * @return immutable path values, excluding blank lines
    */
@@ -289,9 +311,12 @@ public class GitCommitIndex {
   @FullTextField(name = CHANGED_PATH_TERMS_FIELD, analyzer = AnalyzerNames.SIMPLE)
   @KeywordField(name = CHANGED_PATH_EXACT_FIELD)
   @IndexingDependency(
-      derivedFrom = @ObjectPath(@PropertyValue(propertyName = "changedPaths")))
+      derivedFrom = {
+        @ObjectPath(@PropertyValue(propertyName = "changedPaths")),
+        @ObjectPath(@PropertyValue(propertyName = "indexProfile"))
+      })
   public List<String> getChangedPathValues() {
-    if (changedPaths == null || changedPaths.isBlank()) {
+    if (!indexingProfile().indexesPaths() || changedPaths == null || changedPaths.isBlank()) {
       return List.of();
     }
     return changedPaths.lines().filter(path -> !path.isBlank()).toList();
@@ -303,5 +328,17 @@ public class GitCommitIndex {
 
   public void setChangedText(String changedText) {
     this.changedText = changedText;
+  }
+
+  /** Return changed-file text only for content-enabled profiles. */
+  @Transient
+  @FullTextField(name = "changedText", analyzer = GitTextAnalysis.STRUCTURED_TEXT_ANALYZER)
+  @IndexingDependency(
+      derivedFrom = {
+        @ObjectPath(@PropertyValue(propertyName = "changedText")),
+        @ObjectPath(@PropertyValue(propertyName = "indexProfile"))
+      })
+  public String getIndexedChangedText() {
+    return indexingProfile().indexesContent() ? changedText : null;
   }
 }

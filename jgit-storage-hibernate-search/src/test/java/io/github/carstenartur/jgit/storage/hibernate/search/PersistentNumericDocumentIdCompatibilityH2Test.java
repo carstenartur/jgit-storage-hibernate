@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.search.analysis.GitTextAnalysis;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitSearchHit;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
 import jakarta.persistence.Column;
@@ -25,6 +26,9 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
@@ -53,25 +57,36 @@ class PersistentNumericDocumentIdCompatibilityH2Test {
   @TempDir Path temporaryDirectory;
 
   @Test
-  void numericDocumentsRemainLoadableProjectableDeletableAndRestartable() {
+  void numericDocumentsRemainLoadableProjectableDeletableAndRestartable() throws Exception {
     Path database = temporaryDirectory.resolve("database/search");
     Path lucene = temporaryDirectory.resolve("lucene");
 
     try (HibernateSessionFactoryProvider legacy = legacyProvider(database, lucene)) {
-      persistLegacy(legacy, FIRST_REPOSITORY, "1111111111111111111111111111111111111111", "alpha compatibility");
-      persistLegacy(legacy, SECOND_REPOSITORY, "2222222222222222222222222222222222222222", "beta compatibility");
+      persistLegacy(
+          legacy,
+          FIRST_REPOSITORY,
+          "1111111111111111111111111111111111111111",
+          "alpha compatibility");
+      persistLegacy(
+          legacy,
+          SECOND_REPOSITORY,
+          "2222222222222222222222222222222222222222",
+          "beta compatibility");
     }
+
+    applyCurrentProfileMigration(database);
 
     try (HibernateSessionFactoryProvider upgraded = upgradedProvider(database, lucene)) {
       GitHistorySearchService search = new GitHistorySearchService(upgraded.getSessionFactory());
 
-      List<GitCommitIndex> entityHits =
-          search.searchCommitText(FIRST_REPOSITORY, "alpha", 10);
+      List<GitCommitIndex> entityHits = search.searchCommitText(FIRST_REPOSITORY, "alpha", 10);
       assertEquals(1, entityHits.size());
       GitCommitIndex first = entityHits.getFirst();
       assertEquals("1111111111111111111111111111111111111111", first.getObjectId());
       assertNotNull(first.getId(), "The historical numeric document identifier must remain mapped");
-      assertNotNull(first.getProjectionKey(), "The assigned ORM identifier must be available after upgrade");
+      assertNotNull(
+          first.getProjectionKey(), "The assigned ORM identifier must be available after upgrade");
+      assertEquals(SearchIndexingProfile.CONTENT.id(), first.getIndexProfile());
 
       List<CommitSearchHit> projectedHits =
           search.searchCommitTextSummaries(SECOND_REPOSITORY, "beta", 10);
@@ -133,6 +148,23 @@ class PersistentNumericDocumentIdCompatibilityH2Test {
     }
   }
 
+  /**
+   * This test creates its historical schema through Hibernate rather than Flyway so that it can also
+   * create the old Lucene mapping. Apply only the relational profile migration here; the real Flyway
+   * scripts are covered independently by {@link SearchSchemaMigrationIntegrationTest} and the
+   * database-specific migration tests.
+   */
+  private static void applyCurrentProfileMigration(Path database) throws Exception {
+    try (Connection connection = DriverManager.getConnection(databaseUrl(database));
+        Statement statement = connection.createStatement()) {
+      statement.execute("alter table git_commit_index add column index_profile varchar(32)");
+      statement.execute(
+          "update git_commit_index set index_profile = 'content-v1' where index_profile is null");
+      statement.execute(
+          "alter table git_commit_index alter column index_profile set not null");
+    }
+  }
+
   private static HibernateSessionFactoryProvider legacyProvider(Path database, Path lucene) {
     Properties properties = properties(database, lucene);
     properties.put("hibernate.hbm2ddl.auto", "create");
@@ -147,9 +179,7 @@ class PersistentNumericDocumentIdCompatibilityH2Test {
 
   private static Properties properties(Path database, Path lucene) {
     Properties properties = new Properties();
-    properties.put(
-        "hibernate.connection.url",
-        "jdbc:h2:file:" + database.toAbsolutePath() + ";AUTO_SERVER=FALSE");
+    properties.put("hibernate.connection.url", databaseUrl(database));
     properties.put("hibernate.connection.driver_class", "org.h2.Driver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
     properties.put("hibernate.show_sql", "false");
@@ -158,6 +188,10 @@ class PersistentNumericDocumentIdCompatibilityH2Test {
     properties.put("hibernate.search.backend.directory.root", lucene.toAbsolutePath().toString());
     properties.put("hibernate.search.automatic_indexing.synchronization.strategy", "sync");
     return properties;
+  }
+
+  private static String databaseUrl(Path database) {
+    return "jdbc:h2:file:" + database.toAbsolutePath() + ";AUTO_SERVER=FALSE";
   }
 
   /** Released-style numeric ORM/document identifier on the new relational column set. */
