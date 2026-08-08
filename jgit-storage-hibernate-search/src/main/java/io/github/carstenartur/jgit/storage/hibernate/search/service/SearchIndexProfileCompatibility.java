@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
+import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import java.util.Collections;
 import java.util.HashSet;
@@ -17,6 +18,8 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.search.mapper.orm.Search;
+import org.hibernate.search.mapper.orm.session.SearchSession;
 
 /** Repository-scoped fail-closed guard for semantic Search indexing profiles. */
 final class SearchIndexProfileCompatibility {
@@ -29,19 +32,6 @@ final class SearchIndexProfileCompatibility {
   static void requireCompatible(SessionFactory sessionFactory, String repositoryName) {
     Objects.requireNonNull(sessionFactory, "sessionFactory");
     Objects.requireNonNull(repositoryName, "repositoryName");
-
-    /*
-     * An omitted property means the historical CONTENT semantics. The migration backfills every
-     * existing projection to exactly that stable profile, so probing here would add one SQL query to
-     * every existing application's first Search request without protecting against an operator
-     * initiated profile change. Explicit configuration opts into the fail-closed profile contract.
-     */
-    Object configuredProperty =
-        sessionFactory.getProperties().get(SearchIndexingProfile.PROFILE_PROPERTY);
-    if (configuredProperty == null || configuredProperty.toString().isBlank()) {
-      return;
-    }
-
     SearchIndexingProfile configured = SearchIndexingProfile.resolve(sessionFactory);
     String verificationKey = repositoryName + "\u0000" + configured.id();
 
@@ -52,15 +42,40 @@ final class SearchIndexProfileCompatibility {
         return;
       }
 
-      Set<String> persisted = persistedProfiles(sessionFactory, repositoryName);
-      if (!persisted.isEmpty()
-          && (persisted.size() != 1 || !persisted.contains(configured.id()))) {
-        throw new SearchIndexProfileMismatchException(repositoryName, configured.id(), persisted);
+      if (hasIncompatibleSearchDocument(sessionFactory, repositoryName, configured.id())) {
+        throw new SearchIndexProfileMismatchException(
+            repositoryName, configured.id(), persistedProfiles(sessionFactory, repositoryName));
       }
       verified.add(verificationKey);
     }
   }
 
+  /**
+   * Check the derived Search index rather than the relational projection on the normal path.
+   *
+   * <p>This keeps the guard out of Hibernate SQL/query counters while still detecting a profile
+   * change back to the implicit default. Documents created before profile-aware mapping also match
+   * this query because they do not contain the current {@code indexProfile} field and therefore do
+   * not match the configured-profile predicate.
+   */
+  private static boolean hasIncompatibleSearchDocument(
+      SessionFactory sessionFactory, String repositoryName, String configuredProfile) {
+    try (Session session = sessionFactory.openSession()) {
+      SearchSession searchSession = Search.session(session);
+      return !searchSession
+          .search(GitCommitIndex.class)
+          .select(f -> f.id(String.class))
+          .where(
+              f ->
+                  f.bool()
+                      .filter(f.match().field("repositoryName").matching(repositoryName))
+                      .mustNot(f.match().field("indexProfile").matching(configuredProfile)))
+          .fetchHits(1)
+          .isEmpty();
+    }
+  }
+
+  /** Load relational profile IDs only for the fail-closed diagnostic path. */
   private static Set<String> persistedProfiles(
       SessionFactory sessionFactory, String repositoryName) {
     try (Session session = sessionFactory.openSession()) {
