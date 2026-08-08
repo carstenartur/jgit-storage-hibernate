@@ -1,7 +1,8 @@
 -- Keep reverse reflog lookup selective without relying on a 1,024-character index key.
+-- IF NOT EXISTS also supports copied/current schemas adopted without Flyway history.
 
 alter table git_reflog
-    add column ref_name_key varchar(128);
+    add column if not exists ref_name_key varchar(128);
 
 update git_reflog
 set ref_name_key = left(ref_name, 128)
