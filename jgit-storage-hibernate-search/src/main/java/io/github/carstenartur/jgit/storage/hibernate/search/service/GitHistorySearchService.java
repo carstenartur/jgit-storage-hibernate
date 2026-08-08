@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistoryQuery.PathMatch;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -18,6 +19,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.search.engine.search.common.BooleanOperator;
 import org.hibernate.search.engine.search.predicate.SearchPredicate;
 import org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFactory;
+import org.hibernate.search.engine.search.sort.SearchSort;
 import org.hibernate.search.mapper.orm.Search;
 import org.hibernate.search.mapper.orm.scope.SearchScope;
 import org.hibernate.search.mapper.orm.session.SearchSession;
@@ -65,71 +67,74 @@ public class GitHistorySearchService {
    * Find commits matching all supplied full-text, identity, changed-path, time and candidate
    * predicates.
    *
-   * <p>Results are relevance-ranked when full text is present and newest-first otherwise. The
-   * chronological dimension is selected by {@link CommitHistoryQuery#timestampField()} and defaults
-   * to committer time. Offset and limit are always applied after ordering.
+   * <p>Results are relevance-ranked when full text is present and newest-first otherwise. Explicit
+   * analyzed/exact path modes use Lucene even without a free-text expression; the original literal
+   * fragment mode remains relational for backward compatibility. The chronological dimension is
+   * selected by {@link CommitHistoryQuery#timestampField()} and defaults to committer time.
    */
   public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
     validateQuery(query);
     if (matchesNothing(query)) {
       return List.of();
     }
-    return query.text() == null ? findStructuredChanges(query) : findFullTextChanges(query);
+    return query.requiresSearchBackend() ? findIndexedChanges(query) : findStructuredChanges(query);
   }
 
   /**
    * Find compact commit summaries without loading the large projection entity payload.
    *
-   * <p>Full-text hits are projected directly from Lucene. Structured-only hits use a bounded HQL
-   * constructor projection, so both paths return the same immutable result type without loading the
-   * changed text column.
+   * <p>Lucene-backed hits are projected directly from the index. Structured-only hits use a bounded
+   * HQL constructor projection, so both paths return the same immutable result type without loading
+   * the changed text column.
    */
   public List<CommitSearchHit> findChangeSummaries(CommitHistoryQuery query) {
     validateQuery(query);
     if (matchesNothing(query)) {
       return List.of();
     }
-    return query.text() == null
-        ? findStructuredSummaries(query)
-        : findFullTextSummaries(query);
+    return query.requiresSearchBackend()
+        ? findIndexedSummaries(query)
+        : findStructuredSummaries(query);
   }
 
-  private List<GitCommitIndex> findFullTextChanges(CommitHistoryQuery query) {
+  private List<GitCommitIndex> findIndexedChanges(CommitHistoryQuery query) {
     String timeField = searchTimeField(query);
     try (Session session = sessionFactory.openSession()) {
       SearchSession searchSession = Search.session(session);
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
-      SearchPredicate predicate = fullTextPredicate(scope.predicate(), query, timeField);
-      return searchSession
-          .search(scope)
-          .where(predicate)
-          .fetchHits(query.offset(), query.limit());
+      SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
+      var step = searchSession.search(scope).where(predicate);
+      if (query.text() == null) {
+        step = step.sort(chronologicalSort(scope, timeField));
+      }
+      return step.fetchHits(query.offset(), query.limit());
     }
   }
 
-  private List<CommitSearchHit> findFullTextSummaries(CommitHistoryQuery query) {
+  private List<CommitSearchHit> findIndexedSummaries(CommitHistoryQuery query) {
     String timeField = searchTimeField(query);
     try (Session session = sessionFactory.openSession()) {
       SearchSession searchSession = Search.session(session);
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
-      SearchPredicate predicate = fullTextPredicate(scope.predicate(), query, timeField);
-      return searchSession
-          .search(scope)
-          .select(CommitSearchHit.class)
-          .where(predicate)
-          .fetchHits(query.offset(), query.limit());
+      SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
+      var step = searchSession.search(scope).select(CommitSearchHit.class).where(predicate);
+      if (query.text() == null) {
+        step = step.sort(chronologicalSort(scope, timeField));
+      }
+      return step.fetchHits(query.offset(), query.limit());
     }
   }
 
-  private static SearchPredicate fullTextPredicate(
+  private static SearchPredicate indexedPredicate(
       SearchPredicateFactory f, CommitHistoryQuery query, String timeField) {
     var predicate =
-        f.bool()
-            .filter(f.match().field("repositoryName").matching(query.repositoryName()))
-            .must(
-                f.simpleQueryString()
-                    .fields("shortMessage", "fullMessage", "changedPaths", "changedText")
-                    .matching(query.text()));
+        f.bool().filter(f.match().field("repositoryName").matching(query.repositoryName()));
+    if (query.text() != null) {
+      predicate.must(
+          f.simpleQueryString()
+              .fields("shortMessage", "fullMessage", "changedPaths", "changedText")
+              .matching(query.text()));
+    }
     if (query.hasObjectIdRestriction()) {
       predicate.filter(f.terms().field("objectId").matchingAny(query.objectIds()));
     }
@@ -140,11 +145,20 @@ public class GitHistorySearchService {
       predicate.filter(f.match().field("committerEmail").matching(query.committerEmail()));
     }
     if (query.pathFragment() != null) {
-      predicate.filter(
-          f.simpleQueryString()
-              .field(GitCommitIndex.CHANGED_PATH_TERMS_FIELD)
-              .matching(query.pathFragment())
-              .defaultOperator(BooleanOperator.AND));
+      if (query.pathMatch() == PathMatch.EXACT) {
+        predicate.filter(
+            f.match()
+                .field(GitCommitIndex.CHANGED_PATH_EXACT_FIELD)
+                .matching(query.pathFragment()));
+      } else {
+        // ANALYZED_TERMS is explicit. LITERAL_FRAGMENT reaches this path only when a free-text
+        // expression already selected Lucene, preserving the previous compound-query semantics.
+        predicate.filter(
+            f.simpleQueryString()
+                .field(GitCommitIndex.CHANGED_PATH_TERMS_FIELD)
+                .matching(query.pathFragment())
+                .defaultOperator(BooleanOperator.AND));
+      }
     }
     if (query.from() != null) {
       predicate.filter(f.range().field(timeField).atLeast(query.from()));
@@ -153,6 +167,18 @@ public class GitHistorySearchService {
       predicate.filter(f.range().field(timeField).atMost(query.to()));
     }
     return predicate.toPredicate();
+  }
+
+  private static SearchSort chronologicalSort(
+      SearchScope<GitCommitIndex> scope, String timeField) {
+    return scope
+        .sort()
+        .field(timeField)
+        .desc()
+        .then()
+        .field("objectId")
+        .asc()
+        .toSort();
   }
 
   private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
@@ -260,10 +286,31 @@ public class GitHistorySearchService {
     return hqlTimeProperty(query);
   }
 
+  /** Backward-compatible literal, case-insensitive path fragment lookup. */
   public List<GitCommitIndex> findByPath(String repositoryName, String pathFragment, int limit) {
     return findChanges(
         CommitHistoryQuery.forRepository(repositoryName)
             .touchingPath(pathFragment)
+            .limit(limit)
+            .build());
+  }
+
+  /** Find commits matching all analyzed path components through Lucene. */
+  public List<CommitSearchHit> findSummariesByPathTerms(
+      String repositoryName, String pathTerms, int limit) {
+    return findChangeSummaries(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .touchingPathTerms(pathTerms)
+            .limit(limit)
+            .build());
+  }
+
+  /** Find commits that changed one complete exact path through Lucene. */
+  public List<CommitSearchHit> findSummariesByExactPath(
+      String repositoryName, String path, int limit) {
+    return findChangeSummaries(
+        CommitHistoryQuery.forRepository(repositoryName)
+            .touchingExactPath(path)
             .limit(limit)
             .build());
   }
