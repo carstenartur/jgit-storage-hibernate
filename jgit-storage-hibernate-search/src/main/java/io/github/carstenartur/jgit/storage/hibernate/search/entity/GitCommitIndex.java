@@ -22,6 +22,8 @@ import java.time.Instant;
 import java.util.List;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.search.engine.backend.analysis.AnalyzerNames;
+import org.hibernate.search.engine.backend.types.Projectable;
+import org.hibernate.search.engine.backend.types.Sortable;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.GenericField;
 import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
@@ -64,13 +66,14 @@ public class GitCommitIndex {
   @Column(name = "repository_name", nullable = false, length = 255)
   private String repositoryName;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES, sortable = Sortable.YES)
   @Column(name = "object_id", nullable = false, length = 40)
   private String objectId;
 
   @FullTextField(
       analyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER,
-      searchAnalyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER)
+      searchAnalyzer = GitTextAnalysis.NATURAL_LANGUAGE_ANALYZER,
+      projectable = Projectable.YES)
   @Nationalized
   @Column(name = "short_message", length = 2048)
   private String shortMessage;
@@ -82,26 +85,26 @@ public class GitCommitIndex {
   @Column(name = "full_message", length = 8192)
   private String fullMessage;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "author_name")
   private String authorName;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "author_email")
   private String authorEmail;
 
-  @GenericField
+  @GenericField(projectable = Projectable.YES, sortable = Sortable.YES)
   @Column(name = "author_time")
   private Instant authorTime;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "committer_name")
   private String committerName;
 
-  @KeywordField
+  @KeywordField(projectable = Projectable.YES)
   @Nationalized
   @Column(name = "committer_email")
   private String committerEmail;
@@ -111,7 +114,7 @@ public class GitCommitIndex {
    *
    * <p>The database column retains its historic {@code commit_time} name for schema compatibility.
    */
-  @GenericField
+  @GenericField(projectable = Projectable.YES, sortable = Sortable.YES)
   @Column(name = "commit_time")
   private Instant committerTime;
 
