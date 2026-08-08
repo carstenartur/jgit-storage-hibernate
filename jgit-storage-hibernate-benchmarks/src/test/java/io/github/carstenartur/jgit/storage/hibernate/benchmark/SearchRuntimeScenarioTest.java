@@ -79,4 +79,20 @@ class SearchRuntimeScenarioTest {
         IllegalArgumentException.class,
         () -> SearchRuntimeScenario.fromId("batch-17"));
   }
+
+  @Test
+  void malformedNumericScenarioValuesIdentifyTheScenario() {
+    for (String scenario :
+        List.of(
+            "sync-write-sync-rfast",
+            "writer-ramlots-t4",
+            "writer-ram64-tmany",
+            "batch-many")) {
+      IllegalArgumentException exception =
+          assertThrows(
+              IllegalArgumentException.class, () -> SearchRuntimeScenario.fromId(scenario));
+      assertTrue(exception.getMessage().contains(scenario));
+      assertTrue(exception.getMessage().contains("must be an integer"));
+    }
+  }
 }
