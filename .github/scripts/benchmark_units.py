@@ -91,13 +91,13 @@ def normalize_benchmark(benchmark: dict[str, Any]) -> dict[str, Any]:
     original_range = benchmark.get("range", 0.0)
 
     if original_unit in PASSTHROUGH_UNITS:
-      normalized["value"] = _finite_number(original_value, "value")
-      if has_range:
-          numeric_range = _finite_number(original_range, "range")
-          if numeric_range < 0:
-              raise ValueError(f"range must not be negative, got {original_range!r}")
-          normalized["range"] = numeric_range
-      return normalized
+        normalized["value"] = _finite_number(original_value, "value")
+        if has_range:
+            numeric_range = _finite_number(original_range, "range")
+            if numeric_range < 0:
+                raise ValueError(f"range must not be negative, got {original_range!r}")
+            normalized["range"] = numeric_range
+        return normalized
 
     value, error = normalize_measurement(original_value, original_range, original_unit)
     normalized["value"] = value
