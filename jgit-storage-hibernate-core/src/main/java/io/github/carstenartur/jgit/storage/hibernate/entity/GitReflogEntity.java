@@ -17,13 +17,18 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Objects;
 import org.hibernate.annotations.Nationalized;
 
 /** Entity representing a queryable Git reflog entry stored in the database. */
 @Entity
 @Table(
     name = "git_reflog",
-    indexes = {@Index(name = "idx_reflog_repo_id", columnList = "repository_name, id")})
+    indexes = {
+      @Index(
+          name = "idx_reflog_repo_ref_key_id",
+          columnList = "repository_name, ref_name_key, id")
+    })
 public class GitReflogEntity {
 
   /**
@@ -33,6 +38,16 @@ public class GitReflogEntity {
    * AL16UTF16 national character set, the 4,000-byte SQL limit allows at most 2,000 characters.
    */
   public static final int MAX_MESSAGE_LENGTH = 2000;
+
+  /**
+   * Indexed prefix length for portable reverse-reflog lookup.
+   *
+   * <p>SQL Server cannot place the complete nationalized 1,024-character ref name in a portable
+   * nonclustered index key. A 128-character prefix keeps repository + prefix + identity below even
+   * the older 900-byte key limit. Queries still compare the complete ref name after this selective
+   * prefix predicate, so two unusually long refs sharing the prefix cannot be confused.
+   */
+  public static final int REF_NAME_KEY_LENGTH = 128;
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,6 +64,10 @@ public class GitReflogEntity {
   @Nationalized
   @Column(name = "ref_name", nullable = false, length = 1024)
   private String refName;
+
+  @Nationalized
+  @Column(name = "ref_name_key", nullable = false, length = REF_NAME_KEY_LENGTH)
+  private String refNameKey;
 
   @Column(name = "old_id", length = 40)
   private String oldId;
@@ -70,6 +89,19 @@ public class GitReflogEntity {
   @Nationalized
   @Column(name = "message", length = MAX_MESSAGE_LENGTH)
   private String message;
+
+  /**
+   * Produce the portable indexed prefix while retaining a full-name residual comparison.
+   *
+   * @param refName complete non-null Git ref name
+   * @return complete name when short enough, otherwise its first 128 UTF-16 code units
+   */
+  public static String refNameKey(String refName) {
+    Objects.requireNonNull(refName, "refName");
+    return refName.length() <= REF_NAME_KEY_LENGTH
+        ? refName
+        : refName.substring(0, REF_NAME_KEY_LENGTH);
+  }
 
   public Long getId() {
     return id;
@@ -100,7 +132,21 @@ public class GitReflogEntity {
   }
 
   public void setRefName(String refName) {
-    this.refName = refName;
+    this.refName = Objects.requireNonNull(refName, "refName");
+    refNameKey = refNameKey(refName);
+  }
+
+  public String getRefNameKey() {
+    return refNameKey;
+  }
+
+  /**
+   * Set the persisted prefix explicitly for schema-adoption and focused tests.
+   *
+   * @param refNameKey non-null prefix matching {@link #refNameKey(String)}
+   */
+  public void setRefNameKey(String refNameKey) {
+    this.refNameKey = Objects.requireNonNull(refNameKey, "refNameKey");
   }
 
   public String getOldId() {

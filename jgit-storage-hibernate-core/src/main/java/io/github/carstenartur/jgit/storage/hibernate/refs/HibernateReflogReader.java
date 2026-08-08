@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import org.eclipse.jgit.lib.CheckoutEntry;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -28,6 +29,7 @@ public class HibernateReflogReader implements ReflogReader {
   private final HibernateTransactionContext transactionContext;
   private final String repositoryName;
   private final String refName;
+  private final String refNameKey;
 
   /**
    * Create a reader.
@@ -49,9 +51,10 @@ public class HibernateReflogReader implements ReflogReader {
    */
   public HibernateReflogReader(
       HibernateTransactionContext transactionContext, String repositoryName, String refName) {
-    this.transactionContext = transactionContext;
-    this.repositoryName = repositoryName;
-    this.refName = refName;
+    this.transactionContext = Objects.requireNonNull(transactionContext, "transactionContext");
+    this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
+    this.refName = Objects.requireNonNull(refName, "refName");
+    refNameKey = GitReflogEntity.refNameKey(refName);
   }
 
   @Override
@@ -78,10 +81,12 @@ public class HibernateReflogReader implements ReflogReader {
           List<GitReflogEntity> entities =
               session
                   .createQuery(
-                      "FROM GitReflogEntity r WHERE r.repositoryName = :repo AND r.refName = :ref "
+                      "FROM GitReflogEntity r WHERE r.repositoryName = :repo "
+                          + "AND r.refNameKey = :refKey AND r.refName = :ref "
                           + "ORDER BY r.id DESC",
                       GitReflogEntity.class)
                   .setParameter("repo", repositoryName)
+                  .setParameter("refKey", refNameKey)
                   .setParameter("ref", refName)
                   .setMaxResults(max)
                   .getResultList();
