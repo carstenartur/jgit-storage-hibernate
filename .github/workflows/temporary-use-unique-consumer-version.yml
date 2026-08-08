@@ -1,0 +1,143 @@
+name: Temporary use unique consumer version
+
+on:
+  push:
+    branches:
+      - ci/consumer-contracts
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-use-unique-consumer-version
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/consumer-contracts
+          fetch-depth: 0
+
+      - name: Follow the consolidated permanent workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            git fetch origin ci/consumer-contracts
+            git reset --hard origin/ci/consumer-contracts
+            if grep -Fq 'Classify baseline and candidate outcomes' \
+                .github/workflows/consumer-compatibility.yml 2>/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo 'The consolidated consumer workflow did not appear.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Make candidate artifacts unique to the commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/consumer-compatibility.yml')
+          text = path.read_text(encoding='utf-8')
+
+          outputs = '''    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      commit: ${{ steps.identity.outputs.commit }}
+'''
+          outputs_new = '''    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      source-version: ${{ steps.identity.outputs.source-version }}
+      commit: ${{ steps.identity.outputs.commit }}
+'''
+          if 'source-version: ${{ steps.identity.outputs.source-version }}' not in text:
+              if outputs not in text:
+                  raise SystemExit('Could not locate current-library outputs')
+              text = text.replace(outputs, outputs_new, 1)
+
+          old_identity = '''      - name: Resolve exact reactor identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\\ncommit=%s\\n' "$version" "$GITHUB_SHA"
+
+'''
+          new_identity = '''      - name: Resolve a commit-qualified reactor identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_version="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          test -n "$source_version"
+          base_version="${source_version%-SNAPSHOT}"
+          candidate_version="${base_version}-consumer-${GITHUB_SHA:0:12}-SNAPSHOT"
+          mvn -B versions:set \
+            -DnewVersion="$candidate_version" \
+            -DgenerateBackupPoms=false
+          resolved="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          test "$resolved" = "$candidate_version"
+          echo "version=$candidate_version" >> "$GITHUB_OUTPUT"
+          echo "source-version=$source_version" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          printf 'sourceVersion=%s\\ncandidateVersion=%s\\ncommit=%s\\n' \
+            "$source_version" "$candidate_version" "$GITHUB_SHA"
+
+'''
+          if 'name: Resolve a commit-qualified reactor identity' not in text:
+              if old_identity not in text:
+                  raise SystemExit('Could not locate reactor identity step')
+              text = text.replace(old_identity, new_identity, 1)
+
+          text = text.replace(
+              'mvn -B -DskipTests -Dmaven.repo.local="$repository" install',
+              'mvn -B -DskipTests -Djapicmp.skip=true '
+              '-Dmaven.repo.local="$repository" install',
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+
+          docs = Path('docs/operations/consumer-compatibility.md')
+          doc_text = docs.read_text(encoding='utf-8')
+          note = (
+              '\nThe candidate is installed under a commit-qualified local-only Maven version '
+              'such as `0.9.1-consumer-<sha>-SNAPSHOT`. This prevents Maven snapshot metadata '
+              'or a concurrently published snapshot from replacing the exact artifacts under test.\n'
+          )
+          if 'commit-qualified local-only Maven version' not in doc_text:
+              doc_text += note
+          docs.write_text(doc_text, encoding='utf-8')
+
+          for temporary in Path('.github/workflows').glob('temporary-*.yml'):
+              temporary.unlink()
+          PY
+
+      - name: Verify and commit unique candidate versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'consumer-${GITHUB_SHA:0:12}-SNAPSHOT' \
+            .github/workflows/consumer-compatibility.yml
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/consumer-compatibility.yml')"
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          python3 .github/scripts/test_verify_consumer_dependency_tree.py
+          git diff --check
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Use commit-qualified consumer candidate artifacts'
+          git push origin HEAD:ci/consumer-contracts
