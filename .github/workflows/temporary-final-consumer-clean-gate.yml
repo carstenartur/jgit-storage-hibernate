@@ -1,0 +1,155 @@
+name: Temporary final consumer clean gate
+
+on:
+  push:
+    branches:
+      - ci/consumer-contracts
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-final-consumer-clean-gate
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/consumer-contracts
+          fetch-depth: 0
+
+      - name: Follow the fully consolidated consumer branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            git fetch origin ci/consumer-contracts
+            git reset --hard origin/ci/consumer-contracts
+            if grep -Fq 'candidate_version="${base_version}-consumer-' \
+                .github/workflows/consumer-compatibility.yml 2>/dev/null \
+                && grep -Fq 'Classify baseline and candidate outcomes' \
+                .github/workflows/consumer-compatibility.yml 2>/dev/null \
+                && test -f .github/scripts/verify-module-boundaries.py; then
+              break
+            fi
+            if [ "$attempt" -eq 90 ]; then
+              echo 'The permanent consumer workflow did not reach the consolidated form.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Wire merge hygiene and remove every temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          consumer = Path('.github/workflows/consumer-compatibility.yml')
+          text = consumer.read_text(encoding='utf-8')
+          trigger_anchor = "      - '.github/scripts/test_verify_module_boundaries.py'\n"
+          trigger_addition = (
+              trigger_anchor
+              + "      - '.github/scripts/verify-no-temporary-workflows.py'\n"
+              + "      - '.github/scripts/test_verify_no_temporary_workflows.py'\n"
+          )
+          if "verify-no-temporary-workflows.py'" not in text:
+              count = text.count(trigger_anchor)
+              if count != 2:
+                  raise SystemExit(f'Expected two consumer trigger anchors, found {count}')
+              text = text.replace(trigger_anchor, trigger_addition)
+
+          test_anchor = '          python3 .github/scripts/test_verify_module_boundaries.py\n'
+          test_addition = (
+              test_anchor
+              + '          python3 .github/scripts/test_verify_no_temporary_workflows.py\n'
+          )
+          if 'python3 .github/scripts/test_verify_no_temporary_workflows.py' not in text:
+              if test_anchor not in text:
+                  raise SystemExit('Could not locate consumer tooling tests')
+              text = text.replace(test_anchor, test_addition, 1)
+
+          identity_anchor = '      - name: Resolve a commit-qualified reactor identity\n'
+          gate = '''      - name: Verify no temporary repair workflows remain
+        run: python3 .github/scripts/verify-no-temporary-workflows.py
+
+'''
+          if 'name: Verify no temporary repair workflows remain' not in text:
+              if identity_anchor not in text:
+                  raise SystemExit('Could not locate consumer reactor identity step')
+              text = text.replace(identity_anchor, gate + identity_anchor, 1)
+          consumer.write_text(text, encoding='utf-8')
+
+          maven = Path('.github/workflows/maven.yml')
+          maven_text = maven.read_text(encoding='utf-8')
+          compile_line = '.github/scripts/test_release_workflow_trigger.py'
+          additions = (
+              ' .github/scripts/verify-no-temporary-workflows.py'
+              ' .github/scripts/test_verify_no_temporary_workflows.py'
+          )
+          if '.github/scripts/verify-no-temporary-workflows.py' not in maven_text:
+              if compile_line in maven_text:
+                  maven_text = maven_text.replace(compile_line, compile_line + additions, 1)
+              else:
+                  raise SystemExit('Could not locate Maven Python compile list')
+          test_line = 'python3 .github/scripts/test_release_workflow_trigger.py'
+          if 'python3 .github/scripts/test_verify_no_temporary_workflows.py' not in maven_text:
+              if test_line in maven_text:
+                  maven_text = maven_text.replace(
+                      test_line,
+                      test_line
+                      + '\n          python3 .github/scripts/test_verify_no_temporary_workflows.py',
+                      1,
+                  )
+              else:
+                  raise SystemExit('Could not locate Maven tooling test list')
+          verify_anchor = '      - name: Verify release and security consistency\n'
+          if 'name: Verify temporary workflow cleanup' not in maven_text:
+              if verify_anchor not in maven_text:
+                  raise SystemExit('Could not locate Maven verification step')
+              maven_text = maven_text.replace(
+                  verify_anchor,
+                  '      - name: Verify temporary workflow cleanup\n'
+                  '        run: python3 .github/scripts/verify-no-temporary-workflows.py\n'
+                  + verify_anchor,
+                  1,
+              )
+          maven.write_text(maven_text, encoding='utf-8')
+
+          for temporary in Path('.github/workflows').glob('temporary-*.yml'):
+              temporary.unlink()
+          for temporary in Path('.github/workflows').glob('temporary-*.yaml'):
+              temporary.unlink()
+          PY
+
+      - name: Verify the clean permanent branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_prepare_consumer_contract.py
+          python3 .github/scripts/test_verify_consumer_dependency_tree.py
+          python3 .github/scripts/test_verify_module_boundaries.py
+          python3 .github/scripts/test_verify_no_temporary_workflows.py
+          python3 .github/scripts/verify-no-temporary-workflows.py
+          python3 .github/scripts/verify-module-boundaries.py \
+            --json-report target/module-graph.json \
+            --markdown-report target/module-graph.md
+          bash -n .github/scripts/run-consumer-contract.sh
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/consumer-compatibility.yml'); YAML.load_file('.github/workflows/maven.yml')"
+          git diff --check
+
+      - name: Commit the clean merge-gated branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Finalize consumer compatibility and temporary-workflow gate'
+          git push origin HEAD:ci/consumer-contracts
