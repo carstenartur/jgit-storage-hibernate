@@ -2,6 +2,9 @@
 
 (() => {
   const NAME_SEPARATOR = ' — ';
+  const UNCLASSIFIED = 'unclassified';
+  const NO_PINNED_CONSUMER = 'no-pinned-consumer';
+  const KNOWN_CONSUMERS = ['audio-analyzer', 'taxonomy', 'sandbox'];
   const charts = [];
   const backendColors = new Map([
     ['JGit + filesystem', '#1f77b4'],
@@ -92,6 +95,63 @@
     return operations;
   }
 
+  function benchmarkConsumers(bench) {
+    if (!Object.prototype.hasOwnProperty.call(bench, 'consumers')) {
+      return [UNCLASSIFIED];
+    }
+    if (!Array.isArray(bench.consumers) || bench.consumers.length === 0) {
+      return [NO_PINNED_CONSUMER];
+    }
+    return bench.consumers.slice();
+  }
+
+  function benchmarkContract(bench) {
+    return typeof bench.contract === 'string' && bench.contract.length > 0
+      ? bench.contract
+      : UNCLASSIFIED;
+  }
+
+  function consumerLabel(consumer) {
+    if (consumer === 'taxonomy') {
+      return 'Taxonomy';
+    }
+    if (consumer === 'sandbox') {
+      return 'Sandbox';
+    }
+    if (consumer === NO_PINNED_CONSUMER) {
+      return 'no pinned consumer';
+    }
+    if (consumer === UNCLASSIFIED) {
+      return 'unclassified / legacy';
+    }
+    return consumer;
+  }
+
+  function relevanceText(bench) {
+    return 'consumers=' + benchmarkConsumers(bench).map(consumerLabel).join(', ')
+      + '; contract=' + benchmarkContract(bench);
+  }
+
+  function latestOperationRelevance(backends) {
+    let latest = null;
+    for (const points of backends.values()) {
+      const point = latestPoint(points);
+      if (point !== null && (latest === null || point.date > latest.date)) {
+        latest = point;
+      }
+    }
+    if (latest === null) {
+      return { consumers: [UNCLASSIFIED], contract: UNCLASSIFIED, requiredModules: [] };
+    }
+    return {
+      consumers: benchmarkConsumers(latest.bench),
+      contract: benchmarkContract(latest.bench),
+      requiredModules: Array.isArray(latest.bench.requiredModules)
+        ? latest.bench.requiredModules.slice()
+        : [],
+    };
+  }
+
   function colorForBackend(backend, index) {
     return backendColors.get(backend) || fallbackColors[index % fallbackColors.length];
   }
@@ -161,7 +221,7 @@
 
     const head = document.createElement('thead');
     const headRow = document.createElement('tr');
-    for (const label of ['Backend', 'Latest result', 'vs best', 'Commit']) {
+    for (const label of ['Backend', 'Latest result', 'vs best', 'Commit', 'Relevance']) {
       const cell = document.createElement('th');
       cell.scope = 'col';
       cell.textContent = label;
@@ -197,6 +257,10 @@
       commitCell.appendChild(commitLink);
       row.appendChild(commitCell);
 
+      const relevanceCell = document.createElement('td');
+      relevanceCell.textContent = relevanceText(point.bench);
+      row.appendChild(relevanceCell);
+
       body.appendChild(row);
     }
     table.appendChild(body);
@@ -207,6 +271,9 @@
     card.className = 'benchmark-chart-card';
     card.id = operationAnchor(operation);
     card.tabIndex = -1;
+    const relevance = latestOperationRelevance(backends);
+    card.dataset.consumers = JSON.stringify(relevance.consumers);
+    card.dataset.contract = relevance.contract;
     parent.appendChild(card);
 
     const title = document.createElement('h3');
@@ -220,6 +287,17 @@
     title.appendChild(document.createTextNode(' '));
     title.appendChild(permalink);
     card.appendChild(title);
+
+    const relevanceNote = document.createElement('p');
+    relevanceNote.className = 'relevance-note';
+    const requiredModules = relevance.requiredModules.length > 0
+      ? ' Required modules: ' + relevance.requiredModules.join(', ') + '.'
+      : '';
+    relevanceNote.textContent = 'Consumer relevance: '
+      + relevance.consumers.map(consumerLabel).join(', ')
+      + '; contract=' + relevance.contract + '.' + requiredModules
+      + ' This is a library-impact classification, not a measurement of the consumer application.';
+    card.appendChild(relevanceNote);
 
     const container = document.createElement('div');
     container.className = 'chart-container';
@@ -280,7 +358,7 @@
           }],
           yAxes: [{
             type: document.getElementById('scale-select').value,
-            scaleLabel: { display: true, labelString: unit },
+            scaleLabel: { display: true, labelString: unit + ' — lower is better' },
             ticks: { beginAtZero: true },
           }],
         },
@@ -314,7 +392,18 @@
             },
             afterLabel: (item, data) => {
               const point = data.datasets[item.datasetIndex].pointMeta[item.index];
-              return point !== null && point.bench.extra ? '\n' + point.bench.extra : '';
+              if (point === null) {
+                return '';
+              }
+              const details = [];
+              if (point.bench.extra) {
+                details.push(String(point.bench.extra));
+              }
+              details.push('Consumer relevance: ' + relevanceText(point.bench));
+              if (point.bench.consumerRelevanceSemantics) {
+                details.push('Relevance semantics: library impact, not an application measurement');
+              }
+              return '\n' + details.join('\n');
             },
           },
         },
@@ -350,6 +439,109 @@
     }
   }
 
+  function collectFilterValues(benchmarkData) {
+    const consumers = new Set(KNOWN_CONSUMERS);
+    const contracts = new Set();
+    let hasUnclassified = false;
+    let hasNoPinnedConsumer = false;
+    for (const entries of Object.values(benchmarkData.entries)) {
+      for (const entry of entries) {
+        for (const bench of entry.benches || []) {
+          for (const consumer of benchmarkConsumers(bench)) {
+            if (consumer === UNCLASSIFIED) {
+              hasUnclassified = true;
+            } else if (consumer === NO_PINNED_CONSUMER) {
+              hasNoPinnedConsumer = true;
+            } else {
+              consumers.add(consumer);
+            }
+          }
+          contracts.add(benchmarkContract(bench));
+        }
+      }
+    }
+    if (hasUnclassified) {
+      consumers.add(UNCLASSIFIED);
+    }
+    if (hasNoPinnedConsumer) {
+      consumers.add(NO_PINNED_CONSUMER);
+    }
+    if (contracts.size === 0) {
+      contracts.add(UNCLASSIFIED);
+    }
+    return {
+      consumers: [...consumers].sort(),
+      contracts: [...contracts].sort(),
+    };
+  }
+
+  function selectedFilterValues(kind) {
+    return new Set(
+      [...document.querySelectorAll('input[data-filter-kind="' + kind + '"]:checked')]
+        .map(input => input.value)
+    );
+  }
+
+  function applyFilters() {
+    const selectedConsumers = selectedFilterValues('consumer');
+    const selectedContracts = selectedFilterValues('contract');
+    for (const card of document.querySelectorAll('.benchmark-chart-card')) {
+      let consumers = [UNCLASSIFIED];
+      try {
+        consumers = JSON.parse(card.dataset.consumers || '[]');
+      } catch (_ignored) {
+        consumers = [UNCLASSIFIED];
+      }
+      if (consumers.length === 0) {
+        consumers = [NO_PINNED_CONSUMER];
+      }
+      const consumerMatch = consumers.some(consumer => selectedConsumers.has(consumer));
+      const contractMatch = selectedContracts.has(card.dataset.contract || UNCLASSIFIED);
+      card.hidden = !(consumerMatch && contractMatch);
+    }
+    for (const suite of document.querySelectorAll('.benchmark-set')) {
+      const cards = [...suite.querySelectorAll('.benchmark-chart-card')];
+      suite.hidden = cards.length > 0 && cards.every(card => card.hidden);
+    }
+  }
+
+  function renderFilterCheckbox(parent, kind, value, label) {
+    const wrapper = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    checkbox.value = value;
+    checkbox.dataset.filterKind = kind;
+    checkbox.onchange = applyFilters;
+    wrapper.appendChild(checkbox);
+    wrapper.appendChild(document.createTextNode(label));
+    parent.appendChild(wrapper);
+  }
+
+  function renderFilters(benchmarkData) {
+    const values = collectFilterValues(benchmarkData);
+    const consumerParent = document.getElementById('consumer-filter');
+    const contractParent = document.getElementById('contract-filter');
+    const consumerHeading = document.createElement('strong');
+    consumerHeading.textContent = 'Consumers:';
+    consumerParent.appendChild(consumerHeading);
+    const contractHeading = document.createElement('strong');
+    contractHeading.textContent = 'Contracts:';
+    contractParent.appendChild(contractHeading);
+    for (const consumer of values.consumers) {
+      renderFilterCheckbox(consumerParent, 'consumer', consumer, consumerLabel(consumer));
+    }
+    for (const contract of values.contracts) {
+      renderFilterCheckbox(
+        contractParent,
+        'contract',
+        contract,
+        contract === UNCLASSIFIED ? 'unclassified / legacy' : contract
+      );
+    }
+    applyFilters();
+  }
+
   function initialize() {
     const benchmarkData = window.BENCHMARK_DATA;
     document.getElementById('last-update').textContent =
@@ -381,6 +573,7 @@
     for (const [suiteName, entries] of Object.entries(benchmarkData.entries)) {
       renderSuite(main, suiteName, entries);
     }
+    renderFilters(benchmarkData);
 
     scrollToRequestedChart();
     window.addEventListener('hashchange', scrollToRequestedChart);
