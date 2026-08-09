@@ -1,28 +1,22 @@
 'use strict';
 
-(() => {
+((root, factory) => {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) {
+    module.exports = api;
+  }
+  if (root && root.document) {
+    const start = () => api.initialize(root);
+    if (root.document.readyState === 'loading') {
+      root.document.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+      start();
+    }
+  }
+})(typeof window !== 'undefined' ? window : null, () => {
   const NAME_SEPARATOR = ' — ';
-  const charts = [];
-  const backendColors = new Map([
-    ['JGit + filesystem', '#1f77b4'],
-    ['JGit + HSQLDB (in-memory)', '#9467bd'],
-    ['JGit + PostgreSQL', '#d62728'],
-    ['JGit + PostgreSQL + HikariCP', '#2ca02c'],
-  ]);
-  const backendLineStyles = new Map([
-    ['JGit + filesystem', { borderDash: [], pointStyle: 'circle' }],
-    ['JGit + HSQLDB (in-memory)', { borderDash: [2, 3], pointStyle: 'rectRot' }],
-    ['JGit + PostgreSQL', { borderDash: [10, 5], pointStyle: 'triangle' }],
-    ['JGit + PostgreSQL + HikariCP', { borderDash: [10, 4, 2, 4], pointStyle: 'rect' }],
-  ]);
-  const fallbackColors = [
-    '#17becf', '#ff7f0e', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22'
-  ];
-  const fallbackLineStyles = [
-    { borderDash: [6, 3], pointStyle: 'cross' },
-    { borderDash: [2, 2], pointStyle: 'star' },
-    { borderDash: [12, 4, 2, 4], pointStyle: 'crossRot' },
-  ];
+  const UNCLASSIFIED = '__unclassified__';
+  // The commit-pinned core renderer retains the original Chart.js datasets and anchors.
 
   function splitBenchmarkName(name) {
     const separatorIndex = name.lastIndexOf(NAME_SEPARATOR);
@@ -47,344 +41,315 @@
     return 'benchmark-' + slug;
   }
 
-  function scrollToRequestedChart() {
-    const rawAnchor = window.location.hash.slice(1);
-    if (!rawAnchor) {
-      return;
-    }
-
-    let anchor = rawAnchor;
-    try {
-      anchor = decodeURIComponent(rawAnchor);
-    } catch (_ignored) {
-      // Keep the literal hash when it is not valid percent-encoding.
-    }
-
-    const target = document.getElementById(anchor);
-    if (target === null) {
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      target.scrollIntoView({ block: 'start' });
-      target.focus({ preventScroll: true });
-    });
+  function benchmarkRelevanceIds(bench) {
+    return Array.isArray(bench && bench.consumers) && bench.consumers.length > 0
+      ? [...new Set(bench.consumers.map(String))]
+      : [UNCLASSIFIED];
   }
 
-  function collectOperations(entries) {
+  function matchesConsumerSelection(bench, selectedConsumerIds) {
+    const selected = selectedConsumerIds instanceof Set
+      ? selectedConsumerIds
+      : new Set(selectedConsumerIds || []);
+    return benchmarkRelevanceIds(bench).some(consumer => selected.has(consumer));
+  }
+
+  function filterPointValues(points, selectedConsumerIds) {
+    return points.map(point => point && matchesConsumerSelection(point.bench, selectedConsumerIds)
+      ? point.bench.value
+      : null);
+  }
+
+  function collectConsumerFilterIds(benchmarkData) {
+    const ids = new Set(Object.keys(benchmarkData.consumerCatalog || {}));
+    let hasUnclassified = false;
+    for (const entries of Object.values(benchmarkData.entries || {})) {
+      for (const entry of entries || []) {
+        for (const bench of entry.benches || []) {
+          const relevance = benchmarkRelevanceIds(bench);
+          if (relevance.includes(UNCLASSIFIED)) {
+            hasUnclassified = true;
+          } else {
+            relevance.forEach(id => ids.add(id));
+          }
+        }
+      }
+    }
+    const result = [...ids].sort((left, right) => left.localeCompare(right));
+    if (hasUnclassified) {
+      result.push(UNCLASSIFIED);
+    }
+    return result;
+  }
+
+  function consumerDisplayName(consumerId, catalog) {
+    if (consumerId === UNCLASSIFIED) {
+      return 'Unclassified';
+    }
+    const consumer = catalog && catalog[consumerId];
+    return consumer && consumer.displayName ? consumer.displayName : consumerId;
+  }
+
+  function relevanceLabel(bench, catalog) {
+    return benchmarkRelevanceIds(bench)
+      .map(id => consumerDisplayName(id, catalog))
+      .join(', ');
+  }
+
+  function filterBenchmarkData(benchmarkData, selectedConsumerIds) {
+    const filtered = {
+      ...benchmarkData,
+      entries: {},
+    };
+    for (const [suiteName, entries] of Object.entries(benchmarkData.entries || {})) {
+      const filteredEntries = [];
+      for (const entry of entries || []) {
+        const benches = (entry.benches || []).filter(
+          bench => matchesConsumerSelection(bench, selectedConsumerIds)
+        );
+        if (benches.length > 0) {
+          filteredEntries.push({ ...entry, benches });
+        }
+      }
+      if (filteredEntries.length > 0) {
+        filtered.entries[suiteName] = filteredEntries;
+      }
+    }
+    return filtered;
+  }
+
+  function latestSourceCommit(benchmarkData) {
+    let latest = null;
+    for (const entries of Object.values(benchmarkData.entries || {})) {
+      for (const entry of entries || []) {
+        if (!entry || !entry.commit || !entry.commit.id) {
+          continue;
+        }
+        if (latest === null || Number(entry.date || 0) > latest.date) {
+          latest = { id: String(entry.commit.id), date: Number(entry.date || 0) };
+        }
+      }
+    }
+    return latest && latest.id;
+  }
+
+  function coreScriptUrl(benchmarkData) {
+    const commit = latestSourceCommit(benchmarkData);
+    const repositoryUrl = String(benchmarkData.repoUrl || '').replace(/\/$/, '');
+    if (!commit || !repositoryUrl.startsWith('https://github.com/')) {
+      return null;
+    }
+    const repositoryPath = repositoryUrl.slice('https://github.com/'.length);
+    return 'https://cdn.jsdelivr.net/gh/' + repositoryPath + '@' + commit
+      + '/.github/benchmark-dashboard/dashboard-core.js';
+  }
+
+  function selectedFromLocation(root, available) {
+    const parameter = new URL(root.location.href).searchParams.get('consumers');
+    if (parameter === null) {
+      return new Set(available);
+    }
+    const requested = new Set(parameter.split(',').map(value => value.trim()).filter(Boolean));
+    return new Set(available.filter(id => requested.has(id)));
+  }
+
+  function updateLocation(root, selected, available) {
+    const url = new URL(root.location.href);
+    if (selected.size === available.length && available.every(id => selected.has(id))) {
+      url.searchParams.delete('consumers');
+    } else {
+      url.searchParams.set('consumers', [...selected].join(','));
+    }
+    root.location.assign(url.toString());
+  }
+
+  function installStyles(root) {
+    const style = root.document.createElement('style');
+    style.textContent = `
+      .consumer-relevance-filter { margin: 16px 0; padding: 10px 12px 12px; border: 1px solid #9ca3af; border-radius: 6px; }
+      .consumer-relevance-filter legend { padding: 0 6px; font-weight: 700; }
+      .consumer-relevance-options { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 4px 0 10px; }
+      .consumer-relevance-option { display: inline-flex; align-items: center; white-space: nowrap; }
+      .consumer-relevance-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .consumer-relevance-details { margin: 10px 0 0; font-size: .9rem; }
+      .consumer-relevance-details code { overflow-wrap: anywhere; }
+      .dashboard-load-error { padding: 12px; border: 1px solid #b91c1c; border-radius: 6px; }
+    `;
+    root.document.head.appendChild(style);
+  }
+
+  function renderFilter(root, fullData, available, selected) {
+    const fieldset = root.document.createElement('fieldset');
+    fieldset.className = 'consumer-relevance-filter';
+    const legend = root.document.createElement('legend');
+    legend.textContent = 'Consumer relevance';
+    fieldset.appendChild(legend);
+
+    const options = root.document.createElement('div');
+    options.className = 'consumer-relevance-options';
+    fieldset.appendChild(options);
+    const catalog = fullData.consumerCatalog || {};
+    for (const consumerId of available) {
+      const label = root.document.createElement('label');
+      label.className = 'consumer-relevance-option';
+      const checkbox = root.document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = consumerId;
+      checkbox.checked = selected.has(consumerId);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          selected.add(consumerId);
+        } else {
+          selected.delete(consumerId);
+        }
+        updateLocation(root, selected, available);
+      });
+      label.appendChild(checkbox);
+      label.appendChild(root.document.createTextNode(
+        ' ' + consumerDisplayName(consumerId, catalog)
+      ));
+      const consumer = catalog[consumerId];
+      label.title = consumerId === UNCLASSIFIED
+        ? 'History published before consumer relevance metadata was available.'
+        : consumer
+          ? consumer.repository + '@' + String(consumer.ref).slice(0, 7)
+            + '; modules: ' + (consumer.modules || []).join(', ')
+          : 'Historical relevance tag not present in the current consumer catalog.';
+      options.appendChild(label);
+    }
+
+    const actions = root.document.createElement('div');
+    actions.className = 'consumer-relevance-actions';
+    const all = root.document.createElement('button');
+    all.type = 'button';
+    all.textContent = 'Select all';
+    all.addEventListener('click', () => updateLocation(root, new Set(available), available));
+    const none = root.document.createElement('button');
+    none.type = 'button';
+    none.textContent = 'Clear selection';
+    none.addEventListener('click', () => updateLocation(root, new Set(), available));
+    const note = root.document.createElement('span');
+    note.textContent = 'Tags identify affected library consumers; measurements were not run inside those applications.';
+    actions.append(all, none, note);
+    fieldset.appendChild(actions);
+
+    const controls = root.document.querySelector('.controls');
+    if (controls && controls.parentNode) {
+      controls.parentNode.insertBefore(fieldset, controls);
+    } else {
+      root.document.body.insertBefore(fieldset, root.document.getElementById('main'));
+    }
+  }
+
+  function appendRelevanceDetails(root, filteredData) {
+    const catalog = filteredData.consumerCatalog || {};
     const operations = new Map();
-    for (const entry of entries) {
-      const { commit, date, tool, benches } = entry;
-      for (const bench of benches) {
-        const { operation, backend } = splitBenchmarkName(bench.name);
-        let backends = operations.get(operation);
-        if (backends === undefined) {
-          backends = new Map();
-          operations.set(operation, backends);
-        }
-        let points = backends.get(backend);
-        if (points === undefined) {
-          points = [];
-          backends.set(backend, points);
-        }
-        points.push({ commit, date, tool, bench });
-      }
-    }
-    return operations;
-  }
-
-  function colorForBackend(backend, index) {
-    return backendColors.get(backend) || fallbackColors[index % fallbackColors.length];
-  }
-
-  function lineStyleForBackend(backend, index) {
-    return backendLineStyles.get(backend)
-      || fallbackLineStyles[index % fallbackLineStyles.length];
-  }
-
-  function commitAxis(backends) {
-    const commits = new Map();
-    for (const points of backends.values()) {
-      for (const point of points) {
-        const existing = commits.get(point.commit.id);
-        if (existing === undefined || point.date < existing.date) {
-          commits.set(point.commit.id, point);
+    for (const entries of Object.values(filteredData.entries || {})) {
+      for (const entry of entries || []) {
+        for (const bench of entry.benches || []) {
+          const operation = splitBenchmarkName(bench.name).operation;
+          const key = JSON.stringify({
+            consumers: benchmarkRelevanceIds(bench),
+            contract: bench.contract || '',
+            requiredModules: bench.requiredModules || [],
+          });
+          if (!operations.has(operation)) {
+            operations.set(operation, new Map());
+          }
+          operations.get(operation).set(key, bench);
         }
       }
     }
-    return [...commits.values()].sort((left, right) => left.date - right.date);
-  }
-
-  function latestPoint(points) {
-    return points.reduce(
-      (latest, point) => latest === null || point.date > latest.date ? point : latest,
-      null
-    );
-  }
-
-  function formatValue(value) {
-    return Number(value).toLocaleString(undefined, { maximumSignificantDigits: 6 });
-  }
-
-  function relativeRatio(point, bestValue) {
-    if (bestValue === 0) {
-      return point.bench.value === 0 ? 1 : Number.POSITIVE_INFINITY;
+    for (const [operation, variants] of operations) {
+      const card = root.document.getElementById(operationAnchor(operation));
+      if (!card) {
+        continue;
+      }
+      const details = root.document.createElement('details');
+      details.className = 'consumer-relevance-details';
+      const summary = root.document.createElement('summary');
+      summary.textContent = 'Consumer relevance evidence';
+      details.appendChild(summary);
+      const list = root.document.createElement('ul');
+      for (const bench of variants.values()) {
+        const item = root.document.createElement('li');
+        item.textContent = relevanceLabel(bench, catalog)
+          + (bench.contract ? ' — ' + bench.contract : '')
+          + (Array.isArray(bench.requiredModules) && bench.requiredModules.length
+            ? ' — modules: ' + bench.requiredModules.join(', ')
+            : '');
+        list.appendChild(item);
+      }
+      details.appendChild(list);
+      card.appendChild(details);
     }
-    return point.tool === 'customBiggerIsBetter'
-      ? bestValue / point.bench.value
-      : point.bench.value / bestValue;
   }
 
-  function renderLatestValues(card, backends) {
-    const latest = [...backends.entries()]
-      .map(([backend, points]) => ({ backend, point: latestPoint(points) }))
-      .filter(item => item.point !== null);
-    if (latest.length === 0) {
+  function restoreFullDownload(root, fullData) {
+    const button = root.document.getElementById('download-button');
+    if (!button) {
       return;
     }
-
-    const smallerIsBetter = latest[0].point.tool !== 'customBiggerIsBetter';
-    const values = latest.map(item => Number(item.point.bench.value));
-    const bestValue = smallerIsBetter ? Math.min(...values) : Math.max(...values);
-
-    const note = document.createElement('p');
-    note.className = 'chart-note';
-    note.textContent = 'Near-identical measurements can overlap. Distinct line patterns and markers, the grouped tooltip, and the latest-value table keep every backend visible.';
-    card.appendChild(note);
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'latest-values-wrapper';
-    card.appendChild(wrapper);
-
-    const table = document.createElement('table');
-    table.className = 'latest-values';
-    wrapper.appendChild(table);
-
-    const head = document.createElement('thead');
-    const headRow = document.createElement('tr');
-    for (const label of ['Backend', 'Latest result', 'vs best', 'Commit']) {
-      const cell = document.createElement('th');
-      cell.scope = 'col';
-      cell.textContent = label;
-      headRow.appendChild(cell);
-    }
-    head.appendChild(headRow);
-    table.appendChild(head);
-
-    const body = document.createElement('tbody');
-    for (const { backend, point } of latest) {
-      const row = document.createElement('tr');
-
-      const backendCell = document.createElement('th');
-      backendCell.scope = 'row';
-      backendCell.textContent = backend;
-      row.appendChild(backendCell);
-
-      const valueCell = document.createElement('td');
-      valueCell.textContent = formatValue(point.bench.value) + ' ' + point.bench.unit;
-      row.appendChild(valueCell);
-
-      const ratioCell = document.createElement('td');
-      const ratio = relativeRatio(point, bestValue);
-      ratioCell.textContent = Number.isFinite(ratio) ? ratio.toFixed(2) + '×' : '∞';
-      row.appendChild(ratioCell);
-
-      const commitCell = document.createElement('td');
-      const commitLink = document.createElement('a');
-      commitLink.href = point.commit.url;
-      commitLink.target = '_blank';
-      commitLink.rel = 'noopener';
-      commitLink.textContent = point.commit.id.slice(0, 7);
-      commitCell.appendChild(commitLink);
-      row.appendChild(commitCell);
-
-      body.appendChild(row);
-    }
-    table.appendChild(body);
-  }
-
-  function renderOperation(parent, operation, backends) {
-    const card = document.createElement('section');
-    card.className = 'benchmark-chart-card';
-    card.id = operationAnchor(operation);
-    card.tabIndex = -1;
-    parent.appendChild(card);
-
-    const title = document.createElement('h3');
-    title.textContent = operation;
-    const permalink = document.createElement('a');
-    permalink.className = 'chart-permalink';
-    permalink.href = '#' + card.id;
-    permalink.setAttribute('aria-label', 'Permanent link to ' + operation);
-    permalink.title = 'Permanent link to this chart';
-    permalink.textContent = '¶';
-    title.appendChild(document.createTextNode(' '));
-    title.appendChild(permalink);
-    card.appendChild(title);
-
-    const container = document.createElement('div');
-    container.className = 'chart-container';
-    card.appendChild(container);
-
-    const canvas = document.createElement('canvas');
-    container.appendChild(canvas);
-
-    const axis = commitAxis(backends);
-    const labels = axis.map(point => point.commit.id.slice(0, 7));
-    const commitIds = axis.map(point => point.commit.id);
-    const datasets = [...backends.entries()].map(([backend, points], index) => {
-      const byCommit = new Map(points.map(point => [point.commit.id, point]));
-      const color = colorForBackend(backend, index);
-      const lineStyle = lineStyleForBackend(backend, index);
-      return {
-        label: backend,
-        data: commitIds.map(commitId => {
-          const point = byCommit.get(commitId);
-          return point === undefined ? null : point.bench.value;
-        }),
-        pointMeta: commitIds.map(commitId => byCommit.get(commitId) || null),
-        borderColor: color,
-        backgroundColor: color,
-        borderDash: lineStyle.borderDash,
-        borderDashOffset: index * 1.5,
-        borderWidth: 2.5,
-        pointStyle: lineStyle.pointStyle,
-        pointRadius: 3.5,
-        pointHoverRadius: 6,
-        pointBorderWidth: 1.5,
-        fill: false,
-        lineTension: 0.1,
-        spanGaps: true,
-      };
-    });
-
-    const firstPoint = [...backends.values()].flat()[0];
-    const unit = firstPoint === undefined ? '' : firstPoint.bench.unit;
-    const chart = new Chart(canvas, {
-      type: 'line',
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        legend: {
-          display: true,
-          position: 'bottom',
-          labels: { usePointStyle: true },
-        },
-        hover: {
-          mode: 'index',
-          intersect: false,
-        },
-        scales: {
-          xAxes: [{
-            scaleLabel: { display: true, labelString: 'commit' },
-          }],
-          yAxes: [{
-            type: document.getElementById('scale-select').value,
-            scaleLabel: { display: true, labelString: unit },
-            ticks: { beginAtZero: true },
-          }],
-        },
-        tooltips: {
-          mode: 'index',
-          intersect: false,
-          callbacks: {
-            afterTitle: (items, data) => {
-              if (items.length === 0) {
-                return '';
-              }
-              const dataset = data.datasets[items[0].datasetIndex];
-              const point = dataset.pointMeta[items[0].index];
-              if (point === null) {
-                return '';
-              }
-              return '\n' + point.commit.message + '\n\n' + point.commit.timestamp
-                + ' committed by @' + point.commit.committer.username + '\n';
-            },
-            label: (item, data) => {
-              const dataset = data.datasets[item.datasetIndex];
-              const point = dataset.pointMeta[item.index];
-              if (point === null) {
-                return dataset.label + ': no result';
-              }
-              let label = dataset.label + ': ' + point.bench.value + ' ' + point.bench.unit;
-              if (point.bench.range) {
-                label += ' (' + point.bench.range + ')';
-              }
-              return label;
-            },
-            afterLabel: (item, data) => {
-              const point = data.datasets[item.datasetIndex].pointMeta[item.index];
-              return point !== null && point.bench.extra ? '\n' + point.bench.extra : '';
-            },
-          },
-        },
-        onClick: (_event, activeElements) => {
-          if (activeElements.length === 0) {
-            return;
-          }
-          const active = activeElements[0];
-          const dataset = active._chart.data.datasets[active._datasetIndex];
-          const point = dataset.pointMeta[active._index];
-          if (point !== null) {
-            window.open(point.commit.url, '_blank');
-          }
-        },
-      },
-    });
-    charts.push(chart);
-    renderLatestValues(card, backends);
-  }
-
-  function renderSuite(main, suiteName, entries) {
-    const suite = document.createElement('section');
-    suite.className = 'benchmark-set';
-    main.appendChild(suite);
-
-    const title = document.createElement('h2');
-    title.textContent = suiteName;
-    suite.appendChild(title);
-
-    const operations = collectOperations(entries);
-    for (const [operation, backends] of operations.entries()) {
-      renderOperation(suite, operation, backends);
-    }
-  }
-
-  function initialize() {
-    const benchmarkData = window.BENCHMARK_DATA;
-    document.getElementById('last-update').textContent =
-      new Date(benchmarkData.lastUpdate).toString();
-
-    const repositoryLink = document.getElementById('repository-link');
-    repositoryLink.href = benchmarkData.repoUrl;
-    repositoryLink.textContent = benchmarkData.repoUrl;
-
-    document.getElementById('download-button').onclick = () => {
-      const link = document.createElement('a');
+    button.onclick = () => {
+      const link = root.document.createElement('a');
       link.href = 'data:application/json;charset=utf-8,'
-        + encodeURIComponent(JSON.stringify(benchmarkData, null, 2));
+        + encodeURIComponent(JSON.stringify(fullData, null, 2));
       link.download = 'benchmark_data.json';
       link.click();
     };
-
-    document.getElementById('scale-select').onchange = event => {
-      const scaleType = event.target.value;
-      for (const chart of charts) {
-        const yAxis = chart.options.scales.yAxes[0];
-        yAxis.type = scaleType;
-        yAxis.ticks.beginAtZero = scaleType === 'linear';
-        chart.update();
-      }
-    };
-
-    const main = document.getElementById('main');
-    for (const [suiteName, entries] of Object.entries(benchmarkData.entries)) {
-      renderSuite(main, suiteName, entries);
-    }
-
-    scrollToRequestedChart();
-    window.addEventListener('hashchange', scrollToRequestedChart);
   }
 
-  initialize();
-})();
+  function reportLoadFailure(root, message) {
+    const main = root.document.getElementById('main');
+    if (!main) {
+      return;
+    }
+    const error = root.document.createElement('p');
+    error.className = 'dashboard-load-error';
+    error.textContent = message;
+    main.appendChild(error);
+  }
+
+  function initialize(root) {
+    const fullData = root.BENCHMARK_DATA;
+    if (!fullData || !fullData.entries) {
+      return;
+    }
+    const available = collectConsumerFilterIds(fullData);
+    const selected = selectedFromLocation(root, available);
+    installStyles(root);
+    renderFilter(root, fullData, available, selected);
+    root.BENCHMARK_DATA = filterBenchmarkData(fullData, selected);
+
+    const source = coreScriptUrl(fullData);
+    if (!source) {
+      reportLoadFailure(root, 'Could not determine the immutable dashboard renderer for this benchmark history.');
+      return;
+    }
+    const script = root.document.createElement('script');
+    script.src = source;
+    script.async = false;
+    script.addEventListener('load', () => {
+      restoreFullDownload(root, fullData);
+      appendRelevanceDetails(root, root.BENCHMARK_DATA);
+    });
+    script.addEventListener('error', () => {
+      reportLoadFailure(root, 'Could not load the commit-pinned benchmark renderer.');
+    });
+    root.document.head.appendChild(script);
+  }
+
+  return {
+    UNCLASSIFIED,
+    benchmarkRelevanceIds,
+    collectConsumerFilterIds,
+    coreScriptUrl,
+    filterBenchmarkData,
+    filterPointValues,
+    initialize,
+    matchesConsumerSelection,
+    operationAnchor,
+    relevanceLabel,
+    splitBenchmarkName,
+  };
+});
