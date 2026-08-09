@@ -157,6 +157,12 @@ def _check_cycles(edges: dict[str, set[str]]) -> None:
 
 
 def _check_internal_boundaries(modules: dict[str, Module], edges: dict[str, set[str]]) -> None:
+    # Benchmarks are evidence tooling, never a production capability. Diagnose this before the
+    # generic layering rule so the failure explains the architectural reason for the rejection.
+    for source, targets in edges.items():
+        if BENCHMARKS in targets and source != BENCHMARKS:
+            raise BoundaryError(f"{source} must never depend on the benchmark module in production")
+
     for source, targets in edges.items():
         if source == BOM or modules[source].packaging == "pom":
             continue
@@ -169,9 +175,6 @@ def _check_internal_boundaries(modules: dict[str, Module], edges: dict[str, set[
                 f"{source} has forbidden production module dependencies: {', '.join(sorted(forbidden))}; "
                 f"allowed: {', '.join(sorted(allowed)) or 'none'}"
             )
-    for source, targets in edges.items():
-        if BENCHMARKS in targets and source != BENCHMARKS:
-            raise BoundaryError(f"{source} must never depend on the benchmark module in production")
 
 
 def _check_external_boundaries(modules: dict[str, Module]) -> None:
@@ -206,7 +209,7 @@ def verify(modules: dict[str, Module]) -> dict[str, set[str]]:
     if missing:
         raise BoundaryError("Missing expected reactor modules: " + ", ".join(sorted(missing)))
     edges = _production_internal_edges(modules)
-    # Prefer the specific architectural contract error over a secondary cycle error.
+    # Prefer precise architectural diagnostics before the secondary cycle check.
     _check_internal_boundaries(modules, edges)
     _check_external_boundaries(modules)
     _check_cycles(edges)
