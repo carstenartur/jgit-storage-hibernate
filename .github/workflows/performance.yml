@@ -61,7 +61,8 @@ jobs:
         run: |
           test -s .github/benchmark-dashboard/index.html
           test -s .github/benchmark-dashboard/dashboard.js
-          grep -F "Each chart groups the same JGit operation" .github/benchmark-dashboard/index.html
+          grep -F "Reading rule for every chart: lower lines and points are better/faster" .github/benchmark-dashboard/index.html
+          grep -F "one stable operation and one physical unit" .github/benchmark-dashboard/index.html
           grep -F "datasets" .github/benchmark-dashboard/dashboard.js
 
       - name: Generate JMH performance badge
@@ -88,6 +89,7 @@ jobs:
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo 'Compared backends: JGit + filesystem, JGit + HSQLDB (in-memory), JGit + PostgreSQL, and JGit + PostgreSQL + HikariCP.' >> "$GITHUB_STEP_SUMMARY"
           echo 'Related backend measurements are rendered as multiple lines in one chart per JGit operation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All published charts follow one visual rule: lower is better/faster; higher is worse/slower or more expensive.' >> "$GITHUB_STEP_SUMMARY"
           echo 'PostgreSQL is provided by the JUnit Testcontainers extension; the workflow only invokes Maven.' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '[Open performance charts](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)' >> "$GITHUB_STEP_SUMMARY"
