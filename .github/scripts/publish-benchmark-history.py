@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from benchmark_consumer_relevance import apply_to_benches, resolve as resolve_consumer_relevance
 from benchmark_units import CANONICAL_UNIT, normalize_benchmark
 
 SCRIPT_PREFIX = "window.BENCHMARK_DATA = "
@@ -131,6 +132,14 @@ def _validate_current_series_units(
             )
 
 
+def _relevance_for_suite(repository_dir: Path, suite_name: str) -> dict[str, object] | None:
+    consumer_descriptor = repository_dir / ".github" / "consumer-compatibility.json"
+    relevance_map = repository_dir / ".github" / "benchmark-consumer-relevance.json"
+    if not consumer_descriptor.exists() or not relevance_map.exists():
+        return None
+    return resolve_consumer_relevance(consumer_descriptor, relevance_map, suite_name)
+
+
 def _commit_metadata(repository: Path, commit: str, repository_url: str, actor: str) -> dict[str, Any]:
     author_name = _git(repository, "show", "-s", "--format=%an", commit)
     author_email = _git(repository, "show", "-s", "--format=%ae", commit)
@@ -244,6 +253,7 @@ def update_history(
 
     data = _load_data(data_file)
     benches = _load_benches(benchmark_file)
+    benches = apply_to_benches(benches, _relevance_for_suite(repository_dir, suite_name))
     suites = data.setdefault("entries", {})
     history = suites.setdefault(suite_name, [])
     if not isinstance(history, list):
