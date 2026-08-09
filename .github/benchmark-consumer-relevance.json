@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "suites": {
+    "Repository backend comparison": {
+      "contract": "core-storage",
+      "requiredModules": ["jgit-storage-hibernate-core"]
+    },
+    "Reflog performance": {
+      "contract": "core-reflog",
+      "requiredModules": ["jgit-storage-hibernate-core"]
+    },
+    "Hibernate Search performance": {
+      "contract": "search-history",
+      "requiredModules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search"
+      ]
+    },
+    "Hibernate Search runtime tuning": {
+      "contract": "search-runtime",
+      "requiredModules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search"
+      ]
+    },
+    "Git history query crossover": {
+      "contract": "search-history-query-crossover",
+      "requiredModules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search"
+      ]
+    }
+  }
+}
