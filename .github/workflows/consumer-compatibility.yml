@@ -1,0 +1,265 @@
+name: Real Consumer Compatibility
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '43 4 * * 3'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-*/pom.xml'
+      - 'jgit-storage-hibernate-*/src/**'
+      - '.github/consumer-compatibility.json'
+      - '.github/scripts/patch-consumer-candidate.py'
+      - '.github/scripts/test_patch_consumer_candidate.py'
+      - '.github/scripts/verify-consumer-compatibility.py'
+      - '.github/workflows/consumer-compatibility.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-*/pom.xml'
+      - 'jgit-storage-hibernate-*/src/**'
+      - '.github/consumer-compatibility.json'
+      - '.github/scripts/patch-consumer-candidate.py'
+      - '.github/scripts/test_patch_consumer_candidate.py'
+      - '.github/scripts/verify-consumer-compatibility.py'
+      - '.github/workflows/consumer-compatibility.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-candidate:
+    name: Build isolated library candidate
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.contract.outputs.matrix }}
+      candidate_version: ${{ steps.contract.outputs.candidate_version }}
+    steps:
+      - name: Checkout library
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Validate consumer descriptor and candidate patcher
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_patch_consumer_candidate.py
+          matrix="$(python3 .github/scripts/verify-consumer-compatibility.py)"
+          candidate_version="$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('pom.xml').getroot()
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          value = root.findtext('m:version', namespaces=ns)
+          if not value or not value.strip():
+              raise SystemExit('Root pom.xml has no project version')
+          print(value.strip())
+          PY
+          )"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "candidate_version=$candidate_version" >> "$GITHUB_OUTPUT"
+          echo "Candidate version: $candidate_version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install candidate into isolated Maven repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_repo="$GITHUB_WORKSPACE/target/consumer-candidate-m2"
+          mvn -B -ntp -DskipTests -Dmaven.repo.local="$candidate_repo" install
+          test -d "$candidate_repo/io/github/carstenartur"
+          mkdir -p target/consumer-candidate-artifact/io/github
+          cp -R "$candidate_repo/io/github/carstenartur" target/consumer-candidate-artifact/io/github/
+
+      - name: Upload candidate Maven subtree
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jgit-storage-hibernate-consumer-candidate
+          path: target/consumer-candidate-artifact/**
+          if-no-files-found: error
+
+  candidate:
+    name: Candidate — ${{ matrix.id }}
+    if: github.event_name != 'schedule'
+    needs: prepare-candidate
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare-candidate.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout library tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: library
+
+      - name: Checkout pinned consumer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+          path: consumer
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download same-run candidate
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: jgit-storage-hibernate-consumer-candidate
+          path: ${{ runner.temp }}/candidate-repository
+
+      - name: Patch only upstream library versions
+        shell: bash
+        env:
+          CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.candidate_version }}
+          EXPECTED_MODULES: ${{ join(matrix.expectedModules, ',') }}
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/consumer-evidence/${{ matrix.id }}"
+          mkdir -p "$evidence"
+          python3 library/.github/scripts/patch-consumer-candidate.py \
+            --root consumer \
+            --version "$CANDIDATE_VERSION" \
+            --report "$evidence/substitution.json"
+          python3 - "$evidence/substitution.json" "$EXPECTED_MODULES" <<'PY'
+          import json, sys
+          report = json.load(open(sys.argv[1], encoding='utf-8'))
+          expected = sorted(filter(None, sys.argv[2].split(',')))
+          actual = sorted(report['modules'])
+          if actual != expected:
+              raise SystemExit(f'Consumer modules differ from descriptor: expected={expected}, actual={actual}')
+          PY
+          git -C consumer diff -- '*.xml' > "$evidence/pom-diff.patch"
+          git -C consumer diff --name-only > "$evidence/changed-files.txt"
+          if grep -Ev '(^|/)pom\.xml$' "$evidence/changed-files.txt" | grep -q .; then
+            echo 'Candidate substitution changed non-POM files:' >&2
+            cat "$evidence/changed-files.txt" >&2
+            exit 1
+          fi
+
+      - name: Install candidate subtree into isolated consumer Maven repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          maven_repo="${RUNNER_TEMP}/consumer-m2/repository"
+          mkdir -p "$maven_repo"
+          cp -R "${RUNNER_TEMP}/candidate-repository/io" "$maven_repo/"
+          echo "MAVEN_REPO=$maven_repo" >> "$GITHUB_ENV"
+
+      - name: Run consumer-owned candidate contract
+        shell: bash
+        env:
+          JGIT_STORAGE_HIBERNATE_CONTRACT_MODE: candidate
+          JGIT_STORAGE_HIBERNATE_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.candidate_version }}
+        run: |
+          set -euo pipefail
+          cd consumer
+          test -s '${{ matrix.contractScript }}'
+          bash -n '${{ matrix.contractScript }}'
+          MAVEN_OPTS="-Dmaven.repo.local=${MAVEN_REPO} ${MAVEN_OPTS:-}" \
+            bash '${{ matrix.contractScript }}'
+          test -s target/jgit-storage-hibernate-contract/result.json
+
+      - name: Record resolved consumer evidence
+        if: always()
+        shell: bash
+        run: |
+          evidence="$GITHUB_WORKSPACE/consumer-evidence/${{ matrix.id }}"
+          mkdir -p "$evidence"
+          git -C consumer rev-parse HEAD > "$evidence/consumer-commit.txt"
+          if [ -f consumer/target/jgit-storage-hibernate-contract/result.json ]; then
+            cp consumer/target/jgit-storage-hibernate-contract/result.json "$evidence/result.json"
+          fi
+          if [ -f consumer/target/jgit-storage-hibernate-contract/dependency-tree.txt ]; then
+            cp consumer/target/jgit-storage-hibernate-contract/dependency-tree.txt "$evidence/dependency-tree.txt"
+          fi
+
+      - name: Upload candidate consumer evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consumer-candidate-${{ matrix.id }}
+          path: |
+            consumer-evidence/${{ matrix.id }}/**
+            consumer/target/jgit-storage-hibernate-contract/**
+            consumer/**/target/surefire-reports/**
+            consumer/**/target/failsafe-reports/**
+          if-no-files-found: error
+
+  prepare-baseline:
+    name: Prepare pinned baseline matrix
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.contract.outputs.matrix }}
+    steps:
+      - name: Checkout library descriptor
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate descriptor
+        id: contract
+        shell: bash
+        run: |
+          matrix="$(python3 .github/scripts/verify-consumer-compatibility.py)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  baseline:
+    name: Baseline — ${{ matrix.id }}
+    if: github.event_name == 'schedule'
+    needs: prepare-baseline
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare-baseline.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout pinned consumer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run consumer-owned baseline contract
+        shell: bash
+        env:
+          JGIT_STORAGE_HIBERNATE_CONTRACT_MODE: baseline
+        run: |
+          set -euo pipefail
+          test -s '${{ matrix.contractScript }}'
+          bash -n '${{ matrix.contractScript }}'
+          bash '${{ matrix.contractScript }}'
+          test -s target/jgit-storage-hibernate-contract/result.json
+
+      - name: Upload baseline consumer evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consumer-baseline-${{ matrix.id }}
+          path: |
+            target/jgit-storage-hibernate-contract/**
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: error
