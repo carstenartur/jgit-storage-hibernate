@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   build:
+    name: Maven verification
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,7 +29,7 @@ jobs:
       - name: Parse release and publication tooling
         run: |
           bash -n .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
-          python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py .github/scripts/verify-security-policy.py .github/scripts/publish-benchmark-history.py .github/scripts/test_publish_benchmark_history.py .github/scripts/convert-jmh-backend-comparison.py .github/scripts/test_convert_jmh_backend_comparison.py .github/scripts/test_release_workflow_trigger.py
+          python3 -m py_compile .github/scripts/prepare-public_repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py .github/scripts/verify-security-policy.py .github/scripts/publish-benchmark-history.py .github/scripts/test_publish_benchmark_history.py .github/scripts/convert-jmh-backend-comparison.py .github/scripts/test_convert_jmh_backend_comparison.py .github/scripts/test_release_workflow_trigger.py
       - name: Test release and publication tooling
         run: |
           python3 .github/scripts/test_update_release_metadata.py
