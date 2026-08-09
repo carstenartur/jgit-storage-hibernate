@@ -19,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.LongAdder;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -139,7 +139,15 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
     }
   }
 
-  /** Monotone queue telemetry plus current and maximum queued occupancy. */
+  /**
+   * Monotone queue telemetry plus current and maximum queued occupancy.
+   *
+   * <p>{@code completed} and {@code failed} describe durable processor outcomes. Once a command has
+   * entered the processor, a later caller-side cancellation of its completion future does not undo
+   * the database outcome and therefore does not decrement or replace those counters. {@code
+   * cancelled} counts commands discarded before processor execution; {@code rejected} counts
+   * commands rejected at admission or by shutdown before execution.
+   */
   public record Metrics(
       long submitted,
       long completed,
@@ -501,24 +509,18 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
         }
         for (int index = 0; index < batchSize; index++) {
           QueuedCommand queued = batch.commands.get(index);
+          // Processor success is the durable outcome. Publish that monotone metric before making a
+          // successful future observable; a caller-side cancellation cannot undo the committed work.
           completed.increment();
-          if (!queued.submission.completion.complete(results.get(index))) {
-            completed.decrement();
-            if (queued.submission.completion.isCancelled()) {
-              cancelled.increment();
-            }
-          }
+          queued.submission.completion.complete(results.get(index));
         }
       } catch (Throwable failure) {
         failedBatches.increment();
         for (QueuedCommand queued : batch.commands) {
+          // Likewise, the processor failure is an outcome of the attempted durable batch even if a
+          // caller raced to cancel its local completion future.
           failed.increment();
-          if (!queued.submission.completion.completeExceptionally(failure)) {
-            failed.decrement();
-            if (queued.submission.completion.isCancelled()) {
-              cancelled.increment();
-            }
-          }
+          queued.submission.completion.completeExceptionally(failure);
         }
       }
     }
@@ -532,12 +534,11 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
         for (ArrayDeque<QueuedCommand> repositoryQueue : repositoryQueues.values()) {
           QueuedCommand command;
           while ((command = repositoryQueue.pollFirst()) != null) {
-            rejected.increment();
-            if (!command.submission.completion.completeExceptionally(failure)) {
-              rejected.decrement();
-              if (command.submission.completion.isCancelled()) {
-                cancelled.increment();
-              }
+            if (command.submission.completion.isCancelled()) {
+              cancelled.increment();
+            } else {
+              rejected.increment();
+              command.submission.completion.completeExceptionally(failure);
             }
             count++;
           }
