@@ -153,7 +153,7 @@ jobs:
           if actual != expected:
               raise SystemExit(f'Consumer modules differ from descriptor: expected={expected}, actual={actual}')
           PY
-          git -C consumer diff -- '*.xml' > "$evidence/pom-diff.patch"
+          git -C consumer diff -- ':(glob)**/pom.xml' > "$evidence/pom-diff.patch"
           git -C consumer diff --name-only > "$evidence/changed-files.txt"
           if grep -Ev '(^|/)pom\.xml$' "$evidence/changed-files.txt" | grep -q .; then
             echo 'Candidate substitution changed non-POM files:' >&2
