@@ -29,14 +29,33 @@
         font-size: clamp(1.8rem, 4vw, 3rem);
       }
       .metadata,
-      .controls {
+      .controls,
+      .filter-row {
         display: flex;
         flex-wrap: wrap;
         gap: 8px 20px;
         align-items: center;
       }
-      .controls {
+      .controls,
+      .consumer-filters {
         margin-top: 16px;
+      }
+      .consumer-filters {
+        padding: 10px 12px;
+        border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        border-radius: 6px;
+      }
+      .consumer-filters legend {
+        font-weight: 700;
+        padding: 0 6px;
+      }
+      .filter-row + .filter-row {
+        margin-top: 8px;
+      }
+      .filter-row label {
+        display: inline-flex;
+        gap: 5px;
+        align-items: center;
       }
       .direction-contract {
         margin: 14px 0 0;
@@ -90,10 +109,15 @@
         position: relative;
         min-height: 420px;
       }
-      .chart-note {
+      .chart-note,
+      .relevance-note {
         margin: 12px 0 8px;
         font-size: 0.9rem;
         color: color-mix(in srgb, CanvasText 72%, transparent);
+      }
+      .relevance-note {
+        padding: 8px 10px;
+        border-left: 3px solid color-mix(in srgb, #3273dc 65%, transparent);
       }
       .latest-values-wrapper {
         overflow-x: auto;
@@ -151,6 +175,12 @@
         </select>
         <span>Each chart groups one stable operation and one physical unit. Patterns, markers and the latest-value table expose overlapping measurements. The ¶ beside a chart title is a stable direct link.</span>
       </div>
+      <fieldset class="consumer-filters">
+        <legend>Library-impact relevance</legend>
+        <div id="consumer-filter" class="filter-row"></div>
+        <div id="contract-filter" class="filter-row"></div>
+        <p class="chart-note">All filters are selected by default. They hide or show existing charts only; measured values are never recomputed. Consumer tags mean the pinned compatibility contract uses the required library modules, not that the benchmark measured that application.</p>
+      </fieldset>
     </header>
 
     <main id="main"></main>
