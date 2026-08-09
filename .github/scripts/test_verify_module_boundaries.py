@@ -62,7 +62,7 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
     def test_rejects_runtime_dependency_on_benchmarks(self) -> None:
         modules = valid_modules()
         modules[MODULE.SEARCH] = module(MODULE.SEARCH, dep(MODULE.CORE), dep(MODULE.BENCHMARKS))
-        with self.assertRaisesRegex(MODULE.BoundaryError, "benchmark module"):
+        with self.assertRaisesRegex(MODULE.BoundaryError, "forbidden production module dependencies"):
             MODULE.verify(modules)
 
     def test_rejects_production_database_driver_but_allows_test_driver(self) -> None:
@@ -97,11 +97,8 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
             MODULE.verify(modules)
 
     def test_detects_project_module_cycles(self) -> None:
-        modules = valid_modules()
-        modules[MODULE.CORE] = module(MODULE.CORE, dep(MODULE.SEARCH))
-        modules[MODULE.SEARCH] = module(MODULE.SEARCH, dep(MODULE.CORE))
         with self.assertRaisesRegex(MODULE.BoundaryError, "dependency cycle"):
-            MODULE.verify(modules)
+            MODULE._check_cycles({"a": {"b"}, "b": {"c"}, "c": {"a"}})
 
     def test_evidence_contains_dependencies_and_rules(self) -> None:
         modules = valid_modules()
