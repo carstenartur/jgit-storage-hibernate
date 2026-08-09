@@ -278,6 +278,17 @@ public final class CommitHistoryQuery {
       return this;
     }
 
+    /**
+     * Allow a closeable scrolling/export cursor to consume the complete filtered result set.
+     *
+     * <p>Prefer this only with {@link GitHistorySearchService#scrollChangeSummaries(CommitHistoryQuery,
+     * int)}. List-returning paging APIs still materialize their requested result list.
+     */
+    public Builder unbounded() {
+      this.limit = Integer.MAX_VALUE;
+      return this;
+    }
+
     public CommitHistoryQuery build() {
       return new CommitHistoryQuery(this);
     }

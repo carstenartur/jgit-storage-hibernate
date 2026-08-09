@@ -11,14 +11,20 @@ package io.github.carstenartur.jgit.storage.hibernate.search.service;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistoryQuery.PathMatch;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import org.hibernate.ScrollMode;
+import org.hibernate.ScrollableResults;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.hibernate.search.engine.search.common.BooleanOperator;
 import org.hibernate.search.engine.search.predicate.SearchPredicate;
 import org.hibernate.search.engine.search.predicate.dsl.SearchPredicateFactory;
+import org.hibernate.search.engine.search.query.SearchScroll;
 import org.hibernate.search.engine.search.sort.SearchSort;
 import org.hibernate.search.mapper.orm.Search;
 import org.hibernate.search.mapper.orm.scope.SearchScope;
@@ -27,6 +33,18 @@ import org.hibernate.search.mapper.orm.session.SearchSession;
 /** Query service for indexed Git history. */
 public class GitHistorySearchService {
 
+  /** Hibernate configuration property bounding offset-based UI pagination. */
+  public static final String MAX_OFFSET_PROPERTY = "jgit.storage.hibernate.search.max_offset";
+
+  /** Default maximum offset for list-returning page queries. */
+  public static final int DEFAULT_MAX_OFFSET = 10_000;
+
+  /** Default result chunk size used by the closeable scrolling API. */
+  public static final int DEFAULT_SCROLL_CHUNK_SIZE = 100;
+
+  /** Hard safety bound for one scrolling result chunk. */
+  public static final int MAX_SCROLL_CHUNK_SIZE = 1_000;
+
   private static final String SUMMARY_PROJECTION =
       "SELECT new "
           + CommitSearchHit.class.getName()
@@ -34,9 +52,11 @@ public class GitHistorySearchService {
           + "c.committerName, c.committerEmail, c.authorTime, c.committerTime) ";
 
   private final SessionFactory sessionFactory;
+  private final int maxOffset;
 
   public GitHistorySearchService(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
+    maxOffset = configuredMaxOffset(sessionFactory);
     SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(this.sessionFactory);
   }
 
@@ -74,7 +94,7 @@ public class GitHistorySearchService {
    * selected by {@link CommitHistoryQuery#timestampField()} and defaults to committer time.
    */
   public List<GitCommitIndex> findChanges(CommitHistoryQuery query) {
-    validateQuery(query);
+    validatePagedQuery(query);
     if (matchesNothing(query)) {
       return List.of();
     }
@@ -90,7 +110,7 @@ public class GitHistorySearchService {
    * the changed text column.
    */
   public List<CommitSearchHit> findChangeSummaries(CommitHistoryQuery query) {
-    validateQuery(query);
+    validatePagedQuery(query);
     if (matchesNothing(query)) {
       return List.of();
     }
@@ -98,6 +118,41 @@ public class GitHistorySearchService {
     return query.requiresSearchBackend()
         ? findIndexedSummaries(query)
         : findStructuredSummaries(query);
+  }
+
+  /**
+   * Open a closeable, bounded cursor over compact history hits using a 100-hit chunk by default.
+   *
+   * <p>The query's {@link CommitHistoryQuery#limit()} is the maximum number of hits the cursor will
+   * expose. Use {@link CommitHistoryQuery.Builder#unbounded()} for a complete export. Offset must be
+   * zero: scrolling is the replacement for deep offset traversal, not another way to implement it.
+   */
+  public CommitSearchCursor scrollChangeSummaries(CommitHistoryQuery query) {
+    return scrollChangeSummaries(query, DEFAULT_SCROLL_CHUNK_SIZE);
+  }
+
+  /**
+   * Open a closeable, bounded cursor over compact history hits.
+   *
+   * <p>Search-backed queries use Hibernate Search's stateful scroll and a stable score/time/object-id
+   * sort. Structured-only queries use a forward-only Hibernate ORM cursor with the same chronological
+   * ordering as the existing list API. Both paths keep at most one configured chunk in application
+   * memory and release resources when the cursor is closed.
+   */
+  public CommitSearchCursor scrollChangeSummaries(CommitHistoryQuery query, int chunkSize) {
+    validateScrollQuery(query, chunkSize);
+    if (matchesNothing(query) || query.limit() == 0) {
+      return emptyCursor();
+    }
+    SearchIndexProfileCompatibility.requireCompatible(sessionFactory, query.repositoryName());
+    return query.requiresSearchBackend()
+        ? scrollIndexedSummaries(query, chunkSize)
+        : scrollStructuredSummaries(query, chunkSize);
+  }
+
+  /** The configured maximum offset accepted by list-returning pagination APIs. */
+  public int maxOffset() {
+    return maxOffset;
   }
 
   private List<GitCommitIndex> findIndexedChanges(CommitHistoryQuery query) {
@@ -125,6 +180,119 @@ public class GitHistorySearchService {
         step = step.sort(chronologicalSort(scope, timeField));
       }
       return step.fetchHits(query.offset(), query.limit());
+    }
+  }
+
+  private CommitSearchCursor scrollIndexedSummaries(CommitHistoryQuery query, int chunkSize) {
+    String timeField = searchTimeField(query);
+    Session session = sessionFactory.openSession();
+    try {
+      SearchSession searchSession = Search.session(session);
+      SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
+      SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
+      var step = searchSession.search(scope).select(CommitSearchHit.class).where(predicate);
+      step =
+          step.sort(
+              query.text() == null
+                  ? chronologicalSort(scope, timeField)
+                  : stableRelevanceSort(scope, timeField));
+      int effectiveChunk = Math.min(chunkSize, query.limit());
+      SearchScroll<CommitSearchHit> scroll = step.scroll(effectiveChunk);
+      return new CommitSearchCursor(
+          new CommitSearchCursor.Source() {
+            private int remaining = query.limit();
+
+            @Override
+            public List<CommitSearchHit> nextChunk() {
+              if (remaining == 0) {
+                return List.of();
+              }
+              var result = scroll.next();
+              if (!result.hasHits()) {
+                return List.of();
+              }
+              List<CommitSearchHit> hits = result.hits();
+              int returned = Math.min(remaining, hits.size());
+              remaining -= returned;
+              return returned == hits.size() ? hits : hits.subList(0, returned);
+            }
+
+            @Override
+            public void close() {
+              try {
+                scroll.close();
+              } finally {
+                session.close();
+              }
+            }
+          });
+    } catch (RuntimeException | Error failure) {
+      session.close();
+      throw failure;
+    }
+  }
+
+  private CommitSearchCursor scrollStructuredSummaries(CommitHistoryQuery query, int chunkSize) {
+    String timeProperty = hqlTimeProperty(query);
+    StringBuilder hql =
+        new StringBuilder(SUMMARY_PROJECTION)
+            .append("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+    appendStructuredPredicates(hql, query, timeProperty);
+    appendStructuredOrder(hql, timeProperty);
+
+    Session session = sessionFactory.openSession();
+    Transaction transaction = session.beginTransaction();
+    try {
+      var selection = session.createQuery(hql.toString(), CommitSearchHit.class);
+      selection.setFetchSize(chunkSize);
+      selection.setReadOnly(true);
+      bindStructuredParameters(selection, query);
+      ScrollableResults<CommitSearchHit> results = selection.scroll(ScrollMode.FORWARD_ONLY);
+      return new CommitSearchCursor(
+          new CommitSearchCursor.Source() {
+            private int remaining = query.limit();
+
+            @Override
+            public List<CommitSearchHit> nextChunk() {
+              if (remaining == 0) {
+                return List.of();
+              }
+              int requested = Math.min(chunkSize, remaining);
+              List<CommitSearchHit> hits = new ArrayList<>(requested);
+              while (hits.size() < requested && results.next()) {
+                if (Thread.currentThread().isInterrupted()) {
+                  throw new CancellationException("search cursor cancelled by thread interruption");
+                }
+                hits.add(results.get());
+              }
+              remaining -= hits.size();
+              return hits;
+            }
+
+            @Override
+            public void close() {
+              try {
+                results.close();
+              } finally {
+                try {
+                  if (transaction.isActive()) {
+                    transaction.rollback();
+                  }
+                } finally {
+                  session.close();
+                }
+              }
+            }
+          });
+    } catch (RuntimeException | Error failure) {
+      try {
+        if (transaction.isActive()) {
+          transaction.rollback();
+        }
+      } finally {
+        session.close();
+      }
+      throw failure;
     }
   }
 
@@ -180,6 +348,20 @@ public class GitHistorySearchService {
       SearchScope<GitCommitIndex> scope, String timeField) {
     return scope
         .sort()
+        .field(timeField)
+        .desc()
+        .then()
+        .field("objectId")
+        .asc()
+        .toSort();
+  }
+
+  private static SearchSort stableRelevanceSort(
+      SearchScope<GitCommitIndex> scope, String timeField) {
+    return scope
+        .sort()
+        .score()
+        .then()
         .field(timeField)
         .desc()
         .then()
@@ -275,6 +457,31 @@ public class GitHistorySearchService {
     }
   }
 
+  private void validatePagedQuery(CommitHistoryQuery query) {
+    validateQuery(query);
+    if (query.offset() > maxOffset) {
+      throw new IllegalArgumentException(
+          "offset "
+              + query.offset()
+              + " exceeds configured maximum "
+              + maxOffset
+              + "; use scrollChangeSummaries for deep traversal/export or configure "
+              + MAX_OFFSET_PROPERTY);
+    }
+  }
+
+  private static void validateScrollQuery(CommitHistoryQuery query, int chunkSize) {
+    validateQuery(query);
+    if (query.offset() != 0) {
+      throw new IllegalArgumentException(
+          "scrolling requires offset 0; use the cursor itself instead of deep offset pagination");
+    }
+    if (chunkSize <= 0 || chunkSize > MAX_SCROLL_CHUNK_SIZE) {
+      throw new IllegalArgumentException(
+          "scroll chunk size must be between 1 and " + MAX_SCROLL_CHUNK_SIZE);
+    }
+  }
+
   private static void validateQuery(CommitHistoryQuery query) {
     Objects.requireNonNull(query, "query");
   }
@@ -291,6 +498,36 @@ public class GitHistorySearchService {
 
   private static String searchTimeField(CommitHistoryQuery query) {
     return hqlTimeProperty(query);
+  }
+
+  private static int configuredMaxOffset(SessionFactory sessionFactory) {
+    Object configured = sessionFactory.getProperties().get(MAX_OFFSET_PROPERTY);
+    if (configured == null) {
+      return DEFAULT_MAX_OFFSET;
+    }
+    try {
+      int value = Integer.parseInt(configured.toString().trim());
+      if (value < 0) {
+        throw new IllegalArgumentException(MAX_OFFSET_PROPERTY + " must not be negative");
+      }
+      return value;
+    } catch (NumberFormatException invalid) {
+      throw new IllegalArgumentException(
+          MAX_OFFSET_PROPERTY + " must be a non-negative integer", invalid);
+    }
+  }
+
+  private static CommitSearchCursor emptyCursor() {
+    return new CommitSearchCursor(
+        new CommitSearchCursor.Source() {
+          @Override
+          public List<CommitSearchHit> nextChunk() {
+            return List.of();
+          }
+
+          @Override
+          public void close() {}
+        });
   }
 
   /** Backward-compatible literal, case-insensitive path fragment lookup. */
