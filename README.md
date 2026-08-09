@@ -10,6 +10,8 @@
 
 📈 **[Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)** · 📊 **[Performance status and distance to the ceiling](docs/performance-status.md)** · ⚙️ **[Benchmark workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)**
 
+Performance-chart reading rule: **lower is always better/faster; higher is worse/slower or more expensive.** Timing and throughput evidence is normalized to `ms/op`; non-time chart units are published only when they preserve the same smaller-is-better direction.
+
 https://doi.org/10.5281/zenodo.21210132
 
 ## Git history as indexed application knowledge
@@ -30,6 +32,14 @@ query          -> execute indexed predicates/full-text search
 ```
 
 Git and JGit do not normally provide a general full-text search engine over commit messages, actual changed paths and changed-file contents. The Search module adds that capability as a rebuildable read model while Git remains authoritative.
+
+### Measured crossover for repeated history queries
+
+A retained PostgreSQL/JMH fixture now answers the same practical questions through three paths: a normal JGit `FileRepository` with optimized on-demand traversal, the identical JGit traversal over `HibernateRepository`, and the materialized Search projection. The fixture uses canonical nested Git trees and verifies that indexed and on-demand implementations return the same commit set before timing begins.
+
+At 1,000 deterministic commits, the strongest smoke result is the exact-path + changed-content query: **96.20 ms/op** through `FileRepository`/JGit, **22.02 ms/op** through `HibernateRepository`/JGit and **3.47 ms/op** through the indexed projection. The complete `content-v1` rebuild cost was about **840 ms**, which corresponds to a conservative break-even of roughly **nine** such queries versus rebuilding once and then querying the projection. Exact path + time measured 66.86/17.29/3.10 ms/op and the compound author/path/time/content audit query 36.31/10.22/2.62 ms/op.
+
+These are workload point estimates from a bounded smoke fixture, not universal production speedup claims. Their architectural value is that the indexed path is also materially faster than on-demand JGit over the **same database-backed repository**, separating the benefit of materialization from filesystem-versus-database storage effects. See the complete [JGit versus indexed history-query crossover methodology](docs/operations/history-query-crossover.md) and the [public performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/).
 
 ## Two questions that show the difference
 
@@ -215,6 +225,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 - [Performance status and distance to the ceiling](docs/performance-status.md)
 - [Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
 - [Benchmark methodology](docs/benchmarks.md)
+- [JGit versus indexed history-query crossover](docs/operations/history-query-crossover.md)
 - [Consumer, migration and database matrix](docs/consuming.md)
 - [Change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md)
 - [Approval-workflow use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
