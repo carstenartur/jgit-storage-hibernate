@@ -93,6 +93,9 @@ class DurableStripedWriteQueueTest {
               "record-" + index,
               submissions.get(index).completion().get(5, TimeUnit.SECONDS));
           assertEquals(50, submissions.get(index).batchSize());
+          assertTrue(
+              queue.metrics().completed() >= index + 1L,
+              "A successful future must not become observable before its completion metric");
         }
 
         assertEquals(List.of(50), observedBatchSizes);
@@ -203,8 +206,11 @@ class DurableStripedWriteQueueTest {
               queue.submit("repository", 1, 2),
               queue.submit("repository", 1, 3));
 
-      for (Submission<Integer> submission : submissions) {
-        assertThrows(CompletionException.class, submission.completion()::join);
+      for (int index = 0; index < submissions.size(); index++) {
+        assertThrows(CompletionException.class, submissions.get(index).completion()::join);
+        assertTrue(
+            queue.metrics().failed() >= index + 1L,
+            "An exceptional future must not become observable before its failed metric");
       }
       assertEquals(3L, queue.metrics().failed());
       assertEquals(1L, queue.metrics().failedBatches());
