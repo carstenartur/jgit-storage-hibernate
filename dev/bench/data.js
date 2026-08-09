@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786285237667,
+  "lastUpdate": 1786285496810,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -23618,6 +23618,86 @@ window.BENCHMARK_DATA = {
             "unit": "ms/op",
             "value": 3.7896802000000003,
             "range": 1.6756416813425346,
+            "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "229659ef78557ec55d935b9a79660af093ad1956",
+          "message": "Bump actions/setup-java to 5.7.0 (#225)\n\nUpdate the pinned actions/setup-java SHA from v5.6.0 to v5.7.0 across GitHub Actions workflows.",
+          "timestamp": "2026-08-09T16:22:57+02:00",
+          "tree_id": "8f24d401d9b7ec79c6a47b2a5d52d1d0c8aa778b",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/229659ef78557ec55d935b9a79660af093ad1956"
+        },
+        "date": 1786285496810,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Reflog last 100 entries — PostgreSQL legacy repository/id index",
+            "unit": "ms/op",
+            "value": 15.3995328,
+            "range": 6.140490072420931,
+            "extra": "Database: PostgreSQL\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          },
+          {
+            "name": "Reflog last 100 entries — PostgreSQL repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 14.119888,
+            "range": 8.214053033035063,
+            "extra": "Database: PostgreSQL\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          },
+          {
+            "name": "Reflog last 100 entries — SQL Server legacy repository/id index",
+            "unit": "ms/op",
+            "value": 19.8460014,
+            "range": 6.456605281280674,
+            "extra": "Database: SQL Server\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          },
+          {
+            "name": "Reflog last 100 entries — SQL Server repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 22.2837456,
+            "range": 15.597958153179686,
+            "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          },
+          {
+            "name": "Reflog latest entry — PostgreSQL legacy repository/id index",
+            "unit": "ms/op",
+            "value": 5.735096,
+            "range": 4.773232258952359,
+            "extra": "Database: PostgreSQL\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          },
+          {
+            "name": "Reflog latest entry — PostgreSQL repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 3.070724,
+            "range": 2.113080840709268,
+            "extra": "Database: PostgreSQL\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          },
+          {
+            "name": "Reflog latest entry — SQL Server legacy repository/id index",
+            "unit": "ms/op",
+            "value": 4.6476604,
+            "range": 3.0521548779931083,
+            "extra": "Database: SQL Server\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
+          },
+          {
+            "name": "Reflog latest entry — SQL Server repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 4.615584800000001,
+            "range": 2.9552761077541985,
             "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
           }
         ]
