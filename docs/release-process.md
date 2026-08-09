@@ -44,6 +44,8 @@ No Sonatype account, Central token, PGP key or consumer credential is part of th
 
 The normal Maven workflow runs a `Public Maven repository contract` job. It derives the release version from the current snapshot, invokes the real release script with `DRY_RUN=true` and `SKIP_TESTS=true`, stages the complete repository locally and resolves all artifacts from a new empty Maven cache. This validates release layout without publishing.
 
+Runtime, schema and dependency compatibility with the active downstream applications is covered separately by the [real-consumer compatibility gates](consumer-compatibility.md). The release review must inspect that retained audio-analyzer, Taxonomy and sandbox evidence when a candidate changes public APIs, migrations, mappings, packaging or transitive dependencies.
+
 ## Starting a release
 
 A release can be started from the Actions UI or through a guarded request branch.
