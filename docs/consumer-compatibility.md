@@ -18,7 +18,7 @@ The central workflow therefore has a narrow responsibility:
 6. run the downstream-owned contract in `candidate` mode against the isolated Maven repository;
 7. retain the consumer result, dependency tree and Maven test reports.
 
-A scheduled baseline run executes the same pinned consumer scripts without candidate substitution. This separates an upstream regression from a downstream repository that is already red on its own declared dependency.
+A baseline run executes the same consumer scripts without candidate substitution. Pull-request and `main`-push baselines use the immutable pinned commits, so candidate and baseline evidence remains reproducible. The weekly schedule instead checks out each declared default branch to detect consumer-side drift that has not yet been incorporated into the pins.
 
 ## Pinned consumers
 
@@ -28,7 +28,7 @@ The exact commits live in `.github/consumer-compatibility.json` and are intentio
 |---|---|---|
 | audio-analyzer | Core + Search | `audio-app` reactor verification, workflow-history/runtime linkage and packaged-JAR leakage checks |
 | Taxonomy | Core | Taxonomy's catalogue-driven schema/migration/Hibernate Search/PostgreSQL contract |
-| Sandbox | Core | Sandbox storage lifecycle/adoption/packaging contract |
+| sandbox | Core | sandbox storage lifecycle/adoption/OSGi/packaging contract |
 
 The table describes what the **current pinned consumer POMs actually consume**. It must not be used to speculate that a consumer uses another optional module. If a consumer adds Search, Java Analysis or Architecture later, the version-substitution report changes and the descriptor must be updated explicitly.
 
@@ -58,12 +58,27 @@ The workflow fails if:
 
 This makes accidental broad XML rewrites and false-green baseline resolution visible in the retained artifact.
 
+## Reporting and retained evidence
+
+Every matrix leg retains the exact checked-out consumer commit, dependency tree, contract result, Maven test reports and elapsed contract time. Candidate legs additionally retain the original version selector, substituted candidate version, changed-file proof and POM diff.
+
+The final `Summarize real-consumer evidence` job downloads those artifacts and writes one workflow table containing, per consumer:
+
+- checked-out commit;
+- selected modules;
+- original and substituted library versions;
+- candidate and baseline result plus duration;
+- the consumer-owned contract description;
+- a link to the retained workflow artifacts and logs.
+
+A failed or incomplete artifact is reported as such; the summarizer never infers success from the absence of evidence.
+
 ## When the matrix runs
 
-Candidate checks run for pull requests and `main` pushes that change runtime source, Maven descriptors or the compatibility tooling. Documentation-only edits do not start three downstream builds.
+Candidate checks run for pull requests and `main` pushes that change runtime source, Maven descriptors or the compatibility tooling. Documentation-only edits do not start three downstream candidate builds.
 
-The scheduled job runs the pinned downstream baseline contracts separately. Updating a pinned downstream commit is a reviewable library change: first verify the new consumer baseline, then advance `.github/consumer-compatibility.json`.
+For pull requests and `main` pushes, the baseline uses immutable refs from `.github/consumer-compatibility.json`. The bounded weekly schedule uses `defaultBranch` instead, making consumer-side API, dependency, packaging and test drift visible before the next pin update. Updating an immutable pin remains a reviewable library change: first verify the new consumer baseline, then advance the descriptor.
 
 ## Relationship to performance evidence
 
-A consumer being compatible does not imply every benchmark is relevant to it. Performance-dashboard consumer relevance is a separate metadata layer: it should be derived from the modules and contract capabilities proven here, not guessed from repository names. For example, Hibernate Search history-query charts must not be labelled as Sandbox evidence while the pinned Sandbox contract consumes Core only.
+A consumer being compatible does not imply every benchmark is relevant to it. Performance-dashboard consumer relevance is a separate metadata layer: it is derived from the modules and contract capabilities proven here, not guessed from repository names. For example, Hibernate Search history-query charts must not be labelled as sandbox evidence while the pinned sandbox contract consumes Core only.
