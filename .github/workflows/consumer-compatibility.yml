@@ -204,7 +204,6 @@ jobs:
 
   prepare-baseline:
     name: Prepare pinned baseline matrix
-    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.contract.outputs.matrix }}
@@ -221,7 +220,6 @@ jobs:
 
   baseline:
     name: Baseline — ${{ matrix.id }}
-    if: github.event_name == 'schedule'
     needs: prepare-baseline
     strategy:
       fail-fast: false
