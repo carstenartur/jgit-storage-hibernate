@@ -501,19 +501,23 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
         }
         for (int index = 0; index < batchSize; index++) {
           QueuedCommand queued = batch.commands.get(index);
-          if (queued.submission.completion.complete(results.get(index))) {
-            completed.increment();
-          } else if (queued.submission.completion.isCancelled()) {
-            cancelled.increment();
+          completed.increment();
+          if (!queued.submission.completion.complete(results.get(index))) {
+            completed.decrement();
+            if (queued.submission.completion.isCancelled()) {
+              cancelled.increment();
+            }
           }
         }
       } catch (Throwable failure) {
         failedBatches.increment();
         for (QueuedCommand queued : batch.commands) {
-          if (queued.submission.completion.completeExceptionally(failure)) {
-            failed.increment();
-          } else if (queued.submission.completion.isCancelled()) {
-            cancelled.increment();
+          failed.increment();
+          if (!queued.submission.completion.completeExceptionally(failure)) {
+            failed.decrement();
+            if (queued.submission.completion.isCancelled()) {
+              cancelled.increment();
+            }
           }
         }
       }
@@ -528,8 +532,13 @@ public final class DurableStripedWriteQueue<C, R> implements AutoCloseable {
         for (ArrayDeque<QueuedCommand> repositoryQueue : repositoryQueues.values()) {
           QueuedCommand command;
           while ((command = repositoryQueue.pollFirst()) != null) {
-            command.submission.completion.completeExceptionally(failure);
             rejected.increment();
+            if (!command.submission.completion.completeExceptionally(failure)) {
+              rejected.decrement();
+              if (command.submission.completion.isCancelled()) {
+                cancelled.increment();
+              }
+            }
             count++;
           }
         }
