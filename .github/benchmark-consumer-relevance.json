@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "description": "Maps stable benchmark suites to the published modules whose pinned consumer contracts make the measurements relevant.",
+  "suites": {
+    "Repository backend comparison": {
+      "contract": "core-storage-and-pack-publication",
+      "requiredModules": [
+        "jgit-storage-hibernate-core"
+      ]
+    },
+    "Reflog performance": {
+      "contract": "core-reflog-read-path",
+      "requiredModules": [
+        "jgit-storage-hibernate-core"
+      ]
+    },
+    "Hibernate Search performance": {
+      "contract": "search-projection-index-query-rebuild",
+      "requiredModules": [
+        "jgit-storage-hibernate-search"
+      ]
+    },
+    "Hibernate Search runtime tuning": {
+      "contract": "search-projection-runtime",
+      "requiredModules": [
+        "jgit-storage-hibernate-search"
+      ]
+    },
+    "Git history query crossover": {
+      "contract": "search-projection-crossover",
+      "requiredModules": [
+        "jgit-storage-hibernate-search"
+      ]
+    }
+  }
+}
