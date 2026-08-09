@@ -14,6 +14,8 @@ on:
       - '.github/scripts/patch-consumer-candidate.py'
       - '.github/scripts/test_patch_consumer_candidate.py'
       - '.github/scripts/verify-consumer-compatibility.py'
+      - '.github/scripts/summarize-consumer-compatibility.py'
+      - '.github/scripts/test_summarize_consumer_compatibility.py'
       - '.github/workflows/consumer-compatibility.yml'
   push:
     branches: [ main ]
@@ -25,6 +27,8 @@ on:
       - '.github/scripts/patch-consumer-candidate.py'
       - '.github/scripts/test_patch_consumer_candidate.py'
       - '.github/scripts/verify-consumer-compatibility.py'
+      - '.github/scripts/summarize-consumer-compatibility.py'
+      - '.github/scripts/test_summarize_consumer_compatibility.py'
       - '.github/workflows/consumer-compatibility.yml'
 
 concurrency:
@@ -47,17 +51,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up JDK 21
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Validate consumer descriptor and candidate patcher
+      - name: Validate consumer descriptor and tooling
         id: contract
         shell: bash
         run: |
           set -euo pipefail
           python3 .github/scripts/test_patch_consumer_candidate.py
+          python3 .github/scripts/test_summarize_consumer_compatibility.py
           matrix="$(python3 .github/scripts/verify-consumer-compatibility.py)"
           candidate_version="$(python3 - <<'PY'
           import xml.etree.ElementTree as ET
@@ -100,6 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 70
     steps:
+      - name: Record contract start
+        run: echo "CONTRACT_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Checkout library tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,7 +121,7 @@ jobs:
           path: consumer
 
       - name: Set up JDK 21
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
@@ -179,16 +187,33 @@ jobs:
       - name: Record resolved consumer evidence
         if: always()
         shell: bash
+        env:
+          SOURCE_REF: ${{ matrix.ref }}
+          DEFAULT_BRANCH: ${{ matrix.defaultBranch }}
         run: |
           evidence="$GITHUB_WORKSPACE/consumer-evidence/${{ matrix.id }}"
           mkdir -p "$evidence"
-          git -C consumer rev-parse HEAD > "$evidence/consumer-commit.txt"
+          git -C consumer rev-parse HEAD > "$evidence/consumer-commit.txt" 2>/dev/null || true
           if [ -f consumer/target/jgit-storage-hibernate-contract/result.json ]; then
             cp consumer/target/jgit-storage-hibernate-contract/result.json "$evidence/result.json"
           fi
           if [ -f consumer/target/jgit-storage-hibernate-contract/dependency-tree.txt ]; then
             cp consumer/target/jgit-storage-hibernate-contract/dependency-tree.txt "$evidence/dependency-tree.txt"
           fi
+          completed_at="$(date +%s)"
+          python3 - "$evidence/run-metadata.json" "$CONTRACT_STARTED_AT" "$completed_at" "$SOURCE_REF" "$DEFAULT_BRANCH" <<'PY'
+          import json, sys
+          output, started, completed, source_ref, default_branch = sys.argv[1:]
+          data = {
+              'mode': 'candidate',
+              'startedAtEpochSeconds': int(started),
+              'completedAtEpochSeconds': int(completed),
+              'durationSeconds': max(0, int(completed) - int(started)),
+              'sourceRef': source_ref,
+              'defaultBranch': default_branch,
+          }
+          open(output, 'w', encoding='utf-8').write(json.dumps(data, indent=2) + '\n')
+          PY
 
       - name: Upload candidate consumer evidence
         if: always()
@@ -203,7 +228,7 @@ jobs:
           if-no-files-found: error
 
   prepare-baseline:
-    name: Prepare pinned baseline matrix
+    name: Prepare consumer baseline matrix
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.contract.outputs.matrix }}
@@ -227,14 +252,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 70
     steps:
-      - name: Checkout pinned consumer
+      - name: Record contract start
+        run: echo "CONTRACT_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Checkout consumer baseline
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ matrix.repository }}
-          ref: ${{ matrix.ref }}
+          ref: ${{ github.event_name == 'schedule' && matrix.defaultBranch || matrix.ref }}
 
       - name: Set up JDK 21
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
@@ -251,13 +279,79 @@ jobs:
           bash '${{ matrix.contractScript }}'
           test -s target/jgit-storage-hibernate-contract/result.json
 
+      - name: Record resolved baseline evidence
+        if: always()
+        shell: bash
+        env:
+          SOURCE_REF: ${{ github.event_name == 'schedule' && matrix.defaultBranch || matrix.ref }}
+          DEFAULT_BRANCH: ${{ matrix.defaultBranch }}
+        run: |
+          evidence="$GITHUB_WORKSPACE/consumer-evidence/${{ matrix.id }}"
+          mkdir -p "$evidence"
+          git rev-parse HEAD > "$evidence/consumer-commit.txt" 2>/dev/null || true
+          if [ -f target/jgit-storage-hibernate-contract/result.json ]; then
+            cp target/jgit-storage-hibernate-contract/result.json "$evidence/result.json"
+          fi
+          if [ -f target/jgit-storage-hibernate-contract/dependency-tree.txt ]; then
+            cp target/jgit-storage-hibernate-contract/dependency-tree.txt "$evidence/dependency-tree.txt"
+          fi
+          completed_at="$(date +%s)"
+          python3 - "$evidence/run-metadata.json" "$CONTRACT_STARTED_AT" "$completed_at" "$SOURCE_REF" "$DEFAULT_BRANCH" <<'PY'
+          import json, sys
+          output, started, completed, source_ref, default_branch = sys.argv[1:]
+          data = {
+              'mode': 'baseline',
+              'startedAtEpochSeconds': int(started),
+              'completedAtEpochSeconds': int(completed),
+              'durationSeconds': max(0, int(completed) - int(started)),
+              'sourceRef': source_ref,
+              'defaultBranch': default_branch,
+          }
+          open(output, 'w', encoding='utf-8').write(json.dumps(data, indent=2) + '\n')
+          PY
+
       - name: Upload baseline consumer evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: consumer-baseline-${{ matrix.id }}
           path: |
+            consumer-evidence/${{ matrix.id }}/**
             target/jgit-storage-hibernate-contract/**
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
+          if-no-files-found: error
+
+  report:
+    name: Summarize real-consumer evidence
+    if: always()
+    needs: [candidate, baseline]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout reporting tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download candidate and baseline evidence
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          pattern: consumer-*
+          path: target/consumer-report/artifacts
+          merge-multiple: false
+
+      - name: Build concise compatibility summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}#artifacts"
+          python3 .github/scripts/summarize-consumer-compatibility.py \
+            --artifacts target/consumer-report/artifacts \
+            --output target/consumer-report/summary.md \
+            --run-url "$run_url"
+          cat target/consumer-report/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload combined compatibility summary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: consumer-compatibility-summary
+          path: target/consumer-report/summary.md
           if-no-files-found: error
