@@ -8,7 +8,6 @@ import json
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 PROJECT_GROUP = "io.github.carstenartur"
@@ -207,9 +206,10 @@ def verify(modules: dict[str, Module]) -> dict[str, set[str]]:
     if missing:
         raise BoundaryError("Missing expected reactor modules: " + ", ".join(sorted(missing)))
     edges = _production_internal_edges(modules)
-    _check_cycles(edges)
+    # Prefer the specific architectural contract error over a secondary cycle error.
     _check_internal_boundaries(modules, edges)
     _check_external_boundaries(modules)
+    _check_cycles(edges)
     return edges
 
 
