@@ -38,6 +38,14 @@
       .controls {
         margin-top: 16px;
       }
+      .direction-contract {
+        margin: 14px 0 0;
+        padding: 10px 12px;
+        border: 1px solid color-mix(in srgb, CanvasText 24%, transparent);
+        border-radius: 6px;
+        background: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+        font-weight: 600;
+      }
       a {
         color: #3273dc;
       }
@@ -125,18 +133,23 @@
   </head>
   <body>
     <header>
-      <h1>Repository backend performance</h1>
+      <h1>jgit-storage-hibernate performance</h1>
       <div class="metadata">
         <span><strong>Last update:</strong> <span id="last-update"></span></span>
         <span><strong>Repository:</strong> <a id="repository-link" rel="noopener"></a></span>
       </div>
+      <p class="direction-contract">
+        Reading rule for every chart: lower lines and points are better/faster; higher lines and
+        points are worse/slower or more expensive. Timing and throughput are normalized to ms/op.
+        Non-time evidence is published only with the same smaller-is-better direction.
+      </p>
       <div class="controls">
         <label for="scale-select"><strong>Y-axis:</strong></label>
         <select id="scale-select">
           <option value="linear">Linear</option>
           <option value="logarithmic">Logarithmic</option>
         </select>
-        <span>Each chart groups the same JGit operation across all storage backends. Timing and throughput measurements are normalized to ms/op, where lower is better. Patterns, markers and the table expose overlapping measurements. The ¶ beside a chart title is a stable direct link.</span>
+        <span>Each chart groups one stable operation and one physical unit. Patterns, markers and the latest-value table expose overlapping measurements. The ¶ beside a chart title is a stable direct link.</span>
       </div>
     </header>
 
