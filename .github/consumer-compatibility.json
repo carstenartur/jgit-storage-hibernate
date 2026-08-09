@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "candidateSource": "same-run isolated Maven install",
+  "consumers": [
+    {
+      "id": "audio-analyzer",
+      "repository": "carstenartur/audio-analyzer",
+      "ref": "862b9344373e44dfdcc7c76462a23b495fa1bf6f",
+      "defaultBranch": "master",
+      "contractScript": ".github/jgit-storage-hibernate-contract.sh",
+      "expectedModules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search"
+      ]
+    },
+    {
+      "id": "taxonomy",
+      "repository": "carstenartur/Taxonomy",
+      "ref": "9a027b0f4ba32c929c8dcc41fe1eec1434e075e3",
+      "defaultBranch": "main",
+      "contractScript": ".github/jgit-storage-hibernate-contract.sh",
+      "expectedModules": [
+        "jgit-storage-hibernate-core"
+      ]
+    },
+    {
+      "id": "sandbox",
+      "repository": "carstenartur/sandbox",
+      "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
+      "defaultBranch": "main",
+      "contractScript": ".github/jgit-storage-hibernate-contract.sh",
+      "expectedModules": [
+        "jgit-storage-hibernate-core"
+      ]
+    }
+  ]
+}
