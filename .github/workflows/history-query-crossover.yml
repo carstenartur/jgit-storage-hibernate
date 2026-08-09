@@ -1,0 +1,260 @@
+name: Git History Query Crossover
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Benchmark size profile
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - full
+          - large
+  schedule:
+    - cron: '17 5 * * 4'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/history-query-crossover.yml'
+      - '.github/scripts/benchmark_units.py'
+      - '.github/scripts/convert-jmh-history-query-crossover.py'
+      - '.github/scripts/test_convert_jmh_history_query_crossover.py'
+      - '.github/scripts/publish-benchmark-history.py'
+      - '.github/benchmark-dashboard/**'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/history-query-crossover.yml'
+      - '.github/scripts/benchmark_units.py'
+      - '.github/scripts/convert-jmh-history-query-crossover.py'
+      - '.github/scripts/test_convert_jmh_history_query_crossover.py'
+      - '.github/scripts/publish-benchmark-history.py'
+      - '.github/benchmark-dashboard/**'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  history-query-crossover:
+    name: FileRepository/JGit versus indexed history queries
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Select bounded history matrix
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          profile='smoke'
+          if [[ "${GITHUB_EVENT_NAME}" == 'schedule' ]]; then
+            profile='full'
+          elif [[ "${GITHUB_EVENT_NAME}" == 'workflow_dispatch' ]]; then
+            profile='${{ inputs.profile }}'
+          fi
+          all_queries='author-time,path-time,message-text,path-content,compound'
+          case "$profile" in
+            smoke)
+              commit_counts='1000'
+              query_kinds="$all_queries"
+              ;;
+            full)
+              commit_counts='1000,10000'
+              query_kinds="$all_queries"
+              ;;
+            large)
+              commit_counts='100000'
+              query_kinds='path-content,compound'
+              ;;
+            *) echo "Unsupported profile: $profile" >&2; exit 1 ;;
+          esac
+          echo "profile=$profile" >> "$GITHUB_OUTPUT"
+          echo "commit_counts=$commit_counts" >> "$GITHUB_OUTPUT"
+          echo "query_kinds=$query_kinds" >> "$GITHUB_OUTPUT"
+          echo "History-query profile: $profile" >> "$GITHUB_STEP_SUMMARY"
+          echo "- commits: $commit_counts" >> "$GITHUB_STEP_SUMMARY"
+          echo "- queries: $query_kinds" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Test crossover chart conversion
+        run: |
+          python3 .github/scripts/test_convert_jmh_history_query_crossover.py
+          python3 .github/scripts/test_benchmark_units.py
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p target/history-query-crossover
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/history-query-crossover/maven-build.log
+
+      - name: Run crossover matrix on PostgreSQL and local filesystem
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Phistory-query-crossover \
+            -Dbenchmark.history.commitCounts='${{ steps.matrix.outputs.commit_counts }}' \
+            -Dbenchmark.history.queryKinds='${{ steps.matrix.outputs.query_kinds }}' \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/history-query-crossover/jmh-result.json" 2>&1 \
+            | tee target/history-query-crossover/maven-benchmark.log
+
+      - name: Convert results and calculate break-even
+        run: |
+          python3 .github/scripts/convert-jmh-history-query-crossover.py \
+            target/history-query-crossover/jmh-result.json \
+            target/history-query-crossover/comparison.json
+          cat target/history-query-crossover/comparison.json
+
+      - name: Verify stable chart operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .github/benchmark-dashboard/index.html
+          test -s .github/benchmark-dashboard/dashboard.js
+          grep -F 'Git history path + changed-content query' target/history-query-crossover/comparison.json
+          grep -F 'Git history compound audit query' target/history-query-crossover/comparison.json
+          grep -F 'Git history indexed projection build' target/history-query-crossover/comparison.json
+          grep -F 'Break-even vs FileRepository/JGit' target/history-query-crossover/comparison.json
+          if [[ '${{ steps.matrix.outputs.profile }}' != 'large' ]]; then
+            grep -F 'Git history author + time query' target/history-query-crossover/comparison.json
+            grep -F 'Git history path + time query' target/history-query-crossover/comparison.json
+            grep -F 'Git history commit-message query' target/history-query-crossover/comparison.json
+          fi
+
+      - name: Upload crossover evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: history-query-crossover-results
+          path: |
+            target/history-query-crossover/**
+            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
+          if-no-files-found: error
+
+      - name: Report crossover charts
+        if: always()
+        run: |
+          echo '### Git history query crossover' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The same application questions are answered by FileRepository/JGit on demand, HibernateRepository/JGit on demand, and the materialized indexed history projection. Projection-build cost is retained so the dashboard can report break-even query counts.' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Author + time](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-git-history-author-time-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Path + time](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-git-history-path-time-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Commit message](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-git-history-commit-message-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Path + changed content](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-git-history-path-changed-content-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Compound audit query](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-git-history-compound-audit-query)' >> "$GITHUB_STEP_SUMMARY"
+          echo '- [Projection build](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-git-history-indexed-projection-build)' >> "$GITHUB_STEP_SUMMARY"
+
+  publish-history-query-crossover:
+    name: Publish history-query crossover benchmark history
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: history-query-crossover
+    runs-on: ubuntu-latest
+    concurrency:
+      group: repository-pages-publication-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download crossover evidence outside the worktree
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: history-query-crossover-results
+          path: ${{ runner.temp }}/history-query-crossover-artifact
+
+      - name: Publish generated crossover benchmark pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_root="${RUNNER_TEMP}/history-query-crossover-artifact"
+          benchmark_source="$(find "$artifact_root" -type f -name comparison.json -print -quit)"
+          dashboard_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/index.html"
+          dashboard_script_source="${GITHUB_WORKSPACE}/.github/benchmark-dashboard/dashboard.js"
+          test -s "$benchmark_source"
+          test -s "$dashboard_source"
+          test -s "$dashboard_script_source"
+
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            empty_tree="$(git mktree </dev/null)"
+            initial_commit="$(printf '%s\n' 'Initialize generated project pages' | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$empty_tree")"
+            git push origin "$initial_commit:refs/heads/gh-pages"
+          fi
+
+          pages_dir="${RUNNER_TEMP}/generated-pages-history-query"
+          summary_file="${RUNNER_TEMP}/history-query-summary.md"
+          published_at="$(date +%s%3N)"
+
+          for attempt in 1 2 3; do
+            git fetch origin gh-pages
+            git worktree remove --force "$pages_dir" >/dev/null 2>&1 || true
+            git worktree prune
+            git worktree add --detach "$pages_dir" origin/gh-pages
+            rm -f "$summary_file"
+
+            python3 .github/scripts/publish-benchmark-history.py \
+              --data-file "$pages_dir/dev/bench/data.js" \
+              --benchmark-file "$benchmark_source" \
+              --repository-dir "$GITHUB_WORKSPACE" \
+              --repository-url "https://github.com/${GITHUB_REPOSITORY}" \
+              --commit "$GITHUB_SHA" \
+              --actor "$GITHUB_ACTOR" \
+              --suite-name 'Git history query crossover' \
+              --timestamp-ms "$published_at" \
+              --summary-file "$summary_file" \
+              --alert-threshold 1.5
+
+            mkdir -p "$pages_dir/dev/bench"
+            cp "$dashboard_source" "$pages_dir/dev/bench/index.html"
+            cp "$dashboard_script_source" "$pages_dir/dev/bench/dashboard.js"
+            git -C "$pages_dir" add \
+              dev/bench/index.html \
+              dev/bench/dashboard.js \
+              dev/bench/data.js
+
+            if git -C "$pages_dir" diff --cached --quiet; then
+              cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+              echo 'History-query benchmark history and dashboard unchanged'
+              exit 0
+            fi
+
+            git -C "$pages_dir" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Add history-query crossover result for ${GITHUB_SHA}"
+            if git -C "$pages_dir" push origin HEAD:gh-pages; then
+              cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+
+          echo 'Could not publish history-query benchmark history after three attempts' >&2
+          exit 1
