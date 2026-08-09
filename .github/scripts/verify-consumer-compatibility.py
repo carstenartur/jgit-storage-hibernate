@@ -34,12 +34,14 @@ def matrix() -> dict[str, object]:
     if not isinstance(consumers, list) or len(consumers) != 3:
         fail("exactly three consumers must be declared")
     ids: set[str] = set()
+    display_names: set[str] = set()
     repositories: set[str] = set()
     normalized: list[dict[str, object]] = []
     for index, raw in enumerate(consumers):
         if not isinstance(raw, dict):
             fail(f"consumers[{index}] must be an object")
         consumer_id = text(raw.get("id"), f"consumers[{index}].id")
+        display_name = text(raw.get("displayName", consumer_id), f"{consumer_id}.displayName")
         repository = text(raw.get("repository"), f"{consumer_id}.repository")
         ref = text(raw.get("ref"), f"{consumer_id}.ref")
         if SHA.fullmatch(ref) is None:
@@ -55,18 +57,22 @@ def matrix() -> dict[str, object]:
             if not value.startswith(PREFIX) or value == PREFIX + "benchmarks":
                 fail(f"{consumer_id} has invalid runtime module {value!r}")
             normalized_modules.append(value)
-        if consumer_id in ids or repository in repositories:
-            fail(f"duplicate consumer id/repository for {consumer_id}")
+        if len(normalized_modules) != len(set(normalized_modules)):
+            fail(f"{consumer_id}.expectedModules must not contain duplicates")
+        if consumer_id in ids or repository in repositories or display_name in display_names:
+            fail(f"duplicate consumer id/display name/repository for {consumer_id}")
         ids.add(consumer_id)
+        display_names.add(display_name)
         repositories.add(repository)
         normalized.append(
             {
                 "id": consumer_id,
+                "displayName": display_name,
                 "repository": repository,
                 "ref": ref,
                 "defaultBranch": branch,
                 "contractScript": script,
-                "expectedModules": sorted(set(normalized_modules)),
+                "expectedModules": sorted(normalized_modules),
             }
         )
     if ids != EXPECTED:
