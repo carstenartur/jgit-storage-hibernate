@@ -63,32 +63,32 @@ class PublishBenchmarkHistoryTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _command(self, *, timestamp: int = 1234567890000, max_items: int = 100) -> list[str]:
+        return [
+            sys.executable,
+            str(SCRIPT),
+            "--data-file",
+            str(self.data_file),
+            "--benchmark-file",
+            str(self.benchmark_file),
+            "--repository-dir",
+            str(self.repository),
+            "--repository-url",
+            "https://github.com/example/project",
+            "--commit",
+            self.commit,
+            "--actor",
+            "test-user",
+            "--max-items",
+            str(max_items),
+            "--timestamp-ms",
+            str(timestamp),
+            "--summary-file",
+            str(self.summary_file),
+        ]
+
     def _run(self, *, timestamp: int = 1234567890000, max_items: int = 100) -> None:
-        subprocess.run(
-            [
-                sys.executable,
-                str(SCRIPT),
-                "--data-file",
-                str(self.data_file),
-                "--benchmark-file",
-                str(self.benchmark_file),
-                "--repository-dir",
-                str(self.repository),
-                "--repository-url",
-                "https://github.com/example/project",
-                "--commit",
-                self.commit,
-                "--actor",
-                "test-user",
-                "--max-items",
-                str(max_items),
-                "--timestamp-ms",
-                str(timestamp),
-                "--summary-file",
-                str(self.summary_file),
-            ],
-            check=True,
-        )
+        subprocess.run(self._command(timestamp=timestamp, max_items=max_items), check=True)
 
     def _read_data(self) -> dict:
         content = self.data_file.read_text(encoding="utf-8")
@@ -195,6 +195,43 @@ class PublishBenchmarkHistoryTest(unittest.TestCase):
         self.assertIn("Other suite", data["entries"])
         history = data["entries"]["Repository backend comparison"]
         self.assertEqual(["old-2", self.commit], [entry["commit"]["id"] for entry in history])
+
+    def test_rejects_mixed_units_inside_one_chart(self) -> None:
+        self.benchmark_file.write_text(
+            json.dumps(
+                [
+                    {"name": "query — backend-a", "unit": "ms/op", "value": 1.0},
+                    {"name": "query — backend-b", "unit": "count/op", "value": 2.0},
+                ]
+            ),
+            encoding="utf-8",
+        )
+        completed = subprocess.run(
+            self._command(), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn("Mixed units in chart 'query'", completed.stderr)
+
+    def test_rejects_unit_change_for_existing_series(self) -> None:
+        self._write_benchmarks(first_value=1.0)
+        self._run()
+        self.benchmark_file.write_text(
+            json.dumps(
+                [
+                    {"name": "read", "unit": "count/op", "value": 1.0},
+                    {"name": "write", "unit": "ms/op", "value": 2.5},
+                ]
+            ),
+            encoding="utf-8",
+        )
+        completed = subprocess.run(
+            self._command(timestamp=1234567890001),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn("Benchmark series 'read' changed unit", completed.stderr)
 
     def test_rejects_malformed_benchmark_input(self) -> None:
         self.benchmark_file.write_text(json.dumps([{"name": "missing fields"}]), encoding="utf-8")

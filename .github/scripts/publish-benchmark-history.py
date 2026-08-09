@@ -13,6 +13,7 @@ from typing import Any
 from benchmark_units import CANONICAL_UNIT, normalize_benchmark
 
 SCRIPT_PREFIX = "window.BENCHMARK_DATA = "
+NAME_SEPARATOR = " — "
 
 
 def _git(repository: Path, *args: str) -> str:
@@ -24,6 +25,26 @@ def _git(repository: Path, *args: str) -> str:
         text=True,
     )
     return completed.stdout.strip()
+
+
+def _chart_operation(name: str) -> str:
+    separator_index = name.rfind(NAME_SEPARATOR)
+    return name if separator_index < 0 else name[:separator_index]
+
+
+def _validate_chart_units(benches: list[dict[str, Any]], context: str) -> None:
+    """Require one physical unit per rendered chart and smaller-is-better semantics."""
+
+    units_by_operation: dict[str, str] = {}
+    for benchmark in benches:
+        operation = _chart_operation(str(benchmark["name"]))
+        unit = str(benchmark["unit"])
+        previous = units_by_operation.setdefault(operation, unit)
+        if previous != unit:
+            raise ValueError(
+                f"Mixed units in chart {operation!r} ({context}): {previous!r} versus {unit!r}. "
+                "Split the operation or normalize the values before publishing."
+            )
 
 
 def _load_data(path: Path) -> dict[str, Any]:
@@ -58,12 +79,14 @@ def _load_benches(path: Path) -> list[dict[str, Any]]:
         if not isinstance(benchmark["value"], (int, float)):
             raise ValueError(f"Benchmark entry {index} has a non-numeric value")
         benches.append(normalize_benchmark(benchmark))
+    _validate_chart_units(benches, str(path))
     return benches
 
 
 def _normalize_history(history: list[dict[str, Any]]) -> None:
     """Migrate legacy mixed throughput/time points to one smaller-is-better unit."""
 
+    series_units: dict[str, str] = {}
     for entry_index, entry in enumerate(history):
         if not isinstance(entry, dict):
             raise ValueError(f"Benchmark history entry {entry_index} is not an object")
@@ -76,9 +99,36 @@ def _normalize_history(history: list[dict[str, Any]]) -> None:
                 raise ValueError(
                     f"Benchmark history entry {entry_index}, bench {bench_index} is not an object"
                 )
-            normalized.append(normalize_benchmark(benchmark))
+            normalized_benchmark = normalize_benchmark(benchmark)
+            name = str(normalized_benchmark["name"])
+            unit = str(normalized_benchmark["unit"])
+            previous_unit = series_units.setdefault(name, unit)
+            if previous_unit != unit:
+                raise ValueError(
+                    f"Benchmark series {name!r} changed unit in retained history: "
+                    f"{previous_unit!r} versus {unit!r}"
+                )
+            normalized.append(normalized_benchmark)
+        _validate_chart_units(normalized, f"history entry {entry_index}")
         entry["benches"] = normalized
         entry["tool"] = "customSmallerIsBetter"
+
+
+def _validate_current_series_units(
+    history: list[dict[str, Any]], benches: list[dict[str, Any]]
+) -> None:
+    retained_units: dict[str, str] = {}
+    for entry in history:
+        for benchmark in entry.get("benches", []):
+            retained_units.setdefault(str(benchmark["name"]), str(benchmark["unit"]))
+    for benchmark in benches:
+        name = str(benchmark["name"])
+        old_unit = retained_units.get(name)
+        if old_unit is not None and old_unit != benchmark["unit"]:
+            raise ValueError(
+                f"Benchmark series {name!r} changed unit: {old_unit!r} versus {benchmark['unit']!r}. "
+                "Keep the unit stable or publish a new series name."
+            )
 
 
 def _commit_metadata(repository: Path, commit: str, repository_url: str, actor: str) -> dict[str, Any]:
@@ -199,6 +249,7 @@ def update_history(
     if not isinstance(history, list):
         raise ValueError(f"Benchmark suite {suite_name!r} is not a list")
     _normalize_history(history)
+    _validate_current_series_units(history, benches)
 
     previous = next((entry for entry in reversed(history) if entry.get("commit", {}).get("id") != commit), None)
     current = {
