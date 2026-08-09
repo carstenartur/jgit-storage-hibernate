@@ -10,6 +10,7 @@ CONSUMER_POM="$ROOT_DIR/.github/public-repository-consumer/pom.xml"
 ATTEMPTS=${PUBLIC_REPOSITORY_ATTEMPTS:-1}
 RETRY_SECONDS=${PUBLIC_REPOSITORY_RETRY_SECONDS:-10}
 MAVEN_COMMAND=${MAVEN_COMMAND:-mvn}
+REPOSITORY_ID=jgit-storage-hibernate-public
 [[ "$ATTEMPTS" =~ ^[1-9][0-9]*$ ]] || { echo "PUBLIC_REPOSITORY_ATTEMPTS must be positive" >&2; exit 2; }
 [[ "$RETRY_SECONDS" =~ ^[0-9]+$ ]] || { echo "PUBLIC_REPOSITORY_RETRY_SECONDS must be non-negative" >&2; exit 2; }
 
@@ -18,9 +19,42 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 SETTINGS="$WORK_DIR/settings.xml"
 LOCAL_REPO="$WORK_DIR/repository"
 LOG="$WORK_DIR/maven.log"
-cat > "$SETTINGS" <<'XML'
+REPOSITORY_URL_XML=$(python3 - "$REPOSITORY_URL" <<'PY'
+from html import escape
+import sys
+
+print(escape(sys.argv[1], quote=True))
+PY
+)
+cat > "$SETTINGS" <<XML
 <?xml version="1.0" encoding="UTF-8"?>
-<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"><interactiveMode>false</interactiveMode></settings>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <interactiveMode>false</interactiveMode>
+  <profiles>
+    <profile>
+      <id>public-release-resolution</id>
+      <repositories>
+        <repository>
+          <id>${REPOSITORY_ID}</id>
+          <url>${REPOSITORY_URL_XML}</url>
+          <releases>
+            <enabled>true</enabled>
+            <updatePolicy>always</updatePolicy>
+            <checksumPolicy>fail</checksumPolicy>
+          </releases>
+          <snapshots>
+            <enabled>false</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>public-release-resolution</activeProfile>
+  </activeProfiles>
+</settings>
 XML
 
 run_clean() {
@@ -37,7 +71,7 @@ resolve_once() {
   (
     run_clean org.apache.maven.plugins:maven-dependency-plugin:3.11.0:get \
       -Dartifact="io.github.carstenartur:jgit-storage-hibernate-parent:${VERSION}:pom" \
-      -DremoteRepositories="jgit-public::default::${REPOSITORY_URL}" -Dtransitive=false \
+      -DremoteRepositories="${REPOSITORY_ID}::default::${REPOSITORY_URL}" -Dtransitive=false \
     && run_clean -f "$CONSUMER_POM" \
       -Dpublic.version="$VERSION" -Dpublic.repository.url="$REPOSITORY_URL" dependency:go-offline
   ) 2>&1 | tee "$LOG"
