@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786285618406,
+  "lastUpdate": 1786285633813,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -23209,6 +23209,366 @@ window.BENCHMARK_DATA = {
             "unit": "segments",
             "value": 7.333333333333333,
             "range": 1.1547005383792515,
+            "extra": "Profile: metadata-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search segment count — paths-v1 / Lucene",
+            "unit": "segments",
+            "value": 7.0,
+            "range": 1.0,
+            "extra": "Profile: paths-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "229659ef78557ec55d935b9a79660af093ad1956",
+          "message": "Bump actions/setup-java to 5.7.0 (#225)\n\nUpdate the pinned actions/setup-java SHA from v5.6.0 to v5.7.0 across GitHub Actions workflows.",
+          "timestamp": "2026-08-09T16:22:57+02:00",
+          "tree_id": "8f24d401d9b7ec79c6a47b2a5d52d1d0c8aa778b",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/229659ef78557ec55d935b9a79660af093ad1956"
+        },
+        "date": 1786285633813,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Hibernate Search SQL projection footprint — content-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 1122304.0,
+            "range": 0.0,
+            "extra": "Profile: content-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search SQL projection footprint — diff-hunks-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 303104.0,
+            "range": 0.0,
+            "extra": "Profile: diff-hunks-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search SQL projection footprint — metadata-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 212992.0,
+            "range": 0.0,
+            "extra": "Profile: metadata-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search SQL projection footprint — paths-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 212992.0,
+            "range": 0.0,
+            "extra": "Profile: paths-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search content quality — content-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: content-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 20\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search content quality — diff-hunks-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: diff-hunks-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 20\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search content quality — metadata-v1 / miss rate",
+            "unit": "miss %",
+            "value": 100.0,
+            "range": 0.0,
+            "extra": "Profile: metadata-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 0\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search content quality — paths-v1 / miss rate",
+            "unit": "miss %",
+            "value": 100.0,
+            "range": 0.0,
+            "extra": "Profile: paths-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 0\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search content query — content-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 16.264686333333334,
+            "range": 32.208197031765025,
+            "extra": "Profile: content-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search content query — diff-hunks-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 16.685188,
+            "range": 37.278335479979354,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search content query — metadata-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 10.554151,
+            "range": 40.312790030901425,
+            "extra": "Profile: metadata-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search content query — paths-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 11.216652000000002,
+            "range": 23.909620099108245,
+            "extra": "Profile: paths-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — content-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 22.071579,
+            "range": 66.48689988820506,
+            "extra": "Profile: content-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — content-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 16.64129433333333,
+            "range": 65.42888736433068,
+            "extra": "Profile: content-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — diff-hunks-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 18.194617,
+            "range": 62.041173201626286,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — diff-hunks-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 18.226355666666667,
+            "range": 34.508324774655726,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — metadata-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 19.721173333333336,
+            "range": 72.58588289008827,
+            "extra": "Profile: metadata-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — metadata-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 17.729193000000002,
+            "range": 76.5192827050168,
+            "extra": "Profile: metadata-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — paths-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 19.747253,
+            "range": 75.67525819450925,
+            "extra": "Profile: paths-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search full-text query — paths-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 16.645856666666663,
+            "range": 53.31215534328702,
+            "extra": "Profile: paths-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search index footprint — content-v1 / Lucene",
+            "unit": "bytes",
+            "value": 227643.66666666666,
+            "range": 8564.888927086757,
+            "extra": "Profile: content-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search index footprint — diff-hunks-v1 / Lucene",
+            "unit": "bytes",
+            "value": 94750.0,
+            "range": 5278.746157943191,
+            "extra": "Profile: diff-hunks-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search index footprint — metadata-v1 / Lucene",
+            "unit": "bytes",
+            "value": 79170.66666666667,
+            "range": 1200.6291406314162,
+            "extra": "Profile: metadata-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search index footprint — paths-v1 / Lucene",
+            "unit": "bytes",
+            "value": 78036.33333333333,
+            "range": 7069.099824824469,
+            "extra": "Profile: paths-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search indexing — content-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 218.0917416666667,
+            "range": 844.2546608407305,
+            "extra": "Profile: content-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search indexing — diff-hunks-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 173.47916299999997,
+            "range": 502.66790125866225,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search indexing — metadata-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 142.21367633333332,
+            "range": 410.4335256718151,
+            "extra": "Profile: metadata-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search indexing — paths-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 156.98408533333333,
+            "range": 726.384147127476,
+            "extra": "Profile: paths-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path quality — content-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: content-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 50\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search path quality — diff-hunks-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: diff-hunks-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 50\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search path quality — metadata-v1 / miss rate",
+            "unit": "miss %",
+            "value": 100.0,
+            "range": 0.0,
+            "extra": "Profile: metadata-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 0\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search path quality — paths-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: paths-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 50\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost"
+          },
+          {
+            "name": "Hibernate Search path query — content-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 22.43874166666667,
+            "range": 66.53012460152581,
+            "extra": "Profile: content-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — content-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 6.738112999999999,
+            "range": 11.519282104548909,
+            "extra": "Profile: content-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — diff-hunks-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 22.250869333333338,
+            "range": 23.025722734269465,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — diff-hunks-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 6.832069000000001,
+            "range": 10.871223175163868,
+            "extra": "Profile: diff-hunks-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — metadata-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 10.416678666666666,
+            "range": 32.57810615723071,
+            "extra": "Profile: metadata-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — metadata-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 4.5918106666666665,
+            "range": 6.518017435340854,
+            "extra": "Profile: metadata-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — paths-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 21.74464066666667,
+            "range": 51.742092826919965,
+            "extra": "Profile: paths-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search path query — paths-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 7.211764333333332,
+            "range": 23.89975553725096,
+            "extra": "Profile: paths-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search rebuild — content-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 210.399577,
+            "range": 189.75636390488083,
+            "extra": "Profile: content-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search rebuild — diff-hunks-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 147.84499366666668,
+            "range": 394.8710738492615,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search rebuild — metadata-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 132.84091533333333,
+            "range": 523.555896704122,
+            "extra": "Profile: metadata-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search rebuild — paths-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 144.19925666666666,
+            "range": 336.9421400810865,
+            "extra": "Profile: paths-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1"
+          },
+          {
+            "name": "Hibernate Search segment count — content-v1 / Lucene",
+            "unit": "segments",
+            "value": 7.666666666666667,
+            "range": 0.5773502691896257,
+            "extra": "Profile: content-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search segment count — diff-hunks-v1 / Lucene",
+            "unit": "segments",
+            "value": 7.666666666666667,
+            "range": 0.5773502691896257,
+            "extra": "Profile: diff-hunks-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
+          },
+          {
+            "name": "Hibernate Search segment count — metadata-v1 / Lucene",
+            "unit": "segments",
+            "value": 8.0,
+            "range": 0.0,
             "extra": "Profile: metadata-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild"
           },
           {
