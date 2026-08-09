@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786236330834,
+  "lastUpdate": 1786236374594,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -21980,6 +21980,142 @@ window.BENCHMARK_DATA = {
             "unit": "ms/op",
             "value": 16.319064666666666,
             "range": 60.53472601529456,
+            "extra": "Query: path-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "04e63cdb1e835d64d621d5083f82839cbd367269",
+          "message": "Merge PR #222: race-free durable queue outcome metrics\n\nMake durable queue success/failure metrics observable before completion futures while preserving monotone processor-outcome semantics.",
+          "timestamp": "2026-08-09T02:43:30+02:00",
+          "tree_id": "30fc7d250276755c83795b33a5cb4449f0d8f531",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/04e63cdb1e835d64d621d5083f82839cbd367269"
+        },
+        "date": 1786236374594,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Git history author + time query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 27.905044,
+            "range": 25.773467875154168,
+            "extra": "Query: author-time\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history author + time query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 10.912291666666667,
+            "range": 105.77058058747294,
+            "extra": "Query: author-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history author + time query — 1,000 commits / PostgreSQL compact projection",
+            "unit": "ms/op",
+            "value": 2.385987,
+            "range": 10.074363863612907,
+            "extra": "Query: author-time\nImplementation: PostgreSQL compact projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 1\nHibernate transactions: 0\nMeasured content-v1 projection build: 829.546 ms\nSpeedup vs FileRepository/JGit: 11.70x\nSpeedup vs HibernateRepository/JGit: 4.57x\nBreak-even vs FileRepository/JGit including one projection build: 32.51 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 97.29 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation."
+          },
+          {
+            "name": "Git history commit-message query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 37.054542,
+            "range": 51.057174279520744,
+            "extra": "Query: message-text\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history commit-message query — 1,000 commits / Hibernate Search full-text projection",
+            "unit": "ms/op",
+            "value": 3.0623609999999997,
+            "range": 9.846036270067199,
+            "extra": "Query: message-text\nImplementation: Hibernate Search full-text projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 829.546 ms\nSpeedup vs FileRepository/JGit: 12.10x\nSpeedup vs HibernateRepository/JGit: 3.13x\nBreak-even vs FileRepository/JGit including one projection build: 24.40 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 127.19 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation."
+          },
+          {
+            "name": "Git history commit-message query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 9.584558333333334,
+            "range": 49.813760600628015,
+            "extra": "Query: message-text\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history compound audit query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 31.630996333333332,
+            "range": 123.05314437002106,
+            "extra": "Query: compound\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 3\nChanged blobs read: 3\nChanged blob bytes read: 1536\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history compound audit query — 1,000 commits / Hibernate Search compound projection",
+            "unit": "ms/op",
+            "value": 3.4579489999999997,
+            "range": 3.6646378148608383,
+            "extra": "Query: compound\nImplementation: Hibernate Search compound projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 829.546 ms\nSpeedup vs FileRepository/JGit: 9.15x\nSpeedup vs HibernateRepository/JGit: 4.30x\nBreak-even vs FileRepository/JGit including one projection build: 29.44 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 72.62 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation."
+          },
+          {
+            "name": "Git history compound audit query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 14.881076333333333,
+            "range": 55.56609260754768,
+            "extra": "Query: compound\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 3\nChanged blobs read: 3\nChanged blob bytes read: 1536\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history indexed projection build — 1,000 commits / content-v1",
+            "unit": "ms/op",
+            "value": 829.546199,
+            "range": 4280.323028428926,
+            "extra": "Projection: content-v1\nCommits in authoritative history: 1000\nIndexed commits: 1000\nHibernate prepared statements: 23\nHibernate transactions: 21\nMeasured operation is purge/rebuild from an already-created authoritative Git history."
+          },
+          {
+            "name": "Git history path + changed-content query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 113.14180566666666,
+            "range": 360.2272778032733,
+            "extra": "Query: path-content\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 1000\nChanged blobs read: 4\nChanged blob bytes read: 2048\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history path + changed-content query — 1,000 commits / Hibernate Search path + content projection",
+            "unit": "ms/op",
+            "value": 3.439230333333333,
+            "range": 8.779627770153164,
+            "extra": "Query: path-content\nImplementation: Hibernate Search path + content projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 829.546 ms\nSpeedup vs FileRepository/JGit: 32.90x\nSpeedup vs HibernateRepository/JGit: 3.83x\nBreak-even vs FileRepository/JGit including one projection build: 7.56 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 85.24 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation."
+          },
+          {
+            "name": "Git history path + changed-content query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 13.170894333333331,
+            "range": 42.12872199953454,
+            "extra": "Query: path-content\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 1000\nChanged blobs read: 4\nChanged blob bytes read: 2048\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history path + time query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 107.71220899999999,
+            "range": 123.41640652813606,
+            "extra": "Query: path-time\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0"
+          },
+          {
+            "name": "Git history path + time query — 1,000 commits / Hibernate Search exact-path projection",
+            "unit": "ms/op",
+            "value": 3.6823390000000003,
+            "range": 15.783289593610192,
+            "extra": "Query: path-time\nImplementation: Hibernate Search exact-path projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 829.546 ms\nSpeedup vs FileRepository/JGit: 29.25x\nSpeedup vs HibernateRepository/JGit: 3.71x\nBreak-even vs FileRepository/JGit including one projection build: 7.97 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 83.12 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation."
+          },
+          {
+            "name": "Git history path + time query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 13.662968000000001,
+            "range": 92.1498099587075,
             "extra": "Query: path-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0"
           }
         ]
