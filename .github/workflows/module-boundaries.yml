@@ -1,0 +1,55 @@
+name: Module Boundaries
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-*/pom.xml'
+      - '.github/scripts/verify-module-boundaries.py'
+      - '.github/scripts/test_verify_module_boundaries.py'
+      - '.github/workflows/module-boundaries.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-*/pom.xml'
+      - '.github/scripts/verify-module-boundaries.py'
+      - '.github/scripts/test_verify_module_boundaries.py'
+      - '.github/workflows/module-boundaries.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Optional module dependency contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test boundary verifier
+        run: python3 .github/scripts/test_verify_module_boundaries.py
+
+      - name: Verify reactor module boundaries
+        run: |
+          python3 .github/scripts/verify-module-boundaries.py \
+            --json target/module-boundaries/module-graph.json \
+            --markdown target/module-boundaries/module-graph.md
+          cat target/module-boundaries/module-graph.md
+
+      - name: Upload module-boundary evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: module-boundary-evidence
+          path: target/module-boundaries/*
+          if-no-files-found: error
+
+      - name: Report module contract
+        run: |
+          echo '### Optional module boundaries' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Core/Search/Java Analysis/Architecture/Benchmarks production dependency direction was verified directly from the reactor POMs.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The retained JSON/Markdown artifact records the exact module graph used by this commit.' >> "$GITHUB_STEP_SUMMARY"
