@@ -45,10 +45,32 @@ public record RepositoryTransferRequest(
     if (refs.isEmpty()) {
       throw new IllegalArgumentException("at least one ref transfer is required");
     }
+    if (mode == RepositoryTransferMode.INITIAL_CLONE
+        && targetRefPolicy != TargetRefPolicy.CREATE_ONLY) {
+      throw new IllegalArgumentException("initial clone requires CREATE_ONLY target refs");
+    }
+
     Set<String> targetRefs = new HashSet<>();
     for (RefTransferSpec ref : refs) {
       if (!targetRefs.add(ref.targetRef())) {
         throw new IllegalArgumentException("duplicate target ref: " + ref.targetRef());
+      }
+      switch (targetRefPolicy) {
+        case CREATE_ONLY, FAST_FORWARD_ONLY -> {
+          if (ref.expectedTargetObjectId() != null) {
+            throw new IllegalArgumentException(
+                targetRefPolicy + " transfers must not provide expected target object IDs");
+          }
+        }
+        case COMPARE_AND_SET -> {
+          if (ref.expectedTargetObjectId() == null) {
+            throw new IllegalArgumentException(
+                "COMPARE_AND_SET requires an expected target object ID for every ref");
+          }
+        }
+        case FORCE -> {
+          // An optional expected value adds stale-writer protection to an explicit force update.
+        }
       }
     }
   }
@@ -69,6 +91,29 @@ public record RepositoryTransferRequest(
         refs,
         RepositoryTransferMode.INITIAL_CLONE,
         TargetRefPolicy.CREATE_ONLY,
+        true);
+  }
+
+  /**
+   * Create an incremental transfer plan for an existing target repository.
+   *
+   * @param source source logical repository
+   * @param target target logical repository
+   * @param refs exact source-to-target ref mappings
+   * @param policy explicit target ref mutation policy
+   * @return incremental request with connectivity verification enabled
+   */
+  public static RepositoryTransferRequest incrementalFetch(
+      RepositoryName source,
+      RepositoryName target,
+      List<RefTransferSpec> refs,
+      TargetRefPolicy policy) {
+    return new RepositoryTransferRequest(
+        source,
+        target,
+        refs,
+        RepositoryTransferMode.INCREMENTAL_FETCH,
+        policy,
         true);
   }
 }
