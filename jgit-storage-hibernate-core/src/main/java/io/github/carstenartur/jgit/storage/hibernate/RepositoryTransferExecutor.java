@@ -62,6 +62,24 @@ final class RepositoryTransferExecutor {
       List<ResolvedRefTransfer> resolvedRefs,
       boolean targetCreated)
       throws IOException {
+    return transfer(
+        source,
+        target,
+        request,
+        resolvedRefs,
+        targetCreated,
+        TransferExecutionObserver.NO_OP);
+  }
+
+  static RepositoryTransferResult transfer(
+      Repository source,
+      Repository target,
+      RepositoryTransferRequest request,
+      List<ResolvedRefTransfer> resolvedRefs,
+      boolean targetCreated,
+      TransferExecutionObserver observer)
+      throws IOException {
+    observer.stage(RepositoryTransferStage.TARGET_PRECONDITION);
     List<Ref> targetRefs = target.getRefDatabase().getRefsByPrefix(Constants.R_REFS);
     if (request.mode() == RepositoryTransferMode.INITIAL_CLONE && !targetRefs.isEmpty()) {
       throw new HibernateStorageException(
@@ -69,11 +87,18 @@ final class RepositoryTransferExecutor {
     }
 
     List<PreparedRefTransfer> preparedRefs = prepareTargetRefs(target, request, resolvedRefs);
+    observer.stage(RepositoryTransferStage.OBJECT_TRANSFER);
     TransferCounters counters = copyReachableObjects(source, target, resolvedRefs, targetRefs);
     if (request.verifyConnectivity()) {
+      observer.stage(RepositoryTransferStage.CONNECTIVITY_VERIFICATION);
       verifyConnectivity(target, resolvedRefs);
     }
+    observer.stage(RepositoryTransferStage.REF_POLICY_VALIDATION);
     validateFastForwards(target, request.targetRefPolicy(), preparedRefs);
+
+    observer.stage(RepositoryTransferStage.REF_PUBLICATION);
+    observer.beforeRefPublication(
+        publication(request, preparedRefs, counters, targetCreated));
     boolean refsChanged = publishRefs(target, request, preparedRefs);
 
     Map<String, RefTransferResult> refResults = new LinkedHashMap<>();
@@ -101,6 +126,35 @@ final class RepositoryTransferExecutor {
         refResults,
         targetCreated,
         counters.objectsTransferred == 0 && !refsChanged);
+  }
+
+  private static RepositoryTransferPublication publication(
+      RepositoryTransferRequest request,
+      List<PreparedRefTransfer> preparedRefs,
+      TransferCounters counters,
+      boolean targetCreated) {
+    List<RepositoryTransferRefUpdate> refs = new ArrayList<>(preparedRefs.size());
+    for (PreparedRefTransfer prepared : preparedRefs) {
+      ObjectId requiredTarget =
+          prepared.changed()
+              ? prepared.commandOldObjectId()
+              : prepared.currentTargetObjectId();
+      refs.add(
+          new RepositoryTransferRefUpdate(
+              prepared.resolved().spec().sourceRef(),
+              prepared.resolved().spec().targetRef(),
+              prepared.resolved().sourceObjectId(),
+              prepared.currentTargetObjectId(),
+              requiredTarget,
+              prepared.changed()));
+    }
+    return new RepositoryTransferPublication(
+        request,
+        refs,
+        counters.objectsVisited,
+        counters.objectsTransferred,
+        counters.bytesTransferred,
+        targetCreated);
   }
 
   private static List<PreparedRefTransfer> prepareTargetRefs(
@@ -337,6 +391,21 @@ final class RepositoryTransferExecutor {
   }
 
   record ResolvedRefTransfer(RefTransferSpec spec, ObjectId sourceObjectId) {}
+
+  interface TransferExecutionObserver {
+    TransferExecutionObserver NO_OP =
+        new TransferExecutionObserver() {
+          @Override
+          public void stage(RepositoryTransferStage stage) {}
+
+          @Override
+          public void beforeRefPublication(RepositoryTransferPublication publication) {}
+        };
+
+    void stage(RepositoryTransferStage stage);
+
+    void beforeRefPublication(RepositoryTransferPublication publication);
+  }
 
   private record PreparedRefTransfer(
       ResolvedRefTransfer resolved,
