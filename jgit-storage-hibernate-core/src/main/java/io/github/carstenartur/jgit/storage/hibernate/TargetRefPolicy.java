@@ -10,15 +10,24 @@ package io.github.carstenartur.jgit.storage.hibernate;
 
 /** Policy used when publishing transferred source object IDs as target refs. */
 public enum TargetRefPolicy {
-  /** Create a ref only when it does not already exist. */
+  /** Create a ref only when it does not already exist; an identical existing value is a no-op. */
   CREATE_ONLY,
 
-  /** Update an existing ref only when the new commit is a fast-forward. */
+  /** Update an existing commit-valued ref only when the source tip is a fast-forward. */
   FAST_FORWARD_ONLY,
 
-  /** Update a ref only when its current value equals the request's expected value. */
+  /**
+   * Require the exact expected target value and a fast-forward commit update.
+   *
+   * <p>An already-published desired value is accepted as an idempotent retry even when the original
+   * expected value is now stale.
+   */
   COMPARE_AND_SET,
 
-  /** Explicitly permit a non-fast-forward update. */
+  /**
+   * Explicitly permit a non-fast-forward update.
+   *
+   * <p>An optional expected target value still provides stale-writer protection.
+   */
   FORCE
 }
