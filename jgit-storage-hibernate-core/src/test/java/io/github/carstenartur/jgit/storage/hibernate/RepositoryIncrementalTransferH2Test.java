@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -185,6 +186,45 @@ class RepositoryIncrementalTransferH2Test {
       Repository target = targetStorage.repository();
       assertFalse(target.getObjectDatabase().has(mainTip));
       assertFalse(target.getObjectDatabase().has(releaseTip));
+    }
+  }
+
+  @Test
+  void compareAndSetCreateRejectsANonCommitSourceRef() throws Exception {
+    ObjectId base;
+    ObjectId blob;
+    try (HibernateGitStorage sourceStorage = factory.open(sourceName)) {
+      Repository source = sourceStorage.repository();
+      base = createCommit(source, "base", "base.txt", "base", List.of());
+      createRef(source, "refs/heads/main", base);
+      try (ObjectInserter inserter = source.newObjectInserter()) {
+        blob = inserter.insert(Constants.OBJ_BLOB, "tag payload".getBytes(StandardCharsets.UTF_8));
+        inserter.flush();
+      }
+      createRef(source, "refs/tags/blob", blob);
+    }
+    factory.transfer(
+        RepositoryTransferRequest.initialClone(
+            sourceName,
+            targetName,
+            List.of(new RefTransferSpec("refs/heads/main", "refs/heads/draft"))));
+
+    RepositoryTransferRequest request =
+        RepositoryTransferRequest.incrementalFetch(
+            sourceName,
+            targetName,
+            List.of(
+                new RefTransferSpec(
+                    "refs/tags/blob", "refs/tags/tracking-blob", ObjectId.zeroId())),
+            TargetRefPolicy.COMPARE_AND_SET);
+
+    assertThrows(HibernateStorageException.class, () -> factory.transfer(request));
+    try (HibernateGitStorage targetStorage = factory.open(targetName)) {
+      Repository target = targetStorage.repository();
+      assertNull(target.exactRef("refs/tags/tracking-blob"));
+      assertTrue(
+          target.getObjectDatabase().has(blob),
+          "the rejected canonical object remains unreachable and reusable");
     }
   }
 
