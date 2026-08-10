@@ -76,11 +76,12 @@ public record GitAccessContext(
     String principalId,
     Set<String> groupIds,
     String authenticationMethod,
+    String sessionId,
     String correlationId,
     Map<String, String> attributes) {}
 ```
 
-Authorization uses `principalId` and group IDs, never mutable login or display names. Context construction validates bounded, immutable values and rejects missing principal IDs. A separately named privileged system context may exist for migrations and repair, but it must be created explicitly and audited.
+`sessionId` links authorization and audit evidence to the authenticated session; `correlationId` traces one request or operation across components. Neither value is used as the stable authorization identity. Authorization uses `principalId` and group IDs, never mutable login or display names. Context construction validates bounded, immutable values and rejects missing principal IDs. A separately named privileged system context may exist for migrations and repair, but it must be created explicitly and audited.
 
 ### Git-generic permissions
 
@@ -179,7 +180,7 @@ Denied operations can occur outside a storage transaction. The implementation th
 
 ### Caching and revocation
 
-Effective permission caches are keyed by principal, repository and monotone security-version data covering principal status, group membership, grants and ref rules. Management mutations increment or replace the relevant version and invalidate local caches. A bounded TTL is a secondary cross-instance safety mechanism, not the sole invalidation strategy.
+Effective permission caches are keyed by principal, repository and monotonically increasing security-version data covering principal status, group membership, grants and ref rules. Management mutations increment or replace the relevant version and invalidate local caches. A bounded TTL is a secondary cross-instance safety mechanism, not the sole invalidation strategy.
 
 A ref mutation performs a final authorization check against current version data before publication. Long-lived read sessions have a documented bounded validity interval and do not authorize new writes after their policy version becomes stale.
 
