@@ -54,7 +54,8 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
     try (HibernateGitStorage sourceStorage = openStorage(request.source(), false).storage()) {
       List<RepositoryTransferExecutor.ResolvedRefTransfer> resolvedRefs =
           RepositoryTransferExecutor.resolveSourceRefs(sourceStorage.repository(), request);
-      OpenedStorage openedTarget = openStorage(request.target(), true);
+      boolean createTarget = request.mode() == RepositoryTransferMode.INITIAL_CLONE;
+      OpenedStorage openedTarget = openStorage(request.target(), createTarget);
       try (HibernateGitStorage targetStorage = openedTarget.storage()) {
         return RepositoryTransferExecutor.transfer(
             sourceStorage.repository(),

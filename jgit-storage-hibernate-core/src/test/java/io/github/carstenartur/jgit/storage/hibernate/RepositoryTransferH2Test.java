@@ -134,23 +134,17 @@ class RepositoryTransferH2Test {
   }
 
   @Test
-  void unsupportedIncrementalModeFailsExplicitly() throws Exception {
-    try (HibernateGitStorage sourceStorage = factory.open(sourceName)) {
-      ObjectId head =
-          createCommit(sourceStorage.repository(), "source", "file.txt", "value", List.of());
-      createRef(sourceStorage.repository(), "refs/heads/main", head);
-    }
-
-    RepositoryTransferRequest request =
-        new RepositoryTransferRequest(
-            sourceName,
-            targetName,
-            List.of(new RefTransferSpec("refs/heads/main", "refs/heads/tracking")),
-            RepositoryTransferMode.INCREMENTAL_FETCH,
-            TargetRefPolicy.FAST_FORWARD_ONLY,
-            true);
-
-    assertThrows(UnsupportedOperationException.class, () -> factory.transfer(request));
+  void initialCloneRejectsNonCreateTargetPolicies() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new RepositoryTransferRequest(
+                sourceName,
+                targetName,
+                List.of(new RefTransferSpec("refs/heads/main", "refs/heads/draft")),
+                RepositoryTransferMode.INITIAL_CLONE,
+                TargetRefPolicy.FAST_FORWARD_ONLY,
+                true));
   }
 
   private SourceFixture createSourceFixture(Repository source) throws Exception {
