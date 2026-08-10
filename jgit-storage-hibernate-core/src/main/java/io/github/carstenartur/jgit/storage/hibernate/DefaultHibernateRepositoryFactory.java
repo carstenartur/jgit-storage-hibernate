@@ -62,7 +62,7 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
   public RepositoryTransferResult transfer(RepositoryTransferRequest request) {
     Objects.requireNonNull(request, "request");
     boolean cleanupCreatedTarget = false;
-    RuntimeException transferFailure = null;
+    Throwable transferFailure = null;
     try (HibernateGitStorage sourceStorage = openStorage(request.source(), false).storage()) {
       List<RepositoryTransferExecutor.ResolvedRefTransfer> resolvedRefs =
           RepositoryTransferExecutor.resolveSourceRefs(sourceStorage.repository(), request);
@@ -94,6 +94,9 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
     } catch (RuntimeException exception) {
       transferFailure = exception;
       throw exception;
+    } catch (Error error) {
+      transferFailure = error;
+      throw error;
     } finally {
       if (cleanupCreatedTarget) {
         cleanupFailedInitialTarget(request.target(), transferFailure);
@@ -114,7 +117,7 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
   }
 
   private void cleanupFailedInitialTarget(
-      RepositoryName targetRepository, RuntimeException transferFailure) {
+      RepositoryName targetRepository, Throwable transferFailure) {
     try {
       deleteRepository(targetRepository);
     } catch (RuntimeException cleanupFailure) {
