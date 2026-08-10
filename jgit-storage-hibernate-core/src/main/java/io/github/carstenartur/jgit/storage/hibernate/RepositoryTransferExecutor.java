@@ -39,7 +39,6 @@ final class RepositoryTransferExecutor {
 
   static List<ResolvedRefTransfer> resolveSourceRefs(
       Repository source, RepositoryTransferRequest request) throws IOException {
-    requireInitialClone(request);
     List<ResolvedRefTransfer> resolved = new ArrayList<>(request.refs().size());
     for (RefTransferSpec spec : request.refs()) {
       Ref sourceRef = source.exactRef(spec.sourceRef());
@@ -63,14 +62,19 @@ final class RepositoryTransferExecutor {
       List<ResolvedRefTransfer> resolvedRefs,
       boolean targetCreated)
       throws IOException {
-    requireInitialClone(request);
-    requireEmptyTarget(target, request.target());
+    List<Ref> targetRefs = target.getRefDatabase().getRefsByPrefix(Constants.R_REFS);
+    if (request.mode() == RepositoryTransferMode.INITIAL_CLONE && !targetRefs.isEmpty()) {
+      throw new HibernateStorageException(
+          "Initial clone target " + request.target() + " already contains refs");
+    }
 
-    TransferCounters counters = copyReachableObjects(source, target, resolvedRefs);
+    List<PreparedRefTransfer> preparedRefs = prepareTargetRefs(target, request, resolvedRefs);
+    TransferCounters counters = copyReachableObjects(source, target, resolvedRefs, targetRefs);
     if (request.verifyConnectivity()) {
       verifyConnectivity(target, resolvedRefs);
     }
-    publishRefs(target, request, resolvedRefs);
+    validateFastForwards(target, request.targetRefPolicy(), preparedRefs);
+    boolean refsChanged = publishRefs(target, request, preparedRefs);
 
     Map<String, RefTransferResult> refResults = new LinkedHashMap<>();
     for (ResolvedRefTransfer resolved : resolvedRefs) {
@@ -96,11 +100,81 @@ final class RepositoryTransferExecutor {
         counters.bytesTransferred,
         refResults,
         targetCreated,
-        false);
+        counters.objectsTransferred == 0 && !refsChanged);
+  }
+
+  private static List<PreparedRefTransfer> prepareTargetRefs(
+      Repository target,
+      RepositoryTransferRequest request,
+      List<ResolvedRefTransfer> resolvedRefs)
+      throws IOException {
+    List<PreparedRefTransfer> prepared = new ArrayList<>(resolvedRefs.size());
+    for (ResolvedRefTransfer resolved : resolvedRefs) {
+      Ref targetRef = target.exactRef(resolved.spec().targetRef());
+      if (targetRef != null && targetRef.isSymbolic()) {
+        throw new HibernateStorageException(
+            "Symbolic target refs are not supported: " + resolved.spec().targetRef());
+      }
+      ObjectId current =
+          targetRef == null || targetRef.getObjectId() == null
+              ? ObjectId.zeroId()
+              : targetRef.getObjectId().copy();
+      boolean unchanged = current.equals(resolved.sourceObjectId());
+      ObjectId commandOldId;
+
+      switch (request.targetRefPolicy()) {
+        case CREATE_ONLY -> {
+          if (!current.equals(ObjectId.zeroId()) && !unchanged) {
+            throw new HibernateStorageException(
+                "CREATE_ONLY target ref already exists: " + resolved.spec().targetRef());
+          }
+          commandOldId = ObjectId.zeroId();
+        }
+        case FAST_FORWARD_ONLY -> {
+          if (current.equals(ObjectId.zeroId()) && !unchanged) {
+            throw new HibernateStorageException(
+                "FAST_FORWARD_ONLY target ref does not exist: " + resolved.spec().targetRef());
+          }
+          commandOldId = current;
+        }
+        case COMPARE_AND_SET -> {
+          ObjectId expected = resolved.spec().expectedTargetObjectId();
+          if (!current.equals(expected) && !unchanged) {
+            throw new HibernateStorageException(
+                "COMPARE_AND_SET target ref changed: "
+                    + resolved.spec().targetRef()
+                    + " expected "
+                    + expected.name()
+                    + " but was "
+                    + current.name());
+          }
+          commandOldId = expected;
+        }
+        case FORCE -> {
+          ObjectId expected = resolved.spec().expectedTargetObjectId();
+          if (expected != null && !current.equals(expected) && !unchanged) {
+            throw new HibernateStorageException(
+                "FORCE target ref changed: "
+                    + resolved.spec().targetRef()
+                    + " expected "
+                    + expected.name()
+                    + " but was "
+                    + current.name());
+          }
+          commandOldId = current;
+        }
+        default -> throw new IllegalStateException("Unhandled target ref policy");
+      }
+      prepared.add(new PreparedRefTransfer(resolved, current, commandOldId, !unchanged));
+    }
+    return List.copyOf(prepared);
   }
 
   private static TransferCounters copyReachableObjects(
-      Repository source, Repository target, List<ResolvedRefTransfer> resolvedRefs)
+      Repository source,
+      Repository target,
+      List<ResolvedRefTransfer> resolvedRefs,
+      List<Ref> targetRefs)
       throws IOException {
     TransferCounters counters = new TransferCounters();
     try (ObjectReader sourceReader = source.newObjectReader();
@@ -109,6 +183,12 @@ final class RepositoryTransferExecutor {
         ObjectWalk walk = new ObjectWalk(source)) {
       for (ResolvedRefTransfer resolved : resolvedRefs) {
         walk.markStart(walk.parseAny(resolved.sourceObjectId()));
+      }
+      for (Ref targetRef : targetRefs) {
+        ObjectId targetId = targetRef.getObjectId();
+        if (targetId != null && sourceReader.has(targetId)) {
+          walk.markUninteresting(walk.parseAny(targetId));
+        }
       }
 
       RevCommit commit;
@@ -164,25 +244,68 @@ final class RepositoryTransferExecutor {
     }
   }
 
-  private static void publishRefs(
+  private static void validateFastForwards(
+      Repository target,
+      TargetRefPolicy policy,
+      List<PreparedRefTransfer> preparedRefs)
+      throws IOException {
+    if (policy != TargetRefPolicy.FAST_FORWARD_ONLY
+        && policy != TargetRefPolicy.COMPARE_AND_SET) {
+      return;
+    }
+    try (RevWalk walk = new RevWalk(target)) {
+      for (PreparedRefTransfer prepared : preparedRefs) {
+        if (!prepared.changed()
+            || prepared.currentTargetObjectId().equals(ObjectId.zeroId())) {
+          continue;
+        }
+        RevCommit oldCommit;
+        RevCommit newCommit;
+        try {
+          oldCommit = walk.parseCommit(prepared.currentTargetObjectId());
+          newCommit = walk.parseCommit(prepared.resolved().sourceObjectId());
+        } catch (IOException invalidCommitRef) {
+          throw new HibernateStorageException(
+              policy
+                  + " requires commit-valued refs: "
+                  + prepared.resolved().spec().targetRef(),
+              invalidCommitRef);
+        }
+        if (!walk.isMergedInto(oldCommit, newCommit)) {
+          throw new HibernateStorageException(
+              "Non-fast-forward transfer rejected for "
+                  + prepared.resolved().spec().targetRef());
+        }
+      }
+    }
+  }
+
+  private static boolean publishRefs(
       Repository target,
       RepositoryTransferRequest request,
-      List<ResolvedRefTransfer> resolvedRefs)
+      List<PreparedRefTransfer> preparedRefs)
       throws IOException {
+    List<ReceiveCommand> commands = new ArrayList<>(preparedRefs.size());
+    for (PreparedRefTransfer prepared : preparedRefs) {
+      if (!prepared.changed()) {
+        continue;
+      }
+      commands.add(
+          new ReceiveCommand(
+              prepared.commandOldObjectId(),
+              prepared.resolved().sourceObjectId(),
+              prepared.resolved().spec().targetRef()));
+    }
+    if (commands.isEmpty()) {
+      return false;
+    }
+
     BatchRefUpdate update = target.getRefDatabase().newBatchUpdate();
     update.setAtomic(true);
-    update.setAllowNonFastForwards(false);
+    update.setAllowNonFastForwards(request.targetRefPolicy() == TargetRefPolicy.FORCE);
     update.setRefLogIdent(TRANSFER_IDENTITY);
     update.setRefLogMessage("transfer from " + request.source().value(), false);
     update.setForceRefLog(true);
-
-    List<ReceiveCommand> commands = new ArrayList<>(resolvedRefs.size());
-    for (ResolvedRefTransfer resolved : resolvedRefs) {
-      ReceiveCommand command =
-          new ReceiveCommand(
-              ObjectId.zeroId(), resolved.sourceObjectId(), resolved.spec().targetRef());
-      commands.add(command);
-    }
     update.addCommand(commands);
     try (RevWalk walk = new RevWalk(target)) {
       update.execute(walk, NullProgressMonitor.INSTANCE);
@@ -198,35 +321,16 @@ final class RepositoryTransferExecutor {
                 + (command.getMessage() == null ? "" : " (" + command.getMessage() + ")"));
       }
     }
-  }
-
-  private static void requireEmptyTarget(Repository target, RepositoryName targetName)
-      throws IOException {
-    List<Ref> existingRefs = target.getRefDatabase().getRefsByPrefix(Constants.R_REFS);
-    if (!existingRefs.isEmpty()) {
-      throw new HibernateStorageException(
-          "Initial clone target " + targetName + " already contains refs");
-    }
-  }
-
-  private static void requireInitialClone(RepositoryTransferRequest request) {
-    if (request.mode() != RepositoryTransferMode.INITIAL_CLONE) {
-      throw new UnsupportedOperationException(
-          "Incremental logical repository transfer is not implemented yet");
-    }
-    if (request.targetRefPolicy() != TargetRefPolicy.CREATE_ONLY) {
-      throw new UnsupportedOperationException(
-          "Initial logical repository transfer currently requires CREATE_ONLY");
-    }
-    for (RefTransferSpec ref : request.refs()) {
-      if (ref.expectedTargetObjectId() != null) {
-        throw new IllegalArgumentException(
-            "CREATE_ONLY transfers must not provide expected target object IDs");
-      }
-    }
+    return true;
   }
 
   record ResolvedRefTransfer(RefTransferSpec spec, ObjectId sourceObjectId) {}
+
+  private record PreparedRefTransfer(
+      ResolvedRefTransfer resolved,
+      ObjectId currentTargetObjectId,
+      ObjectId commandOldObjectId,
+      boolean changed) {}
 
   private static final class TransferCounters {
     private long objectsVisited;
