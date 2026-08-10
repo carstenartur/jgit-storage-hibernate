@@ -1,6 +1,6 @@
-# Preserve Git ancestry when creating a logical clone or fork
+# Preserve and advance Git ancestry between logical repositories
 
-`DefaultHibernateRepositoryFactory` can provision selected refs in another logical repository while preserving the original Git object IDs and commit graph.
+`DefaultHibernateRepositoryFactory` can provision selected refs in another logical repository and later advance them while preserving original Git object IDs and the commit graph.
 
 This is different from reading a file from the source and committing the same content into the target. A content-copy commit has a new object ID and no shared ancestry. A logical repository transfer keeps the source commit itself, so later merge-base, fetch and merge operations start from real Git ancestry.
 
@@ -38,46 +38,127 @@ After a successful call:
 - closing or deleting the source repository does not affect the target;
 - application and Hibernate Search projections are not copied and should be rebuilt from the returned target IDs.
 
-## Safety contract
+An initial clone requires a target with no refs and always uses `CREATE_ONLY`.
 
-The phase-1 operation is deliberately restricted to:
+## Advance a tracking ref by fast-forward
 
-```text
-mode:              INITIAL_CLONE
-target ref policy: CREATE_ONLY
-source namespaces: refs/heads/* and refs/tags/*
-target state:      no existing refs
+```java
+RepositoryTransferResult fetched =
+    repositories.transfer(
+        RepositoryTransferRequest.incrementalFetch(
+            central,
+            workspace,
+            List.of(
+                new RefTransferSpec(
+                    "refs/heads/main",
+                    "refs/heads/upstream/main")),
+            TargetRefPolicy.FAST_FORWARD_ONLY));
 ```
 
-The service resolves every source ref once before opening the target. Objects are streamed into the target and flushed, the target graph is traversed when connectivity verification is enabled, and only then are all target refs published atomically.
+The target repository must already exist. The operation captures both source and target tips, transfers only newly reachable objects, verifies connectivity and then atomically updates the target ref. A divergent target is rejected.
 
-The service never silently force-updates a target ref. A non-empty target fails before object transfer.
+Every target ref whose object also exists in the source is used as a known-history boundary. The source walk therefore stops at objects already reachable in the target instead of rescanning the complete history. A target-side existence check additionally reuses canonical objects left by an interrupted or rejected earlier attempt.
+
+Repeating the same request after it succeeded returns `noOp() == true`, with zero newly transferred objects and bytes.
+
+## Compare-and-set for application-controlled synchronization
+
+Use `COMPARE_AND_SET` when the application has displayed or persisted a known target tip and must reject a stale decision:
+
+```java
+ObjectId expectedWorkspaceTip = ...;
+
+RepositoryTransferResult updated =
+    repositories.transfer(
+        RepositoryTransferRequest.incrementalFetch(
+            central,
+            workspace,
+            List.of(
+                new RefTransferSpec(
+                    "refs/heads/main",
+                    "refs/heads/upstream/main",
+                    expectedWorkspaceTip)),
+            TargetRefPolicy.COMPARE_AND_SET));
+```
+
+The target must still equal `expectedWorkspaceTip`, and a changed commit-valued ref must be a fast-forward. An expected `ObjectId.zeroId()` can guard creation of a missing ref. If a previous attempt already published the desired source ID, retry is accepted as a no-op even though the original expected value is now stale.
+
+## Explicit force update
+
+`FORCE` is the only policy that permits divergence:
+
+```java
+RepositoryTransferRequest forced =
+    RepositoryTransferRequest.incrementalFetch(
+        central,
+        workspace,
+        List.of(
+            new RefTransferSpec(
+                "refs/heads/main",
+                "refs/heads/upstream/main",
+                expectedWorkspaceTip)),
+        TargetRefPolicy.FORCE);
+```
+
+Supplying an expected target ID is strongly recommended. It proves that the caller is replacing the value it actually reviewed. Even without an explicit expected ID, publication still uses the target value captured at operation start as the command old ID, so a concurrent writer is never silently overwritten.
+
+## Create an additional tracking ref
+
+`INCREMENTAL_FETCH + CREATE_ONLY` can add a new branch or tag to a repository that already has unrelated refs:
+
+```java
+RepositoryTransferRequest addTrackingTag =
+    RepositoryTransferRequest.incrementalFetch(
+        central,
+        workspace,
+        List.of(
+            new RefTransferSpec(
+                "refs/tags/v1.1.0",
+                "refs/tags/upstream-v1.1.0")),
+        TargetRefPolicy.CREATE_ONLY);
+```
+
+A different existing target value is rejected; an identical value is an idempotent no-op.
+
+## Atomicity and concurrency contract
+
+The service resolves every source ref exactly once before opening the target. Incremental operations also resolve every target ref once before copying. Those IDs form the operation snapshot.
+
+Objects are streamed into the target and flushed. When connectivity verification is enabled, the target graph is traversed from every captured source root. Only then are all changed refs submitted in one atomic `BatchRefUpdate`.
+
+The captured target IDs become each command's expected old IDs. Consequently, a concurrent target update after validation causes publication to fail rather than being overwritten. A multi-ref request succeeds as a unit or leaves all target refs unchanged.
+
+`FAST_FORWARD_ONLY` and `COMPARE_AND_SET` require commit-valued changed refs. Use `CREATE_ONLY` for new tags and `FORCE` only when replacing a non-commit or intentionally divergent ref.
 
 ## Failure and retry
 
-A failure before ref publication leaves no visible target history. If object persistence completed but ref publication failed, unreachable target objects may remain. Repeating the same create-only transfer is safe: existing canonical objects are reused and the refs are attempted again.
+A failure before ref publication leaves no newly visible target history. If object persistence completed but a ref policy or atomic publication failed, unreachable target objects may remain. Repeating the request is safe: existing canonical objects are reused and the policy is evaluated again against the current target refs.
 
 Deleting the target through `HibernateRepositoryFactory.deleteRepository(...)` removes both visible and unreachable target-owned storage.
 
-## Reflog and audit evidence
+## Result and audit evidence
 
-Source reflogs are repository-local operational history and are not copied. During phase 1, `RepositoryTransferResult` is the authoritative operation evidence:
+Source reflogs are repository-local operational history and are not copied. `RepositoryTransferResult` is the authoritative transfer evidence:
 
 - source and target repository names;
-- exact source and target object IDs per ref;
+- exact captured source and final target object IDs per ref;
 - objects visited and transferred;
 - canonical content bytes transferred;
-- whether the target repository was created.
+- whether the target repository was created;
+- whether the operation was a complete no-op.
 
-Atomic integration with the dedicated Hibernate reflog and pluggable security/projection completion hooks remains part of the incremental-transfer work tracked in issue #236.
+The transfer configures a neutral JGit ref-update identity. Atomic integration with the dedicated queryable Hibernate reflog and pluggable security/projection completion hooks remains tracked in issue #236.
 
 ## Current limitations
 
-The following API values are reserved but intentionally rejected until their full semantics are implemented and tested:
+The implemented API provides bounded initial clone and incremental selected-ref transfer, but it does not yet provide:
 
-- `INCREMENTAL_FETCH`;
-- `FAST_FORWARD_ONLY`;
-- `COMPARE_AND_SET`;
-- `FORCE`.
+- pack negotiation or a backend-native pack-copy optimization;
+- automatic branch discovery or Git refspec wildcard expansion;
+- shallow or partial clone semantics;
+- dedicated queryable Hibernate reflog rows for a multi-ref transfer;
+- application security/authorization or projection-completion hooks;
+- retained PostgreSQL, SQL Server and HSQLDB scale/failure/concurrency evidence;
+- automatic consumer catalog or UI integration.
 
-Large-history pack negotiation, PostgreSQL/SQL Server/HSQLDB transfer matrices, failure injection, concurrent target writers and consumer adoption are also follow-up phases of issue #236. See [ADR-0002](../adrs/0002-logical-repository-transfer.md) for the architecture and atomicity decision.
+See [ADR-0002](../adrs/0002-logical-repository-transfer.md) for the architecture and atomicity decision.
