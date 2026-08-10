@@ -29,7 +29,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Runs the focused stateful-versus-stateless large-pack threshold comparison. */
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 class LargePackJdbcBatchBenchmarkIT {
 
   private static final String FULL_PROFILE = "full";
