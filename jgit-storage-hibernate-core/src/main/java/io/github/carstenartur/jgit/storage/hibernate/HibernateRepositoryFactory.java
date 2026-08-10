@@ -8,8 +8,8 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate;
 
-/** Factory for opening and deleting Hibernate-backed JGit repositories. */
-public interface HibernateRepositoryFactory {
+/** Factory for opening, transferring and deleting Hibernate-backed JGit repositories. */
+public interface HibernateRepositoryFactory extends HibernateRepositoryTransferService {
 
   /**
    * Open or create a repository with the given logical repository name.
