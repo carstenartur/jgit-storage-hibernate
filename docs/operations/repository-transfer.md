@@ -149,6 +149,29 @@ Source reflogs are repository-local operational history and are not copied. `Rep
 
 The transfer configures a neutral JGit ref-update identity. Atomic integration with the dedicated queryable Hibernate reflog and pluggable security/projection completion hooks remains tracked in issue #236.
 
+## Verified database and restart matrix
+
+The same portable contract is run on every Core database after applying the packaged Flyway stream and starting Hibernate with `hbm2ddl.auto=validate`.
+
+| Database | Restart boundary | Verified transfer sequence |
+|---|---|---|
+| H2 | file-backed database plus a new `SessionFactory` for every phase | initial two-ref clone, reopen, incremental CAS fetch, no-op retry, source/target deletion isolation |
+| HSQLDB | file-backed database, explicit `SHUTDOWN`, engine reopen and new `SessionFactory` | the same sequence across real engine restarts |
+| PostgreSQL | Testcontainers database and a new `SessionFactory` for every phase | the same sequence against the PostgreSQL migration stream |
+| Microsoft SQL Server | Testcontainers database and a new `SessionFactory` for every phase | the same sequence against the SQL Server migration stream |
+
+For every database the contract additionally verifies:
+
+- the target branch has the exact source commit ID;
+- merge parent order and all reachable commit IDs remain intact;
+- the annotated target tag keeps its tag-object ID and original commit target;
+- selected file contents remain readable after every reopen;
+- deleting one target does not change source or another target;
+- deleting source does not make the surviving target unreadable;
+- `git_repository_lifecycle`, `git_repository_lock`, `git_packs` and `git_reflog` rows are scoped and removed only for the deleted `RepositoryName`.
+
+This matrix is a correctness/restart contract, not a large-history performance claim.
+
 ## Current limitations
 
 The implemented API provides bounded initial clone and incremental selected-ref transfer, but it does not yet provide:
@@ -158,7 +181,7 @@ The implemented API provides bounded initial clone and incremental selected-ref 
 - shallow or partial clone semantics;
 - dedicated queryable Hibernate reflog rows for a multi-ref transfer;
 - application security/authorization or projection-completion hooks;
-- retained PostgreSQL, SQL Server and HSQLDB scale/failure/concurrency evidence;
+- retained large-history, failure-injection and concurrent-writer/repack evidence;
 - automatic consumer catalog or UI integration.
 
 See [ADR-0002](../adrs/0002-logical-repository-transfer.md) for the architecture and atomicity decision.
