@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,6 +31,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TagBuilder;
@@ -44,6 +46,10 @@ import org.flywaydb.core.Flyway;
 final class RepositoryTransferDatabaseContract {
 
   private static final AtomicInteger CONTRACT_COUNTER = new AtomicInteger();
+  private static final String SOURCE_HEAD = "refs/heads/main";
+  private static final String SOURCE_TAG = "refs/tags/v1";
+  private static final String TARGET_HEAD = "refs/heads/draft";
+  private static final String TARGET_TAG = "refs/tags/source-v1";
 
   private RepositoryTransferDatabaseContract() {}
 
@@ -70,11 +76,22 @@ final class RepositoryTransferDatabaseContract {
           repositories.transfer(initialClone(sourceName, survivingTarget));
       assertTrue(disposableClone.targetCreated());
       assertTrue(survivingClone.targetCreated());
-      assertEquals(graph.merge(), disposableClone.refs().get("refs/heads/draft").targetObjectId());
-      assertEquals(graph.tag(), disposableClone.refs().get("refs/tags/source-v1").targetObjectId());
-      assertEquals(graph.merge(), survivingClone.refs().get("refs/heads/draft").targetObjectId());
-      assertEquals(graph.tag(), survivingClone.refs().get("refs/tags/source-v1").targetObjectId());
+      assertEquals(graph.merge(), disposableClone.refs().get(TARGET_HEAD).targetObjectId());
+      assertEquals(graph.tag(), disposableClone.refs().get(TARGET_TAG).targetObjectId());
+      assertEquals(graph.merge(), survivingClone.refs().get(TARGET_HEAD).targetObjectId());
+      assertEquals(graph.tag(), survivingClone.refs().get(TARGET_TAG).targetObjectId());
     }
+
+    GraphExpectation initial =
+        new GraphExpectation(
+            graph.merge(),
+            graph.tag(),
+            graph.merge(),
+            List.of(graph.main(), graph.side()),
+            List.of(graph.merge(), graph.main(), graph.side(), graph.root()),
+            "merge-v1",
+            "merge.txt",
+            "merge-v1");
 
     restart(database);
     assertRepositoryRowsPresent(database, sourceName);
@@ -85,14 +102,14 @@ final class RepositoryTransferDatabaseContract {
     try (HibernateSessionFactoryProvider provider = provider(database)) {
       DefaultHibernateRepositoryFactory repositories =
           new DefaultHibernateRepositoryFactory(provider.getSessionFactory());
-      assertGraph(repositories, sourceName, graph.merge(), graph.tag(), "merge-v1");
-      assertGraph(repositories, disposableTarget, graph.merge(), graph.tag(), "merge-v1");
-      assertGraph(repositories, survivingTarget, graph.merge(), graph.tag(), "merge-v1");
+      assertGraph(repositories, sourceName, SOURCE_HEAD, SOURCE_TAG, initial);
+      assertGraph(repositories, disposableTarget, TARGET_HEAD, TARGET_TAG, initial);
+      assertGraph(repositories, survivingTarget, TARGET_HEAD, TARGET_TAG, initial);
 
       RepositoryDeletionResult deleted = repositories.deleteRepository(disposableTarget);
       assertTrue(deleted.deletedAnything());
-      assertGraph(repositories, sourceName, graph.merge(), graph.tag(), "merge-v1");
-      assertGraph(repositories, survivingTarget, graph.merge(), graph.tag(), "merge-v1");
+      assertGraph(repositories, sourceName, SOURCE_HEAD, SOURCE_TAG, initial);
+      assertGraph(repositories, survivingTarget, TARGET_HEAD, TARGET_TAG, initial);
 
       try (HibernateGitStorage source = repositories.open(sourceName)) {
         sourceTip =
@@ -102,7 +119,7 @@ final class RepositoryTransferDatabaseContract {
                 "source-v2.txt",
                 "source-v2",
                 List.of(graph.merge()));
-        updateRef(source.repository(), "refs/heads/main", graph.merge(), sourceTip);
+        updateRef(source.repository(), SOURCE_HEAD, graph.merge(), sourceTip);
       }
 
       RepositoryTransferResult fetched =
@@ -110,13 +127,22 @@ final class RepositoryTransferDatabaseContract {
               RepositoryTransferRequest.incrementalFetch(
                   sourceName,
                   survivingTarget,
-                  List.of(
-                      new RefTransferSpec(
-                          "refs/heads/main", "refs/heads/draft", graph.merge())),
+                  List.of(new RefTransferSpec(SOURCE_HEAD, TARGET_HEAD, graph.merge())),
                   TargetRefPolicy.COMPARE_AND_SET));
-      assertEquals(sourceTip, fetched.refs().get("refs/heads/draft").targetObjectId());
+      assertEquals(sourceTip, fetched.refs().get(TARGET_HEAD).targetObjectId());
       assertTrue(fetched.objectsTransferred() > 0);
     }
+
+    GraphExpectation updated =
+        new GraphExpectation(
+            sourceTip,
+            graph.tag(),
+            graph.merge(),
+            List.of(graph.merge()),
+            List.of(sourceTip, graph.merge(), graph.main(), graph.side(), graph.root()),
+            "source-v2",
+            "source-v2.txt",
+            "source-v2");
 
     assertRepositoryRowsAbsent(database, disposableTarget);
     assertRepositoryRowsPresent(database, sourceName);
@@ -126,17 +152,15 @@ final class RepositoryTransferDatabaseContract {
     try (HibernateSessionFactoryProvider provider = provider(database)) {
       DefaultHibernateRepositoryFactory repositories =
           new DefaultHibernateRepositoryFactory(provider.getSessionFactory());
-      assertGraph(repositories, sourceName, sourceTip, graph.tag(), "source-v2");
-      assertGraph(repositories, survivingTarget, sourceTip, graph.tag(), "source-v2");
+      assertGraph(repositories, sourceName, SOURCE_HEAD, SOURCE_TAG, updated);
+      assertGraph(repositories, survivingTarget, TARGET_HEAD, TARGET_TAG, updated);
 
       RepositoryTransferResult retry =
           repositories.transfer(
               RepositoryTransferRequest.incrementalFetch(
                   sourceName,
                   survivingTarget,
-                  List.of(
-                      new RefTransferSpec(
-                          "refs/heads/main", "refs/heads/draft", graph.merge())),
+                  List.of(new RefTransferSpec(SOURCE_HEAD, TARGET_HEAD, graph.merge())),
                   TargetRefPolicy.COMPARE_AND_SET));
       assertTrue(retry.noOp());
       assertEquals(0, retry.objectsTransferred());
@@ -144,7 +168,7 @@ final class RepositoryTransferDatabaseContract {
 
       RepositoryDeletionResult deletedSource = repositories.deleteRepository(sourceName);
       assertTrue(deletedSource.deletedAnything());
-      assertGraph(repositories, survivingTarget, sourceTip, graph.tag(), "source-v2");
+      assertGraph(repositories, survivingTarget, TARGET_HEAD, TARGET_TAG, updated);
     }
 
     assertRepositoryRowsAbsent(database, sourceName);
@@ -155,7 +179,7 @@ final class RepositoryTransferDatabaseContract {
     try (HibernateSessionFactoryProvider provider = provider(database)) {
       DefaultHibernateRepositoryFactory repositories =
           new DefaultHibernateRepositoryFactory(provider.getSessionFactory());
-      assertGraph(repositories, survivingTarget, sourceTip, graph.tag(), "source-v2");
+      assertGraph(repositories, survivingTarget, TARGET_HEAD, TARGET_TAG, updated);
       RepositoryDeletionResult deletedTarget = repositories.deleteRepository(survivingTarget);
       assertTrue(deletedTarget.deletedAnything());
     }
@@ -171,8 +195,8 @@ final class RepositoryTransferDatabaseContract {
         source,
         target,
         List.of(
-            new RefTransferSpec("refs/heads/main", "refs/heads/draft"),
-            new RefTransferSpec("refs/tags/v1", "refs/tags/source-v1")));
+            new RefTransferSpec(SOURCE_HEAD, TARGET_HEAD),
+            new RefTransferSpec(SOURCE_TAG, TARGET_TAG)));
   }
 
   private static SourceGraph createSourceGraph(Repository source) throws Exception {
@@ -181,7 +205,7 @@ final class RepositoryTransferDatabaseContract {
     ObjectId side = createCommit(source, "side", "side.txt", "side", List.of(root));
     ObjectId merge =
         createCommit(source, "merge-v1", "merge.txt", "merge-v1", List.of(main, side));
-    updateRef(source, "refs/heads/main", ObjectId.zeroId(), merge);
+    updateRef(source, SOURCE_HEAD, ObjectId.zeroId(), merge);
 
     ObjectId tag;
     try (ObjectInserter inserter = source.newObjectInserter()) {
@@ -193,7 +217,7 @@ final class RepositoryTransferDatabaseContract {
       tag = inserter.insert(builder);
       inserter.flush();
     }
-    updateRef(source, "refs/tags/v1", ObjectId.zeroId(), tag);
+    updateRef(source, SOURCE_TAG, ObjectId.zeroId(), tag);
     return new SourceGraph(root, main, side, merge, tag);
   }
 
@@ -238,31 +262,50 @@ final class RepositoryTransferDatabaseContract {
   private static void assertGraph(
       DefaultHibernateRepositoryFactory repositories,
       RepositoryName repositoryName,
-      ObjectId expectedHead,
-      ObjectId expectedTag,
-      String expectedHeadMessage)
+      String headRefName,
+      String tagRefName,
+      GraphExpectation expected)
       throws Exception {
     try (HibernateGitStorage storage = repositories.open(repositoryName)) {
       Repository repository = storage.repository();
-      assertEquals(expectedHead, repository.exactRef("refs/heads/draft").getObjectId());
-      assertEquals(expectedTag, repository.exactRef("refs/tags/source-v1").getObjectId());
+      Ref headRef = repository.exactRef(headRefName);
+      Ref tagRef = repository.exactRef(tagRefName);
+      assertNotNull(headRef);
+      assertNotNull(tagRef);
+      assertEquals(expected.head(), headRef.getObjectId());
+      assertEquals(expected.tag(), tagRef.getObjectId());
+
       try (RevWalk walk = new RevWalk(repository)) {
-        RevCommit head = walk.parseCommit(expectedHead);
-        assertEquals(expectedHeadMessage, head.getFullMessage());
-        RevObject tagObject = walk.parseAny(expectedTag);
+        RevCommit head = walk.parseCommit(expected.head());
+        assertEquals(expected.headMessage(), head.getFullMessage());
+        assertEquals(expected.directParents().size(), head.getParentCount());
+        for (int index = 0; index < expected.directParents().size(); index++) {
+          assertEquals(expected.directParents().get(index), head.getParent(index).getId());
+        }
+
+        List<ObjectId> reachable = new ArrayList<>();
+        walk.markStart(head);
+        for (RevCommit commit : walk) {
+          reachable.add(commit.getId());
+        }
+        assertEquals(expected.reachableCommits(), reachable);
+      }
+
+      try (RevWalk walk = new RevWalk(repository)) {
+        RevObject tagObject = walk.parseAny(expected.tag());
         assertTrue(tagObject instanceof RevTag);
         RevTag tag = (RevTag) tagObject;
         walk.parseHeaders(tag);
-        assertEquals(tag.getObject().getId(), tag.getObject().getId());
+        assertEquals(expected.tagTarget(), tag.getObject().getId());
       }
+
       try (RevWalk walk = new RevWalk(repository)) {
-        RevCommit head = walk.parseCommit(expectedHead);
-        String path = "source-v2".equals(expectedHeadMessage) ? "source-v2.txt" : "merge.txt";
-        try (TreeWalk tree = TreeWalk.forPath(repository, path, head.getTree())) {
+        RevCommit head = walk.parseCommit(expected.head());
+        try (TreeWalk tree = TreeWalk.forPath(repository, expected.path(), head.getTree())) {
           assertNotNull(tree);
           ObjectLoader loader = repository.open(tree.getObjectId(0));
           assertEquals(
-              expectedHeadMessage,
+              expected.content(),
               new String(loader.getBytes(), StandardCharsets.UTF_8));
         }
       }
@@ -344,4 +387,20 @@ final class RepositoryTransferDatabaseContract {
 
   private record SourceGraph(
       ObjectId root, ObjectId main, ObjectId side, ObjectId merge, ObjectId tag) {}
+
+  private record GraphExpectation(
+      ObjectId head,
+      ObjectId tag,
+      ObjectId tagTarget,
+      List<ObjectId> directParents,
+      List<ObjectId> reachableCommits,
+      String headMessage,
+      String path,
+      String content) {
+
+    private GraphExpectation {
+      directParents = List.copyOf(directParents);
+      reachableCommits = List.copyOf(reachableCommits);
+    }
+  }
 }
