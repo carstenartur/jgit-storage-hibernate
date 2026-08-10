@@ -64,6 +64,13 @@
       "size": 9643
     },
     {
+      "path": "io/github/carstenartur/jgit-storage-hibernate-bom/0.10.0/jgit-storage-hibernate-bom-0.10.0.pom",
+      "sha1": "9dfb8b936ec6557fdee62cb261bfbea07d6b1446",
+      "sha256": "8853e6a33082956fae4e9b28ce0ff1d4c090256de0af666c9a3cea9b3c0adf0e",
+      "sha512": "616bc90186be75384ac42a4f0f0217f492f4406917c11e10be8620a67ec54192124de3edddb609670d120b586a67621c98e69bfb6ab2580ad41e261aa834519b",
+      "size": 1710
+    },
+    {
       "path": "io/github/carstenartur/jgit-storage-hibernate-core/0.10.0/jgit-storage-hibernate-core-0.10.0-javadoc.jar",
       "sha1": "0cb270f0f9d3c74854eb2f2375aa99301c167eac",
       "sha256": "e118b93dac6542cf022e1e5c375a20d36271458a2fca116d2660741222d4f992",
@@ -156,6 +163,10 @@
     }
   ],
   "groupId": "io.github.carstenartur",
+  "publicationProvenance": {
+    "integrityRepair": "Added the omitted BOM entry and strong checksum sidecars without changing artifact bytes.",
+    "originalPublicationCommit": "cb10885b107e4fac35f6ab56ff2d6ae81a13aae9"
+  },
   "removedVolatileFiles": [
     "io/github/carstenartur/jgit-storage-hibernate-architecture/0.10.0/jgit-storage-hibernate-architecture-0.10.0-javadoc.jar.md5",
     "io/github/carstenartur/jgit-storage-hibernate-architecture/0.10.0/jgit-storage-hibernate-architecture-0.10.0-sources.jar.md5",
@@ -187,6 +198,6 @@
     "io/github/carstenartur/jgit-storage-hibernate-search/0.10.0/jgit-storage-hibernate-search-0.10.0.pom.md5",
     "io/github/carstenartur/jgit-storage-hibernate-search/maven-metadata.xml.md5"
   ],
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "version": "0.10.0"
 }
