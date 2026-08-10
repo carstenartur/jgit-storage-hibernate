@@ -255,22 +255,24 @@ final class RepositoryTransferExecutor {
     }
     try (RevWalk walk = new RevWalk(target)) {
       for (PreparedRefTransfer prepared : preparedRefs) {
-        if (!prepared.changed()
-            || prepared.currentTargetObjectId().equals(ObjectId.zeroId())) {
+        if (!prepared.changed()) {
           continue;
         }
-        RevCommit oldCommit;
-        RevCommit newCommit;
-        try {
-          oldCommit = walk.parseCommit(prepared.currentTargetObjectId());
-          newCommit = walk.parseCommit(prepared.resolved().sourceObjectId());
-        } catch (IOException invalidCommitRef) {
-          throw new HibernateStorageException(
-              policy
-                  + " requires commit-valued refs: "
-                  + prepared.resolved().spec().targetRef(),
-              invalidCommitRef);
+        RevCommit newCommit =
+            requireCommit(
+                walk,
+                prepared.resolved().sourceObjectId(),
+                policy,
+                prepared.resolved().spec().targetRef());
+        if (prepared.currentTargetObjectId().equals(ObjectId.zeroId())) {
+          continue;
         }
+        RevCommit oldCommit =
+            requireCommit(
+                walk,
+                prepared.currentTargetObjectId(),
+                policy,
+                prepared.resolved().spec().targetRef());
         if (!walk.isMergedInto(oldCommit, newCommit)) {
           throw new HibernateStorageException(
               "Non-fast-forward transfer rejected for "
@@ -278,6 +280,16 @@ final class RepositoryTransferExecutor {
         }
       }
     }
+  }
+
+  private static RevCommit requireCommit(
+      RevWalk walk, ObjectId objectId, TargetRefPolicy policy, String targetRef) throws IOException {
+    RevObject object = walk.parseAny(objectId);
+    if (object instanceof RevCommit commit) {
+      return commit;
+    }
+    throw new HibernateStorageException(
+        policy + " requires commit-valued refs: " + targetRef + " points to " + object.name());
   }
 
   private static boolean publishRefs(
