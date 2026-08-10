@@ -132,9 +132,17 @@ The captured target IDs become each command's expected old IDs. Consequently, a 
 
 ## Failure and retry
 
-A failure before ref publication leaves no newly visible target history. If object persistence completed but a ref policy or atomic publication failed, unreachable target objects may remain. Repeating the request is safe: existing canonical objects are reused and the policy is evaluated again against the current target refs.
+A failure before ref publication leaves no newly visible target history.
 
-Deleting the target through `HibernateRepositoryFactory.deleteRepository(...)` removes both visible and unreachable target-owned storage.
+If an initial clone created its target during the failed operation, the factory deletes that target automatically after all storage handles have closed. The cleanup removes the repository lifecycle and lock rows together with refs, reflogs, packs, chunks and any unreachable objects. The source repository is never modified. A target that existed before the request is never deleted by transfer failure cleanup.
+
+An incremental transfer therefore keeps the existing target and its captured ref values when object copying, connectivity validation or atomic publication fails. Objects that were already flushed may remain unreachable in that target. Repeating the request is safe: canonical object IDs are reused, so a retry can publish the refs without retransmitting those objects.
+
+A concurrent target writer between validation and publication is protected by the captured old object IDs. The stale transfer fails instead of overwriting the concurrent value; a later caller may retry under `FAST_FORWARD_ONLY`, `COMPARE_AND_SET` or an explicit guarded `FORCE` policy.
+
+Deterministic H2 contracts inject failures immediately after object flush and immediately before ref publication. They verify initial-target cleanup, unchanged source and target refs, retained reusable objects for incremental retry, and rejection of a concurrent target update.
+
+Deleting an existing target through `HibernateRepositoryFactory.deleteRepository(...)` removes both visible and unreachable target-owned storage.
 
 ## Result and audit evidence
 
@@ -181,7 +189,7 @@ The implemented API provides bounded initial clone and incremental selected-ref 
 - shallow or partial clone semantics;
 - dedicated queryable Hibernate reflog rows for a multi-ref transfer;
 - application security/authorization or projection-completion hooks;
-- retained large-history, failure-injection and concurrent-writer/repack evidence;
+- retained large-history and concurrent transfer/repack performance evidence;
 - automatic consumer catalog or UI integration.
 
 See [ADR-0002](../adrs/0002-logical-repository-transfer.md) for the architecture and atomicity decision.
