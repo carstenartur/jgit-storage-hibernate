@@ -31,16 +31,26 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
 
   private final SessionFactory sessionFactory;
   private final List<RepositoryDeletionParticipant> deletionParticipants;
+  private final RepositoryTransferCheckpointHook transferCheckpointHook;
 
   public DefaultHibernateRepositoryFactory(SessionFactory sessionFactory) {
-    this(sessionFactory, List.of());
+    this(sessionFactory, List.of(), RepositoryTransferCheckpointHook.NONE);
   }
 
   public DefaultHibernateRepositoryFactory(
       SessionFactory sessionFactory,
       Collection<? extends RepositoryDeletionParticipant> deletionParticipants) {
+    this(sessionFactory, deletionParticipants, RepositoryTransferCheckpointHook.NONE);
+  }
+
+  DefaultHibernateRepositoryFactory(
+      SessionFactory sessionFactory,
+      Collection<? extends RepositoryDeletionParticipant> deletionParticipants,
+      RepositoryTransferCheckpointHook transferCheckpointHook) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     this.deletionParticipants = List.copyOf(deletionParticipants);
+    this.transferCheckpointHook =
+        Objects.requireNonNull(transferCheckpointHook, "transferCheckpointHook");
   }
 
   @Override
@@ -51,26 +61,43 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
   @Override
   public RepositoryTransferResult transfer(RepositoryTransferRequest request) {
     Objects.requireNonNull(request, "request");
+    boolean cleanupCreatedTarget = false;
+    RuntimeException transferFailure = null;
     try (HibernateGitStorage sourceStorage = openStorage(request.source(), false).storage()) {
       List<RepositoryTransferExecutor.ResolvedRefTransfer> resolvedRefs =
           RepositoryTransferExecutor.resolveSourceRefs(sourceStorage.repository(), request);
       boolean createTarget = request.mode() == RepositoryTransferMode.INITIAL_CLONE;
       OpenedStorage openedTarget = openStorage(request.target(), createTarget);
+      cleanupCreatedTarget = openedTarget.created();
       try (HibernateGitStorage targetStorage = openedTarget.storage()) {
-        return RepositoryTransferExecutor.transfer(
-            sourceStorage.repository(),
-            targetStorage.repository(),
-            request,
-            resolvedRefs,
-            openedTarget.created());
+        RepositoryTransferResult result =
+            RepositoryTransferExecutor.transfer(
+                sourceStorage.repository(),
+                targetStorage.repository(),
+                request,
+                resolvedRefs,
+                openedTarget.created(),
+                transferCheckpointHook);
+        cleanupCreatedTarget = false;
+        return result;
       }
     } catch (IOException exception) {
-      throw new HibernateStorageException(
-          "Could not transfer Git history from "
-              + request.source()
-              + " to "
-              + request.target(),
-          exception);
+      HibernateStorageException storageException =
+          new HibernateStorageException(
+              "Could not transfer Git history from "
+                  + request.source()
+                  + " to "
+                  + request.target(),
+              exception);
+      transferFailure = storageException;
+      throw storageException;
+    } catch (RuntimeException exception) {
+      transferFailure = exception;
+      throw exception;
+    } finally {
+      if (cleanupCreatedTarget) {
+        cleanupFailedInitialTarget(request.target(), transferFailure);
+      }
     }
   }
 
@@ -83,6 +110,18 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
       return deleteRepositoryData(repositoryName);
     } finally {
       releaseDeletion(scope, lifecycle);
+    }
+  }
+
+  private void cleanupFailedInitialTarget(
+      RepositoryName targetRepository, RuntimeException transferFailure) {
+    try {
+      deleteRepository(targetRepository);
+    } catch (RuntimeException cleanupFailure) {
+      if (transferFailure == null) {
+        throw cleanupFailure;
+      }
+      transferFailure.addSuppressed(cleanupFailure);
     }
   }
 
