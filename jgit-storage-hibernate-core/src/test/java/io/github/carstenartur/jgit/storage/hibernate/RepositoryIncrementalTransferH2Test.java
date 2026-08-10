@@ -139,6 +139,56 @@ class RepositoryIncrementalTransferH2Test {
   }
 
   @Test
+  void staleRefInMultiRefCasRequestPreventsEveryChangeAndObjectCopy() throws Exception {
+    ObjectId base;
+    try (HibernateGitStorage sourceStorage = factory.open(sourceName)) {
+      Repository source = sourceStorage.repository();
+      base = createCommit(source, "base", "base.txt", "base", List.of());
+      createRef(source, "refs/heads/main", base);
+      createRef(source, "refs/heads/release", base);
+    }
+    factory.transfer(
+        RepositoryTransferRequest.initialClone(
+            sourceName,
+            targetName,
+            List.of(
+                new RefTransferSpec("refs/heads/main", "refs/heads/draft"),
+                new RefTransferSpec("refs/heads/release", "refs/heads/release-track"))));
+
+    ObjectId mainTip;
+    ObjectId releaseTip;
+    try (HibernateGitStorage sourceStorage = factory.open(sourceName)) {
+      Repository source = sourceStorage.repository();
+      mainTip = createCommit(source, "main-tip", "main.txt", "main-v2", List.of(base));
+      releaseTip =
+          createCommit(source, "release-tip", "release.txt", "release-v2", List.of(base));
+      updateRef(source, "refs/heads/main", base, mainTip);
+      updateRef(source, "refs/heads/release", base, releaseTip);
+    }
+
+    RepositoryTransferRequest request =
+        RepositoryTransferRequest.incrementalFetch(
+            sourceName,
+            targetName,
+            List.of(
+                new RefTransferSpec("refs/heads/main", "refs/heads/draft", base),
+                new RefTransferSpec(
+                    "refs/heads/release",
+                    "refs/heads/release-track",
+                    ObjectId.fromString("2222222222222222222222222222222222222222"))),
+            TargetRefPolicy.COMPARE_AND_SET);
+
+    assertThrows(HibernateStorageException.class, () -> factory.transfer(request));
+    assertTargetRef("refs/heads/draft", base);
+    assertTargetRef("refs/heads/release-track", base);
+    try (HibernateGitStorage targetStorage = factory.open(targetName)) {
+      Repository target = targetStorage.repository();
+      assertFalse(target.getObjectDatabase().has(mainTip));
+      assertFalse(target.getObjectDatabase().has(releaseTip));
+    }
+  }
+
+  @Test
   void compareAndSetAdvancesFastForwardAndRetryIsIdempotent() throws Exception {
     ObjectId base = createSourceAndInitialClone();
     ObjectId sourceTip = createSourceChild(base, "source-tip", "source.txt", "source-v2");
