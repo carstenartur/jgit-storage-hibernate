@@ -45,27 +45,31 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
 
   @Override
   public HibernateGitStorage open(RepositoryName repositoryName) {
-    Objects.requireNonNull(repositoryName, "repositoryName");
-    RepositoryScope scope = new RepositoryScope(sessionFactory, repositoryName.value());
-    reserveOpenHandle(scope, repositoryName);
-    boolean handedOff = false;
-    try {
-      HibernateRepository repository =
-          HibernateRepository.create(sessionFactory, repositoryName.value());
-      if (!repository.exists()) {
-        repository.create(true);
+    return openStorage(repositoryName, true).storage();
+  }
+
+  @Override
+  public RepositoryTransferResult transfer(RepositoryTransferRequest request) {
+    Objects.requireNonNull(request, "request");
+    try (HibernateGitStorage sourceStorage = openStorage(request.source(), false).storage()) {
+      List<RepositoryTransferExecutor.ResolvedRefTransfer> resolvedRefs =
+          RepositoryTransferExecutor.resolveSourceRefs(sourceStorage.repository(), request);
+      OpenedStorage openedTarget = openStorage(request.target(), true);
+      try (HibernateGitStorage targetStorage = openedTarget.storage()) {
+        return RepositoryTransferExecutor.transfer(
+            sourceStorage.repository(),
+            targetStorage.repository(),
+            request,
+            resolvedRefs,
+            openedTarget.created());
       }
-      DefaultHibernateGitStorage storage =
-          new DefaultHibernateGitStorage(repository, () -> releaseOpenHandle(scope));
-      handedOff = true;
-      return storage;
     } catch (IOException exception) {
       throw new HibernateStorageException(
-          "Could not open Hibernate-backed repository " + repositoryName, exception);
-    } finally {
-      if (!handedOff) {
-        releaseOpenHandle(scope);
-      }
+          "Could not transfer Git history from "
+              + request.source()
+              + " to "
+              + request.target(),
+          exception);
     }
   }
 
@@ -78,6 +82,36 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
       return deleteRepositoryData(repositoryName);
     } finally {
       releaseDeletion(scope, lifecycle);
+    }
+  }
+
+  private OpenedStorage openStorage(RepositoryName repositoryName, boolean createIfMissing) {
+    Objects.requireNonNull(repositoryName, "repositoryName");
+    RepositoryScope scope = new RepositoryScope(sessionFactory, repositoryName.value());
+    reserveOpenHandle(scope, repositoryName);
+    boolean handedOff = false;
+    try {
+      HibernateRepository repository =
+          HibernateRepository.create(sessionFactory, repositoryName.value());
+      boolean exists = repository.exists();
+      if (!exists && !createIfMissing) {
+        repository.close();
+        throw new HibernateStorageException("Repository " + repositoryName + " does not exist");
+      }
+      if (!exists) {
+        repository.create(true);
+      }
+      DefaultHibernateGitStorage storage =
+          new DefaultHibernateGitStorage(repository, () -> releaseOpenHandle(scope));
+      handedOff = true;
+      return new OpenedStorage(storage, !exists);
+    } catch (IOException exception) {
+      throw new HibernateStorageException(
+          "Could not open Hibernate-backed repository " + repositoryName, exception);
+    } finally {
+      if (!handedOff) {
+        releaseOpenHandle(scope);
+      }
     }
   }
 
@@ -209,6 +243,8 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
           return current.openHandles == 0 ? null : current;
         });
   }
+
+  private record OpenedStorage(HibernateGitStorage storage, boolean created) {}
 
   private static final class RepositoryLifecycle {
     private int openHandles;
