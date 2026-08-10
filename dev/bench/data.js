@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786339634668,
+  "lastUpdate": 1786339653887,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -46143,6 +46143,1339 @@ window.BENCHMARK_DATA = {
             "name": "Hibernate Search segment count — paths-v1 / Lucene",
             "unit": "segments",
             "value": 7.333333333333333,
+            "range": 0.5773502691896257,
+            "extra": "Profile: paths-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          }
+        ],
+        "consumerEvidence": {
+          "audio-analyzer": {
+            "displayName": "audio-analyzer",
+            "repository": "carstenartur/audio-analyzer",
+            "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+            "defaultBranch": "master",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          }
+        }
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "e61329760cbd48309dd4e711eb5028903b1b7fe1",
+          "message": "Prepare development version 0.11.0-SNAPSHOT (#235)\n\nAdvance the reactor and software metadata to 0.11.0-SNAPSHOT after publishing 0.10.0. Keep the documented public release and dependency examples on 0.10.0, and make the focused PostgreSQL benchmark fail explicitly instead of silently skipping when Docker is unavailable.",
+          "timestamp": "2026-08-10T07:22:50+02:00",
+          "tree_id": "8a89b379d57631d9de82fe029d7b20c79835d749",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/e61329760cbd48309dd4e711eb5028903b1b7fe1"
+        },
+        "date": 1786339653887,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Hibernate Search SQL projection footprint — content-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 1122304.0,
+            "range": 0.0,
+            "extra": "Profile: content-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search SQL projection footprint — diff-hunks-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 303104.0,
+            "range": 0.0,
+            "extra": "Profile: diff-hunks-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search SQL projection footprint — metadata-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 212992.0,
+            "range": 0.0,
+            "extra": "Profile: metadata-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search SQL projection footprint — paths-v1 / PostgreSQL",
+            "unit": "bytes",
+            "value": 212992.0,
+            "range": 0.0,
+            "extra": "Profile: paths-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content quality — content-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: content-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 20\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content quality — diff-hunks-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: diff-hunks-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 20\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content quality — metadata-v1 / miss rate",
+            "unit": "miss %",
+            "value": 100.0,
+            "range": 0.0,
+            "extra": "Profile: metadata-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 0\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content quality — paths-v1 / miss rate",
+            "unit": "miss %",
+            "value": 100.0,
+            "range": 0.0,
+            "extra": "Profile: paths-v1\nExpected relevant hits within query limit: 20\nMean observed relevant hits per invocation: 0\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content query — content-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 17.471499333333334,
+            "range": 100.15459563797535,
+            "extra": "Profile: content-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content query — diff-hunks-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 15.937749666666667,
+            "range": 22.974984620777015,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content query — metadata-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 11.298630666666668,
+            "range": 61.446447352265274,
+            "extra": "Profile: metadata-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search content query — paths-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 9.557117,
+            "range": 30.708719814883864,
+            "extra": "Profile: paths-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — content-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 23.346198666666666,
+            "range": 51.559811485160985,
+            "extra": "Profile: content-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — content-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 17.162945666666666,
+            "range": 60.33998277412424,
+            "extra": "Profile: content-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — diff-hunks-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 19.40925466666667,
+            "range": 7.216715222515944,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — diff-hunks-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 16.704547333333334,
+            "range": 65.4530629687183,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — metadata-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 18.934255,
+            "range": 63.762848985775136,
+            "extra": "Profile: metadata-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — metadata-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 15.306405666666665,
+            "range": 10.414500461401861,
+            "extra": "Profile: metadata-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — paths-v1 / Entity hydration",
+            "unit": "ms/op",
+            "value": 18.298824,
+            "range": 34.80196912151106,
+            "extra": "Profile: paths-v1\nImplementation: Entity hydration\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search full-text query — paths-v1 / Lucene projection",
+            "unit": "ms/op",
+            "value": 17.033893666666668,
+            "range": 36.95880709986443,
+            "extra": "Profile: paths-v1\nImplementation: Lucene projection\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search index footprint — content-v1 / Lucene",
+            "unit": "bytes",
+            "value": 232584.0,
+            "range": 674.238088511766,
+            "extra": "Profile: content-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search index footprint — diff-hunks-v1 / Lucene",
+            "unit": "bytes",
+            "value": 89343.66666666667,
+            "range": 12697.192379944998,
+            "extra": "Profile: diff-hunks-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search index footprint — metadata-v1 / Lucene",
+            "unit": "bytes",
+            "value": 77800.0,
+            "range": 4204.269615521821,
+            "extra": "Profile: metadata-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search index footprint — paths-v1 / Lucene",
+            "unit": "bytes",
+            "value": 81905.66666666667,
+            "range": 4822.748628462127,
+            "extra": "Profile: paths-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search indexing — content-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 224.31329933333333,
+            "range": 872.8949587507725,
+            "extra": "Profile: content-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search indexing — diff-hunks-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 181.31662433333335,
+            "range": 531.9379138762084,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search indexing — metadata-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 160.863595,
+            "range": 370.23147845579683,
+            "extra": "Profile: metadata-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search indexing — paths-v1 / Batched incremental indexing",
+            "unit": "ms/op",
+            "value": 161.89939566666666,
+            "range": 442.5551420440655,
+            "extra": "Profile: paths-v1\nImplementation: Batched incremental indexing\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path quality — content-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: content-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 50\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path quality — diff-hunks-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: diff-hunks-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 50\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path quality — metadata-v1 / miss rate",
+            "unit": "miss %",
+            "value": 100.0,
+            "range": 0.0,
+            "extra": "Profile: metadata-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 0\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path quality — paths-v1 / miss rate",
+            "unit": "miss %",
+            "value": 0.0,
+            "range": 0.0,
+            "extra": "Profile: paths-v1\nExpected relevant hits within query limit: 50\nMean observed relevant hits per invocation: 50\nObserved result-count standard deviation: 0\n0% miss is best; reduced-content profiles may intentionally trade recall for cost",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — content-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 20.413462666666664,
+            "range": 74.09300647402831,
+            "extra": "Profile: content-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — content-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 7.539649333333333,
+            "range": 13.29737499217993,
+            "extra": "Profile: content-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — diff-hunks-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 23.382459333333333,
+            "range": 91.80172260848192,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — diff-hunks-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 7.294041,
+            "range": 6.609487415790587,
+            "extra": "Profile: diff-hunks-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — metadata-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 12.495403666666668,
+            "range": 51.93126023175143,
+            "extra": "Profile: metadata-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — metadata-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 4.390319000000001,
+            "range": 8.585861216706745,
+            "extra": "Profile: metadata-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — paths-v1 / Lucene analyzed terms",
+            "unit": "ms/op",
+            "value": 20.724858666666666,
+            "range": 88.15204527032104,
+            "extra": "Profile: paths-v1\nImplementation: Lucene analyzed terms\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search path query — paths-v1 / SQL literal fragment",
+            "unit": "ms/op",
+            "value": 7.093086333333333,
+            "range": 20.459215722166128,
+            "extra": "Profile: paths-v1\nImplementation: SQL literal fragment\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search rebuild — content-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 215.57032233333334,
+            "range": 827.5569929477145,
+            "extra": "Profile: content-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search rebuild — diff-hunks-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 140.0328066666667,
+            "range": 351.37901642993444,
+            "extra": "Profile: diff-hunks-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search rebuild — metadata-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 144.96943366666667,
+            "range": 506.150491503557,
+            "extra": "Profile: metadata-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search rebuild — paths-v1 / Bounded purge + batched rebuild",
+            "unit": "ms/op",
+            "value": 147.63224833333334,
+            "range": 640.6931162735556,
+            "extra": "Profile: paths-v1\nImplementation: Bounded purge + batched rebuild\nCommits: 100\nQuery limit: 50\nJDK: 21.0.11\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search segment count — content-v1 / Lucene",
+            "unit": "segments",
+            "value": 8.0,
+            "range": 0.0,
+            "extra": "Profile: content-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search segment count — diff-hunks-v1 / Lucene",
+            "unit": "segments",
+            "value": 7.0,
+            "range": 1.7320508075688772,
+            "extra": "Profile: diff-hunks-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search segment count — metadata-v1 / Lucene",
+            "unit": "segments",
+            "value": 7.666666666666667,
+            "range": 0.5773502691896257,
+            "extra": "Profile: metadata-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
+            "consumers": [
+              "audio-analyzer"
+            ],
+            "contract": "search-projection-index-query-rebuild",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search segment count — paths-v1 / Lucene",
+            "unit": "segments",
+            "value": 7.666666666666667,
             "range": 0.5773502691896257,
             "extra": "Profile: paths-v1\nCommits: 100\nPer-invocation mean from JMH AuxCounters rawData after a complete PostgreSQL + local-filesystem Lucene projection rebuild",
             "consumers": [
