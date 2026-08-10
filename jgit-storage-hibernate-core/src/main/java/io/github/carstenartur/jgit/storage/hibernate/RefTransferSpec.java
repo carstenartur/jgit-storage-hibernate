@@ -18,7 +18,8 @@ import org.eclipse.jgit.lib.Repository;
  *
  * @param sourceRef fully qualified source ref under {@code refs/heads/} or {@code refs/tags/}
  * @param targetRef fully qualified target ref under {@code refs/heads/} or {@code refs/tags/}
- * @param expectedTargetObjectId expected current target ID for compare-and-set transfers, or null
+ * @param expectedTargetObjectId required current target ID for compare-and-set, optional stale-writer
+ *     guard for force, or null for create-only and fast-forward-only transfers
  */
 public record RefTransferSpec(
     String sourceRef, String targetRef, ObjectId expectedTargetObjectId) {
