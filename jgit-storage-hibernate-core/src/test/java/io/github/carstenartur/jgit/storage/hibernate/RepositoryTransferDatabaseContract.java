@@ -18,9 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
 import org.eclipse.jgit.internal.storage.dfs.DfsBlockCacheConfig;
@@ -88,7 +89,7 @@ final class RepositoryTransferDatabaseContract {
             graph.tag(),
             graph.merge(),
             List.of(graph.main(), graph.side()),
-            List.of(graph.merge(), graph.main(), graph.side(), graph.root()),
+            Set.of(graph.merge(), graph.main(), graph.side(), graph.root()),
             "merge-v1",
             "merge.txt",
             "merge-v1");
@@ -139,7 +140,7 @@ final class RepositoryTransferDatabaseContract {
             graph.tag(),
             graph.merge(),
             List.of(graph.merge()),
-            List.of(sourceTip, graph.merge(), graph.main(), graph.side(), graph.root()),
+            Set.of(sourceTip, graph.merge(), graph.main(), graph.side(), graph.root()),
             "source-v2",
             "source-v2.txt",
             "source-v2");
@@ -283,7 +284,7 @@ final class RepositoryTransferDatabaseContract {
           assertEquals(expected.directParents().get(index), head.getParent(index).getId());
         }
 
-        List<ObjectId> reachable = new ArrayList<>();
+        Set<ObjectId> reachable = new HashSet<>();
         walk.markStart(head);
         for (RevCommit commit : walk) {
           reachable.add(commit.getId());
@@ -393,14 +394,14 @@ final class RepositoryTransferDatabaseContract {
       ObjectId tag,
       ObjectId tagTarget,
       List<ObjectId> directParents,
-      List<ObjectId> reachableCommits,
+      Set<ObjectId> reachableCommits,
       String headMessage,
       String path,
       String content) {
 
     private GraphExpectation {
       directParents = List.copyOf(directParents);
-      reachableCommits = List.copyOf(reachableCommits);
+      reachableCommits = Set.copyOf(reachableCommits);
     }
   }
 }
