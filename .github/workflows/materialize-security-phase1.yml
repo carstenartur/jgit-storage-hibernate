@@ -43,6 +43,39 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          matches = list(
+              Path("jgit-storage-hibernate-security/src/test/java").rglob(
+                  "AuthorizationPersistenceServiceH2Test.java"
+              )
+          )
+          if len(matches) != 1:
+              raise SystemExit(
+                  f"Expected one AuthorizationPersistenceServiceH2Test.java, found {len(matches)}"
+              )
+
+          path = matches[0]
+          text = path.read_text(encoding="utf-8")
+          literal = '"PRINCIPAL"'
+          if text.count(literal) != 2:
+              raise SystemExit(
+                  "Expected exactly two legacy PRINCIPAL string fixtures before typed migration"
+              )
+
+          import_line = (
+              "import io.github.carstenartur.jgit.storage.hibernate.security.model."
+              "SecuritySubjectType;"
+          )
+          if import_line not in text:
+              package_start = text.index("package ")
+              package_end = text.index(";\n", package_start) + 2
+              text = text[:package_end] + "\n" + import_line + "\n" + text[package_end:]
+
+          text = text.replace(literal, "SecuritySubjectType.PRINCIPAL")
+          path.write_text(text, encoding="utf-8")
+          PY
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
           rm -f .github/workflows/materialize-security-phase1.yml
