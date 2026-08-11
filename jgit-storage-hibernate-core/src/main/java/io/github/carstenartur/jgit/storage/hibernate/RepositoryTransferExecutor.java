@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -62,6 +63,24 @@ final class RepositoryTransferExecutor {
       List<ResolvedRefTransfer> resolvedRefs,
       boolean targetCreated)
       throws IOException {
+    return transfer(
+        source,
+        target,
+        request,
+        resolvedRefs,
+        targetCreated,
+        RepositoryTransferCheckpointHook.NONE);
+  }
+
+  static RepositoryTransferResult transfer(
+      Repository source,
+      Repository target,
+      RepositoryTransferRequest request,
+      List<ResolvedRefTransfer> resolvedRefs,
+      boolean targetCreated,
+      RepositoryTransferCheckpointHook checkpointHook)
+      throws IOException {
+    Objects.requireNonNull(checkpointHook, "checkpointHook");
     List<Ref> targetRefs = target.getRefDatabase().getRefsByPrefix(Constants.R_REFS);
     if (request.mode() == RepositoryTransferMode.INITIAL_CLONE && !targetRefs.isEmpty()) {
       throw new HibernateStorageException(
@@ -69,11 +88,30 @@ final class RepositoryTransferExecutor {
     }
 
     List<PreparedRefTransfer> preparedRefs = prepareTargetRefs(target, request, resolvedRefs);
+    checkpointHook.reached(
+        RepositoryTransferCheckpointHook.Phase.TARGET_REFS_PREPARED,
+        source,
+        target,
+        request);
+
     TransferCounters counters = copyReachableObjects(source, target, resolvedRefs, targetRefs);
+    checkpointHook.reached(
+        RepositoryTransferCheckpointHook.Phase.OBJECTS_FLUSHED, source, target, request);
+
     if (request.verifyConnectivity()) {
       verifyConnectivity(target, resolvedRefs);
     }
     validateFastForwards(target, request.targetRefPolicy(), preparedRefs);
+    checkpointHook.reached(
+        RepositoryTransferCheckpointHook.Phase.PRECONDITIONS_VALIDATED,
+        source,
+        target,
+        request);
+    checkpointHook.reached(
+        RepositoryTransferCheckpointHook.Phase.BEFORE_REF_PUBLICATION,
+        source,
+        target,
+        request);
     boolean refsChanged = publishRefs(target, request, preparedRefs);
 
     Map<String, RefTransferResult> refResults = new LinkedHashMap<>();
