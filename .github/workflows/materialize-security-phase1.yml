@@ -63,7 +63,7 @@ jobs:
 
       - name: Test the Security module and its required reactor
         shell: bash
-        run: ./mvnw -B -ntp -pl jgit-storage-hibernate-security -am test
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am test
 
       - name: Commit the reviewable source tree
         shell: bash
