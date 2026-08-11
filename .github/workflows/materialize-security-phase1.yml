@@ -136,22 +136,29 @@ jobs:
                   f"Ordered membership migration after principal/group tables for {path.parent.name}"
               )
 
-          member_entities = list(
-              Path("jgit-storage-hibernate-security/src/main/java").rglob(
-                  "SecurityGroupMember.java"
-              )
-          )
+          member_entities: list[tuple[Path, str]] = []
+          for candidate in Path(
+              "jgit-storage-hibernate-security/src/main/java"
+          ).rglob("*.java"):
+              source = candidate.read_text(encoding="utf-8")
+              if "git_security_group_member" in source and "@Entity" in source:
+                  member_entities.append((candidate, source))
+
           if len(member_entities) != 1:
               raise SystemExit(
-                  f"Expected one SecurityGroupMember entity, found {member_entities}"
+                  "Expected one entity mapped to git_security_group_member, found "
+                  f"{[str(path) for path, _ in member_entities]}"
               )
-          member_entity = member_entities[0]
-          member_source = member_entity.read_text(encoding="utf-8")
+
+          member_entity, member_source = member_entities[0]
           integer_occurrences = len(re.findall(r"\bInteger\b", member_source))
           if integer_occurrences == 0:
               raise SystemExit(
                   f"Expected an Integer identity in {member_entity} before BIGINT alignment"
               )
+          if "id" not in member_source:
+              raise SystemExit(f"Membership entity has no id property: {member_entity}")
+
           member_source = re.sub(r"\bInteger\b", "Long", member_source)
           member_entity.write_text(member_source, encoding="utf-8")
           print(
