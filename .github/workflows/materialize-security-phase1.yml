@@ -46,14 +46,10 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          matches = list(
-              Path("jgit-storage-hibernate-security/src/test/java").rglob(
-                  "AuthorizationPersistenceServiceH2Test.java"
-              )
-          )
+          matches = list(Path(".").rglob("AuthorizationPersistenceServiceH2Test.java"))
           if len(matches) != 1:
               raise SystemExit(
-                  f"Expected one AuthorizationPersistenceServiceH2Test.java, found {len(matches)}"
+                  f"Expected one AuthorizationPersistenceServiceH2Test.java, found {len(matches)}: {matches}"
               )
 
           path = matches[0]
@@ -75,6 +71,7 @@ jobs:
 
           text = text.replace(literal, "SecuritySubjectType.PRINCIPAL")
           path.write_text(text, encoding="utf-8")
+          print(f"Migrated typed subject fixtures in {path}")
           PY
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
