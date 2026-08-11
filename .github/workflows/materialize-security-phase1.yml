@@ -1,4 +1,4 @@
-name: Diagnose Security Phase 1 Schema
+name: Verify Security Phase 1 Source
 
 on:
   push:
@@ -12,20 +12,19 @@ permissions:
   contents: read
 
 jobs:
-  diagnose:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: feature/security-phase-1
-      - name: Set up JDK 21
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Materialize, move the membership block losslessly, and inspect
+      - name: Materialize the complete source archive
         shell: bash
         run: |
           set -euo pipefail
@@ -38,30 +37,34 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
+      - name: Move membership tables behind their referenced parents without rewriting SQL
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import re
 
-          root = Path("jgit-storage-hibernate-security")
-          migration_root = root / "src/main/resources/db/migration/jgit-storage-hibernate/security"
-          starts_member = re.compile(
+          root = Path(
+              "jgit-storage-hibernate-security/src/main/resources/db/migration/"
+              "jgit-storage-hibernate/security"
+          )
+          start_member = re.compile(
               r'^\s*create\s+table\s+(?:\[|\")?git_security_group_member(?:\]|\")?\s*\(',
               re.IGNORECASE,
           )
-          starts_parent = {
-              "principal": re.compile(
-                  r'^\s*create\s+table\s+(?:\[|\")?git_security_principal(?:\]|\")?\s*\(',
-                  re.IGNORECASE,
-              ),
-              "group": re.compile(
-                  r'^\s*create\s+table\s+(?:\[|\")?git_security_group(?:\]|\")?\s*\(',
-                  re.IGNORECASE,
-              ),
-          }
+          start_principal = re.compile(
+              r'^\s*create\s+table\s+(?:\[|\")?git_security_principal(?:\]|\")?\s*\(',
+              re.IGNORECASE,
+          )
+          start_group = re.compile(
+              r'^\s*create\s+table\s+(?:\[|\")?git_security_group(?:\]|\")?\s*\(',
+              re.IGNORECASE,
+          )
 
-          def move_member_table(path: Path) -> str:
+          for path in sorted(root.glob("*/V0_11_0__create_security_schema.sql")):
               lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-              starts = [i for i, line in enumerate(lines) if starts_member.search(line)]
+              starts = [i for i, line in enumerate(lines) if start_member.search(line)]
               if len(starts) != 1:
                   raise SystemExit(f"Expected one membership table in {path}, found {starts}")
               start = starts[0]
@@ -73,7 +76,7 @@ jobs:
                           end += 1
                       break
               if end is None:
-                  raise SystemExit(f"Membership table terminator not found in {path}")
+                  raise SystemExit(f"No membership table terminator in {path}")
               block = lines[start:end]
               remaining = lines[:start] + lines[end:]
               while remaining and not remaining[-1].strip():
@@ -81,59 +84,39 @@ jobs:
               transformed = "".join(remaining) + "\n\n" + "".join(block).lstrip()
               if not transformed.endswith("\n"):
                   transformed += "\n"
-              path.write_text(transformed, encoding="utf-8")
-              return "".join(block)
-
-          for path in sorted(migration_root.glob("*/V0_11_0__create_security_schema.sql")):
-              block = move_member_table(path)
-              text = path.read_text(encoding="utf-8")
-              member_pos = next(
-                  (i for i, line in enumerate(text.splitlines()) if starts_member.search(line)),
-                  -1,
-              )
-              parent_positions = {
-                  name: next(
-                      (i for i, line in enumerate(text.splitlines()) if pattern.search(line)),
-                      -1,
-                  )
-                  for name, pattern in starts_parent.items()
+              transformed_lines = transformed.splitlines()
+              positions = {
+                  "principal": next((i for i, line in enumerate(transformed_lines) if start_principal.search(line)), -1),
+                  "group": next((i for i, line in enumerate(transformed_lines) if start_group.search(line)), -1),
+                  "membership": next((i for i, line in enumerate(transformed_lines) if start_member.search(line)), -1),
               }
-              if member_pos < 0 or any(pos < 0 for pos in parent_positions.values()):
-                  raise SystemExit(
-                      f"Could not verify transformed table order in {path}: "
-                      f"parents={parent_positions}, member={member_pos}"
-                  )
-              if not all(pos < member_pos for pos in parent_positions.values()):
-                  raise SystemExit(
-                      f"Membership table still precedes a parent in {path}: "
-                      f"parents={parent_positions}, member={member_pos}"
-                  )
-              if "membership_id" not in block:
+              if min(positions.values()) < 0 or not (
+                  positions["principal"] < positions["membership"]
+                  and positions["group"] < positions["membership"]
+              ):
+                  raise SystemExit(f"Invalid transformed order in {path}: {positions}")
+              if "membership_id" not in "".join(block):
                   raise SystemExit(f"membership_id was lost from {path}")
-              print(f"=== TRANSFORMED MEMBERSHIP BLOCK: {path} ===")
-              print(block)
+              path.write_text(transformed, encoding="utf-8")
+              print(f"Verified lossless membership ordering for {path.parent.name}: {positions}")
 
-          print("=== SECURITY ENTITIES REGISTRY ===")
-          for path in sorted((root / "src/main/java").rglob("SecurityEntities.java")):
-              print(f"--- {path} ---")
-              print(path.read_text(encoding="utf-8"))
-
-          print("=== SECURITY H2 MIGRATION TEST ===")
-          for path in sorted((root / "src/test/java").rglob("SecuritySchemaMigrationH2Test.java")):
-              print(f"--- {path} ---")
-              print(path.read_text(encoding="utf-8"))
-
-          print("=== ALL TABLE MAPPINGS ===")
-          for path in sorted((root / "src/main/java").rglob("*.java")):
+          print("Generated security test sources:")
+          for path in sorted(Path("jgit-storage-hibernate-security/src/test/java").rglob("*.java")):
               text = path.read_text(encoding="utf-8")
-              if "@Table" in text:
-                  table = re.search(r'@Table\s*\(\s*name\s*=\s*"([^"]+)"', text, re.DOTALL)
-                  ids = re.findall(
-                      r'@Id(?s:.*?)@Column\s*\(\s*name\s*=\s*"([^"]+)"(?s:.*?)(?:private|protected|public)\s+([\w<>?]+)\s+([\w$]+)',
-                      text,
-                  )
-                  print(path, "table=", table.group(1) if table else "?", "ids=", ids)
+              classes = re.findall(r'\bclass\s+(\w+)', text)
+              tests = re.findall(r'\bvoid\s+(\w+)\s*\(', text)
+              print(path, "classes=", classes, "methods=", tests)
           PY
-      - name: Run only the H2 security migration test
+      - name: Verify architecture and security policy
         shell: bash
-        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am -Dtest=SecuritySchemaMigrationH2Test -Dsurefire.failIfNoSpecifiedTests=false test
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_verify_module_boundaries.py
+          python3 .github/scripts/verify-module-boundaries.py \
+            --root . \
+            --json target/module-boundaries/security-phase1.json \
+            --markdown target/module-boundaries/security-phase1.md
+          python3 .github/scripts/verify-security-policy.py
+      - name: Run the complete Security reactor tests
+        shell: bash
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am test
