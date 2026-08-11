@@ -1,0 +1,69 @@
+name: Materialize Security Phase 1
+
+on:
+  push:
+    branches:
+      - feature/security-phase-1
+    paths:
+      - .github/workflows/materialize-security-phase1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    name: Generate reviewed security module
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feature/security-phase-1
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Materialize reviewed source and remove bootstrap payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/generate-security-phase1.py
+          rm -f .github/scripts/generate-security-phase1.py
+          rm -f .github/scripts/security-phase1-module.b64*
+          rm -f .github/workflows/materialize-security-phase1.yml
+          if find .github/scripts -maxdepth 1 -name 'security-phase1-module.b64*' -print -quit | grep -q .; then
+            echo 'Security bootstrap payload remains after generation' >&2
+            exit 1
+          fi
+
+      - name: Verify optional-module boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_verify_module_boundaries.py
+          python3 .github/scripts/verify-module-boundaries.py \
+            --root . \
+            --json target/module-boundaries/security-phase1.json \
+            --markdown target/module-boundaries/security-phase1.md
+
+      - name: Test the Security module and its required reactor
+        shell: bash
+        run: ./mvnw -B -ntp -pl jgit-storage-hibernate-security -am test
+
+      - name: Commit the reviewable source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Carsten Hammer'
+          git config user.email 'carsten.hammer@t-online.de'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Add optional security persistence and evaluator'
+          git push origin HEAD:feature/security-phase-1
