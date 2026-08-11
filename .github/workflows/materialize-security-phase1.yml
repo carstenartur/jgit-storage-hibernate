@@ -1,4 +1,4 @@
-name: Inspect Security Phase 1 Membership Schema
+name: Diagnose Security Phase 1 Schema
 
 on:
   push:
@@ -12,13 +12,20 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  diagnose:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: feature/security-phase-1
-      - name: Materialize and print membership contracts
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Materialize, move the membership block losslessly, and inspect
         shell: bash
         run: |
           set -euo pipefail
@@ -36,30 +43,97 @@ jobs:
           import re
 
           root = Path("jgit-storage-hibernate-security")
-          print("=== ENTITY FILES REFERENCING git_security_group_member ===")
-          for path in sorted((root / "src/main/java").rglob("*.java")):
-              text = path.read_text(encoding="utf-8")
-              if "git_security_group_member" in text or "membership_id" in text:
-                  print(f"--- {path} ---")
-                  print(text)
+          migration_root = root / "src/main/resources/db/migration/jgit-storage-hibernate/security"
+          starts_member = re.compile(
+              r'^\s*create\s+table\s+(?:\[|\")?git_security_group_member(?:\]|\")?\s*\(',
+              re.IGNORECASE,
+          )
+          starts_parent = {
+              "principal": re.compile(
+                  r'^\s*create\s+table\s+(?:\[|\")?git_security_principal(?:\]|\")?\s*\(',
+                  re.IGNORECASE,
+              ),
+              "group": re.compile(
+                  r'^\s*create\s+table\s+(?:\[|\")?git_security_group(?:\]|\")?\s*\(',
+                  re.IGNORECASE,
+              ),
+          }
 
-          print("=== ENTITY FILES WITH @Id AND NUMERIC id ===")
-          for path in sorted((root / "src/main/java").rglob("*.java")):
-              text = path.read_text(encoding="utf-8")
-              if "@Id" in text and re.search(r"\b(?:int|Integer|long|Long)\s+id\b", text):
-                  print(f"--- {path} ---")
-                  print(text)
+          def move_member_table(path: Path) -> str:
+              lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+              starts = [i for i, line in enumerate(lines) if starts_member.search(line)]
+              if len(starts) != 1:
+                  raise SystemExit(f"Expected one membership table in {path}, found {starts}")
+              start = starts[0]
+              end = None
+              for i in range(start + 1, len(lines)):
+                  if lines[i].strip() == ");":
+                      end = i + 1
+                      if end < len(lines) and lines[end].strip().upper() == "GO":
+                          end += 1
+                      break
+              if end is None:
+                  raise SystemExit(f"Membership table terminator not found in {path}")
+              block = lines[start:end]
+              remaining = lines[:start] + lines[end:]
+              while remaining and not remaining[-1].strip():
+                  remaining.pop()
+              transformed = "".join(remaining) + "\n\n" + "".join(block).lstrip()
+              if not transformed.endswith("\n"):
+                  transformed += "\n"
+              path.write_text(transformed, encoding="utf-8")
+              return "".join(block)
 
-          print("=== MEMBERSHIP TABLE BLOCKS ===")
-          for path in sorted((root / "src/main/resources/db/migration").rglob("V0_11_0__create_security_schema.sql")):
+          for path in sorted(migration_root.glob("*/V0_11_0__create_security_schema.sql")):
+              block = move_member_table(path)
               text = path.read_text(encoding="utf-8")
-              match = re.search(
-                  r"(?is)create\s+table\s+(?:\[|\")?git_security_group_member(?:\]|\")?\s*\(.*?\);",
-                  text,
+              member_pos = next(
+                  (i for i, line in enumerate(text.splitlines()) if starts_member.search(line)),
+                  -1,
               )
+              parent_positions = {
+                  name: next(
+                      (i for i, line in enumerate(text.splitlines()) if pattern.search(line)),
+                      -1,
+                  )
+                  for name, pattern in starts_parent.items()
+              }
+              if member_pos < 0 or any(pos < 0 for pos in parent_positions.values()):
+                  raise SystemExit(
+                      f"Could not verify transformed table order in {path}: "
+                      f"parents={parent_positions}, member={member_pos}"
+                  )
+              if not all(pos < member_pos for pos in parent_positions.values()):
+                  raise SystemExit(
+                      f"Membership table still precedes a parent in {path}: "
+                      f"parents={parent_positions}, member={member_pos}"
+                  )
+              if "membership_id" not in block:
+                  raise SystemExit(f"membership_id was lost from {path}")
+              print(f"=== TRANSFORMED MEMBERSHIP BLOCK: {path} ===")
+              print(block)
+
+          print("=== SECURITY ENTITIES REGISTRY ===")
+          for path in sorted((root / "src/main/java").rglob("SecurityEntities.java")):
               print(f"--- {path} ---")
-              print(match.group(0) if match else "<membership table not matched>")
-              for line in text.splitlines():
-                  if "git_security_group_member" in line or re.search(r"\bmembership_id\b|\bid\b", line, re.I):
-                      print("LINE:", line)
+              print(path.read_text(encoding="utf-8"))
+
+          print("=== SECURITY H2 MIGRATION TEST ===")
+          for path in sorted((root / "src/test/java").rglob("SecuritySchemaMigrationH2Test.java")):
+              print(f"--- {path} ---")
+              print(path.read_text(encoding="utf-8"))
+
+          print("=== ALL TABLE MAPPINGS ===")
+          for path in sorted((root / "src/main/java").rglob("*.java")):
+              text = path.read_text(encoding="utf-8")
+              if "@Table" in text:
+                  table = re.search(r'@Table\s*\(\s*name\s*=\s*"([^"]+)"', text, re.DOTALL)
+                  ids = re.findall(
+                      r'@Id(?s:.*?)@Column\s*\(\s*name\s*=\s*"([^"]+)"(?s:.*?)(?:private|protected|public)\s+([\w<>?]+)\s+([\w$]+)',
+                      text,
+                  )
+                  print(path, "table=", table.group(1) if table else "?", "ids=", ids)
           PY
+      - name: Run only the H2 security migration test
+        shell: bash
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am -Dtest=SecuritySchemaMigrationH2Test -Dsurefire.failIfNoSpecifiedTests=false test
