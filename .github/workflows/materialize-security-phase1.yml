@@ -34,6 +34,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cat \
+            .github/scripts/security-phase1-module.b64.part-00-0 \
+            .github/scripts/security-phase1-module.b64.part-00-1 \
+            .github/scripts/security-phase1-module.b64.part-01 \
+            .github/scripts/security-phase1-module.b64.part-02 \
+            .github/scripts/security-phase1-module.b64.part-03 \
+            .github/scripts/security-phase1-module.b64.part-04 \
+            > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
