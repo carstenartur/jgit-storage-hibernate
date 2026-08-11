@@ -45,7 +45,6 @@ jobs:
           python3 .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
-          rm -f .github/workflows/materialize-security-phase1.yml
           if find .github/scripts -maxdepth 1 -name 'security-phase1-module.b64*' -print -quit | grep -q .; then
             echo 'Security bootstrap payload remains after generation' >&2
             exit 1
