@@ -43,23 +43,26 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
+          find . -type f -path '*security*' -print | sort
           python3 - <<'PY'
           from pathlib import Path
 
-          matches = list(Path(".").rglob("AuthorizationPersistenceServiceH2Test.java"))
-          if len(matches) != 1:
+          candidates = []
+          for path in Path(".").rglob("*.java"):
+              text = path.read_text(encoding="utf-8")
+              count = text.count('"PRINCIPAL"')
+              if count:
+                  print(f"Found {count} PRINCIPAL string fixture(s) in {path}")
+              if count == 2 and "AuthorizationPersistenceService" in text:
+                  candidates.append((path, text))
+
+          if len(candidates) != 1:
               raise SystemExit(
-                  f"Expected one AuthorizationPersistenceServiceH2Test.java, found {len(matches)}: {matches}"
+                  f"Expected one persistence test with two legacy PRINCIPAL fixtures, found "
+                  f"{[str(path) for path, _ in candidates]}"
               )
 
-          path = matches[0]
-          text = path.read_text(encoding="utf-8")
-          literal = '"PRINCIPAL"'
-          if text.count(literal) != 2:
-              raise SystemExit(
-                  "Expected exactly two legacy PRINCIPAL string fixtures before typed migration"
-              )
-
+          path, text = candidates[0]
           import_line = (
               "import io.github.carstenartur.jgit.storage.hibernate.security.model."
               "SecuritySubjectType;"
@@ -69,7 +72,7 @@ jobs:
               package_end = text.index(";\n", package_start) + 2
               text = text[:package_end] + "\n" + import_line + "\n" + text[package_end:]
 
-          text = text.replace(literal, "SecuritySubjectType.PRINCIPAL")
+          text = text.replace('"PRINCIPAL"', "SecuritySubjectType.PRINCIPAL")
           path.write_text(text, encoding="utf-8")
           print(f"Migrated typed subject fixtures in {path}")
           PY
