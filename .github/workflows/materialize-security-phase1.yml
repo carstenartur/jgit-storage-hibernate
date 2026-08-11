@@ -151,10 +151,45 @@ jobs:
               )
 
           member_entity, member_source = member_entities[0]
+          id_position = member_source.find("@Id")
+          if id_position < 0:
+              raise SystemExit(f"Membership entity has no @Id mapping: {member_entity}")
+
+          field_match = re.search(
+              r"(?s)(@Id\b.{0,600}?\b(?:private|protected|public)\s+)"
+              r"(int|Integer)(\s+([A-Za-z_$][\w$]*)\s*;)",
+              member_source,
+          )
+          getter_match = re.search(
+              r"(?s)(@Id\b.{0,600}?\b(?:private|protected|public)\s+)"
+              r"(int|Integer)(\s+(get[A-Za-z_$][\w$]*)\s*\()",
+              member_source,
+          )
+
+          tracked_tokens: set[str]
+          if field_match is not None:
+              property_name = field_match.group(4)
+              capitalized = property_name[:1].upper() + property_name[1:]
+              tracked_tokens = {
+                  property_name,
+                  "get" + capitalized,
+                  "set" + capitalized,
+              }
+          elif getter_match is not None:
+              getter_name = getter_match.group(4)
+              suffix = getter_name[3:]
+              property_name = suffix[:1].lower() + suffix[1:]
+              tracked_tokens = {property_name, getter_name, "set" + suffix}
+          else:
+              snippet = member_source[id_position : id_position + 800]
+              raise SystemExit(
+                  f"Could not identify the int/Integer @Id contract in {member_entity}:\n{snippet}"
+              )
+
           changed = 0
           aligned_lines: list[str] = []
           for line in member_source.splitlines(keepends=True):
-              if re.search(r"\b(?:id|getId|setId)\b", line):
+              if any(token in line for token in tracked_tokens):
                   line, replacements = re.subn(
                       r"\b(?:int|Integer)\b", "Long", line
                   )
@@ -162,20 +197,18 @@ jobs:
               aligned_lines.append(line)
           if changed == 0:
               raise SystemExit(
-                  f"Expected an int/Integer identity contract in {member_entity}"
+                  f"The annotated membership identifier was not changed in {member_entity}"
               )
 
           member_source = "".join(aligned_lines)
-          id_field = re.search(
-              r"(?m)^\s*private\s+Long\s+id\s*;", member_source
-          )
-          if id_field is None:
+          id_window = member_source[id_position : id_position + 800]
+          if "Long" not in id_window:
               raise SystemExit(
-                  f"Membership entity does not expose a Long id field after alignment: {member_entity}"
+                  f"Membership @Id contract is not Long after alignment in {member_entity}:\n{id_window}"
               )
           member_entity.write_text(member_source, encoding="utf-8")
           print(
-              f"Aligned {changed} membership identity declaration/accessor occurrence(s) to Long in {member_entity}"
+              f"Aligned {changed} annotated membership identifier occurrence(s) to Long in {member_entity}"
           )
           PY
           rm -f .github/scripts/generate-security-phase1.py
