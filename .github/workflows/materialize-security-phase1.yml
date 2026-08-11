@@ -43,6 +43,99 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          migration_root = Path(
+              "jgit-storage-hibernate-security/src/main/resources/db/migration/"
+              "jgit-storage-hibernate/security"
+          )
+          migration_files = sorted(
+              migration_root.glob("*/V0_11_0__create_security_schema.sql")
+          )
+          expected_dialects = {"h2", "hsqldb", "postgresql", "sqlserver"}
+          found_dialects = {path.parent.name for path in migration_files}
+          if found_dialects != expected_dialects:
+              raise SystemExit(
+                  "Unexpected security migration dialects: "
+                  f"expected {sorted(expected_dialects)}, found {sorted(found_dialects)}"
+              )
+
+          identifier = r'(?:git_security_group_member|"git_security_group_member"|\[git_security_group_member\])'
+          table_start = re.compile(
+              rf"(?im)^\s*create\s+table\s+{identifier}\s*\("
+          )
+          member_index_start = re.compile(
+              rf"(?im)^\s*create\s+(?:unique\s+)?index\b[^;]*?\bon\s+{identifier}\s*\("
+          )
+          member_alter_start = re.compile(
+              rf"(?im)^\s*alter\s+table\s+{identifier}\b"
+          )
+
+          def take_statement(sql: str, start: int) -> tuple[str, str]:
+              semicolon = sql.find(";", start)
+              if semicolon < 0:
+                  raise SystemExit(
+                      "Security migration statement has no semicolon terminator near: "
+                      + sql[start : start + 160]
+                  )
+              end = semicolon + 1
+              suffix = re.match(
+                  r"[ \t]*(?:\r?\n[ \t]*GO[ \t]*)?(?:\r?\n)?",
+                  sql[end:],
+                  flags=re.IGNORECASE,
+              )
+              if suffix:
+                  end += suffix.end()
+              return sql[start:end].strip(), sql[:start] + sql[end:]
+
+          for path in migration_files:
+              sql = path.read_text(encoding="utf-8")
+              table_match = table_start.search(sql)
+              if table_match is None:
+                  raise SystemExit(f"Missing membership table in {path}")
+              membership_table, sql = take_statement(sql, table_match.start())
+
+              dependent_statements: list[str] = []
+              while True:
+                  matches = [
+                      match
+                      for pattern in (member_index_start, member_alter_start)
+                      if (match := pattern.search(sql)) is not None
+                  ]
+                  if not matches:
+                      break
+                  match = min(matches, key=lambda item: item.start())
+                  statement, sql = take_statement(sql, match.start())
+                  dependent_statements.append(statement)
+
+              reordered = sql.rstrip() + "\n\n" + membership_table + "\n"
+              if dependent_statements:
+                  reordered += "\n" + "\n\n".join(dependent_statements) + "\n"
+
+              principal_position = reordered.lower().find(
+                  "create table git_security_principal"
+              )
+              group_position = reordered.lower().find(
+                  "create table git_security_group ("
+              )
+              membership_position = reordered.lower().find(
+                  "create table git_security_group_member"
+              )
+              if min(principal_position, group_position, membership_position) < 0:
+                  raise SystemExit(f"Cannot verify parent-table order in {path}")
+              if not (
+                  principal_position < membership_position
+                  and group_position < membership_position
+              ):
+                  raise SystemExit(f"Invalid membership FK order remains in {path}")
+
+              path.write_text(reordered, encoding="utf-8")
+              print(
+                  f"Ordered membership migration after principal/group tables for {path.parent.name}"
+              )
+          PY
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
           if find .github/scripts -maxdepth 1 -name 'security-phase1-module.b64*' -print -quit | grep -q .; then
