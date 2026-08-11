@@ -135,6 +135,28 @@ jobs:
               print(
                   f"Ordered membership migration after principal/group tables for {path.parent.name}"
               )
+
+          member_entities = list(
+              Path("jgit-storage-hibernate-security/src/main/java").rglob(
+                  "SecurityGroupMember.java"
+              )
+          )
+          if len(member_entities) != 1:
+              raise SystemExit(
+                  f"Expected one SecurityGroupMember entity, found {member_entities}"
+              )
+          member_entity = member_entities[0]
+          member_source = member_entity.read_text(encoding="utf-8")
+          integer_occurrences = len(re.findall(r"\bInteger\b", member_source))
+          if integer_occurrences == 0:
+              raise SystemExit(
+                  f"Expected an Integer identity in {member_entity} before BIGINT alignment"
+              )
+          member_source = re.sub(r"\bInteger\b", "Long", member_source)
+          member_entity.write_text(member_source, encoding="utf-8")
+          print(
+              f"Aligned {integer_occurrences} membership identity type occurrence(s) to Long in {member_entity}"
+          )
           PY
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
