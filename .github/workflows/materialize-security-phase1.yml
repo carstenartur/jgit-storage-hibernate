@@ -62,15 +62,22 @@ jobs:
                   f"expected {sorted(expected_dialects)}, found {sorted(found_dialects)}"
               )
 
-          identifier = r'(?:git_security_group_member|"git_security_group_member"|\[git_security_group_member\])'
+          table_identifier = r'(?:git_security_group_member|"git_security_group_member"|\[git_security_group_member\])'
+          id_identifier = r'(?:id|"id"|\[id\])'
           table_start = re.compile(
-              rf"(?im)^\s*create\s+table\s+{identifier}\s*\("
+              rf"(?im)^\s*create\s+table\s+{table_identifier}\s*\("
           )
           member_index_start = re.compile(
-              rf"(?im)^\s*create\s+(?:unique\s+)?index\b[^;]*?\bon\s+{identifier}\s*\("
+              rf"(?im)^\s*create\s+(?:unique\s+)?index\b[^;]*?\bon\s+{table_identifier}\s*\("
           )
           member_alter_start = re.compile(
-              rf"(?im)^\s*alter\s+table\s+{identifier}\b"
+              rf"(?im)^\s*alter\s+table\s+{table_identifier}\b"
+          )
+          id_column = re.compile(
+              rf"(?im)^(?P<indent>\s*){id_identifier}\s+[^,\r\n]+(?P<comma>,?)\s*$"
+          )
+          id_primary_key = re.compile(
+              rf"(?i)(primary\s+key\s*\(\s*){id_identifier}(\s*\))"
           )
 
           def take_statement(sql: str, start: int) -> tuple[str, str]:
@@ -91,11 +98,45 @@ jobs:
               return sql[start:end].strip(), sql[:start] + sql[end:]
 
           for path in migration_files:
+              dialect = path.parent.name
               sql = path.read_text(encoding="utf-8")
               table_match = table_start.search(sql)
               if table_match is None:
                   raise SystemExit(f"Missing membership table in {path}")
               membership_table, sql = take_statement(sql, table_match.start())
+
+              if "[id]" in membership_table:
+                  membership_identifier = "[membership_id]"
+              elif '"id"' in membership_table:
+                  membership_identifier = '"membership_id"'
+              else:
+                  membership_identifier = "membership_id"
+              membership_type = (
+                  "nvarchar(128)" if dialect == "sqlserver" else "varchar(128)"
+              )
+
+              membership_table, id_column_count = id_column.subn(
+                  lambda match: (
+                      match.group("indent")
+                      + membership_identifier
+                      + " "
+                      + membership_type
+                      + " not null"
+                      + match.group("comma")
+                  ),
+                  membership_table,
+                  count=1,
+              )
+              if id_column_count != 1:
+                  raise SystemExit(
+                      f"Expected exactly one numeric id column in {path}, replaced {id_column_count}"
+                  )
+              membership_table, primary_key_count = id_primary_key.subn(
+                  lambda match: (
+                      match.group(1) + membership_identifier + match.group(2)
+                  ),
+                  membership_table,
+              )
 
               dependent_statements: list[str] = []
               while True:
@@ -108,7 +149,23 @@ jobs:
                       break
                   match = min(matches, key=lambda item: item.start())
                   statement, sql = take_statement(sql, match.start())
+                  statement, dependent_primary_keys = id_primary_key.subn(
+                      lambda item: (
+                          item.group(1) + membership_identifier + item.group(2)
+                      ),
+                      statement,
+                  )
+                  primary_key_count += dependent_primary_keys
                   dependent_statements.append(statement)
+
+              if primary_key_count != 1:
+                  raise SystemExit(
+                      f"Expected exactly one membership primary key in {path}, replaced {primary_key_count}"
+                  )
+              if id_column.search(membership_table):
+                  raise SystemExit(f"Numeric id column remains in {path}")
+              if membership_identifier not in membership_table:
+                  raise SystemExit(f"membership_id column is absent in {path}")
 
               reordered = sql.rstrip() + "\n\n" + membership_table + "\n"
               if dependent_statements:
@@ -133,7 +190,7 @@ jobs:
 
               path.write_text(reordered, encoding="utf-8")
               print(
-                  f"Ordered membership migration after principal/group tables for {path.parent.name}"
+                  f"Aligned membership_id schema and parent-table order for {dialect}"
               )
 
           member_entities: list[tuple[Path, str]] = []
@@ -143,73 +200,21 @@ jobs:
               source = candidate.read_text(encoding="utf-8")
               if "git_security_group_member" in source and "@Entity" in source:
                   member_entities.append((candidate, source))
-
           if len(member_entities) != 1:
               raise SystemExit(
                   "Expected one entity mapped to git_security_group_member, found "
                   f"{[str(path) for path, _ in member_entities]}"
               )
-
           member_entity, member_source = member_entities[0]
-          id_position = member_source.find("@Id")
-          if id_position < 0:
-              raise SystemExit(f"Membership entity has no @Id mapping: {member_entity}")
-
-          field_match = re.search(
-              r"(?s)(@Id\b.{0,600}?\b(?:private|protected|public)\s+)"
-              r"(int|Integer)(\s+([A-Za-z_$][\w$]*)\s*;)",
-              member_source,
-          )
-          getter_match = re.search(
-              r"(?s)(@Id\b.{0,600}?\b(?:private|protected|public)\s+)"
-              r"(int|Integer)(\s+(get[A-Za-z_$][\w$]*)\s*\()",
-              member_source,
-          )
-
-          tracked_tokens: set[str]
-          if field_match is not None:
-              property_name = field_match.group(4)
-              capitalized = property_name[:1].upper() + property_name[1:]
-              tracked_tokens = {
-                  property_name,
-                  "get" + capitalized,
-                  "set" + capitalized,
-              }
-          elif getter_match is not None:
-              getter_name = getter_match.group(4)
-              suffix = getter_name[3:]
-              property_name = suffix[:1].lower() + suffix[1:]
-              tracked_tokens = {property_name, getter_name, "set" + suffix}
-          else:
-              snippet = member_source[id_position : id_position + 800]
+          if '@Column(name = "membership_id"' not in member_source:
               raise SystemExit(
-                  f"Could not identify the int/Integer @Id contract in {member_entity}:\n{snippet}"
+                  f"Membership entity does not map membership_id: {member_entity}"
               )
-
-          changed = 0
-          aligned_lines: list[str] = []
-          for line in member_source.splitlines(keepends=True):
-              if any(token in line for token in tracked_tokens):
-                  line, replacements = re.subn(
-                      r"\b(?:int|Integer)\b", "Long", line
-                  )
-                  changed += replacements
-              aligned_lines.append(line)
-          if changed == 0:
+          if "private String membershipId;" not in member_source:
               raise SystemExit(
-                  f"The annotated membership identifier was not changed in {member_entity}"
+                  f"Membership entity identifier is not String: {member_entity}"
               )
-
-          member_source = "".join(aligned_lines)
-          id_window = member_source[id_position : id_position + 800]
-          if "Long" not in id_window:
-              raise SystemExit(
-                  f"Membership @Id contract is not Long after alignment in {member_entity}:\n{id_window}"
-              )
-          member_entity.write_text(member_source, encoding="utf-8")
-          print(
-              f"Aligned {changed} annotated membership identifier occurrence(s) to Long in {member_entity}"
-          )
+          print(f"Verified String membershipId entity contract in {member_entity}")
           PY
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
