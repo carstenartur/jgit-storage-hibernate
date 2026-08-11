@@ -43,39 +43,6 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-          find . -type f -path '*security*' -print | sort
-          python3 - <<'PY'
-          from pathlib import Path
-
-          candidates = []
-          for path in Path(".").rglob("*.java"):
-              text = path.read_text(encoding="utf-8")
-              count = text.count('"PRINCIPAL"')
-              if count:
-                  print(f"Found {count} PRINCIPAL string fixture(s) in {path}")
-              if count == 2 and "AuthorizationPersistenceService" in text:
-                  candidates.append((path, text))
-
-          if len(candidates) != 1:
-              raise SystemExit(
-                  f"Expected one persistence test with two legacy PRINCIPAL fixtures, found "
-                  f"{[str(path) for path, _ in candidates]}"
-              )
-
-          path, text = candidates[0]
-          import_line = (
-              "import io.github.carstenartur.jgit.storage.hibernate.security.model."
-              "SecuritySubjectType;"
-          )
-          if import_line not in text:
-              package_start = text.index("package ")
-              package_end = text.index(";\n", package_start) + 2
-              text = text[:package_end] + "\n" + import_line + "\n" + text[package_end:]
-
-          text = text.replace('"PRINCIPAL"', "SecuritySubjectType.PRINCIPAL")
-          path.write_text(text, encoding="utf-8")
-          print(f"Migrated typed subject fixtures in {path}")
-          PY
           rm -f .github/scripts/generate-security-phase1.py
           rm -f .github/scripts/security-phase1-module.b64*
           rm -f .github/workflows/materialize-security-phase1.yml
@@ -93,6 +60,7 @@ jobs:
             --root . \
             --json target/module-boundaries/security-phase1.json \
             --markdown target/module-boundaries/security-phase1.md
+          python3 .github/scripts/verify-security-policy.py
 
       - name: Test the Security module and its required reactor
         shell: bash
