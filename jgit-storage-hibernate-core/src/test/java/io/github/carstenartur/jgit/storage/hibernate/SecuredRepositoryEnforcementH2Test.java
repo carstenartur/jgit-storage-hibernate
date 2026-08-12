@@ -149,12 +149,12 @@ class SecuredRepositoryEnforcementH2Test {
         assertNull(repository.exactRef("refs/heads/batch-blocked"));
 
         RefUpdate delete = repository.updateRef("refs/heads/topic");
+        delete.setForceUpdate(true);
         assertEquals(RefUpdate.Result.REJECTED_OTHER_REASON, delete.delete());
         policy.allow(RepositoryAccessOperation.DELETE_REF);
         delete = repository.updateRef("refs/heads/topic");
-        assertTrue(
-            Set.of(RefUpdate.Result.FORCED, RefUpdate.Result.FAST_FORWARD)
-                .contains(delete.delete()));
+        delete.setForceUpdate(true);
+        assertEquals(RefUpdate.Result.FORCED, delete.delete());
         assertNull(repository.exactRef("refs/heads/topic"));
       }
     }
