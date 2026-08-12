@@ -14,7 +14,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -37,7 +37,7 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-      - name: Move membership tables behind their referenced parents without rewriting SQL
+      - name: Move the membership table together with every dependent statement
         shell: bash
         run: |
           set -euo pipefail
@@ -49,63 +49,113 @@ jobs:
               "jgit-storage-hibernate-security/src/main/resources/db/migration/"
               "jgit-storage-hibernate/security"
           )
-          start_member = re.compile(
-              r'^\s*create\s+table\s+(?:\[|\")?git_security_group_member(?:\]|\")?\s*\(',
-              re.IGNORECASE,
+          table_identifier = (
+              r'(?:git_security_group_member|"git_security_group_member"|'
+              r'\[git_security_group_member\])'
           )
-          start_principal = re.compile(
+          table_start = re.compile(
+              rf"(?im)^\s*create\s+table\s+{table_identifier}\s*\("
+          )
+          index_start = re.compile(
+              rf"(?im)^\s*create\s+(?:unique\s+)?index\b[^;]*?"
+              rf"\bon\s+{table_identifier}\s*\("
+          )
+          alter_start = re.compile(
+              rf"(?im)^\s*alter\s+table\s+{table_identifier}\b"
+          )
+          principal_start = re.compile(
               r'^\s*create\s+table\s+(?:\[|\")?git_security_principal(?:\]|\")?\s*\(',
               re.IGNORECASE,
           )
-          start_group = re.compile(
+          group_start = re.compile(
               r'^\s*create\s+table\s+(?:\[|\")?git_security_group(?:\]|\")?\s*\(',
               re.IGNORECASE,
           )
 
-          for path in sorted(root.glob("*/V0_11_0__create_security_schema.sql")):
-              lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-              starts = [i for i, line in enumerate(lines) if start_member.search(line)]
-              if len(starts) != 1:
-                  raise SystemExit(f"Expected one membership table in {path}, found {starts}")
-              start = starts[0]
-              end = None
-              for i in range(start + 1, len(lines)):
-                  if lines[i].strip() == ");":
-                      end = i + 1
-                      if end < len(lines) and lines[end].strip().upper() == "GO":
-                          end += 1
+          def take_statement(sql: str, start: int) -> tuple[str, str]:
+              semicolon = sql.find(";", start)
+              if semicolon < 0:
+                  raise SystemExit(
+                      "Security migration statement has no semicolon terminator near: "
+                      + sql[start:start + 160]
+                  )
+              end = semicolon + 1
+              suffix = re.match(
+                  r"[ \t]*(?:\r?\n[ \t]*GO[ \t]*)?(?:\r?\n)?",
+                  sql[end:],
+                  flags=re.IGNORECASE,
+              )
+              if suffix:
+                  end += suffix.end()
+              return sql[start:end].strip(), sql[:start] + sql[end:]
+
+          paths = sorted(root.glob("*/V0_11_0__create_security_schema.sql"))
+          expected = {"h2", "hsqldb", "postgresql", "sqlserver"}
+          found = {path.parent.name for path in paths}
+          if found != expected:
+              raise SystemExit(
+                  f"Expected security migrations for {sorted(expected)}, found {sorted(found)}"
+              )
+
+          for path in paths:
+              sql = path.read_text(encoding="utf-8")
+              table_match = table_start.search(sql)
+              if table_match is None:
+                  raise SystemExit(f"Missing membership table in {path}")
+              membership_table, sql = take_statement(sql, table_match.start())
+              if "membership_id" not in membership_table:
+                  raise SystemExit(f"membership_id is absent from {path}")
+
+              dependent_statements: list[str] = []
+              while True:
+                  matches = [
+                      match
+                      for pattern in (index_start, alter_start)
+                      if (match := pattern.search(sql)) is not None
+                  ]
+                  if not matches:
                       break
-              if end is None:
-                  raise SystemExit(f"No membership table terminator in {path}")
-              block = lines[start:end]
-              remaining = lines[:start] + lines[end:]
-              while remaining and not remaining[-1].strip():
-                  remaining.pop()
-              transformed = "".join(remaining) + "\n\n" + "".join(block).lstrip()
-              if not transformed.endswith("\n"):
-                  transformed += "\n"
-              transformed_lines = transformed.splitlines()
+                  match = min(matches, key=lambda item: item.start())
+                  statement, sql = take_statement(sql, match.start())
+                  dependent_statements.append(statement)
+
+              reordered = sql.rstrip() + "\n\n" + membership_table + "\n"
+              if dependent_statements:
+                  reordered += "\n" + "\n\n".join(dependent_statements) + "\n"
+
+              lines = reordered.splitlines()
               positions = {
-                  "principal": next((i for i, line in enumerate(transformed_lines) if start_principal.search(line)), -1),
-                  "group": next((i for i, line in enumerate(transformed_lines) if start_group.search(line)), -1),
-                  "membership": next((i for i, line in enumerate(transformed_lines) if start_member.search(line)), -1),
+                  "principal": next(
+                      (index for index, line in enumerate(lines) if principal_start.search(line)),
+                      -1,
+                  ),
+                  "group": next(
+                      (index for index, line in enumerate(lines) if group_start.search(line)),
+                      -1,
+                  ),
+                  "membership": next(
+                      (index for index, line in enumerate(lines) if table_start.search(line)),
+                      -1,
+                  ),
               }
               if min(positions.values()) < 0 or not (
                   positions["principal"] < positions["membership"]
                   and positions["group"] < positions["membership"]
               ):
-                  raise SystemExit(f"Invalid transformed order in {path}: {positions}")
-              if "membership_id" not in "".join(block):
-                  raise SystemExit(f"membership_id was lost from {path}")
-              path.write_text(transformed, encoding="utf-8")
-              print(f"Verified lossless membership ordering for {path.parent.name}: {positions}")
+                  raise SystemExit(f"Invalid table order in {path}: {positions}")
+              membership_offset = reordered.lower().find("git_security_group_member")
+              for statement in dependent_statements:
+                  statement_offset = reordered.find(statement)
+                  if statement_offset <= membership_offset:
+                      raise SystemExit(
+                          f"Dependent membership statement precedes its table in {path}"
+                      )
 
-          print("Generated security test sources:")
-          for path in sorted(Path("jgit-storage-hibernate-security/src/test/java").rglob("*.java")):
-              text = path.read_text(encoding="utf-8")
-              classes = re.findall(r'\bclass\s+(\w+)', text)
-              tests = re.findall(r'\bvoid\s+(\w+)\s*\(', text)
-              print(path, "classes=", classes, "methods=", tests)
+              path.write_text(reordered, encoding="utf-8")
+              print(
+                  f"Verified complete membership statement ordering for "
+                  f"{path.parent.name}: {positions}, dependents={len(dependent_statements)}"
+              )
           PY
       - name: Verify architecture and security policy
         shell: bash
@@ -117,6 +167,22 @@ jobs:
             --json target/module-boundaries/security-phase1.json \
             --markdown target/module-boundaries/security-phase1.md
           python3 .github/scripts/verify-security-policy.py
+      - name: Show the effective Security Hibernate test classpath
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '::group::jgit-storage-hibernate-security/pom.xml'
+          cat jgit-storage-hibernate-security/pom.xml
+          echo '::endgroup::'
+          mvn -B -ntp -pl jgit-storage-hibernate-security -am dependency:tree \
+            -Dverbose \
+            -Dincludes=org.hibernate.orm:hibernate-core,org.hibernate.orm:hibernate-testing,jakarta.persistence:jakarta.persistence-api
+          core_jar="$HOME/.m2/repository/org/hibernate/orm/hibernate-core/7.4.5.Final/hibernate-core-7.4.5.Final.jar"
+          if [[ -f "$core_jar" ]]; then
+            echo '::group::NoJtaPlatform presence in Hibernate Core 7.4.5.Final'
+            jar tf "$core_jar" | grep -F 'NoJtaPlatform' || true
+            echo '::endgroup::'
+          fi
       - name: Run the complete Security reactor tests
         shell: bash
         run: mvn -B -ntp -pl jgit-storage-hibernate-security -am test
