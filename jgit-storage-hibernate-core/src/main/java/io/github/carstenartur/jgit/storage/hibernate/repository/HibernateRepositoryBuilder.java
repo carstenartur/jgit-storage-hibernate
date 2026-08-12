@@ -8,8 +8,10 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.repository;
 
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessRequest;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.function.Consumer;
 import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryBuilder;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
@@ -19,8 +21,11 @@ import org.hibernate.SessionFactory;
 class HibernateRepositoryBuilder
     extends DfsRepositoryBuilder<HibernateRepositoryBuilder, HibernateRepository> {
 
+  private static final Consumer<RepositoryAccessRequest> UNRESTRICTED_ACCESS = ignored -> {};
+
   private SessionFactory sessionFactory;
   private String repositoryName;
+  private Consumer<RepositoryAccessRequest> accessGuard = UNRESTRICTED_ACCESS;
 
   /**
    * Set the Hibernate session factory.
@@ -65,12 +70,30 @@ class HibernateRepositoryBuilder
     return repositoryName;
   }
 
+  /**
+   * Set the explicit access guard carried by the opened repository.
+   *
+   * @param accessGuard guard invoked at sensitive Core publication boundaries
+   * @return this builder
+   */
+  public HibernateRepositoryBuilder setAccessGuard(
+      Consumer<RepositoryAccessRequest> accessGuard) {
+    this.accessGuard = Objects.requireNonNull(accessGuard, "accessGuard");
+    return self();
+  }
+
+  /** @return configured access guard */
+  public Consumer<RepositoryAccessRequest> getAccessGuard() {
+    return accessGuard;
+  }
+
   @Override
   public HibernateRepository build() throws IOException {
     if (repositoryName == null || repositoryName.isBlank()) {
       throw new IllegalArgumentException("repositoryName is required");
     }
     Objects.requireNonNull(sessionFactory, "sessionFactory");
+    Objects.requireNonNull(accessGuard, "accessGuard");
     if (getReaderOptions() == null) {
       setReaderOptions(new DfsReaderOptions());
     }

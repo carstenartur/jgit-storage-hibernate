@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -28,6 +29,7 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
 
   private static final ConcurrentMap<RepositoryScope, RepositoryLifecycle> REPOSITORY_LIFECYCLES =
       new ConcurrentHashMap<>();
+  private static final Consumer<RepositoryAccessRequest> UNRESTRICTED_ACCESS = ignored -> {};
 
   private final SessionFactory sessionFactory;
   private final List<RepositoryDeletionParticipant> deletionParticipants;
@@ -55,7 +57,12 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
 
   @Override
   public HibernateGitStorage open(RepositoryName repositoryName) {
-    return openStorage(repositoryName, true).storage();
+    return openStorage(repositoryName, true, UNRESTRICTED_ACCESS).storage();
+  }
+
+  HibernateGitStorage openExisting(
+      RepositoryName repositoryName, Consumer<RepositoryAccessRequest> accessGuard) {
+    return openStorage(repositoryName, false, accessGuard).storage();
   }
 
   @Override
@@ -63,11 +70,13 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
     Objects.requireNonNull(request, "request");
     boolean cleanupCreatedTarget = false;
     Throwable transferFailure = null;
-    try (HibernateGitStorage sourceStorage = openStorage(request.source(), false).storage()) {
+    try (HibernateGitStorage sourceStorage =
+        openStorage(request.source(), false, UNRESTRICTED_ACCESS).storage()) {
       List<RepositoryTransferExecutor.ResolvedRefTransfer> resolvedRefs =
           RepositoryTransferExecutor.resolveSourceRefs(sourceStorage.repository(), request);
       boolean createTarget = request.mode() == RepositoryTransferMode.INITIAL_CLONE;
-      OpenedStorage openedTarget = openStorage(request.target(), createTarget);
+      OpenedStorage openedTarget =
+          openStorage(request.target(), createTarget, UNRESTRICTED_ACCESS);
       cleanupCreatedTarget = openedTarget.created();
       try (HibernateGitStorage targetStorage = openedTarget.storage()) {
         RepositoryTransferResult result =
@@ -106,11 +115,23 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
 
   @Override
   public RepositoryDeletionResult deleteRepository(RepositoryName repositoryName) {
+    return deleteRepository(repositoryName, UNRESTRICTED_ACCESS);
+  }
+
+  RepositoryDeletionResult deleteRepository(
+      RepositoryName repositoryName, Consumer<RepositoryAccessRequest> accessGuard) {
     Objects.requireNonNull(repositoryName, "repositoryName");
+    Consumer<RepositoryAccessRequest> guard =
+        Objects.requireNonNull(accessGuard, "accessGuard");
+    RepositoryAccessRequest request =
+        RepositoryAccessRequest.repository(
+            repositoryName, RepositoryAccessOperation.DELETE_REPOSITORY);
+    guard.accept(request);
+
     RepositoryScope scope = new RepositoryScope(sessionFactory, repositoryName.value());
     RepositoryLifecycle lifecycle = reserveDeletion(scope, repositoryName);
     try {
-      return deleteRepositoryData(repositoryName);
+      return deleteRepositoryData(repositoryName, guard, request);
     } finally {
       releaseDeletion(scope, lifecycle);
     }
@@ -128,14 +149,25 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
     }
   }
 
-  private OpenedStorage openStorage(RepositoryName repositoryName, boolean createIfMissing) {
+  private OpenedStorage openStorage(
+      RepositoryName repositoryName,
+      boolean createIfMissing,
+      Consumer<RepositoryAccessRequest> accessGuard) {
     Objects.requireNonNull(repositoryName, "repositoryName");
+    Consumer<RepositoryAccessRequest> guard =
+        Objects.requireNonNull(accessGuard, "accessGuard");
+    guard.accept(
+        RepositoryAccessRequest.repository(
+            repositoryName, RepositoryAccessOperation.DISCOVER));
+    guard.accept(
+        RepositoryAccessRequest.repository(repositoryName, RepositoryAccessOperation.READ));
+
     RepositoryScope scope = new RepositoryScope(sessionFactory, repositoryName.value());
     reserveOpenHandle(scope, repositoryName);
     boolean handedOff = false;
     try {
       HibernateRepository repository =
-          HibernateRepository.create(sessionFactory, repositoryName.value());
+          HibernateRepository.create(sessionFactory, repositoryName.value(), guard);
       boolean exists = repository.exists();
       if (!exists && !createIfMissing) {
         repository.close();
@@ -158,7 +190,10 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
     }
   }
 
-  private RepositoryDeletionResult deleteRepositoryData(RepositoryName repositoryName) {
+  private RepositoryDeletionResult deleteRepositoryData(
+      RepositoryName repositoryName,
+      Consumer<RepositoryAccessRequest> accessGuard,
+      RepositoryAccessRequest deletionRequest) {
     try (HibernateRepository cacheScope =
             HibernateRepository.create(sessionFactory, repositoryName.value());
         Session session = sessionFactory.openSession()) {
@@ -179,6 +214,8 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
           throw new HibernateStorageException(
               "Missing repository lifecycle row for " + repositoryName.value());
         }
+
+        accessGuard.accept(deletionRequest);
 
         int projectionRows = 0;
         for (RepositoryDeletionParticipant participant : deletionParticipants) {

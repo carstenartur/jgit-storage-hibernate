@@ -8,6 +8,9 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.refs;
 
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessDeniedException;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessOperation;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessRequest;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.io.IOException;
 import java.time.Instant;
@@ -57,7 +60,7 @@ final class HibernateRefUpdate extends RefUpdate {
 
   @Override
   protected void unlock() {
-    // The compare-and-put operation provides optimistic locking.
+    // The database repository lock and compare-and-put operation provide locking.
   }
 
   @Override
@@ -90,6 +93,9 @@ final class HibernateRefUpdate extends RefUpdate {
     try {
       return refDatabase.inTransaction(
           session -> {
+            if (!authorize(updateOperation(desiredResult), getOldObjectId(), getNewObjectId())) {
+              return Result.REJECTED_OTHER_REASON;
+            }
             if (!refDatabase.compareAndPutRef(destinationRef, newRef)) {
               return Result.LOCK_FAILURE;
             }
@@ -111,6 +117,12 @@ final class HibernateRefUpdate extends RefUpdate {
     try {
       return refDatabase.inTransaction(
           session -> {
+            if (!authorize(
+                RepositoryAccessOperation.DELETE_REF,
+                getOldObjectId(),
+                ObjectId.zeroId())) {
+              return Result.REJECTED_OTHER_REASON;
+            }
             if (!refDatabase.compareAndRemoveRef(destinationRef)) {
               return Result.LOCK_FAILURE;
             }
@@ -138,6 +150,13 @@ final class HibernateRefUpdate extends RefUpdate {
     try {
       return refDatabase.inTransaction(
           session -> {
+            RepositoryAccessOperation operation =
+                desiredResult == Result.NEW
+                    ? RepositoryAccessOperation.CREATE_REF
+                    : RepositoryAccessOperation.FORCE_UPDATE;
+            if (!authorize(operation, getOldObjectId(), null)) {
+              return Result.REJECTED_OTHER_REASON;
+            }
             if (!refDatabase.compareAndPutRef(destinationRef, newRef)) {
               return Result.LOCK_FAILURE;
             }
@@ -151,6 +170,31 @@ final class HibernateRefUpdate extends RefUpdate {
           });
     } catch (RuntimeException exception) {
       throw new IOException("Could not link ref " + destinationRef.getName(), exception);
+    }
+  }
+
+  private RepositoryAccessOperation updateOperation(Result desiredResult) {
+    return switch (desiredResult) {
+      case NEW -> RepositoryAccessOperation.CREATE_REF;
+      case FORCED -> RepositoryAccessOperation.FORCE_UPDATE;
+      default -> RepositoryAccessOperation.UPDATE_REF;
+    };
+  }
+
+  private boolean authorize(
+      RepositoryAccessOperation operation, ObjectId oldObjectId, ObjectId newObjectId) {
+    RepositoryAccessRequest request =
+        RepositoryAccessRequest.ref(
+            getRepository().getLogicalRepositoryName(),
+            operation,
+            destinationRef.getName(),
+            oldObjectId,
+            newObjectId);
+    try {
+      getRepository().requireAccess(request);
+      return true;
+    } catch (RepositoryAccessDeniedException denied) {
+      return false;
     }
   }
 

@@ -14,11 +14,16 @@ import java.io.IOException;
 import java.util.Objects;
 import org.eclipse.jgit.internal.storage.dfs.DfsReftableDatabase;
 import org.eclipse.jgit.internal.storage.reftable.ReftableConfig;
+import org.eclipse.jgit.internal.storage.reftable.ReftableDatabase;
+import org.eclipse.jgit.lib.BatchRefUpdate;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.ReceiveCommand;
 import org.hibernate.Session;
 
 /** Reference database using JGit DFS reftables persisted through the Hibernate object database. */
@@ -62,6 +67,11 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
     return update;
   }
 
+  @Override
+  public BatchRefUpdate newBatchUpdate() {
+    return new HibernateBatchRefUpdate(this, true, true);
+  }
+
   HibernateRepository repository() {
     return repository;
   }
@@ -71,7 +81,20 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
     if (!sameRef(current, oldRef)) {
       return false;
     }
-    return super.compareAndPut(oldRef, newRef);
+
+    ReceiveCommand command = ReftableDatabase.toCommand(oldRef, newRef);
+    try (RevWalk walk = new RevWalk(repository)) {
+      walk.setRetainBody(false);
+      HibernateBatchRefUpdate update = new HibernateBatchRefUpdate(this, false, false);
+      update.setAllowNonFastForwards(true);
+      update.addCommand(command);
+      update.execute(walk, NullProgressMonitor.INSTANCE);
+    }
+    return switch (command.getResult()) {
+      case OK -> true;
+      case REJECTED_OTHER_REASON -> throw new IOException(command.getMessage());
+      default -> false;
+    };
   }
 
   boolean compareAndRemoveRef(Ref oldRef) throws IOException {
@@ -79,7 +102,7 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
     if (!sameRef(current, oldRef)) {
       return false;
     }
-    return super.compareAndRemove(oldRef);
+    return compareAndPutRef(oldRef, null);
   }
 
   private static boolean sameRef(Ref current, Ref expected) {
