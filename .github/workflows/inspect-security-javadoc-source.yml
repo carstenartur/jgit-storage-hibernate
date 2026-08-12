@@ -1,0 +1,60 @@
+name: Inspect Security Javadoc Source
+
+on:
+  push:
+    branches:
+      - feature/security-phase-1
+    paths:
+      - .github/workflows/inspect-security-javadoc-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feature/security-phase-1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Materialize the Security module
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            .github/scripts/security-phase1-module.b64.part-00-0 \
+            .github/scripts/security-phase1-module.b64.part-00-1 \
+            .github/scripts/security-phase1-module.b64.part-01 \
+            .github/scripts/security-phase1-module.b64.part-02 \
+            .github/scripts/security-phase1-module.b64.part-03 \
+            .github/scripts/security-phase1-module.b64.part-04 \
+            > .github/scripts/security-phase1-module.b64
+          python3 .github/scripts/generate-security-phase1.py
+      - name: Run Maven through source generation and compilation
+        shell: bash
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean compile -DskipTests
+      - name: Locate every generated SecureRefDatabase and RefUpdate reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '::group::SecureRefDatabase paths'
+          find . -type f -iname '*SecureRefDatabase*' -print | sort
+          echo '::endgroup::'
+          echo '::group::RefUpdate references in text sources'
+          grep -RIn -B3 -A5 'RefUpdate' \
+            jgit-storage-hibernate-security \
+            --include='*.java' \
+            --include='*.xml' \
+            --include='*.properties' \
+            --include='*.txt' || true
+          echo '::endgroup::'
+          echo '::group::All Security Java source paths after compilation'
+          find jgit-storage-hibernate-security -type f -name '*.java' -print | sort
+          echo '::endgroup::'
