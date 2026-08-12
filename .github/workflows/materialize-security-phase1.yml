@@ -1,4 +1,4 @@
-name: Trace Security Phase 1 Dynamic Test Methods
+name: Trace Security Phase 1 Additional Tests
 
 on:
   push:
@@ -14,11 +14,16 @@ permissions:
 jobs:
   trace:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: feature/security-phase-1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
       - name: Materialize the complete source archive
         shell: bash
         run: |
@@ -32,26 +37,100 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-      - name: Locate semantic JPA test method names and test factories
+      - name: Cleanly compile the complete Security reactor
+        shell: bash
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean test-compile -DskipTests
+      - name: Scan every class, archive and service descriptor
         shell: bash
         run: |
           set -euo pipefail
-          root=jgit-storage-hibernate-security
-          echo '::group::Exact failing method names in all materialized files'
+          echo '::group::Compiled classes with JPA or Security operation names'
+          find . -type f -name '*.class' \( \
+            -iname '*Jpa*' -o \
+            -iname '*SecureRefDatabase*' -o \
+            -iname '*SecurityOperations*' \
+          \) -print | sort
+          echo '::endgroup::'
+
+          echo '::group::JUnit engines, extension autodetection and additional classpaths'
           grep -RInE \
-            'repositoryScopedRefReadsDoNotCrossRepositoryBoundary|allowsObjectInsertForRepositoryMember|objectIdDeleteRequiresStoredOwnerToMatch' \
+            'junit\.jupiter\.extensions\.autodetection|TestEngine|dependenciesToScan|additionalClasspath|testClassesDirectory|BytecodeEnhancedClassLoader|BytecodeEnhanced' \
             . \
             --exclude='security-phase1-module.b64*' \
-            --exclude-dir=.git || true
+            --exclude-dir=.git \
+            --exclude-dir=target || true
+          find . -type f \( \
+            -path '*/META-INF/services/org.junit.platform.engine.TestEngine' -o \
+            -name 'junit-platform.properties' \
+          \) -print -exec cat {} \; || true
           echo '::endgroup::'
-          echo '::group::Every Security test annotation, factory and dynamic-test construction'
-          grep -RInE -B3 -A8 \
-            '@Test|@TestFactory|@TestTemplate|DynamicTest|DynamicContainer|InvocationContext|TestEngine|Launcher' \
-            "$root/src/test" "$root/pom.xml" || true
+
+          echo '::group::Binary locations containing the failing class or method names'
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          roots = [Path('.'), Path.home() / '.m2' / 'repository']
+          needles = [
+              b'JpaSecureRefDatabaseDataIsolationTest',
+              b'JpaSecureRefDatabaseTest',
+              b'JpaSecurityOperationsTest',
+              b'repositoryScopedRefReadsDoNotCrossRepositoryBoundary',
+              b'allowsObjectInsertForRepositoryMember',
+              b'objectIdDeleteRequiresStoredOwnerToMatch',
+          ]
+          seen = set()
+          for root in roots:
+              for path in root.rglob('*'):
+                  if not path.is_file() or path in seen:
+                      continue
+                  seen.add(path)
+                  suffix = path.suffix.lower()
+                  if suffix in {'.jar', '.zip'}:
+                      try:
+                          with zipfile.ZipFile(path) as archive:
+                              for name in archive.namelist():
+                                  try:
+                                      data = archive.read(name)
+                                  except (KeyError, OSError, RuntimeError):
+                                      continue
+                                  hits = [needle.decode() for needle in needles if needle in data]
+                                  if hits:
+                                      print(f'{path}!/{name}: {hits}')
+                      except (OSError, zipfile.BadZipFile):
+                          pass
+                  elif suffix in {'.class', '.xml', '.properties', '.txt', '.java'}:
+                      try:
+                          data = path.read_bytes()
+                      except OSError:
+                          continue
+                      hits = [needle.decode() for needle in needles if needle in data]
+                      if hits:
+                          print(f'{path}: {hits}')
+          PY
           echo '::endgroup::'
-          echo '::group::Complete Security test sources'
-          while IFS= read -r file; do
-            echo "===== $file ====="
-            cat "$file"
-          done < <(find "$root/src/test/java" -type f -name '*.java' -print | sort)
+
+      - name: Print Security dependency and Surefire configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '::group::Materialized Security POM'
+          cat jgit-storage-hibernate-security/pom.xml
+          echo '::endgroup::'
+          mvn -B -ntp -pl jgit-storage-hibernate-security dependency:tree -Dverbose
+          mvn -B -ntp -pl jgit-storage-hibernate-security help:effective-pom \
+            -Doutput=target/security-effective-pom.xml
+          echo '::group::Effective Surefire and test classpath configuration'
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          path = Path('target/security-effective-pom.xml')
+          root = ET.parse(path).getroot()
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          for plugin in root.findall('.//m:plugin', ns):
+              artifact = plugin.findtext('m:artifactId', default='', namespaces=ns)
+              if artifact in {'maven-surefire-plugin', 'maven-failsafe-plugin', 'maven-compiler-plugin'}:
+                  print(ET.tostring(plugin, encoding='unicode'))
+          PY
           echo '::endgroup::'
