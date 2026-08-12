@@ -168,11 +168,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path(
-              "jgit-storage-hibernate-security/src/main/java/"
-              "io/github/carstenartur/jgit/storage/hibernate/security/engine/"
-              "SecureRefDatabase.java"
-          )
+          root = Path("jgit-storage-hibernate-security/src/main/java")
+          paths = sorted(root.rglob("SecureRefDatabase.java"))
+          if len(paths) != 1:
+              raise SystemExit(
+                  f"Expected exactly one generated SecureRefDatabase.java, found {paths}"
+              )
+          path = paths[0]
           text = path.read_text(encoding="utf-8")
           old = "{@link RefUpdate}"
           new = "{@link org.eclipse.jgit.lib.RefUpdate}"
