@@ -14,7 +14,7 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -37,24 +37,77 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-      - name: Run Maven through source generation and compilation
+      - name: Capture the package and Javadoc failure
         shell: bash
-        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean compile -DskipTests
-      - name: Locate every generated SecureRefDatabase and RefUpdate reference
+        run: |
+          set -uo pipefail
+          mkdir -p target/security-javadoc-diagnostics
+          set +e
+          mvn -B -ntp -X clean package -DskipTests \
+            > target/security-javadoc-diagnostics/package-debug.log 2>&1
+          status=$?
+          set -e
+          echo "Maven package exit status: $status"
+          printf '%s\n' "$status" > target/security-javadoc-diagnostics/package-status.txt
+          echo '::group::Relevant Maven/Javadoc diagnostics'
+          grep -n -B20 -A60 -E \
+            'SecureRefDatabase|RefUpdate|reference not found|maven-javadoc-plugin|BUILD FAILURE|BUILD SUCCESS' \
+            target/security-javadoc-diagnostics/package-debug.log \
+            | tail -n 1200 || true
+          echo '::endgroup::'
+      - name: Inspect the effective Security Javadoc configuration
         shell: bash
         run: |
           set -euo pipefail
-          echo '::group::SecureRefDatabase paths'
+          mvn -B -ntp -pl jgit-storage-hibernate-security help:effective-pom \
+            -Doutput=target/security-javadoc-diagnostics/security-effective-pom.xml
+          echo '::group::Effective maven-javadoc-plugin configuration'
+          grep -n -B20 -A180 'maven-javadoc-plugin' \
+            target/security-javadoc-diagnostics/security-effective-pom.xml || true
+          echo '::endgroup::'
+          echo '::group::Configured source paths and Javadoc overrides'
+          grep -RInE -B5 -A15 \
+            'sourcepath|sourcePath|additionalSource|includeDependencySources|maven-javadoc-plugin|javadoc' \
+            pom.xml \
+            jgit-storage-hibernate-*/pom.xml \
+            target/security-javadoc-diagnostics/security-effective-pom.xml \
+            .mvn \
+            .github/scripts \
+            --exclude='security-phase1-module.b64*' || true
+          echo '::endgroup::'
+      - name: Locate the actual source used by Javadoc
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '::group::SecureRefDatabase paths and matching source text'
           find . -type f -iname '*SecureRefDatabase*' -print | sort
+          grep -RIn -B5 -A10 -E \
+            'SecureRefDatabase|Expected old ids are deliberately read only from|\{@link RefUpdate\}' \
+            . \
+            --exclude='security-phase1-module.b64*' \
+            --exclude='package-debug.log' \
+            --exclude-dir=.git || true
           echo '::endgroup::'
-          echo '::group::RefUpdate references in text sources'
-          grep -RIn -B3 -A5 'RefUpdate' \
-            jgit-storage-hibernate-security \
-            --include='*.java' \
-            --include='*.xml' \
-            --include='*.properties' \
-            --include='*.txt' || true
+          echo '::group::Generated Javadoc files'
+          find . -type f \( \
+            -iname '*javadoc*' -o \
+            -name options -o \
+            -name argfile -o \
+            -name packages \
+          \) -print | sort
           echo '::endgroup::'
-          echo '::group::All Security Java source paths after compilation'
-          find jgit-storage-hibernate-security -type f -name '*.java' -print | sort
+          echo '::group::Generated Javadoc arguments'
+          while IFS= read -r file; do
+            echo "===== $file ====="
+            sed -n '1,500p' "$file" || true
+          done < <(find . -type f \( \
+            -name options -o \
+            -name argfile -o \
+            -name packages -o \
+            -name 'javadoc.sh' \
+          \) -print | sort)
           echo '::endgroup::'
+          echo '::group::Every Java source after the package attempt'
+          find . -type f -name '*.java' -print | sort
+          echo '::endgroup::'
+          git status --short
