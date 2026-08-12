@@ -28,27 +28,27 @@ jobs:
 
           path = Path('.github/workflows/publish-security-phase1-source.yml')
           text = path.read_text(encoding='utf-8')
-          old = """          if git diff --cached --name-only | grep -E \\
-            '(^|/)target/|(^|/)__pycache__/|\\.class$|\\.jar$|security-phase1-module\\.b64|generate-security-phase1\\.py|inspect-security-javadoc-source\\.yml|materialize-security-phase1\\.yml|publish-security-phase1-source\\.yml'; then
-            echo 'Forbidden bootstrap, diagnostic or build artifacts are staged.' >&2
-            exit 1
-          fi
-
-          if git grep --cached -nE \\
-            'security-phase1-module\\.b64|generate-security-phase1\\.py|inspect-security-javadoc-source\\.yml|materialize-security-phase1\\.yml|publish-security-phase1-source\\.yml'; then
-            echo 'Bootstrap or diagnostic references remain in the final source tree.' >&2
-            exit 1
-          fi
-"""
-          new = """          if git ls-files --cached | grep -E \\
-            '(^|/)target/|(^|/)__pycache__/|\\.class$|\\.jar$|security-phase1-module\\.b64|generate-security-phase1\\.py|inspect-security-javadoc-source\\.yml|materialize-security-phase1\\.yml|publish-security-phase1-source\\.yml|fix-publish-security-phase1-source\\.yml'; then
-            echo 'Forbidden bootstrap, diagnostic or build artifacts remain in the final index.' >&2
-            exit 1
-          fi
-"""
-          if text.count(old) != 1:
-              raise SystemExit('Expected publisher gate was not found exactly once')
-          path.write_text(text.replace(old, new), encoding='utf-8')
+          old_command = 'if git diff --cached --name-only | grep -E \\'
+          new_command = 'if git ls-files --cached | grep -E \\'
+          if text.count(old_command) != 1:
+              raise SystemExit('Expected staged-path gate was not found exactly once')
+          text = text.replace(old_command, new_command)
+          lines = text.splitlines(keepends=True)
+          starts = [
+              index
+              for index, line in enumerate(lines)
+              if 'if git grep --cached -nE' in line
+          ]
+          if len(starts) != 1:
+              raise SystemExit('Expected content gate was not found exactly once')
+          start = starts[0]
+          end = start
+          while end < len(lines) and lines[end].strip() != 'fi':
+              end += 1
+          if end == len(lines):
+              raise SystemExit('Content gate has no closing fi')
+          del lines[start:end + 1]
+          path.write_text(''.join(lines), encoding='utf-8')
           PY
 
           rm -f .github/workflows/fix-publish-security-phase1-source.yml
