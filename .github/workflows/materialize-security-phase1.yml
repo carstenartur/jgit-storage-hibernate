@@ -36,17 +36,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          root=jgit-storage-hibernate-security/src/test/java/io/github/carstenartur/jgit/storage/hibernate/security
-          for file in \
+          root=jgit-storage-hibernate-security/src/test/java
+          echo '::group::Generated Security test source paths'
+          find "$root" -type f -name '*.java' -print | sort
+          echo '::endgroup::'
+          for basename in \
             JpaSecureRefDatabaseDataIsolationTest.java \
             JpaSecureRefDatabaseTest.java \
             JpaSecurityOperationsTest.java; do
-            echo "::group::$file"
-            sed -n '1,260p' "$root/$file"
+            mapfile -t matches < <(find "$root" -type f -name "$basename" -print)
+            if [[ ${#matches[@]} -ne 1 ]]; then
+              printf 'Expected exactly one %s, found %s: %s\n' \
+                "$basename" "${#matches[@]}" "${matches[*]-}" >&2
+              exit 1
+            fi
+            echo "::group::${matches[0]}"
+            sed -n '1,320p' "${matches[0]}"
             echo '::endgroup::'
           done
           echo '::group::All Hibernate testing annotations and extensions in Security tests'
           grep -RInE 'Bytecode|Enhancement|ExtendWith|DomainModel|SessionFactory|ServiceRegistry|Jpa|hibernate-testing' \
-            jgit-storage-hibernate-security/src/test/java \
+            "$root" \
             jgit-storage-hibernate-security/pom.xml || true
           echo '::endgroup::'
