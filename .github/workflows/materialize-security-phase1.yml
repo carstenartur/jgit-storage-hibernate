@@ -1,4 +1,4 @@
-name: Trace Security Phase 1 Additional Tests
+name: Validate Clean Security Phase 1 Source
 
 on:
   push:
@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  trace:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -24,7 +24,7 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Materialize the complete source archive
+      - name: Materialize the reviewed source archive
         shell: bash
         run: |
           set -euo pipefail
@@ -37,100 +37,166 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-      - name: Cleanly compile the complete Security reactor
-        shell: bash
-        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean test-compile -DskipTests
-      - name: Scan every class, archive and service descriptor
+      - name: Order the membership table and all dependent statements safely
         shell: bash
         run: |
           set -euo pipefail
-          echo '::group::Compiled classes with JPA or Security operation names'
-          find . -type f -name '*.class' \( \
-            -iname '*Jpa*' -o \
-            -iname '*SecureRefDatabase*' -o \
-            -iname '*SecurityOperations*' \
-          \) -print | sort
-          echo '::endgroup::'
-
-          echo '::group::JUnit engines, extension autodetection and additional classpaths'
-          grep -RInE \
-            'junit\.jupiter\.extensions\.autodetection|TestEngine|dependenciesToScan|additionalClasspath|testClassesDirectory|BytecodeEnhancedClassLoader|BytecodeEnhanced' \
-            . \
-            --exclude='security-phase1-module.b64*' \
-            --exclude-dir=.git \
-            --exclude-dir=target || true
-          find . -type f \( \
-            -path '*/META-INF/services/org.junit.platform.engine.TestEngine' -o \
-            -name 'junit-platform.properties' \
-          \) -print -exec cat {} \; || true
-          echo '::endgroup::'
-
-          echo '::group::Binary locations containing the failing class or method names'
           python3 - <<'PY'
           from pathlib import Path
-          import zipfile
+          import re
 
-          roots = [Path('.'), Path.home() / '.m2' / 'repository']
-          needles = [
-              b'JpaSecureRefDatabaseDataIsolationTest',
-              b'JpaSecureRefDatabaseTest',
-              b'JpaSecurityOperationsTest',
-              b'repositoryScopedRefReadsDoNotCrossRepositoryBoundary',
-              b'allowsObjectInsertForRepositoryMember',
-              b'objectIdDeleteRequiresStoredOwnerToMatch',
-          ]
-          seen = set()
-          for root in roots:
-              for path in root.rglob('*'):
-                  if not path.is_file() or path in seen:
-                      continue
-                  seen.add(path)
-                  suffix = path.suffix.lower()
-                  if suffix in {'.jar', '.zip'}:
-                      try:
-                          with zipfile.ZipFile(path) as archive:
-                              for name in archive.namelist():
-                                  try:
-                                      data = archive.read(name)
-                                  except (KeyError, OSError, RuntimeError):
-                                      continue
-                                  hits = [needle.decode() for needle in needles if needle in data]
-                                  if hits:
-                                      print(f'{path}!/{name}: {hits}')
-                      except (OSError, zipfile.BadZipFile):
-                          pass
-                  elif suffix in {'.class', '.xml', '.properties', '.txt', '.java'}:
-                      try:
-                          data = path.read_bytes()
-                      except OSError:
-                          continue
-                      hits = [needle.decode() for needle in needles if needle in data]
-                      if hits:
-                          print(f'{path}: {hits}')
+          root = Path(
+              "jgit-storage-hibernate-security/src/main/resources/db/migration/"
+              "jgit-storage-hibernate/security"
+          )
+          table_identifier = (
+              r'(?:git_security_group_member|"git_security_group_member"|'
+              r'\[git_security_group_member\])'
+          )
+          table_start = re.compile(
+              rf"(?im)^\s*create\s+table\s+{table_identifier}\s*\("
+          )
+          index_start = re.compile(
+              rf"(?im)^\s*create\s+(?:unique\s+)?index\b[^;]*?"
+              rf"\bon\s+{table_identifier}\s*\("
+          )
+          alter_start = re.compile(
+              rf"(?im)^\s*alter\s+table\s+{table_identifier}\b"
+          )
+          principal_start = re.compile(
+              r'^\s*create\s+table\s+(?:\[|\")?git_security_principal(?:\]|\")?\s*\(',
+              re.IGNORECASE,
+          )
+          group_start = re.compile(
+              r'^\s*create\s+table\s+(?:\[|\")?git_security_group(?:\]|\")?\s*\(',
+              re.IGNORECASE,
+          )
+
+          def take_statement(sql: str, start: int) -> tuple[str, str]:
+              semicolon = sql.find(";", start)
+              if semicolon < 0:
+                  raise SystemExit(
+                      "Security migration statement has no semicolon terminator near: "
+                      + sql[start:start + 160]
+                  )
+              end = semicolon + 1
+              suffix = re.match(
+                  r"[ \t]*(?:\r?\n[ \t]*GO[ \t]*)?(?:\r?\n)?",
+                  sql[end:],
+                  flags=re.IGNORECASE,
+              )
+              if suffix:
+                  end += suffix.end()
+              return sql[start:end].strip(), sql[:start] + sql[end:]
+
+          paths = sorted(root.glob("*/V0_11_0__create_security_schema.sql"))
+          expected = {"h2", "hsqldb", "postgresql", "sqlserver"}
+          found = {path.parent.name for path in paths}
+          if found != expected:
+              raise SystemExit(
+                  f"Expected migrations for {sorted(expected)}, found {sorted(found)}"
+              )
+
+          for path in paths:
+              sql = path.read_text(encoding="utf-8")
+              table_match = table_start.search(sql)
+              if table_match is None:
+                  raise SystemExit(f"Missing membership table in {path}")
+              membership_table, sql = take_statement(sql, table_match.start())
+              if "membership_id" not in membership_table:
+                  raise SystemExit(f"membership_id is absent from {path}")
+
+              dependents: list[str] = []
+              while True:
+                  matches = [
+                      match
+                      for pattern in (index_start, alter_start)
+                      if (match := pattern.search(sql)) is not None
+                  ]
+                  if not matches:
+                      break
+                  match = min(matches, key=lambda item: item.start())
+                  statement, sql = take_statement(sql, match.start())
+                  dependents.append(statement)
+
+              reordered = sql.rstrip() + "\n\n" + membership_table + "\n"
+              if dependents:
+                  reordered += "\n" + "\n\n".join(dependents) + "\n"
+
+              lines = reordered.splitlines()
+              positions = {
+                  "principal": next(
+                      (i for i, line in enumerate(lines) if principal_start.search(line)), -1
+                  ),
+                  "group": next(
+                      (i for i, line in enumerate(lines) if group_start.search(line)), -1
+                  ),
+                  "membership": next(
+                      (i for i, line in enumerate(lines) if table_start.search(line)), -1
+                  ),
+              }
+              if min(positions.values()) < 0 or not (
+                  positions["principal"] < positions["membership"]
+                  and positions["group"] < positions["membership"]
+              ):
+                  raise SystemExit(f"Invalid table order in {path}: {positions}")
+
+              membership_offset = reordered.lower().find("git_security_group_member")
+              for statement in dependents:
+                  if reordered.find(statement) <= membership_offset:
+                      raise SystemExit(
+                          f"Dependent membership statement precedes its table in {path}"
+                      )
+
+              path.write_text(reordered, encoding="utf-8")
+              print(
+                  f"Verified {path.parent.name}: {positions}, "
+                  f"dependent statements={len(dependents)}"
+              )
           PY
-          echo '::endgroup::'
-
-      - name: Print Security dependency and Surefire configuration
+      - name: Verify module boundaries and security policy
         shell: bash
         run: |
           set -euo pipefail
-          echo '::group::Materialized Security POM'
-          cat jgit-storage-hibernate-security/pom.xml
-          echo '::endgroup::'
-          mvn -B -ntp -pl jgit-storage-hibernate-security dependency:tree -Dverbose
-          mvn -B -ntp -pl jgit-storage-hibernate-security help:effective-pom \
-            -Doutput=target/security-effective-pom.xml
-          echo '::group::Effective Surefire and test classpath configuration'
+          python3 .github/scripts/test_verify_module_boundaries.py
+          python3 .github/scripts/verify-module-boundaries.py \
+            --root . \
+            --json target/module-boundaries/security-phase1.json \
+            --markdown target/module-boundaries/security-phase1.md
+          python3 .github/scripts/verify-security-policy.py
+      - name: Run a clean complete Security reactor
+        shell: bash
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean test
+      - name: Verify the exact Security test inventory
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
 
-          path = Path('target/security-effective-pom.xml')
-          root = ET.parse(path).getroot()
-          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
-          for plugin in root.findall('.//m:plugin', ns):
-              artifact = plugin.findtext('m:artifactId', default='', namespaces=ns)
-              if artifact in {'maven-surefire-plugin', 'maven-failsafe-plugin', 'maven-compiler-plugin'}:
-                  print(ET.tostring(plugin, encoding='unicode'))
+          reports = sorted(
+              Path("jgit-storage-hibernate-security/target/surefire-reports").glob("TEST-*.xml")
+          )
+          expected_classes = {
+              "io.github.carstenartur.jgit.storage.hibernate.security.GitAccessContextTest",
+              "io.github.carstenartur.jgit.storage.hibernate.security.SecurityAuthorizationEvaluatorTest",
+              "io.github.carstenartur.jgit.storage.hibernate.security.SecurityPostgreSqlSchemaMigrationIntegrationTest",
+              "io.github.carstenartur.jgit.storage.hibernate.security.SecuritySchemaMigrationIntegrationTest",
+              "io.github.carstenartur.jgit.storage.hibernate.security.SecuritySqlServerSchemaMigrationIntegrationTest",
+          }
+          actual_classes = set()
+          totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+          for report in reports:
+              suite = ET.parse(report).getroot()
+              actual_classes.add(suite.attrib["name"])
+              for key in totals:
+                  totals[key] += int(suite.attrib.get(key, "0"))
+          if actual_classes != expected_classes:
+              raise SystemExit(
+                  f"Unexpected Security test inventory: {sorted(actual_classes)}"
+              )
+          if totals != {"tests": 11, "failures": 0, "errors": 0, "skipped": 0}:
+              raise SystemExit(f"Unexpected Security test totals: {totals}")
+          print(f"Verified Security test inventory: {totals}")
           PY
-          echo '::endgroup::'
