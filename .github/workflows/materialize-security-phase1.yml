@@ -1,4 +1,4 @@
-name: Inspect Security Phase 1 Archive Hygiene
+name: Inspect Security Phase 1 JPA Test Wiring
 
 on:
   push:
@@ -32,27 +32,31 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-      - name: Inspect archive contents and stale JPA tests
+      - name: Inspect embedded JPA test declarations and enhancement annotations
         shell: bash
         run: |
           set -euo pipefail
-          echo '::group::Every generated JPA Security source or class'
-          find . -type f \( \
-            -iname '*JpaSecureRefDatabase*' -o \
-            -iname '*JpaSecurityOperations*' \
-          \) -print | sort
+          root=jgit-storage-hibernate-security/src/test/java
+          echo '::group::JPA test declarations with context'
+          grep -RInE -B20 -A35 \
+            'class[[:space:]]+(JpaSecureRefDatabaseDataIsolationTest|JpaSecureRefDatabaseTest|JpaSecurityOperationsTest)|@(BytecodeEnhanced|EnhancementOptions|ExtendWith|DomainModel|SessionFactory|ServiceRegistry)' \
+            "$root" || true
           echo '::endgroup::'
-          echo '::group::Generated target directories'
-          find . -type d -name target -print | sort
+          echo '::group::Imports related to Hibernate testing and JUnit extensions'
+          grep -RInE \
+            '^import[[:space:]].*(hibernate\.testing|Bytecode|Enhancement|junit\.jupiter\.api\.extension)' \
+            "$root" || true
           echo '::endgroup::'
-          echo '::group::Tracked or generated build artifacts under Security module'
-          find jgit-storage-hibernate-security -type f \( \
-            -path '*/target/*' -o \
-            -name '*.class' -o \
-            -name '*.jar' \
-          \) -print | sort | sed -n '1,400p'
-          echo '::endgroup::'
-          if find jgit-storage-hibernate-security -type f -path '*/target/*' -print -quit | grep -q .; then
-            echo 'Security source archive contains forbidden target build output.' >&2
+          echo '::group::Complete Java files containing embedded JPA tests'
+          mapfile -t files < <(grep -RlE \
+            'class[[:space:]]+(JpaSecureRefDatabaseDataIsolationTest|JpaSecureRefDatabaseTest|JpaSecurityOperationsTest)' \
+            "$root" | sort)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo 'No embedded JPA test declarations found.' >&2
             exit 1
           fi
+          for file in "${files[@]}"; do
+            echo "===== $file ====="
+            sed -n '1,520p' "$file"
+          done
+          echo '::endgroup::'
