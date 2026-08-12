@@ -14,7 +14,7 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -37,77 +37,119 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-      - name: Capture the package and Javadoc failure
-        shell: bash
-        run: |
-          set -uo pipefail
-          mkdir -p target/security-javadoc-diagnostics
-          set +e
-          mvn -B -ntp -X clean package -DskipTests \
-            > target/security-javadoc-diagnostics/package-debug.log 2>&1
-          status=$?
-          set -e
-          echo "Maven package exit status: $status"
-          printf '%s\n' "$status" > target/security-javadoc-diagnostics/package-status.txt
-          echo '::group::Relevant Maven/Javadoc diagnostics'
-          grep -n -B20 -A60 -E \
-            'SecureRefDatabase|RefUpdate|reference not found|maven-javadoc-plugin|BUILD FAILURE|BUILD SUCCESS' \
-            target/security-javadoc-diagnostics/package-debug.log \
-            | tail -n 1200 || true
-          echo '::endgroup::'
-      - name: Inspect the effective Security Javadoc configuration
+      - name: Order the membership table and dependent statements
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp -pl jgit-storage-hibernate-security help:effective-pom \
-            -Doutput=target/security-javadoc-diagnostics/security-effective-pom.xml
-          echo '::group::Effective maven-javadoc-plugin configuration'
-          grep -n -B20 -A180 'maven-javadoc-plugin' \
-            target/security-javadoc-diagnostics/security-effective-pom.xml || true
-          echo '::endgroup::'
-          echo '::group::Configured source paths and Javadoc overrides'
-          grep -RInE -B5 -A15 \
-            'sourcepath|sourcePath|additionalSource|includeDependencySources|maven-javadoc-plugin|javadoc' \
-            pom.xml \
-            jgit-storage-hibernate-*/pom.xml \
-            target/security-javadoc-diagnostics/security-effective-pom.xml \
-            .mvn \
-            .github/scripts \
-            --exclude='security-phase1-module.b64*' || true
-          echo '::endgroup::'
-      - name: Locate the actual source used by Javadoc
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path(
+              "jgit-storage-hibernate-security/src/main/resources/db/migration/"
+              "jgit-storage-hibernate/security"
+          )
+          identifier = (
+              r'(?:git_security_group_member|"git_security_group_member"|'
+              r'\[git_security_group_member\])'
+          )
+          table_start = re.compile(
+              rf"(?im)^\s*create\s+table\s+{identifier}\s*\("
+          )
+          index_start = re.compile(
+              rf"(?im)^\s*create\s+(?:unique\s+)?index\b[^;]*?"
+              rf"\bon\s+{identifier}\s*\("
+          )
+          alter_start = re.compile(
+              rf"(?im)^\s*alter\s+table\s+{identifier}\b"
+          )
+
+          def take_statement(sql: str, start: int) -> tuple[str, str]:
+              semicolon = sql.find(";", start)
+              if semicolon < 0:
+                  raise SystemExit(f"Unterminated SQL statement in {sql[start:start + 160]}")
+              end = semicolon + 1
+              suffix = re.match(
+                  r"[ \t]*(?:\r?\n[ \t]*GO[ \t]*)?(?:\r?\n)?",
+                  sql[end:],
+                  flags=re.IGNORECASE,
+              )
+              if suffix:
+                  end += suffix.end()
+              return sql[start:end].strip(), sql[:start] + sql[end:]
+
+          paths = sorted(root.glob("*/V0_11_0__create_security_schema.sql"))
+          if {path.parent.name for path in paths} != {
+              "h2", "hsqldb", "postgresql", "sqlserver"
+          }:
+              raise SystemExit(f"Unexpected migration set: {paths}")
+
+          for path in paths:
+              sql = path.read_text(encoding="utf-8")
+              match = table_start.search(sql)
+              if match is None:
+                  raise SystemExit(f"Missing membership table in {path}")
+              table, sql = take_statement(sql, match.start())
+              dependents: list[str] = []
+              while True:
+                  matches = [
+                      item
+                      for pattern in (index_start, alter_start)
+                      if (item := pattern.search(sql)) is not None
+                  ]
+                  if not matches:
+                      break
+                  item = min(matches, key=lambda candidate: candidate.start())
+                  statement, sql = take_statement(sql, item.start())
+                  dependents.append(statement)
+              reordered = sql.rstrip() + "\n\n" + table + "\n"
+              if dependents:
+                  reordered += "\n" + "\n\n".join(dependents) + "\n"
+              path.write_text(reordered, encoding="utf-8")
+              print(f"Reordered {path.parent.name}; dependents={len(dependents)}")
+          PY
+      - name: Run Core and Security tests
+        shell: bash
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean test
+      - name: Inspect source side effects after tests
         shell: bash
         run: |
           set -euo pipefail
-          echo '::group::SecureRefDatabase paths and matching source text'
+          echo '::group::Source files created or changed by tests'
+          git status --short
           find . -type f -iname '*SecureRefDatabase*' -print | sort
           grep -RIn -B5 -A10 -E \
             'SecureRefDatabase|Expected old ids are deliberately read only from|\{@link RefUpdate\}' \
             . \
             --exclude='security-phase1-module.b64*' \
-            --exclude='package-debug.log' \
             --exclude-dir=.git || true
           echo '::endgroup::'
-          echo '::group::Generated Javadoc files'
-          find . -type f \( \
-            -iname '*javadoc*' -o \
-            -name options -o \
-            -name argfile -o \
-            -name packages \
-          \) -print | sort
+          echo '::group::Security source inventory after tests'
+          find jgit-storage-hibernate-security -type f -name '*.java' -print | sort
           echo '::endgroup::'
-          echo '::group::Generated Javadoc arguments'
-          while IFS= read -r file; do
-            echo "===== $file ====="
-            sed -n '1,500p' "$file" || true
-          done < <(find . -type f \( \
-            -name options -o \
-            -name argfile -o \
-            -name packages -o \
-            -name 'javadoc.sh' \
-          \) -print | sort)
+      - name: Run package after tests without cleaning
+        shell: bash
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/security-package-after-tests.log"
+          set +e
+          mvn -B -ntp -pl jgit-storage-hibernate-security -am package -DskipTests \
+            > "$log" 2>&1
+          status=$?
+          set -e
+          echo "Maven package exit status after tests: $status"
+          echo '::group::Relevant package output'
+          grep -n -B20 -A60 -E \
+            'SecureRefDatabase|RefUpdate|reference not found|maven-javadoc-plugin|BUILD FAILURE|BUILD SUCCESS' \
+            "$log" | tail -n 1000 || true
           echo '::endgroup::'
-          echo '::group::Every Java source after the package attempt'
-          find . -type f -name '*.java' -print | sort
-          echo '::endgroup::'
+          echo '::group::Sources after package attempt'
           git status --short
+          find . -type f -iname '*SecureRefDatabase*' -print | sort
+          grep -RIn -B5 -A10 -E \
+            'SecureRefDatabase|Expected old ids are deliberately read only from|\{@link RefUpdate\}' \
+            . \
+            --exclude='security-phase1-module.b64*' \
+            --exclude-dir=.git || true
+          echo '::endgroup::'
+          exit "$status"
