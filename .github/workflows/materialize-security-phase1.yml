@@ -1,4 +1,4 @@
-name: Validate Clean Security Phase 1 Source
+name: Materialize Validated Security Phase 1 Source
 
 on:
   push:
@@ -9,22 +9,24 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  actions: write
+  contents: write
 
 jobs:
-  validate:
+  materialize:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: feature/security-phase-1
+          fetch-depth: 0
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Materialize the reviewed source archive
+      - name: Materialize the reviewed Security source archive
         shell: bash
         run: |
           set -euo pipefail
@@ -37,7 +39,12 @@ jobs:
             .github/scripts/security-phase1-module.b64.part-04 \
             > .github/scripts/security-phase1-module.b64
           python3 .github/scripts/generate-security-phase1.py
-      - name: Order the membership table and all dependent statements safely
+
+          test -f jgit-storage-hibernate-security/pom.xml
+          test "$(find jgit-storage-hibernate-security/src/main/java -type f -name '*.java' | wc -l)" -eq 24
+          test "$(find jgit-storage-hibernate-security/src/test/java -type f -name '*.java' | wc -l)" -eq 5
+          test "$(find jgit-storage-hibernate-security/src/main/resources -type f -name 'V0_11_0__create_security_schema.sql' | wc -l)" -eq 4
+      - name: Order the membership table and every dependent statement safely
         shell: bash
         run: |
           set -euo pipefail
@@ -154,7 +161,7 @@ jobs:
                   f"dependent statements={len(dependents)}"
               )
           PY
-      - name: Verify module boundaries and security policy
+      - name: Verify module boundaries and Security policy
         shell: bash
         run: |
           set -euo pipefail
@@ -164,9 +171,9 @@ jobs:
             --json target/module-boundaries/security-phase1.json \
             --markdown target/module-boundaries/security-phase1.md
           python3 .github/scripts/verify-security-policy.py
-      - name: Run a clean complete Security reactor
+      - name: Run the complete clean reactor
         shell: bash
-        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean test
+        run: mvn -B -ntp clean verify
       - name: Verify the exact Security test inventory
         shell: bash
         run: |
@@ -179,11 +186,11 @@ jobs:
               Path("jgit-storage-hibernate-security/target/surefire-reports").glob("TEST-*.xml")
           )
           expected_classes = {
-              "io.github.carstenartur.jgit.storage.hibernate.security.GitAccessContextTest",
-              "io.github.carstenartur.jgit.storage.hibernate.security.SecurityAuthorizationEvaluatorTest",
-              "io.github.carstenartur.jgit.storage.hibernate.security.SecurityPostgreSqlSchemaMigrationIntegrationTest",
-              "io.github.carstenartur.jgit.storage.hibernate.security.SecuritySchemaMigrationIntegrationTest",
-              "io.github.carstenartur.jgit.storage.hibernate.security.SecuritySqlServerSchemaMigrationIntegrationTest",
+              "GitAccessContextTest",
+              "SecurityAuthorizationEvaluatorTest",
+              "SecurityPostgreSqlSchemaMigrationIntegrationTest",
+              "SecuritySchemaMigrationIntegrationTest",
+              "SecuritySqlServerSchemaMigrationIntegrationTest",
           }
           actual_classes = set()
           totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
@@ -200,3 +207,61 @@ jobs:
               raise SystemExit(f"Unexpected Security test totals: {totals}")
           print(f"Verified Security test inventory: {totals}")
           PY
+      - name: Replace the bootstrap branch with one reviewable source commit
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source_head="$(git rev-parse HEAD)"
+          git fetch origin main
+          git reset --mixed origin/main
+
+          rm -f .github/scripts/generate-security-phase1.py
+          rm -f .github/scripts/security-phase1-module.b64
+          rm -f .github/scripts/security-phase1-module.b64.part-*
+          rm -f .github/workflows/materialize-security-phase1.yml
+          find . -type d -name target -prune -exec rm -rf {} +
+
+          if grep -RInE \
+            'security-phase1-module\.b64|generate-security-phase1\.py|materialize-security-phase1\.yml' \
+            . \
+            --exclude-dir=.git \
+            --exclude-dir=target; then
+            echo 'Bootstrap references remain after source materialization.' >&2
+            exit 1
+          fi
+
+          test -f jgit-storage-hibernate-security/pom.xml
+          test "$(find jgit-storage-hibernate-security/src/main/java -type f -name '*.java' | wc -l)" -eq 24
+          test "$(find jgit-storage-hibernate-security/src/test/java -type f -name '*.java' | wc -l)" -eq 5
+          test "$(find jgit-storage-hibernate-security/src/main/resources -type f -name 'V0_11_0__create_security_schema.sql' | wc -l)" -eq 4
+
+          git add -A
+          git diff --cached --check
+
+          if git diff --cached --name-only | grep -E \
+            '(^|/)target/|\.class$|\.jar$|security-phase1-module\.b64|generate-security-phase1\.py|materialize-security-phase1\.yml'; then
+            echo 'Forbidden bootstrap or build artifacts are staged.' >&2
+            exit 1
+          fi
+
+          echo '::group::Clean Security source commit summary'
+          git diff --cached --stat
+          git status --short
+          echo '::endgroup::'
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit \
+            -m 'Add Security Phase 1 authorization module' \
+            -m 'Add repository-scoped principals, groups, grants and protected-ref policies with deterministic deny precedence, auditable evidence and Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server.'
+
+          new_head="$(git rev-parse HEAD)"
+          git push \
+            --force-with-lease="refs/heads/feature/security-phase-1:${source_head}" \
+            origin \
+            HEAD:refs/heads/feature/security-phase-1
+
+          echo "new_head=${new_head}" >> "$GITHUB_OUTPUT"
+          echo "Published clean Security source commit ${new_head}"
