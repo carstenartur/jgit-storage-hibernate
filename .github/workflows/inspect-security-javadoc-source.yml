@@ -108,14 +108,50 @@ jobs:
               path.write_text(reordered, encoding="utf-8")
               print(f"Reordered {path.parent.name}; dependents={len(dependents)}")
           PY
-      - name: Run Core and Security tests
-        shell: bash
-        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean test
-      - name: Inspect source side effects after tests
+      - name: Capture Java source baseline before tests
         shell: bash
         run: |
           set -euo pipefail
-          echo '::group::Source files created or changed by tests'
+          sources="$RUNNER_TEMP/java-sources-before-tests.txt"
+          hashes="$RUNNER_TEMP/java-source-hashes-before-tests.txt"
+          find . -path './.git' -prune -o -type f -name '*.java' -print \
+            | sort > "$sources"
+          while IFS= read -r source; do
+            sha256sum "$source"
+          done < "$sources" > "$hashes"
+          touch "$RUNNER_TEMP/before-security-tests"
+          echo "Captured $(wc -l < "$sources") Java sources before tests."
+      - name: Run Core and Security tests
+        id: core_security_tests
+        continue-on-error: true
+        shell: bash
+        run: mvn -B -ntp -pl jgit-storage-hibernate-security -am clean test
+      - name: Inspect source side effects after tests
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          before_sources="$RUNNER_TEMP/java-sources-before-tests.txt"
+          before_hashes="$RUNNER_TEMP/java-source-hashes-before-tests.txt"
+          after_sources="$RUNNER_TEMP/java-sources-after-tests.txt"
+          after_hashes="$RUNNER_TEMP/java-source-hashes-after-tests.txt"
+          find . -path './.git' -prune -o -type f -name '*.java' -print \
+            | sort > "$after_sources"
+          while IFS= read -r source; do
+            sha256sum "$source"
+          done < "$after_sources" > "$after_hashes"
+
+          echo '::group::Java source inventory changes caused by tests'
+          diff -u "$before_sources" "$after_sources" || true
+          echo '::endgroup::'
+          echo '::group::Java source content changes caused by tests'
+          diff -u "$before_hashes" "$after_hashes" || true
+          echo '::endgroup::'
+          echo '::group::Files touched after the test baseline'
+          find . -path './.git' -prune -o -type f \
+            -newer "$RUNNER_TEMP/before-security-tests" -print | sort
+          echo '::endgroup::'
+          echo '::group::Source files created or changed in the worktree'
           git status --short
           find . -type f -iname '*SecureRefDatabase*' -print | sort
           grep -RIn -B5 -A10 -E \
@@ -128,6 +164,9 @@ jobs:
           find jgit-storage-hibernate-security -type f -name '*.java' -print | sort
           echo '::endgroup::'
       - name: Run package after tests without cleaning
+        id: package_after_tests
+        if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -uo pipefail
@@ -143,6 +182,11 @@ jobs:
             'SecureRefDatabase|RefUpdate|reference not found|maven-javadoc-plugin|BUILD FAILURE|BUILD SUCCESS' \
             "$log" | tail -n 1000 || true
           echo '::endgroup::'
+          if [[ "$status" -ne 0 ]]; then
+            echo '::group::Complete failed package output'
+            cat "$log"
+            echo '::endgroup::'
+          fi
           echo '::group::Sources after package attempt'
           git status --short
           find . -type f -iname '*SecureRefDatabase*' -print | sort
@@ -153,3 +197,15 @@ jobs:
             --exclude-dir=.git || true
           echo '::endgroup::'
           exit "$status"
+      - name: Report diagnostic outcome
+        if: always()
+        shell: bash
+        env:
+          TEST_OUTCOME: ${{ steps.core_security_tests.outcome }}
+          PACKAGE_OUTCOME: ${{ steps.package_after_tests.outcome }}
+        run: |
+          echo "Core and Security test outcome: $TEST_OUTCOME"
+          echo "Package-after-tests outcome: $PACKAGE_OUTCOME"
+          if [[ "$TEST_OUTCOME" != success || "$PACKAGE_OUTCOME" != success ]]; then
+            exit 1
+          fi
