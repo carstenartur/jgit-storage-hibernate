@@ -106,7 +106,8 @@ Git objects and refs remain authoritative. Search, Java Analysis and Architectur
 
 | Module | Choose it when... | Persistence contract |
 |---|---|---|
-| `jgit-storage-hibernate-core` | You need database-backed Git semantics and transaction-safe repository publication. | Versioned Flyway migrations for H2, HSQLDB and PostgreSQL |
+| `jgit-storage-hibernate-core` | You need database-backed Git semantics and transaction-safe repository publication. | Versioned Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server |
+| `jgit-storage-hibernate-security` | You need an optional framework-neutral principal/group ACL model and deterministic protected-ref decisions. | Versioned Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server; direct-JGit enforcement follows in phase 2 |
 | `jgit-storage-hibernate-search` | Users or services need repeated audit, reporting or content-search queries. | Versioned Flyway migrations for H2 and PostgreSQL |
 | `jgit-storage-hibernate-java-analysis` | You need to know which logical Java declaration changed and which versions are affected. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-architecture` | You need explainable architecture drift and decision provenance. | In-memory API supported; entity persistence incubating |
@@ -141,7 +142,7 @@ No GitHub token or Maven Central account is required.
 </dependency>
 ```
 
-Add `jgit-storage-hibernate-search` at the same version when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema.
+Add `jgit-storage-hibernate-security` for the optional principal/group ACL schema and evaluator, and add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema.
 
 ### 3. Apply the packaged migration before Hibernate starts
 
@@ -210,6 +211,7 @@ See [Pack capacity and recovery](docs/operations/capacity-and-recovery.md) for s
 | Artifact | H2 | HSQLDB | PostgreSQL | History table |
 |---|---|---|---|---|
 | Core | yes | yes | yes | `jgit_storage_hibernate_core_schema_history` |
+| Security | yes | yes | yes | `jgit_storage_hibernate_security_schema_history` |
 | Search | yes | no | yes | `jgit_storage_hibernate_search_schema_history` |
 | Java Analysis entities | no module-owned contract | no | no | incubating |
 | Architecture entities | no module-owned contract | no | no | incubating |

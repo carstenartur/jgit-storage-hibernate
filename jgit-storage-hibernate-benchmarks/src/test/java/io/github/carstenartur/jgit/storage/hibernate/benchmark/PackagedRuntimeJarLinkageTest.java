@@ -48,6 +48,7 @@ class PackagedRuntimeJarLinkageTest {
   private static final List<String> RUNTIME_MODULES =
       List.of(
           "jgit-storage-hibernate-core",
+          "jgit-storage-hibernate-security",
           "jgit-storage-hibernate-search",
           "jgit-storage-hibernate-java-analysis",
           "jgit-storage-hibernate-architecture");
