@@ -161,6 +161,29 @@ jobs:
                   f"dependent statements={len(dependents)}"
               )
           PY
+      - name: Resolve Security Javadoc links
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              "jgit-storage-hibernate-security/src/main/java/"
+              "io/github/carstenartur/jgit/storage/hibernate/security/engine/"
+              "SecureRefDatabase.java"
+          )
+          text = path.read_text(encoding="utf-8")
+          old = "{@link RefUpdate}"
+          new = "{@link org.eclipse.jgit.lib.RefUpdate}"
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(
+                  f"Expected exactly one unresolved RefUpdate Javadoc link, found {count}"
+              )
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          print(f"Qualified RefUpdate Javadoc link in {path}")
+          PY
       - name: Verify module boundaries and Security policy
         shell: bash
         run: |
