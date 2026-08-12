@@ -163,10 +163,12 @@ jobs:
           PY
 
           hsqldb_migration="jgit-storage-hibernate-security/src/main/resources/db/migration/jgit-storage-hibernate/security/hsqldb/V0_11_0__create_security_schema.sql"
+          timestamp_with_zone='timestamp([[:space:]]*\([0-9]+\))?[[:space:]]+with[[:space:]]+time[[:space:]]+zone'
           test -f "$hsqldb_migration"
-          grep -qiE 'timestamp[[:space:]]+with[[:space:]]+time[[:space:]]+zone' "$hsqldb_migration"
-          sed -Ei 's/timestamp[[:space:]]+with[[:space:]]+time[[:space:]]+zone/timestamp(6)/Ig' "$hsqldb_migration"
-          if grep -qiE 'timestamp[[:space:]]+with[[:space:]]+time[[:space:]]+zone' "$hsqldb_migration"; then
+          grep -niE 'created_at|timestamp' "$hsqldb_migration"
+          grep -qiE "$timestamp_with_zone" "$hsqldb_migration"
+          sed -Ei "s/$timestamp_with_zone/timestamp(6)/Ig" "$hsqldb_migration"
+          if grep -qiE "$timestamp_with_zone" "$hsqldb_migration"; then
             echo 'HSQLDB security migration still contains zoned timestamp columns.' >&2
             exit 1
           fi
