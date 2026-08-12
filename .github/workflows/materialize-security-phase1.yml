@@ -169,20 +169,20 @@ jobs:
           from pathlib import Path
 
           root = Path("jgit-storage-hibernate-security/src/main/java")
-          paths = sorted(root.rglob("SecureRefDatabase.java"))
-          if len(paths) != 1:
-              raise SystemExit(
-                  f"Expected exactly one generated SecureRefDatabase.java, found {paths}"
-              )
-          path = paths[0]
-          text = path.read_text(encoding="utf-8")
           old = "{@link RefUpdate}"
           new = "{@link org.eclipse.jgit.lib.RefUpdate}"
-          count = text.count(old)
-          if count != 1:
+          matches: list[tuple[Path, int]] = []
+          for path in sorted(root.rglob("*.java")):
+              count = path.read_text(encoding="utf-8").count(old)
+              if count:
+                  matches.append((path, count))
+          total = sum(count for _, count in matches)
+          if total != 1 or len(matches) != 1:
               raise SystemExit(
-                  f"Expected exactly one unresolved RefUpdate Javadoc link, found {count}"
+                  f"Expected exactly one unresolved RefUpdate Javadoc link, found {matches}"
               )
+          path = matches[0][0]
+          text = path.read_text(encoding="utf-8")
           path.write_text(text.replace(old, new), encoding="utf-8")
           print(f"Qualified RefUpdate Javadoc link in {path}")
           PY
