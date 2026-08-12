@@ -45,6 +45,10 @@
     </dependency>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
       <artifactId>jgit-storage-hibernate-search</artifactId>
     </dependency>
     <dependency>

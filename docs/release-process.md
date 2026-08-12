@@ -6,6 +6,7 @@ The project publishes immutable releases to an anonymous static Maven repository
 
 - `io.github.carstenartur:jgit-storage-hibernate-parent`
 - `io.github.carstenartur:jgit-storage-hibernate-core`
+- `io.github.carstenartur:jgit-storage-hibernate-security`
 - `io.github.carstenartur:jgit-storage-hibernate-search`
 - `io.github.carstenartur:jgit-storage-hibernate-java-analysis`
 - `io.github.carstenartur:jgit-storage-hibernate-architecture`

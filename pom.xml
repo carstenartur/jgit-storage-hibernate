@@ -18,6 +18,7 @@
 
   <modules>
     <module>jgit-storage-hibernate-core</module>
+    <module>jgit-storage-hibernate-security</module>
     <module>jgit-storage-hibernate-search</module>
     <module>jgit-storage-hibernate-java-analysis</module>
     <module>jgit-storage-hibernate-architecture</module>
@@ -112,6 +113,11 @@
       <dependency>
         <groupId>io.github.carstenartur</groupId>
         <artifactId>jgit-storage-hibernate-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.carstenartur</groupId>
+        <artifactId>jgit-storage-hibernate-security</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

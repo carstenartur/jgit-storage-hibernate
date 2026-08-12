@@ -29,6 +29,7 @@ def module(artifact: str, *dependencies, packaging: str = "jar"):
 def valid_modules():
     return {
         MODULE.CORE: module(MODULE.CORE),
+        MODULE.SECURITY: module(MODULE.SECURITY, dep(MODULE.CORE)),
         MODULE.SEARCH: module(MODULE.SEARCH, dep(MODULE.CORE)),
         MODULE.JAVA_ANALYSIS: module(MODULE.JAVA_ANALYSIS, dep(MODULE.CORE)),
         MODULE.ARCHITECTURE: module(MODULE.ARCHITECTURE, dep(MODULE.JAVA_ANALYSIS)),
@@ -49,6 +50,7 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
         modules = valid_modules()
         edges = MODULE.verify(modules)
         self.assertEqual(set(), edges[MODULE.CORE])
+        self.assertEqual({MODULE.CORE}, edges[MODULE.SECURITY])
         self.assertEqual({MODULE.CORE}, edges[MODULE.SEARCH])
         self.assertEqual({MODULE.CORE}, edges[MODULE.JAVA_ANALYSIS])
         self.assertEqual({MODULE.JAVA_ANALYSIS}, edges[MODULE.ARCHITECTURE])
@@ -58,6 +60,31 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
         modules[MODULE.CORE] = module(MODULE.CORE, dep(MODULE.SEARCH))
         with self.assertRaisesRegex(MODULE.BoundaryError, "forbidden production module dependencies"):
             MODULE.verify(modules)
+
+    def test_rejects_security_dependency_on_search_or_protocol_runtime(self) -> None:
+        modules = valid_modules()
+        modules[MODULE.SECURITY] = module(
+            MODULE.SECURITY, dep(MODULE.CORE), dep(MODULE.SEARCH)
+        )
+        with self.assertRaisesRegex(
+            MODULE.BoundaryError, "forbidden production module dependencies"
+        ):
+            MODULE.verify(modules)
+
+        for dependency in (
+            dep("hibernate-search-mapper-orm", group="org.hibernate.search"),
+            dep("jakarta.servlet-api", group="jakarta.servlet"),
+            dep("org.eclipse.jgit.http.server", group="org.eclipse.jgit"),
+        ):
+            with self.subTest(dependency=dependency):
+                modules = valid_modules()
+                modules[MODULE.SECURITY] = module(
+                    MODULE.SECURITY, dep(MODULE.CORE), dependency
+                )
+                with self.assertRaisesRegex(
+                    MODULE.BoundaryError, "forbidden Security runtime"
+                ):
+                    MODULE.verify(modules)
 
     def test_rejects_runtime_dependency_on_benchmarks(self) -> None:
         modules = valid_modules()

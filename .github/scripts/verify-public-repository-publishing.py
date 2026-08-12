@@ -14,6 +14,7 @@ GROUP_ID="io.github.carstenartur"
 BOM="jgit-storage-hibernate-bom"
 PRODUCTION={
     "jgit-storage-hibernate-core",
+    "jgit-storage-hibernate-security",
     "jgit-storage-hibernate-search",
     "jgit-storage-hibernate-java-analysis",
     "jgit-storage-hibernate-architecture",

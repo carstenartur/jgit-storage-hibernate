@@ -4,10 +4,11 @@ This guide covers the storage-facing artifacts:
 
 ```text
 io.github.carstenartur:jgit-storage-hibernate-core
+io.github.carstenartur:jgit-storage-hibernate-security
 io.github.carstenartur:jgit-storage-hibernate-search
 ```
 
-Core provides database-backed JGit repositories. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
+Core provides database-backed JGit repositories. Security is optional and adds a framework-neutral principal/group ACL schema plus deterministic repository/ref decisions. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
 
 The documented released line is **0.1.17**. It uses Java 21, Hibernate ORM 7.4.5.Final, Hibernate Search 8.4.0.Final and Flyway 13.0.0. Keep those versions aligned through the published artifacts and tested deployment stack instead of overriding only one side of the stack.
 
@@ -81,11 +82,26 @@ Optional generic history search:
 
 Use Search 0.1.16 or later for SQL Server.
 
+Optional database-backed security policy (development preview):
+
+Security is introduced in the upcoming `0.11.0` line and is not contained in the documented `0.10.0` release. Until `0.11.0` is released, use the snapshot repository and replace the placeholder below with the current snapshot version.
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-security</artifactId>
+  <version>X.Y.Z-SNAPSHOT</version>
+</dependency>
+```
+
+Phase 1 supplies the explicit access context, Git-generic permission model, deterministic evaluator and migrations. Principal-bound direct-JGit enforcement is delivered separately so Core-only consumers remain unchanged.
+
 ## Schema ownership
 
 | Module | Owned tables | Flyway history table |
 |---|---|---|
 | Core | `git_packs`, `git_pack_chunks`, `git_repository_lock`, `git_reflog` | `jgit_storage_hibernate_core_schema_history` |
+| Security | principals, groups, memberships, repository grants, ref rules and monotonic security versions | `jgit_storage_hibernate_security_schema_history` |
 | Search | `git_commit_index` | `jgit_storage_hibernate_search_schema_history` |
 
 `git_packs` stores committed publication metadata, compatibility inline payloads and lease-owned durable unpublished state. Small pack extensions may remain inline; sufficiently large extensions use ordered 1 MiB rows in `git_pack_chunks`. `git_repository_lock` coordinates ref updates, logical-pack visibility, direct pack replacement, repository deletion and lease-aware cleanup across independent `SessionFactory` instances.
@@ -103,8 +119,12 @@ Application workflow, session, audit, outbox and domain-projection tables are ou
 | Search | H2 | `classpath:db/migration/jgit-storage-hibernate/search/h2` |
 | Search | PostgreSQL | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` |
 | Search | Microsoft SQL Server | `classpath:db/migration/jgit-storage-hibernate/search/sqlserver` |
+| Security | H2 | `classpath:db/migration/jgit-storage-hibernate/security/h2` |
+| Security | HSQLDB | `classpath:db/migration/jgit-storage-hibernate/security/hsqldb` |
+| Security | PostgreSQL | `classpath:db/migration/jgit-storage-hibernate/security/postgresql` |
+| Security | Microsoft SQL Server | `classpath:db/migration/jgit-storage-hibernate/security/sqlserver` |
 
-The public constants in `CoreSchemaMigrations` and `SearchSchemaMigrations` avoid copying these strings or history-table names into consumer code.
+The public constants in `CoreSchemaMigrations`, `SecuritySchemaMigrations` and `SearchSchemaMigrations` avoid copying these strings or history-table names into consumer code.
 
 Flyway is a deployment concern and is intentionally not a runtime dependency of the published storage artifacts. Add `flyway-core` and the matching database module to the application, migration module or deployment tool:
 

@@ -32,6 +32,11 @@
     </dependency>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-security</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
       <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
       <scope>test</scope>
     </dependency>

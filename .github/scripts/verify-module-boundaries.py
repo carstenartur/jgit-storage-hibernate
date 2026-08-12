@@ -14,6 +14,7 @@ PROJECT_GROUP = "io.github.carstenartur"
 PREFIX = "jgit-storage-hibernate-"
 
 CORE = PREFIX + "core"
+SECURITY = PREFIX + "security"
 SEARCH = PREFIX + "search"
 JAVA_ANALYSIS = PREFIX + "java-analysis"
 ARCHITECTURE = PREFIX + "architecture"
@@ -21,13 +22,14 @@ BENCHMARKS = PREFIX + "benchmarks"
 BOM = PREFIX + "bom"
 PARENT = PREFIX + "parent"
 
-RUNTIME_MODULES = {CORE, SEARCH, JAVA_ANALYSIS, ARCHITECTURE}
+RUNTIME_MODULES = {CORE, SECURITY, SEARCH, JAVA_ANALYSIS, ARCHITECTURE}
 ALLOWED_INTERNAL = {
     CORE: set(),
+    SECURITY: {CORE},
     SEARCH: {CORE},
     JAVA_ANALYSIS: {CORE},
     ARCHITECTURE: {JAVA_ANALYSIS},
-    BENCHMARKS: {CORE, SEARCH, JAVA_ANALYSIS, ARCHITECTURE},
+    BENCHMARKS: {CORE, SECURITY, SEARCH, JAVA_ANALYSIS, ARCHITECTURE},
 }
 
 DB_DRIVERS = {
@@ -38,6 +40,21 @@ DB_DRIVERS = {
 }
 FORBIDDEN_GROUP_PREFIXES = ("org.springframework", "org.springframework.boot")
 FORBIDDEN_UI_TOKENS = ("swt", "jface", "workbench", "e4.ui")
+SECURITY_FORBIDDEN_GROUP_PREFIXES = (
+    "org.hibernate.search",
+    "jakarta.servlet",
+    "javax.servlet",
+)
+SECURITY_FORBIDDEN_COORDINATES = {
+    ("org.eclipse.jgit", "org.eclipse.jgit.http.server"),
+}
+SECURITY_FORBIDDEN_ARTIFACT_TOKENS = (
+    "servlet",
+    "spring-security",
+    "jetty",
+    "tomcat",
+    "undertow",
+)
 
 
 @dataclass(frozen=True)
@@ -199,12 +216,21 @@ def _check_external_boundaries(modules: dict[str, Module]) -> None:
                 violations.append(
                     f"{artifact} -> {dependency.group_id}:{dependency.artifact_id} ({dependency.scope}) UI runtime"
                 )
+            if artifact == SECURITY and (
+                dependency.group_id.startswith(SECURITY_FORBIDDEN_GROUP_PREFIXES)
+                or coordinate in SECURITY_FORBIDDEN_COORDINATES
+                or any(token in lowered for token in SECURITY_FORBIDDEN_ARTIFACT_TOKENS)
+            ):
+                violations.append(
+                    f"{artifact} -> {dependency.group_id}:{dependency.artifact_id} "
+                    f"({dependency.scope}) forbidden Security runtime"
+                )
     if violations:
         raise BoundaryError("Forbidden production dependencies:\n- " + "\n- ".join(violations))
 
 
 def verify(modules: dict[str, Module]) -> dict[str, set[str]]:
-    required = {CORE, SEARCH, JAVA_ANALYSIS, ARCHITECTURE, BENCHMARKS, BOM}
+    required = {CORE, SECURITY, SEARCH, JAVA_ANALYSIS, ARCHITECTURE, BENCHMARKS, BOM}
     missing = required - set(modules)
     if missing:
         raise BoundaryError("Missing expected reactor modules: " + ", ".join(sorted(missing)))
@@ -250,7 +276,8 @@ def graph_markdown(modules: dict[str, Module], edges: dict[str, set[str]]) -> st
             "",
             "## Enforced rules",
             "",
-            "- Core has no production dependency on Search, Java Analysis, Architecture or Benchmarks.",
+            "- Core has no production dependency on Security, Search, Java Analysis, Architecture or Benchmarks.",
+            "- Security may depend on Core only and never on Search, Servlet, Spring or HTTP runtimes.",
             "- Search may depend on Core only among project runtime modules.",
             "- Java Analysis may depend on Core only among project runtime modules.",
             "- Architecture may depend on Java Analysis only among project runtime modules.",
