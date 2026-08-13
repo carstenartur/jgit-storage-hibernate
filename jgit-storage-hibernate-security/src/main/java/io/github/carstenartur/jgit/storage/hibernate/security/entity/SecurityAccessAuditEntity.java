@@ -18,9 +18,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.Immutable;
 
 /** Append-only persistent evidence for one repository authorization decision. */
 @Entity(name = "SecurityAccessAudit")
+@Immutable
 @Table(
     name = "git_security_access_audit",
     indexes = {
