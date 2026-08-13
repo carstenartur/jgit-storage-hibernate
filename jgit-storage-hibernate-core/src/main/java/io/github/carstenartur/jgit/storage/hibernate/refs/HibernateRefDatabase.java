@@ -92,7 +92,7 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
     }
     return switch (command.getResult()) {
       case OK -> true;
-      case REJECTED_OTHER_REASON -> throw new IOException(command.getMessage());
+      case REJECTED_OTHER_REASON -> throw new IOException(commandFailureMessage(command));
       default -> false;
     };
   }
@@ -103,6 +103,17 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
       return false;
     }
     return compareAndPutRef(oldRef, null);
+  }
+
+  private static String commandFailureMessage(ReceiveCommand command) {
+    String message = command.getMessage();
+    if (message != null && !message.isBlank()) {
+      return message;
+    }
+    return "Ref publication failed for "
+        + command.getRefName()
+        + " with result "
+        + command.getResult();
   }
 
   private static boolean sameRef(Ref current, Ref expected) {
