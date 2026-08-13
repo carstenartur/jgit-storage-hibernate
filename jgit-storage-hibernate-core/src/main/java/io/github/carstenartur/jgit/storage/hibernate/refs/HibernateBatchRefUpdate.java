@@ -55,7 +55,7 @@ final class HibernateBatchRefUpdate extends DfsReftableBatchRefUpdate {
             return null;
           });
     } catch (IOException | RuntimeException exception) {
-      rejectAll(transactionFailureMessage(exception));
+      rejectAll(getCommands(), transactionFailureMessage(exception));
     }
   }
 
@@ -118,8 +118,8 @@ final class HibernateBatchRefUpdate extends DfsReftableBatchRefUpdate {
         command.getNewId());
   }
 
-  private void rejectAll(String message) {
-    for (ReceiveCommand command : getCommands()) {
+  static void rejectAll(List<ReceiveCommand> commands, String message) {
+    for (ReceiveCommand command : commands) {
       command.setResult(ReceiveCommand.Result.REJECTED_OTHER_REASON, message);
     }
   }
@@ -127,7 +127,10 @@ final class HibernateBatchRefUpdate extends DfsReftableBatchRefUpdate {
   static String transactionFailureMessage(Exception exception) {
     String detail = exception.getMessage();
     String type = exception.getClass().getSimpleName();
-    String prefix = type.isBlank() ? TRANSACTION_FAILURE_MESSAGE : TRANSACTION_FAILURE_MESSAGE + " (" + type + ")";
+    String prefix =
+        type.isBlank()
+            ? TRANSACTION_FAILURE_MESSAGE
+            : TRANSACTION_FAILURE_MESSAGE + " (" + type + ")";
     if (detail == null || detail.isBlank()) {
       return prefix;
     }
