@@ -36,7 +36,7 @@ public final class SecuritySchemaMigrations {
   public static final String PRE_MIGRATION_BASELINE_VERSION = "0";
 
   /** Latest schema version produced by this module. */
-  public static final String CURRENT_SCHEMA_VERSION = "0.11.0";
+  public static final String CURRENT_SCHEMA_VERSION = "0.11.1";
 
   private SecuritySchemaMigrations() {}
 }

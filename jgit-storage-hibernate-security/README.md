@@ -8,10 +8,11 @@ It provides:
 - immutable, explicitly propagated `GitAccessContext` values;
 - Git-generic repository permissions;
 - deterministic principal/group grant and protected-ref evaluation;
-- module-owned Hibernate entities for principals, groups, memberships, grants, ref rules and security versions;
+- module-owned Hibernate entities for principals, groups, memberships, grants, ref rules, security versions and append-only access audit;
 - independent Flyway migrations for H2, HSQLDB, PostgreSQL and Microsoft SQL Server;
 - a database-backed adapter for Core's dependency-free repository access SPI;
-- principal-bound repository sessions that enforce direct JGit ref mutations and repository deletion.
+- principal-bound repository sessions that enforce direct JGit ref mutations and repository deletion;
+- bounded persistent evidence for allowed, denied and failed authorization evaluations.
 
 The evaluator fails closed. Repository grants are a prerequisite for access, explicit deny grants win
 over allows, and the highest-precedence matching ref rule can further allow or deny a ref mutation.
@@ -78,5 +79,70 @@ opened without an access guard remain explicitly privileged infrastructure capab
 them into untrusted request or domain code. Persisting loose/unreachable Git objects does not publish a
 branch or tag; authority-changing ref publication is enforced separately.
 
-This module deliberately has no Hibernate Search, Spring, Servlet or HTTP-server dependency. Audit,
-local credential/token services and Smart HTTP integration remain later stages of issue #233.
+## Persistent authorization audit
+
+Register the audit entity through `SecurityEntities.annotatedClasses()` and apply the Security Flyway
+stream through version `0.11.1`. Then pass one persistent recorder to the database-backed policy:
+
+```java
+HibernateSecurityAccessAuditService audit =
+    new HibernateSecurityAccessAuditService(sessionFactory);
+HibernateSecurityRepositoryAccessPolicy accessPolicy =
+    new HibernateSecurityRepositoryAccessPolicy(sessionFactory, audit);
+SecuredHibernateRepositoryFactory<GitAccessContext> repositories =
+    new SecuredHibernateRepositoryFactory<>(sessionFactory, accessPolicy);
+```
+
+Every policy check now appends a bounded event with the stable principal ID, authentication method,
+session and correlation IDs, logical repository, exact operation, optional ref and old/new object IDs,
+outcome, reason code, optional policy evidence ID and policy version. The record deliberately excludes:
+
+- caller-supplied group lists and arbitrary context attributes;
+- commit, tree, blob, message or changed-file content;
+- passwords, tokens, hashes or other credential material;
+- display names, login names and author/committer metadata.
+
+Queries are intentionally scoped and bounded:
+
+```java
+List<SecurityAccessAuditEvent> repositoryEvents =
+    audit.findByRepository(new RepositoryName("demo"), 100);
+List<SecurityAccessAuditEvent> requestEvents =
+    audit.findByCorrelationId("correlation-789", 100);
+```
+
+There is no unbounded `findAll()` and no update API. The Hibernate entity is also mapped `@Immutable`,
+so a loaded audit row is not rewritten through normal ORM dirty checking. Audit IDs are opaque.
+Consumers should expose these queries only behind an explicit administrative permission and should
+apply database backup, retention, legal-hold and deletion policies appropriate to their jurisdiction.
+
+### Failure and transaction semantics
+
+An audit row records an **authorization evaluation**, not proof that the subsequent Git/storage
+operation committed. For example, an allowed ref decision can still be followed by an optimistic-lock,
+I/O or transaction failure. Storage success remains observable through the JGit result, reflog and
+storage transaction outcome.
+
+Audit rows use their own short transaction. This makes denials durable even when they occur before or
+outside a storage transaction. When audit and storage share one `SessionFactory`, the connection pool
+must provide an independent audit connection in addition to a connection already held by a ref or
+repository-lifecycle transaction. A deployment may instead give the audit service its own compatible
+`SessionFactory` targeting the same migrated Security schema.
+
+The resulting rules are deterministic:
+
+- an allowed decision is not returned when its required audit append fails; the operation fails closed
+  with `SecurityAuditPersistenceException`;
+- a denied decision remains denied when audit persistence also fails; the audit error is attached as a
+  suppressed exception and can never turn the denial into an allow;
+- an evaluator/database failure remains the primary failure; a simultaneous audit failure is attached
+  as suppressed evidence;
+- repository deletion may produce two allowed checks with the same correlation ID because it is
+  deliberately checked before lifecycle reservation and again after acquiring the database lock.
+
+The default one-argument policy constructors retain the explicit no-op recorder for compatibility.
+Security-sensitive deployments that require durable audit must construct and inject
+`HibernateSecurityAccessAuditService`; there is no ambient global recorder.
+
+This module deliberately has no Hibernate Search, Spring, Servlet or HTTP-server dependency. Local
+credential/token services and Smart HTTP integration remain later stages of issue #233.

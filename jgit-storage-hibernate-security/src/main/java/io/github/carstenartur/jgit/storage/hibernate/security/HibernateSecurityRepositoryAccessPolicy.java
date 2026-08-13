@@ -36,27 +36,45 @@ public final class HibernateSecurityRepositoryAccessPolicy
     implements RepositoryAccessPolicy<GitAccessContext> {
 
   private final SessionFactory sessionFactory;
+  private final SecurityAccessAuditRecorder auditRecorder;
 
   /**
-   * Create a database-backed policy.
+   * Create a database-backed policy without persistent audit.
    *
    * @param sessionFactory Hibernate session factory containing Security entities
    */
   public HibernateSecurityRepositoryAccessPolicy(SessionFactory sessionFactory) {
+    this(sessionFactory, SecurityAccessAuditRecorder.NONE);
+  }
+
+  /**
+   * Create a database-backed policy that audits every allowed, denied or failed evaluation.
+   *
+   * @param sessionFactory Hibernate session factory containing Security entities
+   * @param auditRecorder authorization audit sink
+   */
+  public HibernateSecurityRepositoryAccessPolicy(
+      SessionFactory sessionFactory, SecurityAccessAuditRecorder auditRecorder) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
+    this.auditRecorder = Objects.requireNonNull(auditRecorder, "auditRecorder");
   }
 
   @Override
   public void require(GitAccessContext context, RepositoryAccessRequest request) {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(request, "request");
+    boolean delegatedToDecisionPolicy = false;
     try (Session session = sessionFactory.openSession()) {
       SecurityPrincipalEntity principal =
           session.find(SecurityPrincipalEntity.class, context.principalId());
       if (principal == null || principal.getStatus() != SecurityPrincipalStatus.ACTIVE) {
         long version = principal != null ? principal.getSecurityVersion() : 0L;
-        throw new RepositoryAccessDeniedException(
-            request, "PRINCIPAL_NOT_ACTIVE", null, version);
+        RepositoryAccessDeniedException denied =
+            new RepositoryAccessDeniedException(
+                request, "PRINCIPAL_NOT_ACTIVE", null, version);
+        SecurityAuditSupport.deny(
+            auditRecorder, SecurityAccessAuditRecord.denied(context, denied), denied);
+        return;
       }
 
       List<SecurityGroupMembershipEntity> memberships =
@@ -112,9 +130,22 @@ public final class HibernateSecurityRepositoryAccessPolicy
               context.sessionId(),
               context.correlationId(),
               context.attributes());
-      new SecurityRepositoryAccessPolicy(
-              new SecurityAuthorizationEvaluator(grants, refRules))
-          .require(effectiveContext, request);
+      SecurityRepositoryAccessPolicy decisionPolicy =
+          new SecurityRepositoryAccessPolicy(
+              new SecurityAuthorizationEvaluator(grants, refRules), auditRecorder);
+      delegatedToDecisionPolicy = true;
+      decisionPolicy.require(effectiveContext, request);
+    } catch (RepositoryAccessDeniedException | SecurityAuditPersistenceException handled) {
+      throw handled;
+    } catch (RuntimeException failure) {
+      if (delegatedToDecisionPolicy) {
+        // The delegated policy has already recorded FAILED or attached its audit failure.
+        throw failure;
+      }
+      SecurityAuditSupport.fail(
+          auditRecorder,
+          SecurityAccessAuditRecord.failed(context, request, failure),
+          failure);
     }
   }
 

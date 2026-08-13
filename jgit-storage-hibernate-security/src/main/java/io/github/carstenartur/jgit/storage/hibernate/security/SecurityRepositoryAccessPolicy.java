@@ -21,43 +21,92 @@ public final class SecurityRepositoryAccessPolicy
     implements RepositoryAccessPolicy<GitAccessContext> {
 
   private final Function<RepositoryName, SecurityAuthorizationEvaluator> evaluatorProvider;
+  private final SecurityAccessAuditRecorder auditRecorder;
 
   /**
-   * Create a policy using one immutable evaluator snapshot.
+   * Create a policy using one immutable evaluator snapshot without persistent audit.
    *
    * @param evaluator evaluator snapshot
    */
   public SecurityRepositoryAccessPolicy(SecurityAuthorizationEvaluator evaluator) {
-    this(ignored -> Objects.requireNonNull(evaluator, "evaluator"));
+    this(evaluator, SecurityAccessAuditRecorder.NONE);
   }
 
   /**
-   * Create a policy resolving the current evaluator for every operation.
+   * Create a policy using one immutable evaluator snapshot and an explicit audit recorder.
+   *
+   * @param evaluator evaluator snapshot
+   * @param auditRecorder authorization audit sink
+   */
+  public SecurityRepositoryAccessPolicy(
+      SecurityAuthorizationEvaluator evaluator,
+      SecurityAccessAuditRecorder auditRecorder) {
+    this(
+        ignored -> Objects.requireNonNull(evaluator, "evaluator"),
+        auditRecorder);
+  }
+
+  /**
+   * Create a policy resolving the current evaluator for every operation without persistent audit.
    *
    * @param evaluatorProvider provider keyed by immutable logical repository name
    */
   public SecurityRepositoryAccessPolicy(
       Function<RepositoryName, SecurityAuthorizationEvaluator> evaluatorProvider) {
+    this(evaluatorProvider, SecurityAccessAuditRecorder.NONE);
+  }
+
+  /**
+   * Create a policy resolving the current evaluator for every operation and auditing every outcome.
+   *
+   * @param evaluatorProvider provider keyed by immutable logical repository name
+   * @param auditRecorder authorization audit sink
+   */
+  public SecurityRepositoryAccessPolicy(
+      Function<RepositoryName, SecurityAuthorizationEvaluator> evaluatorProvider,
+      SecurityAccessAuditRecorder auditRecorder) {
     this.evaluatorProvider =
         Objects.requireNonNull(evaluatorProvider, "evaluatorProvider");
+    this.auditRecorder = Objects.requireNonNull(auditRecorder, "auditRecorder");
   }
 
   @Override
   public void require(GitAccessContext context, RepositoryAccessRequest request) {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(request, "request");
-    SecurityAuthorizationEvaluator evaluator =
-        Objects.requireNonNull(
-            evaluatorProvider.apply(request.repositoryName()),
-            "evaluatorProvider result");
-    AuthorizationDecision decision = evaluator.authorize(context, authorizationRequest(request));
-    if (!decision.allowed()) {
-      throw new RepositoryAccessDeniedException(
-          request,
-          decision.reason().name(),
-          decision.evidenceId(),
-          decision.policyVersion());
+
+    AuthorizationDecision decision;
+    try {
+      SecurityAuthorizationEvaluator evaluator =
+          Objects.requireNonNull(
+              evaluatorProvider.apply(request.repositoryName()),
+              "evaluatorProvider result");
+      decision =
+          Objects.requireNonNull(
+              evaluator.authorize(context, authorizationRequest(request)),
+              "authorization decision");
+    } catch (RuntimeException failure) {
+      SecurityAuditSupport.fail(
+          auditRecorder,
+          SecurityAccessAuditRecord.failed(context, request, failure),
+          failure);
+      return;
     }
+
+    SecurityAccessAuditRecord record =
+        SecurityAccessAuditRecord.decision(context, request, decision);
+    if (decision.allowed()) {
+      SecurityAuditSupport.recordAllowed(auditRecorder, record);
+      return;
+    }
+
+    RepositoryAccessDeniedException denied =
+        new RepositoryAccessDeniedException(
+            request,
+            decision.reason().name(),
+            decision.evidenceId(),
+            decision.policyVersion());
+    SecurityAuditSupport.deny(auditRecorder, record, denied);
   }
 
   private static RepositoryAuthorizationRequest authorizationRequest(
