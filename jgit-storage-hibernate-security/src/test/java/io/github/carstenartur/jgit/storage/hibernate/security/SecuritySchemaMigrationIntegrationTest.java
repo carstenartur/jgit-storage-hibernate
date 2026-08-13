@@ -13,8 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessOperation;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
+import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityAccessAuditEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupMembershipEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupStatus;
@@ -37,6 +39,8 @@ import org.junit.jupiter.api.Test;
 class SecuritySchemaMigrationIntegrationTest {
 
   private static final Instant FIXTURE_TIME = Instant.parse("2026-08-11T00:00:00Z");
+  private static final String OLD_OBJECT_ID = "1111111111111111111111111111111111111111";
+  private static final String NEW_OBJECT_ID = "2222222222222222222222222222222222222222";
 
   @Test
   void h2MigrationValidatesAndPersistsEverySecurityEntityAcrossRestart() throws Exception {
@@ -194,6 +198,24 @@ class SecuritySchemaMigrationIntegrationTest {
     version.setScopeKey("repository:workflows");
     version.setVersionValue(5);
 
+    SecurityAccessAuditEntity audit = new SecurityAccessAuditEntity();
+    audit.setAuditId("audit-1");
+    audit.setOccurredAt(FIXTURE_TIME);
+    audit.setPrincipalId("alice");
+    audit.setAuthenticationMethod("oidc");
+    audit.setSessionId("session-1");
+    audit.setCorrelationId("correlation-1");
+    audit.setRepositoryName("workflows");
+    audit.setOperation(RepositoryAccessOperation.FORCE_UPDATE);
+    audit.setRefName("refs/heads/integration/main");
+    audit.setOldObjectId(OLD_OBJECT_ID);
+    audit.setNewObjectId(NEW_OBJECT_ID);
+    audit.setOutcome(SecurityAuditOutcome.DENIED);
+    audit.setReasonCode("PROTECTED_REF_DENY");
+    audit.setEvidenceId("rule-1");
+    audit.setPolicyVersion(5);
+    audit.setFailureType(null);
+
     sessionFactory.inTransaction(
         session -> {
           session.persist(principal);
@@ -202,6 +224,7 @@ class SecuritySchemaMigrationIntegrationTest {
           session.persist(grant);
           session.persist(rule);
           session.persist(version);
+          session.persist(audit);
         });
   }
 
@@ -281,6 +304,26 @@ class SecuritySchemaMigrationIntegrationTest {
           assertEquals("repository:workflows", version.getScopeKey());
           assertEquals(5, version.getVersionValue());
           assertTrue(version.getEntityVersion() >= 0);
+
+          SecurityAccessAuditEntity audit =
+              session.find(SecurityAccessAuditEntity.class, "audit-1");
+          assertNotNull(audit);
+          assertEquals("audit-1", audit.getAuditId());
+          assertEquals(FIXTURE_TIME, audit.getOccurredAt());
+          assertEquals("alice", audit.getPrincipalId());
+          assertEquals("oidc", audit.getAuthenticationMethod());
+          assertEquals("session-1", audit.getSessionId());
+          assertEquals("correlation-1", audit.getCorrelationId());
+          assertEquals("workflows", audit.getRepositoryName());
+          assertEquals(RepositoryAccessOperation.FORCE_UPDATE, audit.getOperation());
+          assertEquals("refs/heads/integration/main", audit.getRefName());
+          assertEquals(OLD_OBJECT_ID, audit.getOldObjectId());
+          assertEquals(NEW_OBJECT_ID, audit.getNewObjectId());
+          assertEquals(SecurityAuditOutcome.DENIED, audit.getOutcome());
+          assertEquals("PROTECTED_REF_DENY", audit.getReasonCode());
+          assertEquals("rule-1", audit.getEvidenceId());
+          assertEquals(5, audit.getPolicyVersion());
+          assertEquals(null, audit.getFailureType());
         });
   }
 
