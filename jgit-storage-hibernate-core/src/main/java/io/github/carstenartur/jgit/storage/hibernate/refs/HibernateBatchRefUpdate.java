@@ -24,7 +24,8 @@ import org.eclipse.jgit.transport.ReceiveCommand;
 final class HibernateBatchRefUpdate extends DfsReftableBatchRefUpdate {
 
   private static final String ACCESS_DENIED_MESSAGE = "repository access denied";
-  private static final String LOCK_FAILURE_MESSAGE = "repository lock failure";
+  private static final String TRANSACTION_FAILURE_MESSAGE = "repository transaction failed";
+  private static final int MAXIMUM_FAILURE_DETAIL_LENGTH = 256;
 
   private final HibernateRefDatabase refDatabase;
   private final boolean authorize;
@@ -53,8 +54,8 @@ final class HibernateBatchRefUpdate extends DfsReftableBatchRefUpdate {
             executeWithinTransaction(walk, monitor, options);
             return null;
           });
-    } catch (IOException exception) {
-      rejectPending(ReceiveCommand.Result.LOCK_FAILURE, LOCK_FAILURE_MESSAGE);
+    } catch (IOException | RuntimeException exception) {
+      rejectAll(transactionFailureMessage(exception));
     }
   }
 
@@ -117,13 +118,23 @@ final class HibernateBatchRefUpdate extends DfsReftableBatchRefUpdate {
         command.getNewId());
   }
 
-  private void rejectPending(ReceiveCommand.Result result, String message) {
-    List<ReceiveCommand> pending =
-        ReceiveCommand.filter(getCommands(), ReceiveCommand.Result.NOT_ATTEMPTED);
-    if (pending.isEmpty()) {
-      return;
+  private void rejectAll(String message) {
+    for (ReceiveCommand command : getCommands()) {
+      command.setResult(ReceiveCommand.Result.REJECTED_OTHER_REASON, message);
     }
-    pending.get(0).setResult(result, message);
-    ReceiveCommand.abort(pending);
+  }
+
+  static String transactionFailureMessage(Exception exception) {
+    String detail = exception.getMessage();
+    String type = exception.getClass().getSimpleName();
+    String prefix = type.isBlank() ? TRANSACTION_FAILURE_MESSAGE : TRANSACTION_FAILURE_MESSAGE + " (" + type + ")";
+    if (detail == null || detail.isBlank()) {
+      return prefix;
+    }
+    String normalized = detail.replaceAll("\\s+", " ").trim();
+    if (normalized.length() > MAXIMUM_FAILURE_DETAIL_LENGTH) {
+      normalized = normalized.substring(0, MAXIMUM_FAILURE_DETAIL_LENGTH) + "…";
+    }
+    return prefix + ": " + normalized;
   }
 }
