@@ -111,9 +111,10 @@ List<SecurityAccessAuditEvent> requestEvents =
     audit.findByCorrelationId("correlation-789", 100);
 ```
 
-There is no unbounded `findAll()` and no update API. Audit IDs are opaque. Consumers should expose
-these queries only behind an explicit administrative permission and should apply database backup,
-retention, legal-hold and deletion policies appropriate to their jurisdiction.
+There is no unbounded `findAll()` and no update API. The Hibernate entity is also mapped `@Immutable`,
+so a loaded audit row is not rewritten through normal ORM dirty checking. Audit IDs are opaque.
+Consumers should expose these queries only behind an explicit administrative permission and should
+apply database backup, retention, legal-hold and deletion policies appropriate to their jurisdiction.
 
 ### Failure and transaction semantics
 
@@ -123,7 +124,12 @@ I/O or transaction failure. Storage success remains observable through the JGit 
 storage transaction outcome.
 
 Audit rows use their own short transaction. This makes denials durable even when they occur before or
-outside a storage transaction. The resulting rules are deterministic:
+outside a storage transaction. When audit and storage share one `SessionFactory`, the connection pool
+must provide an independent audit connection in addition to a connection already held by a ref or
+repository-lifecycle transaction. A deployment may instead give the audit service its own compatible
+`SessionFactory` targeting the same migrated Security schema.
+
+The resulting rules are deterministic:
 
 - an allowed decision is not returned when its required audit append fails; the operation fails closed
   with `SecurityAuditPersistenceException`;
