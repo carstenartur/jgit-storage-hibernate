@@ -16,6 +16,7 @@ import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessOperation;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessRequest;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityAccessAuditEntity;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -125,6 +126,43 @@ class HibernateSecurityAccessAuditServiceTest {
           third.findByRepository(OTHER, 10).stream()
               .map(SecurityAccessAuditEvent::auditId)
               .toList());
+    }
+  }
+
+  @Test
+  void immutableMappingDoesNotRewritePersistedEvidence() {
+    try (HibernateSessionFactoryProvider provider = provider()) {
+      HibernateSecurityAccessAuditService service =
+          service(
+              provider,
+              Instant.parse("2026-08-13T00:00:00Z"),
+              "audit-immutable");
+      service.record(
+          SecurityAccessAuditRecord.decision(
+              ALICE,
+              RepositoryAccessRequest.repository(
+                  WORKFLOWS, RepositoryAccessOperation.READ),
+              new AuthorizationDecision(
+                  true,
+                  AuthorizationReason.GRANT_ALLOWED,
+                  "grant-read",
+                  4,
+                  Set.of(GitRepositoryPermission.READ))));
+
+      provider
+          .getSessionFactory()
+          .inTransaction(
+              session -> {
+                SecurityAccessAuditEntity entity =
+                    session.find(SecurityAccessAuditEntity.class, "audit-immutable");
+                entity.setReasonCode("tampered");
+                entity.setEvidenceId("tampered");
+              });
+
+      SecurityAccessAuditRecord persisted =
+          service.findByAuditId("audit-immutable").orElseThrow().record();
+      assertEquals(AuthorizationReason.GRANT_ALLOWED.name(), persisted.reasonCode());
+      assertEquals("grant-read", persisted.evidenceId());
     }
   }
 
