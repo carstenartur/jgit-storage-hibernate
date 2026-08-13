@@ -8,6 +8,8 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.repository;
 
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessRequest;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLockEntity;
 import io.github.carstenartur.jgit.storage.hibernate.objects.HibernateObjDatabase;
@@ -25,6 +27,8 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperatio
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Objects;
+import java.util.function.Consumer;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogReader;
@@ -45,12 +49,16 @@ public class HibernateRepository extends DfsRepository {
   private final HibernateTransactionContext transactionContext;
   private final SessionFactory sessionFactory;
   private final String repositoryName;
+  private final RepositoryName logicalRepositoryName;
+  private final Consumer<RepositoryAccessRequest> accessGuard;
   private String gitwebDescription;
 
   HibernateRepository(HibernateRepositoryBuilder builder) throws IOException {
     super(builder);
     this.sessionFactory = builder.getSessionFactory();
     this.repositoryName = builder.getRepositoryName();
+    this.logicalRepositoryName = new RepositoryName(repositoryName);
+    this.accessGuard = Objects.requireNonNull(builder.getAccessGuard(), "accessGuard");
     this.transactionContext = new HibernateTransactionContext(sessionFactory);
     this.objectDatabase =
         new ReadAheadHibernateObjDatabase(
@@ -72,6 +80,27 @@ public class HibernateRepository extends DfsRepository {
         .build();
   }
 
+  /**
+   * Create a repository carrying one explicit access guard into sensitive Core operations.
+   *
+   * @param sessionFactory Hibernate session factory
+   * @param repositoryName logical repository name
+   * @param accessGuard guard invoked for ref mutations
+   * @return opened repository
+   * @throws IOException when repository initialization fails
+   */
+  public static HibernateRepository create(
+      SessionFactory sessionFactory,
+      String repositoryName,
+      Consumer<RepositoryAccessRequest> accessGuard)
+      throws IOException {
+    return new HibernateRepositoryBuilder()
+        .setSessionFactory(sessionFactory)
+        .setRepositoryName(repositoryName)
+        .setAccessGuard(accessGuard)
+        .build();
+  }
+
   @Override
   public HibernateObjDatabase getObjectDatabase() {
     return objectDatabase;
@@ -86,8 +115,30 @@ public class HibernateRepository extends DfsRepository {
     return repositoryName;
   }
 
+  /** @return immutable public logical repository name */
+  public RepositoryName getLogicalRepositoryName() {
+    return logicalRepositoryName;
+  }
+
   public SessionFactory getSessionFactory() {
     return sessionFactory;
+  }
+
+  /**
+   * Require one access operation through the policy bound when this repository was opened.
+   *
+   * @param request exact repository or ref mutation request
+   */
+  public void requireAccess(RepositoryAccessRequest request) {
+    Objects.requireNonNull(request, "request");
+    if (!logicalRepositoryName.equals(request.repositoryName())) {
+      throw new IllegalArgumentException(
+          "request repository "
+              + request.repositoryName()
+              + " does not match "
+              + logicalRepositoryName);
+    }
+    accessGuard.accept(request);
   }
 
   /**

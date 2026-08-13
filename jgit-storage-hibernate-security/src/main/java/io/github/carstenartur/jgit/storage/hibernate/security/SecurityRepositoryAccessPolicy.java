@@ -1,0 +1,83 @@
+/*
+ * Copyright (C) 2026, Carsten Hammer and contributors.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the BSD 3-Clause License.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+package io.github.carstenartur.jgit.storage.hibernate.security;
+
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessDeniedException;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessOperation;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessPolicy;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessRequest;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
+import java.util.Objects;
+import java.util.function.Function;
+
+/** Adapts the Security evaluator to Core's dependency-free repository access SPI. */
+public final class SecurityRepositoryAccessPolicy
+    implements RepositoryAccessPolicy<GitAccessContext> {
+
+  private final Function<RepositoryName, SecurityAuthorizationEvaluator> evaluatorProvider;
+
+  /**
+   * Create a policy using one immutable evaluator snapshot.
+   *
+   * @param evaluator evaluator snapshot
+   */
+  public SecurityRepositoryAccessPolicy(SecurityAuthorizationEvaluator evaluator) {
+    this(ignored -> Objects.requireNonNull(evaluator, "evaluator"));
+  }
+
+  /**
+   * Create a policy resolving the current evaluator for every operation.
+   *
+   * @param evaluatorProvider provider keyed by immutable logical repository name
+   */
+  public SecurityRepositoryAccessPolicy(
+      Function<RepositoryName, SecurityAuthorizationEvaluator> evaluatorProvider) {
+    this.evaluatorProvider =
+        Objects.requireNonNull(evaluatorProvider, "evaluatorProvider");
+  }
+
+  @Override
+  public void require(GitAccessContext context, RepositoryAccessRequest request) {
+    Objects.requireNonNull(context, "context");
+    Objects.requireNonNull(request, "request");
+    SecurityAuthorizationEvaluator evaluator =
+        Objects.requireNonNull(
+            evaluatorProvider.apply(request.repositoryName()),
+            "evaluatorProvider result");
+    AuthorizationDecision decision = evaluator.authorize(context, authorizationRequest(request));
+    if (!decision.allowed()) {
+      throw new RepositoryAccessDeniedException(
+          request,
+          decision.reason().name(),
+          decision.evidenceId(),
+          decision.policyVersion());
+    }
+  }
+
+  private static RepositoryAuthorizationRequest authorizationRequest(
+      RepositoryAccessRequest request) {
+    GitRepositoryPermission permission = permission(request.operation());
+    return request.refScoped()
+        ? RepositoryAuthorizationRequest.ref(
+            request.repositoryName(), permission, request.refName())
+        : RepositoryAuthorizationRequest.repository(request.repositoryName(), permission);
+  }
+
+  private static GitRepositoryPermission permission(RepositoryAccessOperation operation) {
+    return switch (operation) {
+      case DISCOVER -> GitRepositoryPermission.DISCOVER;
+      case READ -> GitRepositoryPermission.READ;
+      case CREATE_REF -> GitRepositoryPermission.CREATE_REF;
+      case UPDATE_REF -> GitRepositoryPermission.UPDATE_REF;
+      case DELETE_REF -> GitRepositoryPermission.DELETE_REF;
+      case FORCE_UPDATE -> GitRepositoryPermission.FORCE_UPDATE;
+      case DELETE_REPOSITORY -> GitRepositoryPermission.ADMINISTER;
+    };
+  }
+}
