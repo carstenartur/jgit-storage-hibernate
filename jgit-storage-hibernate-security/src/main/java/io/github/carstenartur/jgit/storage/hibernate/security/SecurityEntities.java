@@ -9,6 +9,7 @@
 
 package io.github.carstenartur.jgit.storage.hibernate.security;
 
+import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityAccessAuditEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupMembershipEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityPrincipalEntity;
@@ -27,7 +28,8 @@ public final class SecurityEntities {
           SecurityGroupMembershipEntity.class,
           SecurityRepositoryGrantEntity.class,
           SecurityRefRuleEntity.class,
-          SecurityVersionEntity.class);
+          SecurityVersionEntity.class,
+          SecurityAccessAuditEntity.class);
 
   private SecurityEntities() {}
 
