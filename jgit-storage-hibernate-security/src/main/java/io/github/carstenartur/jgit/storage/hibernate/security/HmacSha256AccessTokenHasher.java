@@ -107,17 +107,20 @@ public final class HmacSha256AccessTokenHasher implements AccessTokenHasher {
       throw new IllegalArgumentException(
           "tokenValue must contain 1 to " + MAXIMUM_TOKEN_CHARACTERS + " ASCII characters");
     }
-    for (int index = 0; index < tokenValue.length(); index++) {
-      if (tokenValue.charAt(index) > 0x7f) {
-        throw new IllegalArgumentException("tokenValue must contain ASCII characters only");
-      }
-    }
     return tokenValue;
   }
 
   private static boolean validToken(String tokenValue) {
-    return tokenValue != null
-        && !tokenValue.isBlank()
-        && tokenValue.length() <= MAXIMUM_TOKEN_CHARACTERS;
+    if (tokenValue == null
+        || tokenValue.isBlank()
+        || tokenValue.length() > MAXIMUM_TOKEN_CHARACTERS) {
+      return false;
+    }
+    for (int index = 0; index < tokenValue.length(); index++) {
+      if (tokenValue.charAt(index) > 0x7f) {
+        return false;
+      }
+    }
+    return true;
   }
 }
