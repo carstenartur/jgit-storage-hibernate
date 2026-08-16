@@ -9,7 +9,6 @@
 package io.github.carstenartur.jgit.storage.hibernate.security;
 
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
-import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupStatus;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityManagedPolicyEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityPrincipalEntity;
@@ -24,7 +23,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.exception.ConstraintViolationException;
@@ -135,119 +134,27 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
     int outsideGrantCount = repositoryGrants.size() - managedGrants.size();
     int outsideRuleCount = repositoryRules.size() - managedRules.size();
     long currentPolicyVersion = head == null ? 0 : head.getPolicyVersion();
-    long currentGeneration = head == null ? 0 : head.getPolicyGeneration();
+    long currentGeneration = repositoryVersion.getVersionValue();
 
-    if (head == null && (!managedGrants.isEmpty() || !managedRules.isEmpty())) {
-      return result(
-          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
-          "MANAGED_POLICY_HEAD_MISSING",
-          desired,
-          currentPolicyVersion,
-          currentPolicyVersion,
-          repositoryVersion.getVersionValue(),
-          digest,
-          0,
-          0,
-          0,
-          outsideGrantCount,
-          outsideRuleCount);
-    }
-    if (desired.ownershipMode() == RepositoryPolicyOwnershipMode.EXCLUSIVE_REPOSITORY
-        && (outsideGrantCount > 0 || outsideRuleCount > 0)) {
-      return result(
-          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
-          "OUTSIDE_NAMESPACE_POLICY_PRESENT",
-          desired,
-          currentPolicyVersion,
-          currentPolicyVersion,
-          currentGeneration,
-          digest,
-          0,
-          0,
-          0,
-          outsideGrantCount,
-          outsideRuleCount);
-    }
-    if (desired.policyVersion() < currentPolicyVersion) {
-      return result(
-          RepositoryAuthorizationPolicySyncStatus.STALE,
-          "STALE_POLICY_VERSION",
-          desired,
-          currentPolicyVersion,
-          currentPolicyVersion,
-          currentGeneration,
-          digest,
-          0,
-          0,
-          0,
-          outsideGrantCount,
-          outsideRuleCount);
-    }
-    if (desired.policyVersion() == currentPolicyVersion) {
-      if (head != null
-          && head.getContentDigest().equals(digest)
-          && head.getOwnershipMode() == desired.ownershipMode()) {
-        return result(
-            RepositoryAuthorizationPolicySyncStatus.NO_OP,
-            "POLICY_ALREADY_ACTIVE",
+    RepositoryAuthorizationPolicySyncResult preliminary =
+        preliminaryResult(
             desired,
-            currentPolicyVersion,
-            currentPolicyVersion,
-            currentGeneration,
+            expectedCurrentPolicyVersion,
             digest,
-            0,
-            0,
-            0,
+            head,
+            managedGrants,
+            managedRules,
+            repositoryGrants,
             outsideGrantCount,
-            outsideRuleCount);
-      }
-      return result(
-          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
-          "POLICY_VERSION_DIGEST_CONFLICT",
-          desired,
-          currentPolicyVersion,
-          currentPolicyVersion,
-          currentGeneration,
-          digest,
-          0,
-          0,
-          0,
-          outsideGrantCount,
-          outsideRuleCount);
-    }
-    if (expectedCurrentPolicyVersion != currentPolicyVersion) {
-      return result(
-          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
-          "EXPECTED_POLICY_VERSION_MISMATCH",
-          desired,
-          currentPolicyVersion,
-          currentPolicyVersion,
-          currentGeneration,
-          digest,
-          0,
-          0,
-          0,
-          outsideGrantCount,
-          outsideRuleCount);
-    }
-    if (hasOutsideGrantSemanticConflict(repositoryGrants, desired)) {
-      return result(
-          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
-          "GRANT_SEMANTIC_CONFLICT",
-          desired,
-          currentPolicyVersion,
-          currentPolicyVersion,
-          currentGeneration,
-          digest,
-          0,
-          0,
-          0,
-          outsideGrantCount,
-          outsideRuleCount);
+            outsideRuleCount,
+            currentPolicyVersion,
+            currentGeneration);
+    if (preliminary != null) {
+      return preliminary;
     }
 
     validateSubjects(session, desired);
-    long generation = nextVersion(repositoryVersion.getVersionValue(), "policy generation");
+    long generation = nextVersion(currentGeneration, "policy generation");
     Instant now = clock.instant();
     MutationCounts counts =
         applyManagedEntries(
@@ -269,6 +176,101 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
         outsideRuleCount);
   }
 
+  private static RepositoryAuthorizationPolicySyncResult preliminaryResult(
+      RepositoryAuthorizationPolicySnapshot desired,
+      long expectedCurrentPolicyVersion,
+      String digest,
+      SecurityManagedPolicyEntity head,
+      List<SecurityRepositoryGrantEntity> managedGrants,
+      List<SecurityRefRuleEntity> managedRules,
+      List<SecurityRepositoryGrantEntity> repositoryGrants,
+      int outsideGrantCount,
+      int outsideRuleCount,
+      long currentPolicyVersion,
+      long currentGeneration) {
+    if (head == null && (!managedGrants.isEmpty() || !managedRules.isEmpty())) {
+      return unchanged(
+          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
+          "MANAGED_POLICY_HEAD_MISSING",
+          desired,
+          currentPolicyVersion,
+          currentGeneration,
+          digest,
+          outsideGrantCount,
+          outsideRuleCount);
+    }
+    if (desired.ownershipMode() == RepositoryPolicyOwnershipMode.EXCLUSIVE_REPOSITORY
+        && (outsideGrantCount > 0 || outsideRuleCount > 0)) {
+      return unchanged(
+          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
+          "OUTSIDE_NAMESPACE_POLICY_PRESENT",
+          desired,
+          currentPolicyVersion,
+          currentGeneration,
+          digest,
+          outsideGrantCount,
+          outsideRuleCount);
+    }
+    if (desired.policyVersion() < currentPolicyVersion) {
+      return unchanged(
+          RepositoryAuthorizationPolicySyncStatus.STALE,
+          "STALE_POLICY_VERSION",
+          desired,
+          currentPolicyVersion,
+          currentGeneration,
+          digest,
+          outsideGrantCount,
+          outsideRuleCount);
+    }
+    if (desired.policyVersion() == currentPolicyVersion) {
+      if (head != null
+          && head.getContentDigest().equals(digest)
+          && head.getOwnershipMode() == desired.ownershipMode()) {
+        return unchanged(
+            RepositoryAuthorizationPolicySyncStatus.NO_OP,
+            "POLICY_ALREADY_ACTIVE",
+            desired,
+            currentPolicyVersion,
+            currentGeneration,
+            digest,
+            outsideGrantCount,
+            outsideRuleCount);
+      }
+      return unchanged(
+          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
+          "POLICY_VERSION_DIGEST_CONFLICT",
+          desired,
+          currentPolicyVersion,
+          currentGeneration,
+          digest,
+          outsideGrantCount,
+          outsideRuleCount);
+    }
+    if (expectedCurrentPolicyVersion != currentPolicyVersion) {
+      return unchanged(
+          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
+          "EXPECTED_POLICY_VERSION_MISMATCH",
+          desired,
+          currentPolicyVersion,
+          currentGeneration,
+          digest,
+          outsideGrantCount,
+          outsideRuleCount);
+    }
+    if (hasOutsideGrantSemanticConflict(repositoryGrants, desired)) {
+      return unchanged(
+          RepositoryAuthorizationPolicySyncStatus.CONFLICT,
+          "GRANT_SEMANTIC_CONFLICT",
+          desired,
+          currentPolicyVersion,
+          currentGeneration,
+          digest,
+          outsideGrantCount,
+          outsideRuleCount);
+    }
+    return null;
+  }
+
   private MutationCounts applyManagedEntries(
       Session session,
       RepositoryAuthorizationPolicySnapshot desired,
@@ -280,10 +282,89 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
     Map<String, SecurityRepositoryGrantEntity> grantsByKey = grantMap(existingGrants);
     Map<String, SecurityRefRuleEntity> rulesByKey = ruleMap(existingRules);
     Set<String> desiredGrantKeys =
-        desired.grants().stream().map(DesiredRepositoryGrant::entryKey).collect(java.util.stream.Collectors.toSet());
+        desired.grants().stream()
+            .map(DesiredRepositoryGrant::entryKey)
+            .collect(Collectors.toSet());
     Set<String> desiredRuleKeys =
-        desired.refRules().stream().map(DesiredRepositoryRefRule::entryKey).collect(java.util.stream.Collectors.toSet());
+        desired.refRules().stream()
+            .map(DesiredRepositoryRefRule::entryKey)
+            .collect(Collectors.toSet());
 
+    int deleted = removeObsolete(session, existingGrants, existingRules, desiredGrantKeys, desiredRuleKeys);
+    int created = 0;
+    int updated = 0;
+
+    List<DesiredRepositoryGrant> orderedGrants =
+        desired.grants().stream()
+            .sorted(Comparator.comparing(DesiredRepositoryGrant::entryKey))
+            .toList();
+    for (DesiredRepositoryGrant desiredGrant : orderedGrants) {
+      SecurityRepositoryGrantEntity entity = grantsByKey.get(desiredGrant.entryKey());
+      boolean isNew = entity == null;
+      if (isNew) {
+        entity = new SecurityRepositoryGrantEntity();
+        entity.setGrantId(
+            managedId("grant", desired.repositoryName(), desired.source(), desiredGrant.entryKey()));
+        rejectPolicyIdCollision(session, SecurityRepositoryGrantEntity.class, entity.getGrantId());
+        entity.setRepositoryName(desired.repositoryName().value());
+        entity.setCreatedAt(now);
+        entity.setCreatedBy(actor.principalId());
+      }
+      entity.setSubjectType(desiredGrant.subject().type());
+      entity.setSubjectId(desiredGrant.subject().id());
+      entity.setPermission(desiredGrant.permission());
+      entity.setEffect(desiredGrant.effect());
+      setManaged(entity, desired.source(), desiredGrant.entryKey(), desired.policyVersion());
+      entity.setSecurityVersion(generation);
+      if (isNew) {
+        session.persist(entity);
+        created++;
+      } else {
+        updated++;
+      }
+    }
+
+    List<DesiredRepositoryRefRule> orderedRules =
+        desired.refRules().stream()
+            .sorted(Comparator.comparing(DesiredRepositoryRefRule::entryKey))
+            .toList();
+    for (DesiredRepositoryRefRule desiredRule : orderedRules) {
+      SecurityRefRuleEntity entity = rulesByKey.get(desiredRule.entryKey());
+      boolean isNew = entity == null;
+      if (isNew) {
+        entity = new SecurityRefRuleEntity();
+        entity.setRuleId(
+            managedId("rule", desired.repositoryName(), desired.source(), desiredRule.entryKey()));
+        rejectPolicyIdCollision(session, SecurityRefRuleEntity.class, entity.getRuleId());
+        entity.setRepositoryName(desired.repositoryName().value());
+        entity.setCreatedAt(now);
+        entity.setCreatedBy(actor.principalId());
+      }
+      entity.setRefPattern(desiredRule.refPattern());
+      entity.setPermission(desiredRule.permission());
+      entity.setEffect(desiredRule.effect());
+      entity.setPriority(desiredRule.priority());
+      entity.setSubjectType(desiredRule.subject() == null ? null : desiredRule.subject().type());
+      entity.setSubjectId(desiredRule.subject() == null ? null : desiredRule.subject().id());
+      entity.setEnabled(true);
+      setManaged(entity, desired.source(), desiredRule.entryKey(), desired.policyVersion());
+      entity.setSecurityVersion(generation);
+      if (isNew) {
+        session.persist(entity);
+        created++;
+      } else {
+        updated++;
+      }
+    }
+    return new MutationCounts(created, updated, deleted);
+  }
+
+  private static int removeObsolete(
+      Session session,
+      List<SecurityRepositoryGrantEntity> existingGrants,
+      List<SecurityRefRuleEntity> existingRules,
+      Set<String> desiredGrantKeys,
+      Set<String> desiredRuleKeys) {
     int deleted = 0;
     for (SecurityRepositoryGrantEntity existing : existingGrants) {
       if (!desiredGrantKeys.contains(existing.getManagedEntryKey())) {
@@ -300,66 +381,7 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
     if (deleted > 0) {
       session.flush();
     }
-
-    int created = 0;
-    int updated = 0;
-    List<DesiredRepositoryGrant> orderedGrants =
-        desired.grants().stream()
-            .sorted(Comparator.comparing(DesiredRepositoryGrant::entryKey))
-            .toList();
-    for (DesiredRepositoryGrant desiredGrant : orderedGrants) {
-      SecurityRepositoryGrantEntity entity = grantsByKey.get(desiredGrant.entryKey());
-      if (entity == null) {
-        entity = new SecurityRepositoryGrantEntity();
-        entity.setGrantId(
-            managedId("grant", desired.repositoryName(), desired.source(), desiredGrant.entryKey()));
-        rejectPolicyIdCollision(session, SecurityRepositoryGrantEntity.class, entity.getGrantId());
-        entity.setRepositoryName(desired.repositoryName().value());
-        entity.setCreatedAt(now);
-        entity.setCreatedBy(actor.principalId());
-        session.persist(entity);
-        created++;
-      } else {
-        updated++;
-      }
-      entity.setSubjectType(desiredGrant.subject().type());
-      entity.setSubjectId(desiredGrant.subject().id());
-      entity.setPermission(desiredGrant.permission());
-      entity.setEffect(desiredGrant.effect());
-      setManaged(entity, desired.source(), desiredGrant.entryKey(), desired.policyVersion());
-      entity.setSecurityVersion(generation);
-    }
-
-    List<DesiredRepositoryRefRule> orderedRules =
-        desired.refRules().stream()
-            .sorted(Comparator.comparing(DesiredRepositoryRefRule::entryKey))
-            .toList();
-    for (DesiredRepositoryRefRule desiredRule : orderedRules) {
-      SecurityRefRuleEntity entity = rulesByKey.get(desiredRule.entryKey());
-      if (entity == null) {
-        entity = new SecurityRefRuleEntity();
-        entity.setRuleId(
-            managedId("rule", desired.repositoryName(), desired.source(), desiredRule.entryKey()));
-        rejectPolicyIdCollision(session, SecurityRefRuleEntity.class, entity.getRuleId());
-        entity.setRepositoryName(desired.repositoryName().value());
-        entity.setCreatedAt(now);
-        entity.setCreatedBy(actor.principalId());
-        session.persist(entity);
-        created++;
-      } else {
-        updated++;
-      }
-      entity.setRefPattern(desiredRule.refPattern());
-      entity.setPermission(desiredRule.permission());
-      entity.setEffect(desiredRule.effect());
-      entity.setPriority(desiredRule.priority());
-      entity.setSubjectType(desiredRule.subject() == null ? null : desiredRule.subject().type());
-      entity.setSubjectId(desiredRule.subject() == null ? null : desiredRule.subject().id());
-      entity.setEnabled(true);
-      setManaged(entity, desired.source(), desiredRule.entryKey(), desired.policyVersion());
-      entity.setSecurityVersion(generation);
-    }
-    return new MutationCounts(created, updated, deleted);
+    return deleted;
   }
 
   private void updateHead(
@@ -373,7 +395,8 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
       long generation,
       Instant now) {
     SecurityManagedPolicyEntity entity = head;
-    if (entity == null) {
+    boolean isNew = entity == null;
+    if (isNew) {
       entity = new SecurityManagedPolicyEntity();
       entity.setPolicyId(policyId);
       entity.setRepositoryName(desired.repositoryName().value());
@@ -381,7 +404,6 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
       entity.setManagedSourceInstanceId(desired.source().sourceInstanceId());
       entity.setCreatedAt(now);
       entity.setCreatedByPrincipalId(actor.principalId());
-      session.persist(entity);
     }
     entity.setOwnershipMode(desired.ownershipMode());
     entity.setPolicyVersion(desired.policyVersion());
@@ -391,6 +413,9 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
     entity.setUpdatedByPrincipalId(actor.principalId());
     entity.setLastOperationId(operationId);
     entity.setLastCorrelationId(actor.correlationId());
+    if (isNew) {
+      session.persist(entity);
+    }
   }
 
   private static void validateDesiredSemantics(
@@ -620,29 +645,31 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
     digestField(digest, desired.ownershipMode().name());
     desired.grants().stream()
         .sorted(Comparator.comparing(DesiredRepositoryGrant::entryKey))
-        .forEach(
-            grant -> {
-              digestField(digest, "GRANT");
-              digestField(digest, grant.entryKey());
-              digestField(digest, grant.subject().type().name());
-              digestField(digest, grant.subject().id());
-              digestField(digest, grant.permission().name());
-              digestField(digest, grant.effect().name());
-            });
+        .forEach(grant -> digestGrant(digest, grant));
     desired.refRules().stream()
         .sorted(Comparator.comparing(DesiredRepositoryRefRule::entryKey))
-        .forEach(
-            rule -> {
-              digestField(digest, "REF_RULE");
-              digestField(digest, rule.entryKey());
-              digestField(digest, rule.refPattern());
-              digestField(digest, rule.permission().name());
-              digestField(digest, rule.effect().name());
-              digestField(digest, Integer.toString(rule.priority()));
-              digestField(digest, rule.subject() == null ? "GLOBAL" : rule.subject().type().name());
-              digestField(digest, rule.subject() == null ? "GLOBAL" : rule.subject().id());
-            });
+        .forEach(rule -> digestRule(digest, rule));
     return HexFormat.of().formatHex(digest.digest());
+  }
+
+  private static void digestGrant(MessageDigest digest, DesiredRepositoryGrant grant) {
+    digestField(digest, "GRANT");
+    digestField(digest, grant.entryKey());
+    digestField(digest, grant.subject().type().name());
+    digestField(digest, grant.subject().id());
+    digestField(digest, grant.permission().name());
+    digestField(digest, grant.effect().name());
+  }
+
+  private static void digestRule(MessageDigest digest, DesiredRepositoryRefRule rule) {
+    digestField(digest, "REF_RULE");
+    digestField(digest, rule.entryKey());
+    digestField(digest, rule.refPattern());
+    digestField(digest, rule.permission().name());
+    digestField(digest, rule.effect().name());
+    digestField(digest, Integer.toString(rule.priority()));
+    digestField(digest, rule.subject() == null ? "GLOBAL" : rule.subject().type().name());
+    digestField(digest, rule.subject() == null ? "GLOBAL" : rule.subject().id());
   }
 
   private static String managedId(
@@ -653,12 +680,14 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
     digestField(digest, source.sourceId());
     digestField(digest, source.sourceInstanceId());
     digestField(digest, entryKey);
-    return switch (kind) {
-      case "policy" -> "mp-";
-      case "grant" -> "mg-";
-      case "rule" -> "mr-";
-      default -> throw new IllegalArgumentException("unknown managed ID kind");
-    } + HexFormat.of().formatHex(digest.digest());
+    String prefix =
+        switch (kind) {
+          case "policy" -> "mp-";
+          case "grant" -> "mg-";
+          case "rule" -> "mr-";
+          default -> throw new IllegalArgumentException("unknown managed ID kind");
+        };
+    return prefix + HexFormat.of().formatHex(digest.digest());
   }
 
   private static MessageDigest sha256() {
@@ -696,6 +725,30 @@ public final class HibernateRepositoryAuthorizationPolicySynchronizer
           name + " must not contain surrounding whitespace or control characters");
     }
     return value;
+  }
+
+  private static RepositoryAuthorizationPolicySyncResult unchanged(
+      RepositoryAuthorizationPolicySyncStatus status,
+      String reasonCode,
+      RepositoryAuthorizationPolicySnapshot desired,
+      long currentPolicyVersion,
+      long generation,
+      String digest,
+      int outsideGrantCount,
+      int outsideRuleCount) {
+    return result(
+        status,
+        reasonCode,
+        desired,
+        currentPolicyVersion,
+        currentPolicyVersion,
+        generation,
+        digest,
+        0,
+        0,
+        0,
+        outsideGrantCount,
+        outsideRuleCount);
   }
 
   private static RepositoryAuthorizationPolicySyncResult result(
