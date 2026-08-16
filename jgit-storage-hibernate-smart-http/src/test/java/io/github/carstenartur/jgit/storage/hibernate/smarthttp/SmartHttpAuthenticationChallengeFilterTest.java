@@ -111,7 +111,8 @@ class SmartHttpAuthenticationChallengeFilterTest {
   }
 
   @Test
-  void resetRemovesOldHeadersAndAllowsAReplacementUnauthorizedResponse() throws Exception {
+  void resetDiscardsATransientStatusAndAllowsAReplacementUnauthorizedResponse()
+      throws Exception {
     List<String> challenges = new ArrayList<>();
     AtomicInteger status = new AtomicInteger(HttpServletResponse.SC_OK);
     SmartHttpAuthenticationChallengeFilter.basicAndBearer("Git")
@@ -121,7 +122,6 @@ class SmartHttpAuthenticationChallengeFilterTest {
             (servletRequest, servletResponse) -> {
               HttpServletResponse http = (HttpServletResponse) servletResponse;
               http.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-              http.flushBuffer();
               http.reset();
               http.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             });
