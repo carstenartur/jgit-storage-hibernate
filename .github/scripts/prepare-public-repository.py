@@ -14,6 +14,7 @@ PARENT = "jgit-storage-hibernate-parent"
 JARS = (
     "jgit-storage-hibernate-core",
     "jgit-storage-hibernate-security",
+    "jgit-storage-hibernate-smart-http",
     "jgit-storage-hibernate-search",
     "jgit-storage-hibernate-java-analysis",
     "jgit-storage-hibernate-architecture",
