@@ -103,8 +103,10 @@ an alternate path around the secured resolver.
 `SmartHttpAccessContextProvider<C>` is called once when JGit resolves the repository. It must either:
 
 1. return one non-null immutable context accepted by the configured secured factory;
-2. throw `ServiceNotAuthorizedException` for missing or invalid authentication; or
-3. throw `ServiceMayNotContinueException` with a server-error status when authentication
+2. throw `ServiceNotAuthorizedException` for missing or invalid authentication;
+3. throw `ServiceMayNotContinueException` with a deliberate non-authentication status when a transport
+   precondition fails; or
+4. throw `ServiceMayNotContinueException` with a server-error status when authentication
    infrastructure failed.
 
 External OIDC, LDAP or application-session integrations implement this boundary directly. For the
@@ -125,11 +127,16 @@ SecuritySmartHttpAccessContextProvider authentication =
 GitServlet servlet = SecuredSmartHttp.servlet(repositories, authentication);
 ```
 
-The adapter accepts exactly one bounded `Authorization` header and requires a trusted secure
-transport. Basic payloads are decoded as UTF-8. Malformed Base64, missing separators, invalid UTF-8
-and oversized decoded credentials execute the credential service's dummy password-verification path
-before the request is rejected. Decoded Basic byte and password buffers are cleared after the
-authentication call. Bearer values are passed directly to the one-way access-token service.
+The adapter first establishes trusted secure transport. When the request is not secure it returns HTTP
+403 before reading or parsing an Authorization value. This is intentionally not a 401: a Basic or
+Bearer challenge over plaintext HTTP could cause a Git client to transmit a password or token on the
+next request.
+
+On secure transport the adapter accepts exactly one bounded `Authorization` header. Basic payloads
+are decoded as UTF-8. Malformed Base64, missing separators, invalid UTF-8 and oversized decoded
+credentials execute the credential service's dummy password-verification path before the request is
+rejected. Decoded Basic byte and password buffers are cleared after the authentication call. Bearer
+values are passed directly to the one-way access-token service.
 
 Credential, inactive-principal, lockout, token-format, expiry and revocation denials are all mapped to
 the same generic JGit 401 result without attaching the internal reason as a protocol exception cause.
@@ -139,7 +146,8 @@ required identity-audit and unexpected adapter failures remain HTTP 500 response
 The default transport decision is `request.isSecure()`. Behind a trusted reverse proxy, configure the
 servlet container so this value reflects the original HTTPS connection. The explicit transport
 predicate constructor exists for container integrations that have already authenticated proxy state;
-it must never read a caller-controlled `X-Forwarded-Proto` header directly.
+it must never read a caller-controlled `X-Forwarded-Proto` header directly. A predicate failure is an
+infrastructure error and is returned as HTTP 500 rather than silently treating the request as secure.
 
 `SecuritySmartHttpTraceProvider.opaquePerRequest()` creates opaque identifiers without retaining a
 remote address. Applications with trusted request/session identifiers should provide them explicitly.
@@ -158,9 +166,12 @@ SmartHttpAuthenticationChallengeFilter challenge =
 
 Factories are also available for Basic-only and Bearer-only deployments. Realms are restricted to a
 bounded printable-ASCII quoted value so they cannot inject response headers. The filter adds its
-configured `WWW-Authenticate` fields only immediately before a 401 status or error is committed. It
-does not advertise challenges on successful, not-found, forbidden or server-error responses, and it
-adds each configured challenge only once per response unless the response is reset.
+configured `WWW-Authenticate` fields only immediately before a final 401 status or error is committed.
+A transient 401 that is replaced by a successful status does not leak a challenge. The filter does not
+advertise challenges on successful, not-found, forbidden or server-error responses, and it adds each
+configured challenge only once per response unless the response is reset. Because insecure requests
+from the provided Security adapter are 403, this filter never solicits those credentials over
+plaintext HTTP.
 
 For access tokens, pair the servlet with
 `HibernateCredentialScopedRepositoryAccessPolicy`. It revalidates token existence, principal,
@@ -196,7 +207,8 @@ The resolver validates the request repository name, authenticates the request an
 
 | Condition | Protocol result |
 |---|---|
-| Missing/invalid authentication | not authorized |
+| Insecure transport for the Security Basic/Bearer adapter | forbidden; no authentication challenge |
+| Missing/invalid authentication on secure transport | not authorized |
 | Invalid URL repository name | not found |
 | Principal lacks `DISCOVER` or `READ` | not found |
 | Authorized repository does not exist | not found |
@@ -275,7 +287,8 @@ supported JGit 7.5, 7.6, 7.7.0 and 7.7.1 lines.
 
 The local credential bridge additionally verifies successful UTF-8 Basic and Bearer authentication,
 password-buffer clearing, malformed-Basic dummy verification, bounded denial audit, ambiguous-header
-rejection, trusted transport overrides, backend failure mapping and exact challenge emission.
+rejection, no-challenge insecure-transport refusal, trusted transport overrides, backend failure
+mapping and exact final-status challenge emission.
 
 ## Deployment requirements
 
