@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.smarthttp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
@@ -49,5 +50,21 @@ class SmartHttpRepositoryNameMapperTest {
       assertThrows(RepositoryNotFoundException.class, () -> mapper.map(candidate), candidate);
     }
     assertThrows(RepositoryNotFoundException.class, () -> mapper.map(null));
+  }
+
+  @Test
+  void invalidRequestNamesAreNeverReflectedIntoExceptionMessages() {
+    String controlCharacters = "private\nrepository\rname";
+    RepositoryNotFoundException controlFailure =
+        assertThrows(RepositoryNotFoundException.class, () -> mapper.map(controlCharacters));
+    assertFalse(controlFailure.getMessage().contains(controlCharacters));
+    assertFalse(controlFailure.getMessage().contains("\n"));
+    assertFalse(controlFailure.getMessage().contains("\r"));
+
+    String oversized = "secret-" + "x".repeat(1024);
+    RepositoryNotFoundException oversizedFailure =
+        assertThrows(RepositoryNotFoundException.class, () -> mapper.map(oversized));
+    assertFalse(oversizedFailure.getMessage().contains(oversized));
+    assertFalse(oversizedFailure.getMessage().contains("secret-"));
   }
 }
