@@ -158,11 +158,11 @@ public final class HibernateSecurityCredentialService {
                     SecurityLocalCredentialEntity.class,
                     request.subjectPrincipalId(),
                     LockModeType.PESSIMISTIC_WRITE);
-            if (credential == null) {
+            boolean newCredential = credential == null;
+            if (newCredential) {
               credential = new SecurityLocalCredentialEntity();
               credential.setPrincipalId(request.subjectPrincipalId());
               credential.setSecurityVersion(1);
-              session.persist(credential);
             } else {
               credential.setSecurityVersion(nextVersion(credential.getSecurityVersion()));
             }
@@ -172,6 +172,9 @@ public final class HibernateSecurityCredentialService {
             credential.setChangedAt(now);
             credential.setFailedAttemptCount(0);
             credential.setLockedUntil(null);
+            if (newCredential) {
+              session.persist(credential);
+            }
             record(
                 session,
                 SecurityIdentityAuditRecord.management(
@@ -369,11 +372,11 @@ public final class HibernateSecurityCredentialService {
   public AuthenticatedGitAccess authenticatePassword(
       String loginName, char[] password, SecurityAuthenticationTrace trace) {
     Objects.requireNonNull(trace, "trace");
+    AuthenticationOutcome outcome;
     try {
-      AuthenticationOutcome outcome =
+      outcome =
           sessionFactory.fromTransaction(
               session -> authenticatePassword(session, loginName, password, trace));
-      return requireAuthenticated(outcome);
     } catch (DeniedAuthenticationAuditFailure denied) {
       throw denied.authenticationException();
     } catch (SecurityIdentityAuditPersistenceException auditFailure) {
@@ -387,6 +390,7 @@ public final class HibernateSecurityCredentialService {
           null,
           failure);
     }
+    return requireAuthenticated(outcome);
   }
 
   /** Authenticate a one-way access token by its non-secret lookup prefix. */
@@ -410,11 +414,11 @@ public final class HibernateSecurityCredentialService {
     }
 
     String prefix = matcher.group(1);
+    AuthenticationOutcome outcome;
     try {
-      AuthenticationOutcome outcome =
+      outcome =
           sessionFactory.fromTransaction(
               session -> authenticateAccessToken(session, tokenValue, prefix, trace));
-      return requireAuthenticated(outcome);
     } catch (DeniedAuthenticationAuditFailure denied) {
       throw denied.authenticationException();
     } catch (SecurityIdentityAuditPersistenceException auditFailure) {
@@ -428,6 +432,7 @@ public final class HibernateSecurityCredentialService {
           null,
           failure);
     }
+    return requireAuthenticated(outcome);
   }
 
   /** Find non-secret password metadata for one principal. */
@@ -956,7 +961,7 @@ public final class HibernateSecurityCredentialService {
     if (permissionScopes.isEmpty()) {
       throw new IllegalArgumentException("permissionScopes must not be empty");
     }
-    if (permissionScopes.contains(null)) {
+    if (permissionScopes.stream().anyMatch(Objects::isNull)) {
       throw new IllegalArgumentException("permissionScopes must not contain null");
     }
     return Set.copyOf(permissionScopes);
