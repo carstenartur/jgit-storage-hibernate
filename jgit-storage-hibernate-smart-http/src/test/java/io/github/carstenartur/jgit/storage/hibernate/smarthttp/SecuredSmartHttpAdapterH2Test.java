@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -106,6 +107,25 @@ class SecuredSmartHttpAdapterH2Test {
   }
 
   @Test
+  void servletWiringIsAvailableWithoutOpeningARepository() {
+    try (HibernateSessionFactoryProvider provider = provider("servlet")) {
+      RecordingPolicy policy = new RecordingPolicy();
+      SecuredHibernateRepositoryFactory<String> factory =
+          new SecuredHibernateRepositoryFactory<>(provider.getSessionFactory(), policy);
+
+      GitServlet servlet = SecuredSmartHttp.servlet(factory, ignored -> "alice");
+      assertNotNull(servlet);
+
+      SecuredSmartHttp.configure(
+          new GitServlet(),
+          factory,
+          ignored -> "alice",
+          SmartHttpRepositoryNameMapper.strict(),
+          SmartHttpReceiveAdmission.allowAuthenticatedRequests());
+    }
+  }
+
+  @Test
   void resolverConcealsDeniedAndMissingRepositories() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider("conceal")) {
       SessionFactory sessionFactory = provider.getSessionFactory();
@@ -128,10 +148,9 @@ class SecuredSmartHttpAdapterH2Test {
   }
 
   @Test
-  void infrastructureFailureRemainsServerError() throws Exception {
+  void authorizationInfrastructureFailureForMissingRepositoryRemainsServerError() throws Exception {
     try (HibernateSessionFactoryProvider provider = provider("failure")) {
       SessionFactory sessionFactory = provider.getSessionFactory();
-      initializeRepository(sessionFactory);
       RecordingPolicy policy = new RecordingPolicy();
       policy.fail(new HibernateStorageException("authorization database unavailable"));
       SecuredHibernateRepositoryFactory<String> factory =
@@ -142,7 +161,7 @@ class SecuredSmartHttpAdapterH2Test {
       ServiceMayNotContinueException failure =
           assertThrows(
               ServiceMayNotContinueException.class,
-              () -> resolver.open(request(), "team/demo.git"));
+              () -> resolver.open(request(), "team/missing.git"));
       assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, failure.getStatusCode());
       assertTrue(failure.getCause() instanceof HibernateStorageException);
     }

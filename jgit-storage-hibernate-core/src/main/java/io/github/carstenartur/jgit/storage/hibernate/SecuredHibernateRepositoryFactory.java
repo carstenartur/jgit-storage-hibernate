@@ -12,6 +12,7 @@ import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecyc
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -77,13 +78,25 @@ public final class SecuredHibernateRepositoryFactory<C> {
       RepositoryName repositoryName, C accessContext) {
     RepositoryName name = Objects.requireNonNull(repositoryName, "repositoryName");
     C context = Objects.requireNonNull(accessContext, "accessContext");
-    Consumer<RepositoryAccessRequest> guard = request -> accessPolicy.require(context, request);
+    AtomicReference<RuntimeException> policyFailure = new AtomicReference<>();
+    Consumer<RepositoryAccessRequest> guard =
+        request -> {
+          try {
+            accessPolicy.require(context, request);
+          } catch (RuntimeException failure) {
+            policyFailure.compareAndSet(null, failure);
+            throw failure;
+          }
+        };
     try {
       HibernateGitStorage storage = delegate.openExisting(name, guard);
       return new DefaultAuthorizedRepositorySession<>(name, context, accessPolicy, storage);
     } catch (RepositoryAccessDeniedException handled) {
       throw handled;
     } catch (HibernateStorageException failure) {
+      if (policyFailure.get() == failure) {
+        throw failure;
+      }
       if (!repositoryExistsAfterOpenFailure(name, failure)) {
         throw new RepositoryDoesNotExistException(name, failure);
       }
