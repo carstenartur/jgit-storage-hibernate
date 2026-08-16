@@ -40,9 +40,10 @@ import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
  *
  * <p>Exactly one Authorization header is accepted. Basic credentials use UTF-8, decoded password
  * arrays are cleared after authentication, bearer values are passed directly to the one-way token
- * service, and every client-facing rejection is generic. Credential or required-audit
- * infrastructure failures remain HTTP 500 errors instead of being mislabeled as invalid
- * credentials.
+ * service, and every client-facing authentication denial is generic. Insecure transport is rejected
+ * with HTTP 403 so an authentication challenge cannot solicit credentials over plaintext HTTP.
+ * Credential or required-audit infrastructure failures remain HTTP 500 errors instead of being
+ * mislabeled as invalid credentials.
  */
 public final class SecuritySmartHttpAccessContextProvider
     implements SmartHttpAccessContextProvider<AuthenticatedGitAccess> {
@@ -100,7 +101,7 @@ public final class SecuritySmartHttpAccessContextProvider
       throws ServiceNotAuthorizedException, ServiceMayNotContinueException {
     HttpServletRequest current = Objects.requireNonNull(request, "request");
     if (!isSecure(current)) {
-      throw unauthorized();
+      throw insecureTransport();
     }
 
     String header;
@@ -288,6 +289,11 @@ public final class SecuritySmartHttpAccessContextProvider
 
   private static ServiceNotAuthorizedException unauthorized() {
     return new ServiceNotAuthorizedException();
+  }
+
+  private static ServiceMayNotContinueException insecureTransport() {
+    return new ServiceMayNotContinueException(
+        "Secure transport required", HttpServletResponse.SC_FORBIDDEN);
   }
 
   private static ServiceMayNotContinueException unavailable(Throwable cause) {
