@@ -171,25 +171,35 @@ Security fixes are provided for the latest released `0.1.x` version.
             text,
         )
         self.assertIn("Automatic release preparation", text)
-
-        preflight = normalized.index(
-            "python3 .github/scripts/verify-release-consistency.py"
+        self.assertIn(
+            "python3 .github/scripts/verify-release-consistency.py",
+            text,
         )
+
+        prepare_release = normalized.index("prepare_release()")
+        preflight = normalized.index("verify_repository_contract", prepare_release)
         set_release = normalized.index(
-            'mvn -B versions:set -DnewVersion="$RELEASE_VERSION"'
+            'mvn -B versions:set -DnewVersion="$RELEASE_VERSION"',
+            preflight,
         )
         generate_release = normalized.index(
-            'python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release'
+            'python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release',
+            set_release,
         )
+        write_candidate = normalized.index("write_release_candidate", generate_release)
         generated_state_check = normalized.index(
-            "python3 .github/scripts/verify-release-consistency.py",
-            generate_release,
+            "verify_repository_contract",
+            write_candidate,
         )
-        stage_generated_release = normalized.index("git add -A", generate_release)
+        stage_generated_release = normalized.index(
+            "git add -A",
+            generated_state_check,
+        )
 
         self.assertLess(preflight, set_release)
         self.assertLess(set_release, generate_release)
-        self.assertLess(generate_release, generated_state_check)
+        self.assertLess(generate_release, write_candidate)
+        self.assertLess(write_candidate, generated_state_check)
         self.assertLess(generated_state_check, stage_generated_release)
         self.assertIn(
             'python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"',
