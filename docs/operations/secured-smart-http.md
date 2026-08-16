@@ -16,7 +16,7 @@ HTTP request
     -> SecuredSmartHttpRepositoryResolver
     -> SecuredHibernateRepositoryFactory
     -> repository READ policy
-    -> UploadPack / ReceivePack
+    -> UploadPack / explicitly admitted ReceivePack
     -> Core publication-boundary ref authorization
     -> Hibernate transaction
 ```
@@ -52,7 +52,7 @@ module: an application can bind the same protocol adapter to database credential
 existing authenticated session. Core-only consumers that do not select Smart HTTP retain their
 existing dependency surface.
 
-## Minimal servlet wiring
+## Fetch-only servlet wiring
 
 ```java
 SecuredHibernateRepositoryFactory<MyAccessContext> repositories =
@@ -67,11 +67,16 @@ GitServlet servlet =
 Register the returned servlet at an application-owned mapping such as `/git/*`. The servlet is not
 started by the library and no embedded server is selected transitively.
 
-`SecuredSmartHttp.servlet(...)` configures all of these as one unit:
+The two-argument `SecuredSmartHttp.servlet(...)` overload is deliberately **fetch-only**. It enables
+repository discovery, clone and fetch, but leaves receive-pack disabled. A deployment that only needs
+read access therefore cannot accidentally accept pack data and rely on a later ref rejection to undo
+the resource cost.
+
+The helper configures all of these as one unit:
 
 - `SecuredSmartHttpRepositoryResolver`;
 - `SecuredSmartHttpUploadPackFactory`;
-- `SecuredSmartHttpReceivePackFactory`;
+- a `SecuredSmartHttpReceivePackFactory` with disabled admission;
 - disabled dumb-HTTP/as-is file service.
 
 Disabling the as-is file service is security relevant: static repository-file serving must not become
@@ -137,7 +142,8 @@ must not depend on mutable display names.
 
 ## Discovery and failure semantics
 
-The resolver authenticates first, then opens through `SecuredHibernateRepositoryFactory`:
+The resolver validates the request repository name, authenticates the request and then opens through
+`SecuredHibernateRepositoryFactory`:
 
 | Condition | Protocol result |
 |---|---|
@@ -151,6 +157,10 @@ Missing and undiscoverable repositories intentionally share one result so a call
 `DISCOVER` cannot test whether a private repository exists. Infrastructure failures are deliberately
 not mislabeled as 404 responses; doing so would hide outages and break operational monitoring.
 
+An authorized lookup for a missing repository does not create or repair lifecycle/lock rows. Partial
+metadata and metadata without initialized Git refs are treated as infrastructure failures, not as a
+normal 404.
+
 ## Fetch and clone
 
 Repository resolution requires `DISCOVER` and `READ`. `SecuredSmartHttpUploadPackFactory` performs a
@@ -161,10 +171,9 @@ Repository-level `READ` currently exposes the repository's advertised refs and r
 Protected-ref rules are write rules, not per-ref read filters. Applications must not present this as
 path-level or branch-level content confidentiality.
 
-## Push and exact ref authorization
+## Enabling push and exact ref authorization
 
-`SecuredSmartHttpReceivePackFactory` performs a fresh `READ` check, applies an optional coarse receive
-admission callback and enables JGit atomic command execution.
+Push requires the explicit overload with an application-owned coarse receive admission:
 
 ```java
 GitServlet servlet =
@@ -176,11 +185,13 @@ GitServlet servlet =
             applicationWriteAdmission.requireAnyWriteCapability(repository, access));
 ```
 
-The callback can reject a principal before a request body/pack is processed when the application
-already has a safe repository-level write-capability answer. It is only an optimization. It must not
-approve an exact ref command or replace Core enforcement.
+`SecuredSmartHttpReceivePackFactory` performs a fresh `READ` check and invokes this callback before it
+creates JGit's atomic `ReceivePack`. The callback should reject a principal with no repository-level
+write capability before request pack data is accepted.
 
-Core classifies and rechecks every command at the transactional publication boundary:
+This is still only an early rejection boundary. It must not approve an exact ref command or replace
+Core enforcement. Core classifies and rechecks every command at the transactional publication
+boundary:
 
 - `CREATE_REF`;
 - fast-forward `UPDATE_REF`;
@@ -189,6 +200,10 @@ Core classifies and rechecks every command at the transactional publication boun
 
 A mixed batch containing an unauthorized command is rejected atomically. The identity in commit
 `author` or `committer` fields is Git content and never influences this decision.
+
+`SmartHttpReceiveAdmission.allowAuthenticatedRequests()` is available for controlled deployments
+that deliberately accept receiving pack data before the exact Core decision. It is not the default
+and is generally unsuitable for untrusted or resource-constrained servers.
 
 ## Repository/session lifetime
 
@@ -212,13 +227,14 @@ Before production use:
 - use bounded authentication/session lifetime and deterministic token revocation;
 - retain authorization and identity audit according to the applicable privacy/retention policy;
 - keep raw repository factories out of request-scoped dependency injection;
+- leave receive-pack disabled unless an explicit coarse write-admission policy is configured;
 - run clone, fetch, allowed push, protected-ref rejection, force/delete rejection and mixed-command
   tests against the selected servlet container.
 
 ## Current limitations and follow-up work
 
-The first adapter increment deliberately does not claim that phase 3 of issue #233 is complete.
-Remaining work includes:
+The first adapter increment deliberately does not claim that the Smart HTTP phase of issue #233 is
+complete. Remaining work includes:
 
 - reusable, non-secret Basic/Bearer header adapters for the Security credential service;
 - a database-backed coarse write-admission implementation with bounded query cost;
