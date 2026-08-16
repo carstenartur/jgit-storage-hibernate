@@ -57,7 +57,9 @@ public final class SmartHttpAuthenticationChallengeFilter implements Filter {
     if (!(response instanceof HttpServletResponse httpResponse)) {
       throw new ServletException("Smart HTTP authentication requires an HTTP response");
     }
-    chain.doFilter(request, new ChallengeResponse(httpResponse, challenges));
+    ChallengeResponse challengeResponse = new ChallengeResponse(httpResponse, challenges);
+    chain.doFilter(request, challengeResponse);
+    challengeResponse.complete();
   }
 
   private static String realm(String value) {
@@ -98,15 +100,21 @@ public final class SmartHttpAuthenticationChallengeFilter implements Filter {
     }
 
     @Override
-    public void setStatus(int status) {
-      addChallenges(status);
-      super.setStatus(status);
+    public void flushBuffer() throws IOException {
+      addChallenges(getStatus());
+      super.flushBuffer();
     }
 
     @Override
     public void reset() {
       super.reset();
       added = false;
+    }
+
+    void complete() {
+      if (!isCommitted()) {
+        addChallenges(getStatus());
+      }
     }
 
     private void addChallenges(int status) {
