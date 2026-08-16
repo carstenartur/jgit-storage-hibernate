@@ -180,7 +180,7 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
       boolean exists = repository.exists();
       if (!exists && !createIfMissing) {
         repository.close();
-        throw new HibernateStorageException("Repository " + repositoryName + " does not exist");
+        throw new RepositoryDoesNotExistException(repositoryName);
       }
       if (!exists) {
         repository.create(true);

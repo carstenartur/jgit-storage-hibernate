@@ -16,18 +16,15 @@ public final class RepositoryDoesNotExistException extends HibernateStorageExcep
   private final RepositoryName repositoryName;
 
   /**
-   * Create a missing-repository result while retaining the lower-level open failure.
+   * Create a missing-repository result at Core's authoritative existence check.
    *
    * @param repositoryName missing logical repository
-   * @param cause lower-level storage failure that established absence
    */
-  public RepositoryDoesNotExistException(
-      RepositoryName repositoryName, HibernateStorageException cause) {
+  public RepositoryDoesNotExistException(RepositoryName repositoryName) {
     super(
         "Repository "
             + Objects.requireNonNull(repositoryName, "repositoryName")
-            + " does not exist",
-        Objects.requireNonNull(cause, "cause"));
+            + " does not exist");
     this.repositoryName = repositoryName;
   }
 
