@@ -15,14 +15,15 @@ It provides:
 - one request binding shared by `RepositoryResolver`, `UploadPackFactory` and
   `ReceivePackFactory`;
 - a fresh `READ` policy check before upload-pack and receive-pack service creation;
-- atomic receive-pack command execution, while Core still performs the authoritative exact-ref
-  checks at the transactional publication boundary;
+- fetch-only default wiring so a read-only deployment cannot accidentally accept push pack data;
+- explicit coarse receive admission before JGit creates an atomic receive-pack;
+- Core's authoritative exact-ref checks at the transactional publication boundary;
 - explicit disabling of dumb HTTP file service so it cannot bypass the secured resolver;
 - distinct missing/denied and infrastructure-failure results so outages are never disguised as 404s.
 
 See the complete [secured Smart HTTP operations guide](../docs/operations/secured-smart-http.md).
 
-## Wiring
+## Fetch-only wiring
 
 ```java
 GitServlet servlet =
@@ -31,12 +32,15 @@ GitServlet servlet =
         request -> applicationAuthentication.requireAccessContext(request));
 ```
 
-The access-context provider may use the Security module's local password/access-token service, an
-OIDC or LDAP adapter, or an already authenticated application session. It must return one immutable
-context accepted by the configured `SecuredHibernateRepositoryFactory`; missing authentication must
-raise JGit's `ServiceNotAuthorizedException`.
+This overload enables clone and fetch but deliberately leaves receive-pack disabled. The
+access-context provider may use the Security module's local password/access-token service, an OIDC or
+LDAP adapter, or an already authenticated application session. It must return one immutable context
+accepted by the configured `SecuredHibernateRepositoryFactory`; missing authentication must raise
+JGit's `ServiceNotAuthorizedException`.
 
-For an application-owned coarse push admission check:
+## Explicit push admission
+
+Push requires the overload with an application-owned coarse admission check:
 
 ```java
 GitServlet servlet =
@@ -48,9 +52,13 @@ GitServlet servlet =
             applicationWriteAdmission.requireAnyWriteCapability(repository, accessContext));
 ```
 
-The admission callback is an early rejection optimization only. It must never replace Core's final
-`CREATE_REF`, `UPDATE_REF`, `DELETE_REF` and `FORCE_UPDATE` checks. The default admits an already
-authenticated and readable repository to receive-pack; exact commands remain fail-closed in Core.
+The admission callback rejects principals with no repository-level write capability before JGit
+accepts pack data. It is still only an early rejection boundary and must never approve an exact ref
+command or replace Core's final `CREATE_REF`, `UPDATE_REF`, `DELETE_REF` and `FORCE_UPDATE` checks.
+
+`SmartHttpReceiveAdmission.allowAuthenticatedRequests()` is available for controlled deployments that
+accept receiving pack data before the exact Core decision, but it is not the default and is a poor fit
+for untrusted or resource-constrained servers.
 
 ## Current boundary
 
