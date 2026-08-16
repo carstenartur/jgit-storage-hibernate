@@ -105,10 +105,10 @@ class RepositoryDeletionH2Test {
           new DefaultHibernateRepositoryFactory(sessionFactory);
       RepositoryName repositoryName = new RepositoryName("resolver-owned-repository");
 
-      Repository repository = factory.open(repositoryName).repository();
-      ObjectId commitId = commit(repository, "resolver-owned");
-      assertEquals(commitId, repository.exactRef("refs/heads/main").getObjectId());
-      repository.close();
+      try (Repository repository = factory.open(repositoryName).repository()) {
+        ObjectId commitId = commit(repository, "resolver-owned");
+        assertEquals(commitId, repository.exactRef("refs/heads/main").getObjectId());
+      }
 
       RepositoryDeletionResult deleted = factory.deleteRepository(repositoryName);
       assertTrue(deleted.deletedAnything());
