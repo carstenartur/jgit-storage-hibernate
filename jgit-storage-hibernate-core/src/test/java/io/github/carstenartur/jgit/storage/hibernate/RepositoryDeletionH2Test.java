@@ -97,6 +97,27 @@ class RepositoryDeletionH2Test {
   }
 
   @Test
+  void closingReturnedJgitRepositoryReleasesFactoryHandle() throws Exception {
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    try (HibernateSessionFactoryProvider provider = provider("jgit-close")) {
+      SessionFactory sessionFactory = provider.getSessionFactory();
+      DefaultHibernateRepositoryFactory factory =
+          new DefaultHibernateRepositoryFactory(sessionFactory);
+      RepositoryName repositoryName = new RepositoryName("resolver-owned-repository");
+
+      Repository repository = factory.open(repositoryName).repository();
+      ObjectId commitId = commit(repository, "resolver-owned");
+      assertEquals(commitId, repository.exactRef("refs/heads/main").getObjectId());
+      repository.close();
+
+      RepositoryDeletionResult deleted = factory.deleteRepository(repositoryName);
+      assertTrue(deleted.deletedAnything());
+      assertEquals(0L, countLifecycleRows(sessionFactory, repositoryName));
+      assertEquals(0L, countLockRows(sessionFactory, repositoryName));
+    }
+  }
+
+  @Test
   void participantFailureRollsBackCoreAndParticipantDeletes() throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     try (HibernateSessionFactoryProvider provider = provider("rollback")) {
