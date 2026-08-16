@@ -62,7 +62,9 @@ public record SecurityManagementRequest(
   }
 
   private static String required(String name, String value, int maximumLength) {
-    Objects.requireNonNull(value, name);
+    if (value == null) {
+      throw new IllegalArgumentException(name + " must not be null");
+    }
     if (value.isBlank()) {
       throw new IllegalArgumentException(name + " must not be blank");
     }
