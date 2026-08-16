@@ -38,6 +38,7 @@ class SecuritySqlServerSchemaMigrationIntegrationTest {
             SecuritySchemaMigrations.SQL_SERVER_LOCATION,
             () -> {})) {
       SecuritySchemaMigrationIntegrationTest.verifyEmptyMigrationAndRestart(database);
+      ExternalPrincipalBindingDatabaseContract.verify(database);
     }
   }
 }
