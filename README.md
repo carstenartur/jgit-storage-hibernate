@@ -18,6 +18,8 @@ https://doi.org/10.5281/zenodo.21210132
 
 JGit is the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. `jgit-storage-hibernate` adds a relational storage backend plus persistent query models over that history: transaction-safe pack/ref publication, structured history queries and Lucene full-text search. The Java Analysis and Architecture modules additionally provide semantic in-memory analysis APIs; their module-owned database persistence is still incubating in the `0.1.x` line.
 
+The `0.11.0-SNAPSHOT` development line also contains optional principal-bound Security and secured JGit Smart HTTP capabilities. They keep users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core. These development modules are not contained in the current public `0.10.0` release.
+
 The important distinction is not merely that the library saves application code. It changes **when and how often** expensive work is performed:
 
 ```text
@@ -92,11 +94,13 @@ See the complete [change-audit and Java-usage use case](docs/use-cases/change-au
 
 ## What it adds on top of JGit
 
-| Need | What the project adds | Maturity in `0.1.x` |
+| Need | What the project adds | Maturity |
 |---|---|---|
 | Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with chunked payloads and transactional publication | Supported Core contract |
 | Run repeated structured history queries | Materialized first-parent changed paths plus indexed author, committer and timestamp fields | Supported Search contract |
 | Search history content | Hibernate Search/Lucene indexes for messages, changed paths and selected changed-file text | Supported Search contract |
+| Enforce multi-user repository and protected-ref access | Explicit principal contexts, database grants/ref rules, final direct-JGit checks, revocable tokens and bounded audit | `0.11.0-SNAPSHOT` development capability |
+| Expose secured clone, fetch and push over JGit Smart HTTP | Request-bound resolver and upload/receive factories over the same Core publication checks | `0.11.0-SNAPSHOT` development capability |
 | Understand Java evolution beyond tokens and lines | Binding-aware symbols, references, semantic diff, timelines and software graphs | Analysis API supported; persistence incubating |
 | Keep architecture intent connected to implementation | Versioned rules, evidence, code mapping and drift evaluation | Evaluation API supported; persistence incubating |
 
@@ -104,10 +108,13 @@ Git objects and refs remain authoritative. Search, Java Analysis and Architectur
 
 ## Module guide
 
-| Module | Choose it when... | Persistence contract |
+Security and Smart HTTP below describe the upcoming `0.11.0` line; they are not artifacts of the current public `0.10.0` release.
+
+| Module | Choose it when... | Persistence/runtime contract |
 |---|---|---|
 | `jgit-storage-hibernate-core` | You need database-backed Git semantics and transaction-safe repository publication. | Versioned Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server |
-| `jgit-storage-hibernate-security` | You need an optional framework-neutral principal/group ACL model and deterministic protected-ref decisions. | Versioned Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server; direct-JGit enforcement follows in phase 2 |
+| `jgit-storage-hibernate-security` | You need principals/groups, repository/ref ACLs, local credentials or tokens, revocation and durable authorization/identity audit. | Own Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server; principal-bound direct-JGit enforcement |
+| `jgit-storage-hibernate-smart-http` | You expose authenticated clone, fetch and push through JGit Smart HTTP. | No schema; optional Servlet/JGit HTTP adapter over Core's final ref checks |
 | `jgit-storage-hibernate-search` | Users or services need repeated audit, reporting or content-search queries. | Versioned Flyway migrations for H2 and PostgreSQL |
 | `jgit-storage-hibernate-java-analysis` | You need to know which logical Java declaration changed and which versions are affected. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-architecture` | You need explainable architecture drift and decision provenance. | In-memory API supported; entity persistence incubating |
@@ -142,7 +149,7 @@ No GitHub token or Maven Central account is required.
 </dependency>
 ```
 
-Add `jgit-storage-hibernate-security` for the optional principal/group ACL schema and evaluator, and add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema.
+Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security and Smart HTTP become independently selectable with the upcoming `0.11.0` release; source/reactor builds keep them aligned through `${project.version}`.
 
 ### 3. Apply the packaged migration before Hibernate starts
 
@@ -212,6 +219,7 @@ See [Pack capacity and recovery](docs/operations/capacity-and-recovery.md) for s
 |---|---|---|---|---|
 | Core | yes | yes | yes | `jgit_storage_hibernate_core_schema_history` |
 | Security | yes | yes | yes | `jgit_storage_hibernate_security_schema_history` |
+| Smart HTTP | no schema | no schema | no schema | — |
 | Search | yes | no | yes | `jgit_storage_hibernate_search_schema_history` |
 | Java Analysis entities | no module-owned contract | no | no | incubating |
 | Architecture entities | no module-owned contract | no | no | incubating |
@@ -228,6 +236,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 - [Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
 - [Benchmark methodology](docs/benchmarks.md)
 - [JGit versus indexed history-query crossover](docs/operations/history-query-crossover.md)
+- [Secured JGit Smart HTTP](docs/operations/secured-smart-http.md)
 - [Consumer, migration and database matrix](docs/consuming.md)
 - [Change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md)
 - [Approval-workflow use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
@@ -243,6 +252,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 - Consumer code uses module-owned facades and DTOs, not packages marked `@InternalApi`.
 - Git data is authoritative; semantic and search indexes are rebuildable.
 - Domain-specific workflows and application tables remain owned by consuming applications.
+- Security and Smart HTTP are explicit optional capabilities; Core never selects users, credentials, Servlet or an HTTP server transitively.
 - Java 21 is the baseline.
 
 ## License
