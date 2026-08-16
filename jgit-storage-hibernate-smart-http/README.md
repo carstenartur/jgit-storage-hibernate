@@ -3,6 +3,9 @@
 This optional module binds JGit Smart HTTP requests to `SecuredHibernateRepositoryFactory` without
 adding Servlet or HTTP-server dependencies to Core or Security.
 
+> **Development status:** this module belongs to the upcoming `0.11.0` line and is not contained in
+> the current public `0.10.0` release.
+
 It provides:
 
 - strict and deterministic URL-name to `RepositoryName` mapping, including one optional `.git`
@@ -14,7 +17,10 @@ It provides:
 - a fresh `READ` policy check before upload-pack and receive-pack service creation;
 - atomic receive-pack command execution, while Core still performs the authoritative exact-ref
   checks at the transactional publication boundary;
-- explicit disabling of dumb HTTP file service so it cannot bypass the secured resolver.
+- explicit disabling of dumb HTTP file service so it cannot bypass the secured resolver;
+- distinct missing/denied and infrastructure-failure results so outages are never disguised as 404s.
+
+See the complete [secured Smart HTTP operations guide](../docs/operations/secured-smart-http.md).
 
 ## Wiring
 
