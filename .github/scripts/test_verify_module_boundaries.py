@@ -18,8 +18,13 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def dep(artifact: str, scope: str = "compile", group: str = MODULE.PROJECT_GROUP):
-    return MODULE.Dependency(group, artifact, scope, False)
+def dep(
+    artifact: str,
+    scope: str = "compile",
+    group: str = MODULE.PROJECT_GROUP,
+    optional: bool = False,
+):
+    return MODULE.Dependency(group, artifact, scope, optional)
 
 
 def module(artifact: str, *dependencies, packaging: str = "jar"):
@@ -33,6 +38,7 @@ def valid_modules():
         MODULE.SMART_HTTP: module(
             MODULE.SMART_HTTP,
             dep(MODULE.CORE),
+            dep(MODULE.SECURITY, optional=True),
             dep("org.eclipse.jgit.http.server", group="org.eclipse.jgit"),
             dep("jakarta.servlet-api", group="jakarta.servlet"),
         ),
@@ -57,7 +63,7 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
         edges = MODULE.verify(modules)
         self.assertEqual(set(), edges[MODULE.CORE])
         self.assertEqual({MODULE.CORE}, edges[MODULE.SECURITY])
-        self.assertEqual({MODULE.CORE}, edges[MODULE.SMART_HTTP])
+        self.assertEqual({MODULE.CORE, MODULE.SECURITY}, edges[MODULE.SMART_HTTP])
         self.assertEqual({MODULE.CORE}, edges[MODULE.SEARCH])
         self.assertEqual({MODULE.CORE}, edges[MODULE.JAVA_ANALYSIS])
         self.assertEqual({MODULE.JAVA_ANALYSIS}, edges[MODULE.ARCHITECTURE])
@@ -68,14 +74,12 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.BoundaryError, "forbidden production module dependencies"):
             MODULE.verify(modules)
 
-    def test_rejects_smart_http_dependency_on_security(self) -> None:
+    def test_requires_smart_http_security_dependency_to_remain_optional(self) -> None:
         modules = valid_modules()
         modules[MODULE.SMART_HTTP] = module(
             MODULE.SMART_HTTP, dep(MODULE.CORE), dep(MODULE.SECURITY)
         )
-        with self.assertRaisesRegex(
-            MODULE.BoundaryError, "forbidden production module dependencies"
-        ):
+        with self.assertRaisesRegex(MODULE.BoundaryError, "optional dependency"):
             MODULE.verify(modules)
 
     def test_rejects_security_dependency_on_search_or_protocol_runtime(self) -> None:
