@@ -968,7 +968,7 @@ public final class HibernateSecurityCredentialService {
     return Set.copyOf(permissionScopes);
   }
 
-  private static String serializeScopes(Set<GitRepositoryPermission> scopes) {
+  static String serializeScopes(Set<GitRepositoryPermission> scopes) {
     String serialized =
         scopes.stream()
             .sorted()
