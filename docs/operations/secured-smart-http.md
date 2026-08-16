@@ -36,13 +36,14 @@ must receive a `SecuredHibernateRepositoryFactory`, never the raw factory.
 
 ## Dependency selection
 
-Use the module only in the server application that exposes Git HTTP traffic:
+Use the module only in the server application that exposes Git HTTP traffic. Until the first public
+release that contains this module, source/reactor builds use the aligned project version:
 
 ```xml
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-smart-http</artifactId>
-  <version>0.11.0-SNAPSHOT</version>
+  <version>${project.version}</version>
 </dependency>
 ```
 
