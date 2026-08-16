@@ -172,25 +172,25 @@ Security fixes are provided for the latest released `0.1.x` version.
         )
         self.assertIn("Automatic release preparation", text)
 
-        preflight = text.index("python3 .github/scripts/verify-release-consistency.py")
-        set_release = text.index(
+        preflight = normalized.index(
+            "python3 .github/scripts/verify-release-consistency.py"
+        )
+        set_release = normalized.index(
             'mvn -B versions:set -DnewVersion="$RELEASE_VERSION"'
         )
-        generate_release = text.index(
+        generate_release = normalized.index(
             'python3 .github/scripts/update-release-metadata.py "$RELEASE_VERSION" --release'
         )
-        generated_state_check = text.index(
+        generated_state_check = normalized.index(
             "python3 .github/scripts/verify-release-consistency.py",
             generate_release,
         )
+        stage_generated_release = normalized.index("git add -A", generate_release)
 
         self.assertLess(preflight, set_release)
         self.assertLess(set_release, generate_release)
         self.assertLess(generate_release, generated_state_check)
-        self.assertIn(
-            "README.md docs jgit-storage-hibernate-*/README.md",
-            normalized,
-        )
+        self.assertLess(generated_state_check, stage_generated_release)
         self.assertIn(
             'python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"',
             text,
