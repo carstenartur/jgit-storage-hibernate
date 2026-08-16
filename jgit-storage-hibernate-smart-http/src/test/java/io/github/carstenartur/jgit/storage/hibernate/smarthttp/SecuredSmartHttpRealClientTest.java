@@ -119,7 +119,8 @@ class SecuredSmartHttpRealClientTest {
         MutablePolicy.readable()
             .allowWrites(
                 request ->
-                    request.refName().orElse("").startsWith("refs/heads/users/alice/")
+                    request.refName() != null
+                        && request.refName().startsWith("refs/heads/users/alice/")
                         && (request.operation() == RepositoryAccessOperation.CREATE_REF
                             || request.operation() == RepositoryAccessOperation.UPDATE_REF));
     try (SmartHttpFixture fixture = SmartHttpFixture.pushEnabled(policy)) {
