@@ -52,7 +52,7 @@ final class StrictSmartHttpRepositoryNameMapper implements SmartHttpRepositoryNa
     if (requestName == null
         || requestName.isBlank()
         || !requestName.equals(requestName.strip())) {
-      throw hidden(requestName);
+      throw hidden();
     }
 
     String canonical =
@@ -65,22 +65,23 @@ final class StrictSmartHttpRepositoryNameMapper implements SmartHttpRepositoryNa
         || canonical.endsWith("/")
         || canonical.contains("\\")
         || canonical.contains("//")) {
-      throw hidden(requestName);
+      throw hidden();
     }
     for (int index = 0; index < canonical.length(); index++) {
       if (Character.isISOControl(canonical.charAt(index))) {
-        throw hidden(requestName);
+        throw hidden();
       }
     }
     for (String segment : canonical.split("/", -1)) {
       if (segment.isEmpty() || Objects.equals(segment, ".") || Objects.equals(segment, "..")) {
-        throw hidden(requestName);
+        throw hidden();
       }
     }
     return new RepositoryName(canonical);
   }
 
-  private static RepositoryNotFoundException hidden(String requestName) {
-    return new RepositoryNotFoundException(requestName == null ? "" : requestName);
+  private static RepositoryNotFoundException hidden() {
+    // Never reflect an untrusted URL-derived name into an exception that a container may log.
+    return new RepositoryNotFoundException("");
   }
 }
