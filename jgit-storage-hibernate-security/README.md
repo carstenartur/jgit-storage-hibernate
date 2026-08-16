@@ -8,11 +8,13 @@ It provides:
 - immutable, explicitly propagated `GitAccessContext` values;
 - Git-generic repository permissions;
 - deterministic principal/group grant and protected-ref evaluation;
-- module-owned Hibernate entities for principals, groups, memberships, grants, ref rules, security versions and append-only access audit;
+- module-owned Hibernate entities for principals, groups, memberships, grants, ref rules, credentials,
+  access tokens, security versions and append-only authorization/identity audit;
 - independent Flyway migrations for H2, HSQLDB, PostgreSQL and Microsoft SQL Server;
 - a database-backed adapter for Core's dependency-free repository access SPI;
 - principal-bound repository sessions that enforce direct JGit ref mutations and repository deletion;
-- bounded persistent evidence for allowed, denied and failed authorization evaluations.
+- bounded persistent evidence for allowed, denied and failed authorization evaluations;
+- framework-neutral local password and one-way access-token lifecycle services.
 
 The evaluator fails closed. Repository grants are a prerequisite for access, explicit deny grants win
 over allows, and the highest-precedence matching ref rule can further allow or deny a ref mutation.
@@ -79,6 +81,111 @@ opened without an access guard remain explicitly privileged infrastructure capab
 them into untrusted request or domain code. Persisting loose/unreachable Git objects does not publish a
 branch or tag; authority-changing ref publication is enforced separately.
 
+## Local passwords and one-way access tokens
+
+Apply the Security Flyway stream through version `0.11.2` and register every class returned by
+`SecurityEntities.annotatedClasses()`. Construct the service with an application-owned management
+policy, the persistent identity-audit service and an access-token pepper obtained from a secret manager:
+
+```java
+byte[] tokenPepper = secretManager.read("jgit-access-token-pepper");
+try {
+  HibernateSecurityIdentityAuditService identityAudit =
+      new HibernateSecurityIdentityAuditService(sessionFactory);
+  HibernateSecurityCredentialService credentials =
+      new HibernateSecurityCredentialService(
+          sessionFactory,
+          new Pbkdf2PasswordHasher(),
+          new HmacSha256AccessTokenHasher(tokenPepper),
+          managementPolicy,
+          identityAudit);
+} finally {
+  Arrays.fill(tokenPepper, (byte) 0);
+}
+```
+
+`managementPolicy` is mandatory and receives an explicit `SecurityManagementRequest` for every
+password or token mutation. The library does not infer administrative authority from a global process
+user, Spring context or thread-local identity.
+
+Set or replace a password with a caller-owned character array and clear that array after the call:
+
+```java
+char[] password = suppliedPassword.toCharArray();
+try {
+  credentials.setPassword(
+      SecurityManagementRequest.password(
+          actor,
+          SecurityManagementOperation.SET_PASSWORD,
+          "principal-123"),
+      password);
+} finally {
+  Arrays.fill(password, '\0');
+}
+```
+
+The default hasher uses PBKDF2-HMAC-SHA-256 with 600,000 iterations, a random 16-byte salt and a
+32-byte verifier. A successful login transparently replaces a verifier when the configured hasher says
+that it needs rehashing. Failed attempts, timed lockout, successful reset and identity audit are updated
+transactionally. Every externally visible password denial uses the same `INVALID_CREDENTIALS` reason;
+more specific reasons such as lockout, inactive principal or missing credential remain available only
+in bounded audit evidence.
+
+```java
+AuthenticatedGitAccess authenticated =
+    credentials.authenticatePassword(
+        loginName,
+        password,
+        SecurityAuthenticationTrace.withoutRemoteAddress(
+            "session-456", "correlation-789"));
+```
+
+Issue an access token with scopes that can only reduce repository ACL permissions:
+
+```java
+IssuedAccessToken issued =
+    credentials.issueAccessToken(
+        SecurityManagementRequest.issueToken(actor, "principal-123"),
+        Set.of(GitRepositoryPermission.DISCOVER, GitRepositoryPermission.READ),
+        Instant.now().plus(Duration.ofDays(30)));
+String plaintextToken = issued.tokenValue(); // returned only by this issuance result
+```
+
+The database stores only a bounded non-secret lookup prefix, an HMAC-SHA-256 verifier and lifecycle
+metadata. The plaintext token is never readable again and is excluded from `toString()`, exceptions and
+audit records. `lastUsedAt`, expiry and revocation are persisted; a normal use timestamp does not
+change the credential security version. Repeated revocation is idempotent.
+
+Bind the authenticated credential boundary before the authoritative repository ACL policy:
+
+```java
+HibernateSecurityAccessAuditService repositoryAudit =
+    new HibernateSecurityAccessAuditService(sessionFactory);
+HibernateSecurityRepositoryAccessPolicy repositoryAcl =
+    new HibernateSecurityRepositoryAccessPolicy(sessionFactory, repositoryAudit);
+CredentialScopedRepositoryAccessPolicy credentialPolicy =
+    new CredentialScopedRepositoryAccessPolicy(repositoryAcl, repositoryAudit);
+SecuredHibernateRepositoryFactory<AuthenticatedGitAccess> repositories =
+    new SecuredHibernateRepositoryFactory<>(sessionFactory, credentialPolicy);
+```
+
+An `ADMINISTER` credential scope includes the Git-generic permissions below it, but no scope can grant a
+permission denied by repository grants or protected-ref rules. Bearer-token access contexts represent
+one successful authentication snapshot. Reauthenticate and reopen them for every HTTP request; do not
+retain a token-authenticated repository session across requests when prompt expiry or revocation is
+required. A database-backed publication-time token-version check remains part of the Smart HTTP and
+bounded-revocation follow-up in issue #233.
+
+Basic authentication, when an application maps it to `authenticatePassword`, must be accepted only over
+TLS. The token HMAC key is not stored by this library. To rotate it without invalidating every existing
+token, supply an application-owned multi-key `AccessTokenHasher` that verifies old keys while issuing
+with the new key; otherwise revoke and reissue tokens during rotation.
+
+Successful credential state changes and successful authentication audit share one transaction when
+`HibernateSecurityIdentityAuditService` is injected. If required audit cannot be appended, the success
+is rolled back and fails closed. A failed authentication remains denied when its audit append also
+fails, with the audit failure retained only as suppressed diagnostic evidence.
+
 ## Persistent authorization audit
 
 Register the audit entity through `SecurityEntities.annotatedClasses()` and apply the Security Flyway
@@ -144,5 +251,6 @@ The default one-argument policy constructors retain the explicit no-op recorder 
 Security-sensitive deployments that require durable audit must construct and inject
 `HibernateSecurityAccessAuditService`; there is no ambient global recorder.
 
-This module deliberately has no Hibernate Search, Spring, Servlet or HTTP-server dependency. Local
-credential/token services and Smart HTTP integration remain later stages of issue #233.
+This module deliberately has no Hibernate Search, Spring, Servlet or HTTP-server dependency. Smart HTTP
+integration, request-bound authentication adapters and bounded revocation for long-lived sessions
+remain later stages of issue #233.
