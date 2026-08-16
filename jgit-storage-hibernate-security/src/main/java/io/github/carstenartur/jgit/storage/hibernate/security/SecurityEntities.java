@@ -15,6 +15,7 @@ import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGro
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityGroupMembershipEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityIdentityAuditEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityLocalCredentialEntity;
+import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityManagedPolicyEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityPrincipalEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityRefRuleEntity;
 import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityRepositoryGrantEntity;
@@ -31,6 +32,7 @@ public final class SecurityEntities {
           SecurityGroupMembershipEntity.class,
           SecurityRepositoryGrantEntity.class,
           SecurityRefRuleEntity.class,
+          SecurityManagedPolicyEntity.class,
           SecurityVersionEntity.class,
           SecurityAccessAuditEntity.class,
           SecurityLocalCredentialEntity.class,

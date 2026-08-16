@@ -39,7 +39,11 @@ import java.time.Instant;
           columnList = "subject_type, subject_id, repository_name"),
       @Index(
           name = "idx_git_sec_grant_repository",
-          columnList = "repository_name, permission_name")
+          columnList = "repository_name, permission_name"),
+      @Index(
+          name = "idx_git_sec_grant_managed_source",
+          columnList =
+              "repository_name, managed_source_id, managed_source_instance_id, managed_entry_key")
     })
 public class SecurityRepositoryGrantEntity {
 
@@ -70,6 +74,18 @@ public class SecurityRepositoryGrantEntity {
 
   @Column(name = "created_by", nullable = false, length = 128)
   private String createdBy;
+
+  @Column(name = "managed_source_id", length = 128)
+  private String managedSourceId;
+
+  @Column(name = "managed_source_instance_id", length = 128)
+  private String managedSourceInstanceId;
+
+  @Column(name = "managed_entry_key", length = 256)
+  private String managedEntryKey;
+
+  @Column(name = "managed_policy_version")
+  private Long managedPolicyVersion;
 
   @Version
   @Column(name = "entity_version", nullable = false)
@@ -140,6 +156,38 @@ public class SecurityRepositoryGrantEntity {
 
   public void setCreatedBy(String createdBy) {
     this.createdBy = createdBy;
+  }
+
+  public String getManagedSourceId() {
+    return managedSourceId;
+  }
+
+  public void setManagedSourceId(String managedSourceId) {
+    this.managedSourceId = managedSourceId;
+  }
+
+  public String getManagedSourceInstanceId() {
+    return managedSourceInstanceId;
+  }
+
+  public void setManagedSourceInstanceId(String managedSourceInstanceId) {
+    this.managedSourceInstanceId = managedSourceInstanceId;
+  }
+
+  public String getManagedEntryKey() {
+    return managedEntryKey;
+  }
+
+  public void setManagedEntryKey(String managedEntryKey) {
+    this.managedEntryKey = managedEntryKey;
+  }
+
+  public Long getManagedPolicyVersion() {
+    return managedPolicyVersion;
+  }
+
+  public void setManagedPolicyVersion(Long managedPolicyVersion) {
+    this.managedPolicyVersion = managedPolicyVersion;
   }
 
   public long getEntityVersion() {
