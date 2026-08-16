@@ -172,15 +172,19 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
             releaseOpenHandle(scope);
           }
         };
+    HibernateRepository repository = null;
     boolean handedOff = false;
     try {
-      HibernateRepository repository =
+      if (!createIfMissing) {
+        requireExistingRepositoryMetadata(repositoryName);
+      }
+      repository =
           HibernateRepository.create(
               sessionFactory, repositoryName.value(), guard, releaseHandle);
       boolean exists = repository.exists();
       if (!exists && !createIfMissing) {
-        repository.close();
-        throw new RepositoryDoesNotExistException(repositoryName);
+        throw new HibernateStorageException(
+            "Repository metadata exists but Git refs are not initialized for " + repositoryName);
       }
       if (!exists) {
         repository.create(true);
@@ -193,8 +197,46 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
           "Could not open Hibernate-backed repository " + repositoryName, exception);
     } finally {
       if (!handedOff) {
+        if (repository != null) {
+          repository.close();
+        }
         releaseHandle.run();
       }
+    }
+  }
+
+  private void requireExistingRepositoryMetadata(RepositoryName repositoryName) {
+    try (Session session = sessionFactory.openSession()) {
+      Transaction transaction = session.beginTransaction();
+      try {
+        boolean lifecycleExists =
+            session.find(GitRepositoryLifecycleEntity.class, repositoryName.value()) != null;
+        boolean lockExists =
+            session.find(GitRepositoryLockEntity.class, repositoryName.value()) != null;
+        if (!lifecycleExists && !lockExists) {
+          throw new RepositoryDoesNotExistException(repositoryName);
+        }
+        if (lifecycleExists != lockExists) {
+          throw new HibernateStorageException(
+              "Incomplete repository metadata for "
+                  + repositoryName
+                  + ": lifecycle="
+                  + lifecycleExists
+                  + ", lock="
+                  + lockExists);
+        }
+        transaction.commit();
+      } catch (RuntimeException failure) {
+        if (transaction.isActive()) {
+          transaction.rollback();
+        }
+        throw failure;
+      }
+    } catch (HibernateStorageException handled) {
+      throw handled;
+    } catch (RuntimeException failure) {
+      throw new HibernateStorageException(
+          "Could not verify repository metadata for " + repositoryName, failure);
     }
   }
 
