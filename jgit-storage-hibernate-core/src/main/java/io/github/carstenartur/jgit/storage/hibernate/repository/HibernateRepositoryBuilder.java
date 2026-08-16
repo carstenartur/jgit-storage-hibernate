@@ -28,6 +28,7 @@ class HibernateRepositoryBuilder
   private String repositoryName;
   private Consumer<RepositoryAccessRequest> accessGuard = UNRESTRICTED_ACCESS;
   private Runnable afterClose = NO_AFTER_CLOSE;
+  private boolean initializeRepositoryRows = true;
 
   /**
    * Set the Hibernate session factory.
@@ -103,6 +104,22 @@ class HibernateRepositoryBuilder
   /** @return configured repository-close callback */
   public Runnable getAfterClose() {
     return afterClose;
+  }
+
+  /**
+   * Select whether construction may create missing durable repository metadata rows.
+   *
+   * @param initializeRepositoryRows true for create-or-open, false after an explicit existing-row check
+   * @return this builder
+   */
+  HibernateRepositoryBuilder setInitializeRepositoryRows(boolean initializeRepositoryRows) {
+    this.initializeRepositoryRows = initializeRepositoryRows;
+    return self();
+  }
+
+  /** @return whether construction initializes durable repository metadata */
+  boolean shouldInitializeRepositoryRows() {
+    return initializeRepositoryRows;
   }
 
   @Override

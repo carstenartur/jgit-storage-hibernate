@@ -179,8 +179,11 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
         requireExistingRepositoryMetadata(repositoryName);
       }
       repository =
-          HibernateRepository.create(
-              sessionFactory, repositoryName.value(), guard, releaseHandle);
+          createIfMissing
+              ? HibernateRepository.create(
+                  sessionFactory, repositoryName.value(), guard, releaseHandle)
+              : HibernateRepository.openExisting(
+                  sessionFactory, repositoryName.value(), guard, releaseHandle);
       boolean exists = repository.exists();
       if (!exists && !createIfMissing) {
         throw new HibernateStorageException(
