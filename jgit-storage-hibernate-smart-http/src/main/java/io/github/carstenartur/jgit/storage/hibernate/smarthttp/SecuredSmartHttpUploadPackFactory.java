@@ -34,7 +34,9 @@ public final class SecuredSmartHttpUploadPackFactory<C>
               RepositoryAccessRequest.repository(
                   binding.session().repositoryName(), RepositoryAccessOperation.READ));
     } catch (RepositoryAccessDeniedException denied) {
-      throw new ServiceNotAuthorizedException("Repository read access was revoked", denied);
+      // The bounded audit record carries the internal reason. Do not disclose revocation or ACL
+      // details through the Git protocol response.
+      throw new ServiceNotAuthorizedException();
     }
     return new UploadPack(repository);
   }
