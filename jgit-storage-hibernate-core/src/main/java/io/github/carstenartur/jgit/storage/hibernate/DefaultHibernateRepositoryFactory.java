@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.hibernate.Session;
@@ -164,10 +165,18 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
 
     RepositoryScope scope = new RepositoryScope(sessionFactory, repositoryName.value());
     reserveOpenHandle(scope, repositoryName);
+    AtomicBoolean handleOpen = new AtomicBoolean(true);
+    Runnable releaseHandle =
+        () -> {
+          if (handleOpen.compareAndSet(true, false)) {
+            releaseOpenHandle(scope);
+          }
+        };
     boolean handedOff = false;
     try {
       HibernateRepository repository =
-          HibernateRepository.create(sessionFactory, repositoryName.value(), guard);
+          HibernateRepository.create(
+              sessionFactory, repositoryName.value(), guard, releaseHandle);
       boolean exists = repository.exists();
       if (!exists && !createIfMissing) {
         repository.close();
@@ -176,8 +185,7 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
       if (!exists) {
         repository.create(true);
       }
-      DefaultHibernateGitStorage storage =
-          new DefaultHibernateGitStorage(repository, () -> releaseOpenHandle(scope));
+      DefaultHibernateGitStorage storage = new DefaultHibernateGitStorage(repository);
       handedOff = true;
       return new OpenedStorage(storage, !exists);
     } catch (IOException exception) {
@@ -185,7 +193,7 @@ public final class DefaultHibernateRepositoryFactory implements HibernateReposit
           "Could not open Hibernate-backed repository " + repositoryName, exception);
     } finally {
       if (!handedOff) {
-        releaseOpenHandle(scope);
+        releaseHandle.run();
       }
     }
   }

@@ -51,6 +51,7 @@ public class HibernateRepository extends DfsRepository {
   private final String repositoryName;
   private final RepositoryName logicalRepositoryName;
   private final Consumer<RepositoryAccessRequest> accessGuard;
+  private final Runnable afterClose;
   private String gitwebDescription;
 
   HibernateRepository(HibernateRepositoryBuilder builder) throws IOException {
@@ -59,6 +60,7 @@ public class HibernateRepository extends DfsRepository {
     this.repositoryName = builder.getRepositoryName();
     this.logicalRepositoryName = new RepositoryName(repositoryName);
     this.accessGuard = Objects.requireNonNull(builder.getAccessGuard(), "accessGuard");
+    this.afterClose = Objects.requireNonNull(builder.getAfterClose(), "afterClose");
     this.transactionContext = new HibernateTransactionContext(sessionFactory);
     this.objectDatabase =
         new ReadAheadHibernateObjDatabase(
@@ -98,6 +100,34 @@ public class HibernateRepository extends DfsRepository {
         .setSessionFactory(sessionFactory)
         .setRepositoryName(repositoryName)
         .setAccessGuard(accessGuard)
+        .build();
+  }
+
+  /**
+   * Create a guarded repository whose JGit close operation releases an owning lifecycle handle.
+   *
+   * <p>This overload supports framework integrations such as JGit Smart HTTP whose resolver returns
+   * only a {@link org.eclipse.jgit.lib.Repository}. JGit closes that returned repository directly,
+   * so lifecycle ownership must travel with the repository rather than a separate storage wrapper.
+   *
+   * @param sessionFactory Hibernate session factory
+   * @param repositoryName logical repository name
+   * @param accessGuard guard invoked for ref mutations
+   * @param afterClose callback invoked after JGit closes the repository databases
+   * @return opened repository
+   * @throws IOException when repository initialization fails
+   */
+  public static HibernateRepository create(
+      SessionFactory sessionFactory,
+      String repositoryName,
+      Consumer<RepositoryAccessRequest> accessGuard,
+      Runnable afterClose)
+      throws IOException {
+    return new HibernateRepositoryBuilder()
+        .setSessionFactory(sessionFactory)
+        .setRepositoryName(repositoryName)
+        .setAccessGuard(accessGuard)
+        .setAfterClose(afterClose)
         .build();
   }
 
@@ -300,6 +330,27 @@ public class HibernateRepository extends DfsRepository {
       refDatabase.refresh();
     } catch (RuntimeException cacheFailure) {
       originalFailure.addSuppressed(cacheFailure);
+    }
+  }
+
+  @Override
+  protected void doClose() {
+    Throwable closeFailure = null;
+    try {
+      super.doClose();
+    } catch (RuntimeException | Error failure) {
+      closeFailure = failure;
+      throw failure;
+    } finally {
+      try {
+        afterClose.run();
+      } catch (RuntimeException | Error callbackFailure) {
+        if (closeFailure != null) {
+          closeFailure.addSuppressed(callbackFailure);
+        } else {
+          throw callbackFailure;
+        }
+      }
     }
   }
 
