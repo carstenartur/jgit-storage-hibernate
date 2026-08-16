@@ -55,6 +55,7 @@ import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 
@@ -103,6 +104,27 @@ class SecuredSmartHttpAdapterH2Test {
       RepositoryDeletionResult deletion =
           new DefaultHibernateRepositoryFactory(sessionFactory).deleteRepository(REPOSITORY);
       assertTrue(deletion.deletedAnything());
+    }
+  }
+
+  @Test
+  void defaultReceivePackFactoryIsDisabledUntilAdmissionIsExplicit() throws Exception {
+    try (HibernateSessionFactoryProvider provider = provider("receive-disabled")) {
+      SessionFactory sessionFactory = provider.getSessionFactory();
+      initializeRepository(sessionFactory);
+      RecordingPolicy policy = new RecordingPolicy();
+      policy.allow(RepositoryAccessOperation.DISCOVER, RepositoryAccessOperation.READ);
+      SecuredHibernateRepositoryFactory<String> factory =
+          new SecuredHibernateRepositoryFactory<>(sessionFactory, policy);
+      HttpServletRequest request = request();
+      Repository repository =
+          new SecuredSmartHttpRepositoryResolver<>(factory, ignored -> "alice")
+              .open(request, "team/demo.git");
+
+      assertThrows(
+          ServiceNotEnabledException.class,
+          () -> new SecuredSmartHttpReceivePackFactory<String>().create(request, repository));
+      repository.close();
     }
   }
 

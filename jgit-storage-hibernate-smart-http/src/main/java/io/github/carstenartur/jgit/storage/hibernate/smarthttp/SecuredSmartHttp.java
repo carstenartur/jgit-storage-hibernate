@@ -18,7 +18,11 @@ public final class SecuredSmartHttp {
   private SecuredSmartHttp() {}
 
   /**
-   * Create a servlet with strict repository names and default authenticated receive admission.
+   * Create a fetch-only servlet with strict repository names and disabled receive-pack.
+   *
+   * <p>Push must be enabled through the overload that supplies an explicit {@link
+   * SmartHttpReceiveAdmission}. This prevents a read-only deployment from accepting pack data merely
+   * because exact Core ref authorization would reject publication later.
    *
    * @param repositoryFactory principal-bound repository factory
    * @param accessContextProvider request authentication boundary
@@ -32,7 +36,7 @@ public final class SecuredSmartHttp {
         repositoryFactory,
         accessContextProvider,
         SmartHttpRepositoryNameMapper.strict(),
-        SmartHttpReceiveAdmission.allowAuthenticatedRequests());
+        SmartHttpReceiveAdmission.disabled());
   }
 
   /** Create a servlet with explicit name mapping and coarse receive admission. */

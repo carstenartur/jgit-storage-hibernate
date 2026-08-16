@@ -20,7 +20,7 @@ import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /**
- * Creates an atomic JGit receive-pack after current read access and optional coarse admission.
+ * Creates an atomic JGit receive-pack after current read access and explicit coarse admission.
  *
  * @param <C> access-context type
  */
@@ -29,9 +29,9 @@ public final class SecuredSmartHttpReceivePackFactory<C>
 
   private final SmartHttpReceiveAdmission<? super C> receiveAdmission;
 
-  /** Admit authenticated readable repositories and leave exact command decisions to Core. */
+  /** Disable receive-pack until an explicit coarse admission policy is supplied. */
   public SecuredSmartHttpReceivePackFactory() {
-    this(SmartHttpReceiveAdmission.allowAuthenticatedRequests());
+    this(SmartHttpReceiveAdmission.disabled());
   }
 
   /** Create a factory with an application-owned coarse receive-pack admission check. */

@@ -14,7 +14,7 @@ import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /**
- * Optional coarse admission check performed before JGit accepts a receive-pack request body.
+ * Coarse admission check performed before JGit accepts a receive-pack request body.
  *
  * <p>This callback is not the authority for exact ref commands. Core rechecks every command at the
  * atomic publication boundary even after this callback succeeds.
@@ -38,9 +38,23 @@ public interface SmartHttpReceiveAdmission<C> {
       throws ServiceNotAuthorizedException, ServiceNotEnabledException;
 
   /**
-   * Admit an already authenticated and readable repository to receive-pack.
+   * Disable receive-pack until the application supplies an explicit write-admission policy.
    *
-   * <p>Exact ref authorization remains mandatory and is enforced by Core.
+   * @param <C> access-context type
+   * @return fail-closed admission used by default servlet/factory wiring
+   */
+  static <C> SmartHttpReceiveAdmission<C> disabled() {
+    return (request, repositoryName, accessContext) -> {
+      throw new ServiceNotEnabledException();
+    };
+  }
+
+  /**
+   * Admit every authenticated and readable repository to receive-pack.
+   *
+   * <p>This deliberately performs no early write-capability check. Exact ref authorization remains
+   * mandatory and is enforced by Core, but JGit may receive pack data before that final decision.
+   * Prefer a repository-level coarse admission policy for untrusted or resource-constrained servers.
    *
    * @param <C> access-context type
    * @return no-op coarse admission
