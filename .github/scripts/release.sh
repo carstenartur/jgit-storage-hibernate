@@ -101,10 +101,10 @@ verify_no_snapshot_poms() {
 }
 
 run_complete_build() {
-  docker info >/dev/null
   if [[ "$SKIP_TESTS" == true ]]; then
     mvn -B -DskipTests verify
   else
+    docker info >/dev/null
     mvn -B verify
   fi
 }
