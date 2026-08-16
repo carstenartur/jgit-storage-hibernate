@@ -78,13 +78,14 @@ SmartHttpAuthenticationChallengeFilter challenge =
 ```
 
 Register the challenge filter before the servlet mapping. It adds `WWW-Authenticate` only when JGit
-emits a 401, allowing clients to discover UTF-8 Basic or Bearer authentication without advertising
-challenges on successful responses.
+emits a final 401, allowing clients to discover UTF-8 Basic or Bearer authentication without
+advertising challenges on successful responses. Insecure transport is rejected with HTTP 403 before
+credentials are parsed, so the filter does not solicit a password or token over plaintext HTTP.
 
 The credential adapter:
 
 - accepts exactly one bounded `Authorization` header;
-- requires `request.isSecure()` by default;
+- requires `request.isSecure()` by default and maps insecure transport to HTTP 403;
 - decodes Basic credentials as UTF-8 and clears decoded byte/password buffers;
 - performs the credential service's dummy verifier path for malformed Basic input;
 - sends every credential, principal-state and token-state denial through the same generic 401;
