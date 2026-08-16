@@ -59,9 +59,16 @@ public record AuthenticatedGitAccess(
         Set.of(GitRepositoryPermission.values()));
   }
 
-  /** Return whether this credential permits the requested permission to reach the repository ACL. */
+  /**
+   * Return whether this credential permits the requested permission to reach the repository ACL.
+   *
+   * <p>An {@link GitRepositoryPermission#ADMINISTER} scope carries every repository permission, just
+   * as an authoritative repository grant with that permission does.
+   */
   public boolean carries(GitRepositoryPermission permission) {
-    return credentialScopes.contains(Objects.requireNonNull(permission, "permission"));
+    GitRepositoryPermission requested = Objects.requireNonNull(permission, "permission");
+    return credentialScopes.contains(requested)
+        || credentialScopes.contains(GitRepositoryPermission.ADMINISTER);
   }
 
   private static String required(String name, String value, int maximumLength) {
