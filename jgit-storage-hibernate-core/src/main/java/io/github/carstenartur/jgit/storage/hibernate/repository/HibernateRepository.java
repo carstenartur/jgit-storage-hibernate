@@ -71,7 +71,9 @@ public class HibernateRepository extends DfsRepository {
             transactionContext);
     this.reflogWriter = new HibernateReflogWriter(transactionContext, repositoryName);
     this.refDatabase = new HibernateRefDatabase(this);
-    ensureRepositoryRows();
+    if (builder.shouldInitializeRepositoryRows()) {
+      ensureRepositoryRows();
+    }
   }
 
   public static HibernateRepository create(SessionFactory sessionFactory, String repositoryName)
@@ -128,6 +130,35 @@ public class HibernateRepository extends DfsRepository {
         .setRepositoryName(repositoryName)
         .setAccessGuard(accessGuard)
         .setAfterClose(afterClose)
+        .build();
+  }
+
+  /**
+   * Open an already verified repository without creating or repairing durable metadata rows.
+   *
+   * <p>The caller must first prove that both repository lifecycle and lock rows exist. This method is
+   * used by Core's existing-only path after that bounded check, preventing a failed lookup from
+   * creating repository state and avoiding a second initialization transaction.
+   *
+   * @param sessionFactory Hibernate session factory
+   * @param repositoryName existing logical repository name
+   * @param accessGuard guard invoked for ref mutations
+   * @param afterClose callback invoked after JGit closes the repository databases
+   * @return opened repository handle
+   * @throws IOException when repository construction fails
+   */
+  public static HibernateRepository openExisting(
+      SessionFactory sessionFactory,
+      String repositoryName,
+      Consumer<RepositoryAccessRequest> accessGuard,
+      Runnable afterClose)
+      throws IOException {
+    return new HibernateRepositoryBuilder()
+        .setSessionFactory(sessionFactory)
+        .setRepositoryName(repositoryName)
+        .setAccessGuard(accessGuard)
+        .setAfterClose(afterClose)
+        .setInitializeRepositoryRows(false)
         .build();
   }
 

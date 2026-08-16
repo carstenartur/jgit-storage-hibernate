@@ -15,6 +15,7 @@ PREFIX = "jgit-storage-hibernate-"
 
 CORE = PREFIX + "core"
 SECURITY = PREFIX + "security"
+SMART_HTTP = PREFIX + "smart-http"
 SEARCH = PREFIX + "search"
 JAVA_ANALYSIS = PREFIX + "java-analysis"
 ARCHITECTURE = PREFIX + "architecture"
@@ -22,14 +23,15 @@ BENCHMARKS = PREFIX + "benchmarks"
 BOM = PREFIX + "bom"
 PARENT = PREFIX + "parent"
 
-RUNTIME_MODULES = {CORE, SECURITY, SEARCH, JAVA_ANALYSIS, ARCHITECTURE}
+RUNTIME_MODULES = {CORE, SECURITY, SMART_HTTP, SEARCH, JAVA_ANALYSIS, ARCHITECTURE}
 ALLOWED_INTERNAL = {
     CORE: set(),
     SECURITY: {CORE},
+    SMART_HTTP: {CORE},
     SEARCH: {CORE},
     JAVA_ANALYSIS: {CORE},
     ARCHITECTURE: {JAVA_ANALYSIS},
-    BENCHMARKS: {CORE, SECURITY, SEARCH, JAVA_ANALYSIS, ARCHITECTURE},
+    BENCHMARKS: {CORE, SECURITY, SMART_HTTP, SEARCH, JAVA_ANALYSIS, ARCHITECTURE},
 }
 
 DB_DRIVERS = {
@@ -230,7 +232,16 @@ def _check_external_boundaries(modules: dict[str, Module]) -> None:
 
 
 def verify(modules: dict[str, Module]) -> dict[str, set[str]]:
-    required = {CORE, SECURITY, SEARCH, JAVA_ANALYSIS, ARCHITECTURE, BENCHMARKS, BOM}
+    required = {
+        CORE,
+        SECURITY,
+        SMART_HTTP,
+        SEARCH,
+        JAVA_ANALYSIS,
+        ARCHITECTURE,
+        BENCHMARKS,
+        BOM,
+    }
     missing = required - set(modules)
     if missing:
         raise BoundaryError("Missing expected reactor modules: " + ", ".join(sorted(missing)))
@@ -276,8 +287,9 @@ def graph_markdown(modules: dict[str, Module], edges: dict[str, set[str]]) -> st
             "",
             "## Enforced rules",
             "",
-            "- Core has no production dependency on Security, Search, Java Analysis, Architecture or Benchmarks.",
+            "- Core has no production dependency on Security, Smart HTTP, Search, Java Analysis, Architecture or Benchmarks.",
             "- Security may depend on Core only and never on Search, Servlet, Spring or HTTP runtimes.",
+            "- Smart HTTP may depend on Core only among project modules and exclusively owns JGit HTTP/Servlet integration.",
             "- Search may depend on Core only among project runtime modules.",
             "- Java Analysis may depend on Core only among project runtime modules.",
             "- Architecture may depend on Java Analysis only among project runtime modules.",

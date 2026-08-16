@@ -89,8 +89,11 @@ resolve_once() {
   fi
 
   local base="$LOCAL_REPO/io/github/carstenartur" artifact extension expected
-  for artifact in jgit-storage-hibernate-parent jgit-storage-hibernate-core jgit-storage-hibernate-security jgit-storage-hibernate-search jgit-storage-hibernate-java-analysis jgit-storage-hibernate-architecture; do
-    extension=jar; [[ "$artifact" == jgit-storage-hibernate-parent ]] && extension=pom
+  for artifact in jgit-storage-hibernate-parent jgit-storage-hibernate-bom jgit-storage-hibernate-core jgit-storage-hibernate-security jgit-storage-hibernate-smart-http jgit-storage-hibernate-search jgit-storage-hibernate-java-analysis jgit-storage-hibernate-architecture; do
+    extension=jar
+    case "$artifact" in
+      jgit-storage-hibernate-parent|jgit-storage-hibernate-bom) extension=pom ;;
+    esac
     expected="$base/$artifact/$VERSION/$artifact-$VERSION.$extension"
     [[ -s "$expected" ]] || { echo "Missing resolved artifact: $expected" >&2; return 1; }
   done

@@ -68,6 +68,7 @@ public final class SecuredHibernateRepositoryFactory<C> {
    * @param repositoryName logical repository
    * @param accessContext authenticated context
    * @return principal-bound repository session
+   * @throws RepositoryDoesNotExistException when authorization succeeded but the repository is absent
    */
   public AuthorizedRepositorySession<C> open(
       RepositoryName repositoryName, C accessContext) {

@@ -37,12 +37,24 @@
     </dependency>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-smart-http</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
       <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
       <artifactId>jgit-storage-hibernate-architecture</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <version>6.1.0</version>
       <scope>test</scope>
     </dependency>
 

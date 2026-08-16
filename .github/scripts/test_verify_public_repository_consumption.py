@@ -145,9 +145,18 @@ class PublicRepositoryConsumptionTest(unittest.TestCase):
                             raise AssertionError(
                                 "second invocation must resolve the complete consumer graph"
                             )
+                        bom = (
+                            base
+                            / "jgit-storage-hibernate-bom"
+                            / version
+                            / f"jgit-storage-hibernate-bom-{version}.pom"
+                        )
+                        bom.parent.mkdir(parents=True, exist_ok=True)
+                        bom.write_text("<project/>", encoding="utf-8")
                         for artifact in (
                             "jgit-storage-hibernate-core",
                             "jgit-storage-hibernate-security",
+                            "jgit-storage-hibernate-smart-http",
                             "jgit-storage-hibernate-search",
                             "jgit-storage-hibernate-java-analysis",
                             "jgit-storage-hibernate-architecture",
