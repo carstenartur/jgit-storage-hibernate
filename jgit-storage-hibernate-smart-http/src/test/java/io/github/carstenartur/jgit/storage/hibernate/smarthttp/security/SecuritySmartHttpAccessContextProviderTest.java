@@ -82,7 +82,7 @@ class SecuritySmartHttpAccessContextProviderTest {
               Instant.now().plus(Duration.ofHours(1)));
 
       SecuritySmartHttpAccessContextProvider authentication =
-          authentication(credentials, "success");
+          new SecuritySmartHttpAccessContextProvider(credentials);
       AuthenticatedGitAccess passwordAccess =
           authentication.require(request(true, basic("alice", "sëcret")));
       assertEquals("alice", passwordAccess.context().principalId());
@@ -111,9 +111,16 @@ class SecuritySmartHttpAccessContextProviderTest {
           authentication(credentials, "denied");
       String valid = basic("alice", "secret");
 
+      ServiceMayNotContinueException insecure =
+          assertThrows(
+              ServiceMayNotContinueException.class,
+              () -> authentication.require(request(false, valid)));
+      assertEquals(403, insecure.getStatusCode());
+      assertNull(insecure.getCause());
+      assertFalse(String.valueOf(insecure.getMessage()).contains("secret"));
+
       List<HttpServletRequest> rejectedRequests =
           List.of(
-              request(false, valid),
               request(true),
               request(true, valid, "Bearer duplicate"),
               request(true, " " + valid),
@@ -294,8 +301,11 @@ class SecuritySmartHttpAccessContextProviderTest {
           () -> new SecuritySmartHttpAccessContextProvider(credentials, null, trace));
       assertThrows(
           NullPointerException.class,
-          () -> new SecuritySmartHttpAccessContextProvider(credentials, Set.of(
-              SecuritySmartHttpAuthenticationMethod.BASIC), null));
+          () ->
+              new SecuritySmartHttpAccessContextProvider(
+                  credentials,
+                  Set.of(SecuritySmartHttpAuthenticationMethod.BASIC),
+                  null));
       assertThrows(
           NullPointerException.class,
           () ->
