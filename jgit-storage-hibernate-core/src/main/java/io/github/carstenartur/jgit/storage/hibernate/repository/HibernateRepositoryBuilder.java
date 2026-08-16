@@ -22,10 +22,12 @@ class HibernateRepositoryBuilder
     extends DfsRepositoryBuilder<HibernateRepositoryBuilder, HibernateRepository> {
 
   private static final Consumer<RepositoryAccessRequest> UNRESTRICTED_ACCESS = ignored -> {};
+  private static final Runnable NO_AFTER_CLOSE = () -> {};
 
   private SessionFactory sessionFactory;
   private String repositoryName;
   private Consumer<RepositoryAccessRequest> accessGuard = UNRESTRICTED_ACCESS;
+  private Runnable afterClose = NO_AFTER_CLOSE;
 
   /**
    * Set the Hibernate session factory.
@@ -87,6 +89,22 @@ class HibernateRepositoryBuilder
     return accessGuard;
   }
 
+  /**
+   * Set a lifecycle callback invoked when JGit closes the repository handle.
+   *
+   * @param afterClose callback invoked after repository databases close
+   * @return this builder
+   */
+  public HibernateRepositoryBuilder setAfterClose(Runnable afterClose) {
+    this.afterClose = Objects.requireNonNull(afterClose, "afterClose");
+    return self();
+  }
+
+  /** @return configured repository-close callback */
+  public Runnable getAfterClose() {
+    return afterClose;
+  }
+
   @Override
   public HibernateRepository build() throws IOException {
     if (repositoryName == null || repositoryName.isBlank()) {
@@ -94,6 +112,7 @@ class HibernateRepositoryBuilder
     }
     Objects.requireNonNull(sessionFactory, "sessionFactory");
     Objects.requireNonNull(accessGuard, "accessGuard");
+    Objects.requireNonNull(afterClose, "afterClose");
     if (getReaderOptions() == null) {
       setReaderOptions(new DfsReaderOptions());
     }
