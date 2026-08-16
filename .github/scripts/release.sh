@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Automatic release preparation and protected finalization keep the whole Maven reactor aligned.
+
 : "${RELEASE_VERSION:?RELEASE_VERSION is required}"
 
 trim() {
@@ -111,12 +113,24 @@ remote_branch_exists() {
   git ls-remote --exit-code --heads origin "refs/heads/$1" >/dev/null 2>&1
 }
 
-push_replaceable_branch() {
+fetch_remote_branch() {
   local branch=$1
+  git fetch origin \
+    "refs/heads/$branch:refs/remotes/origin/$branch"
+}
+
+push_replaceable_branch() {
+  local branch=$1 expected
   if remote_branch_exists "$branch"; then
-    git fetch origin "$branch"
+    fetch_remote_branch "$branch"
+    expected=$(git rev-parse "refs/remotes/origin/$branch")
+    git push \
+      --force-with-lease="refs/heads/$branch:$expected" \
+      origin \
+      "HEAD:refs/heads/$branch"
+  else
+    git push origin "HEAD:refs/heads/$branch"
   fi
-  git push --force-with-lease origin "HEAD:refs/heads/$branch"
 }
 
 append_summary() {
@@ -290,8 +304,10 @@ publish_repository() {
   rmdir "$WORKTREE"
 
   if [[ "$exists" == true ]]; then
-    git fetch origin "$PUBLIC_REPOSITORY_BRANCH"
-    git worktree add --detach "$WORKTREE" "origin/$PUBLIC_REPOSITORY_BRANCH"
+    fetch_remote_branch "$PUBLIC_REPOSITORY_BRANCH"
+    git worktree add --detach \
+      "$WORKTREE" \
+      "refs/remotes/origin/$PUBLIC_REPOSITORY_BRANCH"
   else
     git worktree add --detach "$WORKTREE" HEAD
     git -C "$WORKTREE" switch --orphan "$PUBLIC_REPOSITORY_BRANCH"
@@ -368,10 +384,12 @@ ensure_release_tag() {
 }
 
 create_github_release() {
+  local artifacts_relative
   rm -rf "$RELEASE_ARTIFACTS"
   mkdir -p "$RELEASE_ARTIFACTS"
+  artifacts_relative=$(realpath --relative-to="$PWD" "$RELEASE_ARTIFACTS")
   find . \
-    -path "$RELEASE_ARTIFACTS" -prune -o \
+    -path "./$artifacts_relative" -prune -o \
     -path '*/target/*.jar' -type f ! -name 'original-*' \
     -exec cp {} "$RELEASE_ARTIFACTS/" \;
   cp CITATION.cff CITATION.md .zenodo.json codemeta.json \
