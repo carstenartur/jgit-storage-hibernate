@@ -82,8 +82,8 @@ class HibernateSecurityCredentialServiceTest {
               () ->
                   service.authenticatePassword(
                       "alice", chars("wrong"), trace("password-wrong-2")));
-      assertEquals(SecurityAuthenticationReason.PASSWORD_LOCKED, locked.reason());
-      assertEquals(START.plus(Duration.ofMinutes(5)), locked.retryAt());
+      assertEquals(SecurityAuthenticationReason.INVALID_CREDENTIALS, locked.reason());
+      assertNull(locked.retryAt());
       LocalCredentialMetadata lockedMetadata = service.findLocalCredential("alice").orElseThrow();
       assertEquals(2, lockedMetadata.failedAttemptCount());
       assertTrue(lockedMetadata.lockedAt(START));
@@ -94,7 +94,8 @@ class HibernateSecurityCredentialServiceTest {
               () ->
                   service.authenticatePassword(
                       "alice", chars("secret"), trace("password-locked")));
-      assertEquals(SecurityAuthenticationReason.PASSWORD_LOCKED, stillLocked.reason());
+      assertEquals(SecurityAuthenticationReason.INVALID_CREDENTIALS, stillLocked.reason());
+      assertNull(stillLocked.retryAt());
 
       sessionFactory.inTransaction(
           session -> {
@@ -140,8 +141,21 @@ class HibernateSecurityCredentialServiceTest {
                   service.authenticatePassword(
                       "alice", chars("secret"), trace("password-missing")));
       assertEquals(
-          SecurityAuthenticationReason.CREDENTIAL_NOT_CONFIGURED,
+          SecurityAuthenticationReason.INVALID_CREDENTIALS,
           notConfigured.reason());
+      assertNull(notConfigured.retryAt());
+      assertTrue(
+          audit.findBySubjectPrincipal("alice", 100).stream()
+              .anyMatch(
+                  event ->
+                      SecurityAuthenticationReason.PASSWORD_LOCKED.name()
+                          .equals(event.record().reasonCode())));
+      assertTrue(
+          audit.findBySubjectPrincipal("alice", 100).stream()
+              .anyMatch(
+                  event ->
+                      SecurityAuthenticationReason.CREDENTIAL_NOT_CONFIGURED.name()
+                          .equals(event.record().reasonCode())));
       assertTrue(audit.findBySubjectPrincipal("alice", 100).size() >= 10);
     }
   }
@@ -179,7 +193,7 @@ class HibernateSecurityCredentialServiceTest {
                   () -> service.authenticatePassword(" ", new char[0], trace("bad-input")))
               .reason());
       assertEquals(
-          SecurityAuthenticationReason.PRINCIPAL_NOT_ACTIVE,
+          SecurityAuthenticationReason.INVALID_CREDENTIALS,
           assertThrows(
                   SecurityAuthenticationException.class,
                   () ->
@@ -228,7 +242,7 @@ class HibernateSecurityCredentialServiceTest {
       assertFalse(access.carries(GitRepositoryPermission.UPDATE_REF));
       AccessTokenMetadata used = service.findAccessToken("token-1").orElseThrow();
       assertEquals(START, used.lastUsedAt());
-      assertTrue(used.securityVersion() > issued.metadata().securityVersion());
+      assertEquals(issued.metadata().securityVersion(), used.securityVersion());
 
       AtomicInteger delegated = new AtomicInteger();
       CredentialScopedRepositoryAccessPolicy scopedPolicy =

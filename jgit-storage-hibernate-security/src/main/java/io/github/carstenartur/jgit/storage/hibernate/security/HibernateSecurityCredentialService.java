@@ -694,7 +694,6 @@ public final class HibernateSecurityCredentialService {
 
     Set<GitRepositoryPermission> scopes = parseScopes(token.getPermissionScopes());
     token.setLastUsedAt(now);
-    token.setSecurityVersion(nextVersion(token.getSecurityVersion()));
     GitAccessContext context =
         new GitAccessContext(
             token.getPrincipalId(),
@@ -739,7 +738,8 @@ public final class HibernateSecurityCredentialService {
         credentialId,
         reason,
         retryAt);
-    return AuthenticationOutcome.denied(reason, retryAt);
+    return AuthenticationOutcome.denied(
+        SecurityAuthenticationReason.INVALID_CREDENTIALS, null);
   }
 
   private AuthenticationOutcome deniedToken(
@@ -782,7 +782,8 @@ public final class HibernateSecurityCredentialService {
               reason));
     } catch (RuntimeException auditFailure) {
       SecurityAuthenticationException denied =
-          new SecurityAuthenticationException(reason, retryAt, null);
+          new SecurityAuthenticationException(
+              SecurityAuthenticationReason.INVALID_CREDENTIALS);
       denied.addSuppressed(asIdentityAuditFailure(auditFailure));
       throw new DeniedAuthenticationAuditFailure(denied);
     }
