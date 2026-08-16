@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -64,6 +65,52 @@ class SmartHttpAuthenticationChallengeFilterTest {
   }
 
   @Test
+  void addsForFinalStatusAndDoesNotLeakFromATransientUnauthorizedStatus() throws Exception {
+    List<String> challenges = new ArrayList<>();
+    AtomicInteger status = new AtomicInteger(HttpServletResponse.SC_OK);
+    SmartHttpAuthenticationChallengeFilter filter =
+        SmartHttpAuthenticationChallengeFilter.basic("Git");
+
+    filter.doFilter(
+        request(),
+        response(challenges, status),
+        (servletRequest, servletResponse) ->
+            ((HttpServletResponse) servletResponse)
+                .setStatus(HttpServletResponse.SC_UNAUTHORIZED));
+    assertEquals(
+        List.of("Basic realm=\"Git\", charset=\"UTF-8\""), challenges);
+
+    challenges.clear();
+    status.set(HttpServletResponse.SC_OK);
+    filter.doFilter(
+        request(),
+        response(challenges, status),
+        (servletRequest, servletResponse) -> {
+          HttpServletResponse http = (HttpServletResponse) servletResponse;
+          http.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+          http.setStatus(HttpServletResponse.SC_OK);
+        });
+    assertTrue(challenges.isEmpty());
+    assertEquals(HttpServletResponse.SC_OK, status.get());
+  }
+
+  @Test
+  void addsBeforeAnUnauthorizedBufferFlush() throws Exception {
+    List<String> challenges = new ArrayList<>();
+    AtomicInteger status = new AtomicInteger(HttpServletResponse.SC_OK);
+    SmartHttpAuthenticationChallengeFilter.bearer("Git")
+        .doFilter(
+            request(),
+            response(challenges, status),
+            (servletRequest, servletResponse) -> {
+              HttpServletResponse http = (HttpServletResponse) servletResponse;
+              http.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+              http.flushBuffer();
+            });
+    assertEquals(List.of("Bearer realm=\"Git\""), challenges);
+  }
+
+  @Test
   void resetRemovesOldHeadersAndAllowsAReplacementUnauthorizedResponse() throws Exception {
     List<String> challenges = new ArrayList<>();
     AtomicInteger status = new AtomicInteger(HttpServletResponse.SC_OK);
@@ -74,6 +121,7 @@ class SmartHttpAuthenticationChallengeFilterTest {
             (servletRequest, servletResponse) -> {
               HttpServletResponse http = (HttpServletResponse) servletResponse;
               http.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+              http.flushBuffer();
               http.reset();
               http.sendError(HttpServletResponse.SC_UNAUTHORIZED);
             });
@@ -136,6 +184,7 @@ class SmartHttpAuthenticationChallengeFilterTest {
 
   private static HttpServletResponse response(
       List<String> challenges, AtomicInteger status) {
+    AtomicBoolean committed = new AtomicBoolean();
     return (HttpServletResponse)
         Proxy.newProxyInstance(
             SmartHttpAuthenticationChallengeFilterTest.class.getClassLoader(),
@@ -148,16 +197,29 @@ class SmartHttpAuthenticationChallengeFilterTest {
                   }
                   return null;
                 }
-                case "sendError", "setStatus" -> {
+                case "sendError" -> {
+                  status.set((Integer) arguments[0]);
+                  committed.set(true);
+                  return null;
+                }
+                case "setStatus" -> {
                   status.set((Integer) arguments[0]);
                   return null;
                 }
                 case "getStatus" -> {
                   return status.get();
                 }
+                case "flushBuffer" -> {
+                  committed.set(true);
+                  return null;
+                }
+                case "isCommitted" -> {
+                  return committed.get();
+                }
                 case "reset" -> {
                   challenges.clear();
                   status.set(HttpServletResponse.SC_OK);
+                  committed.set(false);
                   return null;
                 }
                 case "toString" -> {
