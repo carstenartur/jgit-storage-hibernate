@@ -67,7 +67,8 @@ public record AuthenticatedGitAccess(
    */
   public boolean carries(GitRepositoryPermission permission) {
     GitRepositoryPermission requested = Objects.requireNonNull(permission, "permission");
-    return credentialScopes.stream().anyMatch(scope -> scope.includes(requested));
+    return credentialScopes.contains(requested)
+        || credentialScopes.contains(GitRepositoryPermission.ADMINISTER);
   }
 
   private static String required(String name, String value, int maximumLength) {
