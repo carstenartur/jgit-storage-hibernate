@@ -30,6 +30,12 @@ def valid_modules():
     return {
         MODULE.CORE: module(MODULE.CORE),
         MODULE.SECURITY: module(MODULE.SECURITY, dep(MODULE.CORE)),
+        MODULE.SMART_HTTP: module(
+            MODULE.SMART_HTTP,
+            dep(MODULE.CORE),
+            dep("org.eclipse.jgit.http.server", group="org.eclipse.jgit"),
+            dep("jakarta.servlet-api", group="jakarta.servlet"),
+        ),
         MODULE.SEARCH: module(MODULE.SEARCH, dep(MODULE.CORE)),
         MODULE.JAVA_ANALYSIS: module(MODULE.JAVA_ANALYSIS, dep(MODULE.CORE)),
         MODULE.ARCHITECTURE: module(MODULE.ARCHITECTURE, dep(MODULE.JAVA_ANALYSIS)),
@@ -51,6 +57,7 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
         edges = MODULE.verify(modules)
         self.assertEqual(set(), edges[MODULE.CORE])
         self.assertEqual({MODULE.CORE}, edges[MODULE.SECURITY])
+        self.assertEqual({MODULE.CORE}, edges[MODULE.SMART_HTTP])
         self.assertEqual({MODULE.CORE}, edges[MODULE.SEARCH])
         self.assertEqual({MODULE.CORE}, edges[MODULE.JAVA_ANALYSIS])
         self.assertEqual({MODULE.JAVA_ANALYSIS}, edges[MODULE.ARCHITECTURE])
@@ -59,6 +66,16 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
         modules = valid_modules()
         modules[MODULE.CORE] = module(MODULE.CORE, dep(MODULE.SEARCH))
         with self.assertRaisesRegex(MODULE.BoundaryError, "forbidden production module dependencies"):
+            MODULE.verify(modules)
+
+    def test_rejects_smart_http_dependency_on_security(self) -> None:
+        modules = valid_modules()
+        modules[MODULE.SMART_HTTP] = module(
+            MODULE.SMART_HTTP, dep(MODULE.CORE), dep(MODULE.SECURITY)
+        )
+        with self.assertRaisesRegex(
+            MODULE.BoundaryError, "forbidden production module dependencies"
+        ):
             MODULE.verify(modules)
 
     def test_rejects_security_dependency_on_search_or_protocol_runtime(self) -> None:
@@ -135,6 +152,7 @@ class ModuleBoundaryVerifierTest(unittest.TestCase):
         self.assertEqual(MODULE.PROJECT_GROUP, payload["groupId"])
         markdown = MODULE.graph_markdown(modules, edges)
         self.assertIn("Core has no production dependency", markdown)
+        self.assertIn(MODULE.SMART_HTTP, markdown)
         self.assertIn(MODULE.ARCHITECTURE, markdown)
 
 
