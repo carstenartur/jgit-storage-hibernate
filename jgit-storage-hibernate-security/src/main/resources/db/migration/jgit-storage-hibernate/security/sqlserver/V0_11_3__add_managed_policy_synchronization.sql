@@ -1,9 +1,12 @@
 -- Versioned desired-state synchronization for application-managed repository authorization.
 
-alter table git_security_repository_grant add managed_source_id varchar(128);
-alter table git_security_repository_grant add managed_source_instance_id varchar(128);
-alter table git_security_repository_grant add managed_entry_key varchar(256);
-alter table git_security_repository_grant add managed_policy_version bigint;
+alter table git_security_repository_grant add
+    managed_source_id varchar(128),
+    managed_source_instance_id varchar(128),
+    managed_entry_key varchar(256),
+    managed_policy_version bigint;
+GO
+
 alter table git_security_repository_grant add constraint ck_git_sec_grant_managed_tuple check (
     (managed_source_id is null
         and managed_source_instance_id is null
@@ -14,6 +17,8 @@ alter table git_security_repository_grant add constraint ck_git_sec_grant_manage
         and managed_entry_key is not null
         and managed_policy_version > 0)
 );
+GO
+
 create unique index uk_git_sec_managed_grant_entry
     on git_security_repository_grant (
         repository_name, managed_source_id, managed_source_instance_id, managed_entry_key
@@ -21,11 +26,15 @@ create unique index uk_git_sec_managed_grant_entry
     where managed_source_id is not null
       and managed_source_instance_id is not null
       and managed_entry_key is not null;
+GO
 
-alter table git_security_ref_rule add managed_source_id varchar(128);
-alter table git_security_ref_rule add managed_source_instance_id varchar(128);
-alter table git_security_ref_rule add managed_entry_key varchar(256);
-alter table git_security_ref_rule add managed_policy_version bigint;
+alter table git_security_ref_rule add
+    managed_source_id varchar(128),
+    managed_source_instance_id varchar(128),
+    managed_entry_key varchar(256),
+    managed_policy_version bigint;
+GO
+
 alter table git_security_ref_rule add constraint ck_git_sec_ref_rule_managed_tuple check (
     (managed_source_id is null
         and managed_source_instance_id is null
@@ -36,6 +45,8 @@ alter table git_security_ref_rule add constraint ck_git_sec_ref_rule_managed_tup
         and managed_entry_key is not null
         and managed_policy_version > 0)
 );
+GO
+
 create unique index uk_git_sec_managed_ref_rule_entry
     on git_security_ref_rule (
         repository_name, managed_source_id, managed_source_instance_id, managed_entry_key
@@ -43,6 +54,7 @@ create unique index uk_git_sec_managed_ref_rule_entry
     where managed_source_id is not null
       and managed_source_instance_id is not null
       and managed_entry_key is not null;
+GO
 
 create table git_security_managed_policy (
     policy_id varchar(128) not null,
@@ -67,6 +79,7 @@ create table git_security_managed_policy (
     constraint ck_git_sec_managed_policy_version check (policy_version > 0),
     constraint ck_git_sec_managed_policy_generation check (policy_generation > 0)
 );
+GO
 
 create index idx_git_sec_managed_policy_repository
     on git_security_managed_policy (repository_name, policy_generation);
