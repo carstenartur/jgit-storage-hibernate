@@ -7,6 +7,7 @@ Packages.
 ## Public artifacts
 
 - `io.github.carstenartur:jgit-storage-hibernate-parent`
+- `io.github.carstenartur:jgit-storage-hibernate-bom`
 - `io.github.carstenartur:jgit-storage-hibernate-core`
 - `io.github.carstenartur:jgit-storage-hibernate-security`
 - `io.github.carstenartur:jgit-storage-hibernate-smart-http`
@@ -15,9 +16,9 @@ Packages.
 - `io.github.carstenartur:jgit-storage-hibernate-architecture`
 - `io.github.carstenartur:jgit-storage-hibernate-benchmarks`
 
-The benchmark artifact is for CI and release review, not normal runtime use. Smart HTTP is an
-optional runtime capability and must be released with its primary, source and Javadoc JARs just like
-the other production modules.
+The parent and BOM are POM-only artifacts. The benchmark artifact is for CI and release review, not
+normal runtime use. Smart HTTP is an optional runtime capability and must be released with its
+primary, source and Javadoc JARs just like the other production modules.
 
 ## Distribution channels
 
@@ -55,10 +56,10 @@ version from the current snapshot, invokes the real release script with `DRY_RUN
 `SKIP_TESTS=true`, stages the complete repository locally and resolves all artifacts from a new empty
 Maven cache. This validates release layout without publishing.
 
-The staged repository verifier requires the parent POM plus primary, source and Javadoc JARs for Core,
-Security, Smart HTTP, Search, Java Analysis, Architecture and Benchmarks. The anonymous consumer then
-imports the candidate BOM and resolves every production module, including the provided Servlet API
-boundary required by Smart HTTP.
+The staged repository verifier requires the parent and BOM POMs plus primary, source and Javadoc JARs
+for Core, Security, Smart HTTP, Search, Java Analysis, Architecture and Benchmarks. Every retained
+release file receives canonical SHA-256/SHA-512 evidence and a SHA-1 compatibility sidecar. The
+anonymous consumer then imports the candidate BOM and resolves every production module.
 
 Runtime, schema and dependency compatibility with the active downstream applications is covered
 separately by the [real-consumer compatibility gates](consumer-compatibility.md). The release review

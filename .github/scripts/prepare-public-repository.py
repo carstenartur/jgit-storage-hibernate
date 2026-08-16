@@ -11,6 +11,7 @@ from pathlib import Path
 
 GROUP = Path("io/github/carstenartur")
 PARENT = "jgit-storage-hibernate-parent"
+POMS = ("jgit-storage-hibernate-bom",)
 JARS = (
     "jgit-storage-hibernate-core",
     "jgit-storage-hibernate-security",
@@ -31,6 +32,8 @@ VOLATILE_SUFFIXES = (".md5", ".lastUpdated")
 
 def required(version: str) -> list[Path]:
     result = [GROUP / PARENT / version / f"{PARENT}-{version}.pom"]
+    for artifact in POMS:
+        result.append(GROUP / artifact / version / f"{artifact}-{version}.pom")
     for artifact in JARS:
         base = GROUP / artifact / version / f"{artifact}-{version}"
         result.extend([
