@@ -5,9 +5,10 @@
 Accepted and under staged implementation in issue #233.
 
 The architecture decision is stable. The principal/group ACL model, direct-JGit enforcement,
-authorization and identity audit, local password/access-token services, token revalidation and the
-first request-bound Smart HTTP adapter have now been implemented. Full servlet-container protocol
-coverage and reusable HTTP credential-header adapters remain follow-up work.
+authorization and identity audit, local password/access-token services, token revalidation, the
+request-bound Smart HTTP adapter and real-client protocol coverage have now been implemented. PR
+#256 adds reusable HTTP credential-header adapters. Bounded database-backed coarse write admission
+and retained protocol-security overhead evidence remain follow-up work.
 
 ## Implementation status
 
@@ -19,7 +20,9 @@ coverage and reusable HTTP credential-header adapters remain follow-up work.
 | PR #244 | Added bounded durable repository/ref authorization audit. |
 | PR #245 | Added local password and one-way access-token authentication plus identity audit. |
 | PR #247/#248 | Added current security-version and access-token revalidation at sensitive Core boundaries. |
-| PR #249 | Adds the optional request-bound JGit Smart HTTP resolver and upload/receive factories. |
+| PR #249 | Added the optional request-bound JGit Smart HTTP resolver and upload/receive factories. |
+| PR #250 | Added retained real-JGit-client clone, fetch and exact push-authorization protocol contracts. |
+| PR #256 | Adds strict UTF-8 Basic/Bearer adapters, trusted-TLS handling and bounded 401 challenges. |
 
 This ADR describes the intended end state as well as the constraints that every increment must keep.
 
@@ -97,6 +100,7 @@ jgit-storage-hibernate-security
 
 jgit-storage-hibernate-smart-http
   request authentication adapter boundary
+  optional Security Basic/Bearer bridge and challenge filter
   strict repository-name mapper
   RepositoryResolver
   UploadPackFactory / ReceivePackFactory
@@ -106,13 +110,15 @@ jgit-storage-hibernate-smart-http
 `security` depends on Core and Hibernate ORM. It does not depend on Hibernate Search, Spring
 Security, Jakarta Servlet, JGit HTTP support or an HTTP server.
 
-`smart-http` depends on Core, JGit HTTP support and Jakarta Servlet. Among project modules it depends
-on Core only. This keeps the protocol adapter reusable with Security, OIDC, LDAP or an existing
-application session and prevents Servlet dependencies from leaking through Security. Applications
-that use database credentials compose `smart-http` with the Security services explicitly.
+`smart-http` depends on Core, JGit HTTP support and Jakarta Servlet. It may additionally depend on
+Security through exactly one **optional** Maven edge. This keeps the protocol adapter reusable with
+OIDC, LDAP or an existing application session and prevents Servlet dependencies from leaking through
+Security. Applications using local database passwords or one-way access tokens declare both modules
+explicitly; consumers of Smart HTTP do not receive Security transitively.
 
-The module-boundary verifier enforces these directions. A later SSH adapter can be another optional
-module using the same Core context/policy boundary.
+The module-boundary verifier enforces these directions and rejects a non-optional or duplicate Smart
+HTTP-to-Security edge. A later SSH adapter can be another optional module using the same Core
+context/policy boundary.
 
 The raw `HibernateRepositoryFactory` remains available and is explicitly privileged infrastructure.
 Untrusted request or domain code in a security-enabled application receives only a configured
@@ -239,10 +245,23 @@ password and personal/service access-token support:
 - expiry, revocation, last-used time and monotonically changing credential versions;
 - scopes that can only restrict repository/ref authority and never create an ACL permission.
 
-Basic authentication is TLS-only. Smart HTTP intentionally accepts an application-supplied
-`SmartHttpAccessContextProvider<C>` rather than parsing headers inside Core or Security. Reusable
-Basic/Bearer adapters can be added in a later Security/HTTP integration increment without changing
-this trust boundary.
+Smart HTTP continues to accept a generic application-supplied `SmartHttpAccessContextProvider<C>`.
+The optional Security bridge additionally provides strict local Basic/Bearer handling without moving
+HTTP parsing into Core or Security:
+
+- exactly one bounded `Authorization` header;
+- trusted TLS state required by default;
+- UTF-8 Basic decoding with cleared decoded byte/password buffers;
+- dummy password verification for malformed Basic payloads;
+- one-way access-token verification through the existing credential service;
+- one generic client-facing 401 for all credential and principal/token-state denials;
+- HTTP 500 for credential-store, required identity-audit or adapter infrastructure failures;
+- Basic-only, Bearer-only or combined bounded `WWW-Authenticate` challenges emitted only on 401.
+
+The explicit secure-transport predicate is for integrations whose servlet container has already
+validated trusted proxy state. It must never trust a caller-controlled forwarding header directly.
+Trace providers retain only bounded non-secret identifiers and never copy credentials, Authorization
+headers or raw remote addresses.
 
 ### Audit
 
@@ -254,6 +273,10 @@ Allowed authority-changing decisions participate in the protected storage transa
 current Core contract permits it. Denied and failed decisions remain durable through separate bounded
 transactions. Audit failure never turns a denial into an allow; configured required audit can make an
 otherwise allowed action fail closed.
+
+The HTTP bridge deliberately does not attach the persisted internal denial reason as a protocol
+exception cause. The credential service owns the durable bounded detail; the network result remains a
+uniform authentication challenge.
 
 ### Caching and revocation
 
@@ -275,7 +298,7 @@ secondary cross-instance safeguard.
 The optional adapter uses existing JGit extension points:
 
 ```text
-HTTP/application authentication adapter
+HTTP/application or Security credential adapter
         -> immutable access context
         -> SecuredSmartHttpRepositoryResolver
         -> SecuredHibernateRepositoryFactory
@@ -283,17 +306,19 @@ HTTP/application authentication adapter
         -> Core publication-boundary authorization
 ```
 
-The first adapter increment provides:
+The implemented adapter provides:
 
 - strict logical repository-name mapping with one optional `.git` suffix;
 - request-bound context/repository/session identity;
 - concealment of both absent and undiscoverable repositories;
 - preservation of infrastructure failures as server errors;
 - a fresh `READ` check before upload-pack and receive-pack creation;
-- optional coarse receive admission before protocol processing;
+- fetch-only defaults and optional coarse receive admission before protocol processing;
 - JGit atomic receive support;
 - disabled dumb/as-is HTTP file service;
-- repository close propagation back to Core's logical open-handle lifecycle.
+- repository close propagation back to Core's logical open-handle lifecycle;
+- real JGit-client clone, fetch, allowed push and rejection contracts across supported JGit lines;
+- optional strict local Basic/Bearer authentication and bounded challenge emission.
 
 The coarse receive callback is an optimization only. Every exact receive command is still classified
 and rechecked by Core. Mixed permitted and forbidden command batches are rejected atomically by the
@@ -303,9 +328,9 @@ Repository-level `READ` currently exposes advertised refs and reachable objects.
 are write rules, not per-ref read visibility. The adapter does not pretend to provide path-level or
 branch-level content confidentiality.
 
-Remaining Smart HTTP work includes reusable non-secret credential-header adapters, full real-client
-servlet-container clone/fetch/push tests, an evidence-backed database coarse-write admission helper and
-performance/audit-overhead measurements.
+Remaining Smart HTTP work includes an evidence-backed database coarse-write admission helper,
+retained authorization/identity-audit overhead measurements and explicit advertised-ref filtering
+only if a future permission model adds ref-read visibility.
 
 ## Delivery order
 
@@ -315,14 +340,15 @@ performance/audit-overhead measurements.
    ref update/batch/delete checks and revocation contracts.
 3. **Audit and local credentials/tokens — implemented:** authorization/identity audit, password and
    access-token lifecycle, token scopes and publication-boundary revalidation.
-4. **Smart HTTP adapter — in progress:** the request-bound adapter is implemented in PR #249;
-   full servlet-container protocol and reusable header-adapter increments remain.
+4. **Smart HTTP adapter — in progress:** PR #249 added the request-bound adapter, PR #250 added real
+   protocol-client coverage and PR #256 adds reusable local Basic/Bearer adapters. Bounded coarse
+   write admission and retained overhead evidence remain.
 5. **Consumer adoption — pending:** Taxonomy role mapping and server integration; other consumers
    remain Core-only unless they explicitly select Security or Smart HTTP.
 
 Every phase preserves a buildable Core-only capability profile. The module-boundary verifier fails if
 Core acquires Security/Servlet/Spring dependencies, if Security acquires Smart HTTP dependencies or if
-Smart HTTP pulls Security transitively.
+Smart HTTP's optional Security integration becomes transitive.
 
 ## Consequences
 
@@ -334,6 +360,8 @@ Positive consequences:
 - Stable principal IDs and explicit contexts make decisions testable and auditable.
 - Smart HTTP is available without modifying upstream JGit or forcing one authentication framework.
 - Security-only consumers do not inherit Servlet or JGit HTTP dependencies.
+- Applications using local credentials share one strict header, TLS, challenge and failure-mapping
+  implementation instead of duplicating it.
 
 Costs and risks:
 
@@ -342,5 +370,6 @@ Costs and risks:
   scopes;
 - credentials and audit introduce operational retention, privacy and incident-response duties;
 - repository-level `READ` is not per-path or per-ref content confidentiality;
-- complete servlet-container, multi-instance and performance evidence is substantial and remains
-  staged under issue #233.
+- each deployment container still needs trusted proxy/TLS configuration and integration tests;
+- representative multi-instance authentication/authorization overhead evidence remains staged under
+  issue #233.
