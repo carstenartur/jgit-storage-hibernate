@@ -171,26 +171,27 @@ jobs:
               ;;
             [0-9]*.[0-9]*.[0-9]*)
               release=$current
-              stage="$PWD/target/public-maven-repository"
-              evidence="$PWD/target/public-repository-evidence/manifest.json"
-              rm -rf "$stage" "$(dirname "$evidence")"
-              mkdir -p "$stage"
-              mvn -B -Ppublic-repository-release -DskipTests \
-                -Dpublic.repository.directory="$stage" deploy \
-                2>&1 | tee public-repository-contract.log
-              python3 .github/scripts/prepare-public-repository.py \
-                "$release" "$stage" "$evidence" \
-                2>&1 | tee -a public-repository-contract.log
-              MAVEN_COMMAND=mvn PUBLIC_REPOSITORY_ATTEMPTS=1 \
-                .github/scripts/verify-public-repository-consumption.sh \
-                "$release" "file://$stage" \
-                2>&1 | tee -a public-repository-contract.log
               ;;
             *)
               echo "Unsupported project version for repository contract: $current" >&2
               exit 1
               ;;
           esac
+
+          stage="$PWD/target/public-maven-repository"
+          evidence="$PWD/target/public-repository-evidence/manifest.json"
+          rm -rf "$stage" "$(dirname "$evidence")"
+          mkdir -p "$stage"
+          mvn -B -Ppublic-repository-release -DskipTests \
+            -Dpublic.repository.directory="$stage" deploy \
+            2>&1 | tee -a public-repository-contract.log
+          python3 .github/scripts/prepare-public-repository.py \
+            "$release" "$stage" "$evidence" \
+            2>&1 | tee -a public-repository-contract.log
+          MAVEN_COMMAND=mvn PUBLIC_REPOSITORY_ATTEMPTS=1 \
+            .github/scripts/verify-public-repository-consumption.sh \
+            "$release" "file://$stage" \
+            2>&1 | tee -a public-repository-contract.log
       - name: Require repository evidence
         run: test -s target/public-repository-evidence/manifest.json
       - name: Upload public repository evidence
