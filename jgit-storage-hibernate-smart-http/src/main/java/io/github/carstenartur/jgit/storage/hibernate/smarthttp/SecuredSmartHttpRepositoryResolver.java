@@ -9,7 +9,8 @@
 package io.github.carstenartur.jgit.storage.hibernate.smarthttp;
 
 import io.github.carstenartur.jgit.storage.hibernate.AuthorizedRepositorySession;
-import io.github.carstenartur.jgit.storage.hibernate.HibernateStorageException;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessDeniedException;
+import io.github.carstenartur.jgit.storage.hibernate.RepositoryDoesNotExistException;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
 import io.github.carstenartur.jgit.storage.hibernate.SecuredHibernateRepositoryFactory;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,7 +27,9 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
  * JGit repository resolver that authenticates explicitly and returns only principal-bound handles.
  *
  * <p>Both an ACL denial and a missing repository are exposed as the same JGit not-found result, so
- * authenticated callers without {@code DISCOVER} cannot distinguish repository existence.
+ * authenticated callers without {@code DISCOVER} cannot distinguish repository existence. Storage
+ * and authorization infrastructure failures remain server errors instead of being mislabeled as
+ * missing repositories.
  *
  * @param <C> access-context type
  */
@@ -81,7 +84,7 @@ public final class SecuredSmartHttpRepositoryResolver<C>
           request, new SmartHttpRequestBinding<>(session, repository));
       handedOff = true;
       return repository;
-    } catch (HibernateStorageException hidden) {
+    } catch (RepositoryAccessDeniedException | RepositoryDoesNotExistException hidden) {
       throw new RepositoryNotFoundException(name, hidden);
     } catch (RuntimeException failure) {
       throw new ServiceMayNotContinueException(

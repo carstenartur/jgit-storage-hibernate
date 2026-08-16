@@ -8,10 +8,12 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate;
 
+import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
 /**
@@ -31,6 +33,7 @@ import org.hibernate.SessionFactory;
  */
 public final class SecuredHibernateRepositoryFactory<C> {
 
+  private final SessionFactory sessionFactory;
   private final DefaultHibernateRepositoryFactory delegate;
   private final RepositoryAccessPolicy<? super C> accessPolicy;
 
@@ -56,9 +59,9 @@ public final class SecuredHibernateRepositoryFactory<C> {
       SessionFactory sessionFactory,
       Collection<? extends RepositoryDeletionParticipant> deletionParticipants,
       RepositoryAccessPolicy<? super C> accessPolicy) {
+    this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     this.delegate =
-        new DefaultHibernateRepositoryFactory(
-            Objects.requireNonNull(sessionFactory, "sessionFactory"), deletionParticipants);
+        new DefaultHibernateRepositoryFactory(this.sessionFactory, deletionParticipants);
     this.accessPolicy = Objects.requireNonNull(accessPolicy, "accessPolicy");
   }
 
@@ -68,14 +71,24 @@ public final class SecuredHibernateRepositoryFactory<C> {
    * @param repositoryName logical repository
    * @param accessContext authenticated context
    * @return principal-bound repository session
+   * @throws RepositoryDoesNotExistException when authorization succeeded but the repository is absent
    */
   public AuthorizedRepositorySession<C> open(
       RepositoryName repositoryName, C accessContext) {
     RepositoryName name = Objects.requireNonNull(repositoryName, "repositoryName");
     C context = Objects.requireNonNull(accessContext, "accessContext");
     Consumer<RepositoryAccessRequest> guard = request -> accessPolicy.require(context, request);
-    HibernateGitStorage storage = delegate.openExisting(name, guard);
-    return new DefaultAuthorizedRepositorySession<>(name, context, accessPolicy, storage);
+    try {
+      HibernateGitStorage storage = delegate.openExisting(name, guard);
+      return new DefaultAuthorizedRepositorySession<>(name, context, accessPolicy, storage);
+    } catch (RepositoryAccessDeniedException handled) {
+      throw handled;
+    } catch (HibernateStorageException failure) {
+      if (!repositoryExistsAfterOpenFailure(name, failure)) {
+        throw new RepositoryDoesNotExistException(name, failure);
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -91,5 +104,16 @@ public final class SecuredHibernateRepositoryFactory<C> {
     C context = Objects.requireNonNull(accessContext, "accessContext");
     Consumer<RepositoryAccessRequest> guard = request -> accessPolicy.require(context, request);
     return delegate.deleteRepository(name, guard);
+  }
+
+  private boolean repositoryExistsAfterOpenFailure(
+      RepositoryName repositoryName, HibernateStorageException openFailure) {
+    try (Session session = sessionFactory.openSession()) {
+      return session.find(GitRepositoryLifecycleEntity.class, repositoryName.value()) != null;
+    } catch (RuntimeException probeFailure) {
+      openFailure.addSuppressed(probeFailure);
+      // Preserve the original storage failure when absence cannot be established reliably.
+      return true;
+    }
   }
 }

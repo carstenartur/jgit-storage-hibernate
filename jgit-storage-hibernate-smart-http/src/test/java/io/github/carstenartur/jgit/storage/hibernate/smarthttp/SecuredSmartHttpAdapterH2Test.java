@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.DefaultHibernateRepositoryFactory;
 import io.github.carstenartur.jgit.storage.hibernate.HibernateGitStorage;
+import io.github.carstenartur.jgit.storage.hibernate.HibernateStorageException;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessDeniedException;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessOperation;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryAccessPolicy;
@@ -25,6 +26,7 @@ import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
 import io.github.carstenartur.jgit.storage.hibernate.SecuredHibernateRepositoryFactory;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -49,6 +51,7 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.transport.ReceivePack;
+import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.hibernate.SessionFactory;
@@ -121,6 +124,27 @@ class SecuredSmartHttpAdapterH2Test {
       assertThrows(
           RepositoryNotFoundException.class,
           () -> resolver.open(request(), "team/missing.git"));
+    }
+  }
+
+  @Test
+  void infrastructureFailureRemainsServerError() throws Exception {
+    try (HibernateSessionFactoryProvider provider = provider("failure")) {
+      SessionFactory sessionFactory = provider.getSessionFactory();
+      initializeRepository(sessionFactory);
+      RecordingPolicy policy = new RecordingPolicy();
+      policy.fail(new HibernateStorageException("authorization database unavailable"));
+      SecuredHibernateRepositoryFactory<String> factory =
+          new SecuredHibernateRepositoryFactory<>(sessionFactory, policy);
+      SecuredSmartHttpRepositoryResolver<String> resolver =
+          new SecuredSmartHttpRepositoryResolver<>(factory, ignored -> "alice");
+
+      ServiceMayNotContinueException failure =
+          assertThrows(
+              ServiceMayNotContinueException.class,
+              () -> resolver.open(request(), "team/demo.git"));
+      assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, failure.getStatusCode());
+      assertTrue(failure.getCause() instanceof HibernateStorageException);
     }
   }
 
@@ -277,9 +301,14 @@ class SecuredSmartHttpAdapterH2Test {
     private final Set<RepositoryAccessOperation> allowed =
         EnumSet.noneOf(RepositoryAccessOperation.class);
     private final List<RepositoryAccessRequest> requests = new ArrayList<>();
+    private RuntimeException failure;
 
     void allow(RepositoryAccessOperation... operations) {
       allowed.addAll(List.of(operations));
+    }
+
+    void fail(RuntimeException nextFailure) {
+      failure = nextFailure;
     }
 
     List<RepositoryAccessOperation> operations() {
@@ -290,6 +319,9 @@ class SecuredSmartHttpAdapterH2Test {
     public void require(String context, RepositoryAccessRequest request) {
       assertEquals("alice", context);
       requests.add(request);
+      if (failure != null) {
+        throw failure;
+      }
       if (!allowed.contains(request.operation())) {
         throw new RepositoryAccessDeniedException(
             request, "DENIED_BY_SMART_HTTP_TEST", "smart-http-test", 1);
