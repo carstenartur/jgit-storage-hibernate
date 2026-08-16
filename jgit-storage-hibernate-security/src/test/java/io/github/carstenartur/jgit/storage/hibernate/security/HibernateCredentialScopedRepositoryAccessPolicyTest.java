@@ -172,29 +172,29 @@ class HibernateCredentialScopedRepositoryAccessPolicyTest {
 
   @Test
   void tokenStoreFailureIsAuditedAndNeverDelegates() {
-    HibernateSessionFactoryProvider provider = provider("store-failure");
-    SessionFactory sessionFactory = provider.getSessionFactory();
-    List<SecurityAccessAuditRecord> audit = new ArrayList<>();
-    AtomicInteger delegated = new AtomicInteger();
-    HibernateCredentialScopedRepositoryAccessPolicy policy =
-        new HibernateCredentialScopedRepositoryAccessPolicy(
-            sessionFactory,
-            (context, request) -> delegated.incrementAndGet(),
-            audit::add,
-            CLOCK);
-    sessionFactory.close();
+    try (HibernateSessionFactoryProvider provider = provider("store-failure")) {
+      SessionFactory sessionFactory = provider.getSessionFactory();
+      List<SecurityAccessAuditRecord> audit = new ArrayList<>();
+      AtomicInteger delegated = new AtomicInteger();
+      HibernateCredentialScopedRepositoryAccessPolicy policy =
+          new HibernateCredentialScopedRepositoryAccessPolicy(
+              sessionFactory,
+              (context, request) -> delegated.incrementAndGet(),
+              audit::add,
+              CLOCK);
+      sessionFactory.close();
 
-    assertThrows(
-        RuntimeException.class,
-        () ->
-            policy.require(
-                tokenAccess("token-1", "alice", 1, Set.of(GitRepositoryPermission.READ)),
-                READ_REQUEST));
-    assertEquals(0, delegated.get());
-    assertEquals(1, audit.size());
-    assertEquals(SecurityAuditOutcome.FAILED, audit.getFirst().outcome());
-    assertEquals("AUTHORIZATION_EVALUATION_FAILED", audit.getFirst().reasonCode());
-    provider.close();
+      assertThrows(
+          RuntimeException.class,
+          () ->
+              policy.require(
+                  tokenAccess("token-1", "alice", 1, Set.of(GitRepositoryPermission.READ)),
+                  READ_REQUEST));
+      assertEquals(0, delegated.get());
+      assertEquals(1, audit.size());
+      assertEquals(SecurityAuditOutcome.FAILED, audit.getFirst().outcome());
+      assertEquals("AUTHORIZATION_EVALUATION_FAILED", audit.getFirst().reasonCode());
+    }
   }
 
   private static void assertDenied(

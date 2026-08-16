@@ -15,7 +15,6 @@ import io.github.carstenartur.jgit.storage.hibernate.security.entity.SecurityAcc
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
@@ -113,13 +112,15 @@ public final class HibernateCredentialScopedRepositoryAccessPolicy
 
       boolean versionChanged = token.getSecurityVersion() != access.credentialVersion();
       boolean scopesChanged =
-          !canonicalScopes(access).equals(token.getPermissionScopes());
+          !HibernateSecurityCredentialService.serializeScopes(access.credentialScopes())
+              .equals(token.getPermissionScopes());
       if (versionChanged || scopesChanged) {
         deny(
             access,
             request,
             SecurityAuthenticationReason.INVALID_CREDENTIALS,
             token.getSecurityVersion());
+        return;
       }
     } catch (RepositoryAccessDeniedException | SecurityAuditPersistenceException handled) {
       throw handled;
@@ -145,10 +146,4 @@ public final class HibernateCredentialScopedRepositoryAccessPolicy
         denied);
   }
 
-  private static String canonicalScopes(AuthenticatedGitAccess access) {
-    return access.credentialScopes().stream()
-        .sorted()
-        .map(Enum::name)
-        .collect(Collectors.joining(","));
-  }
 }
