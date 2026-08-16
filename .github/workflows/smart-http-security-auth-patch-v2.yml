@@ -58,3 +58,5 @@ jobs:
           git rm .github/scripts/normalize_smart_http_security_auth_patch.py
           git commit -m "Add strict Smart HTTP Basic and Bearer authentication"
           git push origin HEAD:feature/security-smart-http-authentication
+
+# Retry after making the generated patch replay-safe against the current adapter branch.
