@@ -164,7 +164,7 @@ Security fixes are provided for the latest released `0.1.x` version.
 
     def test_release_script_generates_documentation_instead_of_requiring_pre_alignment(self) -> None:
         text = RELEASE_SCRIPT.read_text(encoding="utf-8")
-        normalized = re.sub(r"\\\s*\n\s*", " ", text)
+        normalized = re.sub(r"[ \t]*\\\n[ \t]*", " ", text)
 
         self.assertNotIn(
             "Documented release $DOCUMENTED_RELEASE_VERSION does not match requested release",
