@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.exception.ConstraintViolationException;
 
 /** Hibernate-backed external issuer/subject binding with deterministic concurrent provisioning. */
 public final class HibernateExternalPrincipalBindingService
@@ -68,7 +69,8 @@ public final class HibernateExternalPrincipalBindingService
     } catch (SecurityAuthenticationException | SecurityPolicyConfigurationException expected) {
       throw expected;
     } catch (RuntimeException failure) {
-      if (policy == ExternalPrincipalProvisioningPolicy.CREATE_IF_MISSING) {
+      if (policy == ExternalPrincipalProvisioningPolicy.CREATE_IF_MISSING
+          && causedByConstraintViolation(failure)) {
         ExternalPrincipalBindingResult concurrent =
             sessionFactory.fromTransaction(
                 session -> findExisting(session, externalIdentity));
@@ -166,6 +168,17 @@ public final class HibernateExternalPrincipalBindingService
         outcome,
         principal.getDisplayName(),
         principal.getSecurityVersion());
+  }
+
+  private static boolean causedByConstraintViolation(Throwable failure) {
+    Throwable current = failure;
+    while (current != null) {
+      if (current instanceof ConstraintViolationException) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
   }
 
   private static long nextVersion(long current) {
