@@ -136,24 +136,35 @@ public final class Pbkdf2PasswordHasher implements PasswordHasher {
     if (parts.length != 3) {
       return null;
     }
+
+    byte[] salt = null;
+    byte[] hash = null;
     try {
       int encodedIterations = Integer.parseInt(parts[0]);
       if (encodedIterations < MIN_ITERATIONS || encodedIterations > MAX_ITERATIONS) {
         return null;
       }
-      byte[] salt = Base64.getUrlDecoder().decode(parts[1]);
-      byte[] hash = Base64.getUrlDecoder().decode(parts[2]);
+      salt = Base64.getUrlDecoder().decode(parts[1]);
+      hash = Base64.getUrlDecoder().decode(parts[2]);
       if (salt.length < MIN_SALT_BYTES
           || salt.length > MAX_SALT_BYTES
           || hash.length < MIN_HASH_BYTES
           || hash.length > MAX_HASH_BYTES) {
-        Arrays.fill(salt, (byte) 0);
-        Arrays.fill(hash, (byte) 0);
         return null;
       }
-      return new ParsedVerifier(encodedIterations, salt, hash);
+      ParsedVerifier parsed = new ParsedVerifier(encodedIterations, salt, hash);
+      salt = null;
+      hash = null;
+      return parsed;
     } catch (IllegalArgumentException malformed) {
       return null;
+    } finally {
+      if (salt != null) {
+        Arrays.fill(salt, (byte) 0);
+      }
+      if (hash != null) {
+        Arrays.fill(hash, (byte) 0);
+      }
     }
   }
 

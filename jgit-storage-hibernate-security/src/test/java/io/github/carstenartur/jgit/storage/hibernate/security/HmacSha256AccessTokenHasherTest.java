@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.Base64;
 import org.junit.jupiter.api.Test;
 
 class HmacSha256AccessTokenHasherTest {
@@ -28,6 +29,9 @@ class HmacSha256AccessTokenHasherTest {
     assertTrue(hasher.verify("gst_example-token_0123456789", hash));
     assertFalse(hasher.verify("gst_example-token_0123456788", hash));
     assertFalse(hasher.verify("gst_tökén", hash));
+    assertFalse(hasher.verify(null, hash));
+    assertFalse(hasher.verify(" ", hash));
+    assertFalse(hasher.verify("x".repeat(513), hash));
     assertFalse(
         hasher.verify(
             "gst_example-token_0123456789",
@@ -38,6 +42,39 @@ class HmacSha256AccessTokenHasherTest {
             new AccessTokenHash(hash.algorithm(), hash.version() + 1, hash.encodedHash())));
 
     assertThrows(IllegalArgumentException.class, () -> hasher.hash("gst_tökén"));
+    assertThrows(IllegalArgumentException.class, () -> hasher.hash(null));
+    assertThrows(IllegalArgumentException.class, () -> hasher.hash(" "));
+    assertThrows(IllegalArgumentException.class, () -> hasher.hash("x".repeat(513)));
+    assertThrows(NullPointerException.class, () -> hasher.verify("token", null));
+    assertThrows(NullPointerException.class, () -> new HmacSha256AccessTokenHasher(null));
     assertThrows(IllegalArgumentException.class, () -> new HmacSha256AccessTokenHasher(new byte[31]));
+  }
+
+  @Test
+  void rejectsMalformedOrWrongLengthStoredMacsBeforeComparison() {
+    HmacSha256AccessTokenHasher hasher = new HmacSha256AccessTokenHasher(new byte[32]);
+    String token = "gst_example-token";
+
+    assertFalse(
+        hasher.verify(
+            token,
+            new AccessTokenHash(
+                HmacSha256AccessTokenHasher.ALGORITHM,
+                HmacSha256AccessTokenHasher.VERSION,
+                "not-base64***")));
+    assertFalse(
+        hasher.verify(
+            token,
+            new AccessTokenHash(
+                HmacSha256AccessTokenHasher.ALGORITHM,
+                HmacSha256AccessTokenHasher.VERSION,
+                Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[31]))));
+    assertFalse(
+        hasher.verify(
+            token,
+            new AccessTokenHash(
+                HmacSha256AccessTokenHasher.ALGORITHM,
+                HmacSha256AccessTokenHasher.VERSION,
+                Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[33]))));
   }
 }

@@ -27,6 +27,7 @@ public final class HmacSha256AccessTokenHasher implements AccessTokenHasher {
   public static final int VERSION = 1;
 
   private static final String JCA_ALGORITHM = "HmacSHA256";
+  private static final int MAC_BYTES = 32;
   private static final int MINIMUM_KEY_BYTES = 32;
   private static final int MAXIMUM_TOKEN_CHARACTERS = 512;
 
@@ -77,18 +78,25 @@ public final class HmacSha256AccessTokenHasher implements AccessTokenHasher {
         || expected.version() != VERSION) {
       return false;
     }
-    byte[] expectedBytes;
+
+    byte[] expectedBytes = null;
+    byte[] actualBytes = null;
     try {
       expectedBytes = Base64.getUrlDecoder().decode(expected.encodedHash());
+      if (expectedBytes.length != MAC_BYTES) {
+        return false;
+      }
+      actualBytes = mac(tokenValue);
+      return MessageDigest.isEqual(expectedBytes, actualBytes);
     } catch (IllegalArgumentException malformed) {
       return false;
-    }
-    byte[] actualBytes = mac(tokenValue);
-    try {
-      return MessageDigest.isEqual(expectedBytes, actualBytes);
     } finally {
-      Arrays.fill(expectedBytes, (byte) 0);
-      Arrays.fill(actualBytes, (byte) 0);
+      if (expectedBytes != null) {
+        Arrays.fill(expectedBytes, (byte) 0);
+      }
+      if (actualBytes != null) {
+        Arrays.fill(actualBytes, (byte) 0);
+      }
     }
   }
 
@@ -103,21 +111,26 @@ public final class HmacSha256AccessTokenHasher implements AccessTokenHasher {
   }
 
   private static String requiredToken(String tokenValue) {
-    if (!validToken(tokenValue)) {
+    if (tokenValue == null || tokenValue.isBlank() || tokenValue.length() > MAXIMUM_TOKEN_CHARACTERS) {
       throw new IllegalArgumentException(
           "tokenValue must contain 1 to " + MAXIMUM_TOKEN_CHARACTERS + " ASCII characters");
+    }
+    if (!ascii(tokenValue)) {
+      throw new IllegalArgumentException("tokenValue must contain ASCII characters only");
     }
     return tokenValue;
   }
 
   private static boolean validToken(String tokenValue) {
-    if (tokenValue == null
-        || tokenValue.isBlank()
-        || tokenValue.length() > MAXIMUM_TOKEN_CHARACTERS) {
-      return false;
-    }
-    for (int index = 0; index < tokenValue.length(); index++) {
-      if (tokenValue.charAt(index) > 0x7f) {
+    return tokenValue != null
+        && !tokenValue.isBlank()
+        && tokenValue.length() <= MAXIMUM_TOKEN_CHARACTERS
+        && ascii(tokenValue);
+  }
+
+  private static boolean ascii(String value) {
+    for (int index = 0; index < value.length(); index++) {
+      if (value.charAt(index) > 0x7f) {
         return false;
       }
     }
