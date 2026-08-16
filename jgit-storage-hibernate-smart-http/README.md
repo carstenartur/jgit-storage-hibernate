@@ -50,12 +50,12 @@ deployments can keep using the generic Smart HTTP boundary without selecting the
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-security</artifactId>
-  <version>${jgit-storage-hibernate.version}</version>
+  <version>${project.version}</version>
 </dependency>
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-smart-http</artifactId>
-  <version>${jgit-storage-hibernate.version}</version>
+  <version>${project.version}</version>
 </dependency>
 ```
 
