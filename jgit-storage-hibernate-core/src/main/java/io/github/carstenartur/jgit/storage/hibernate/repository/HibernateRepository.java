@@ -335,10 +335,22 @@ public class HibernateRepository extends DfsRepository {
 
   @Override
   protected void doClose() {
+    Throwable closeFailure = null;
     try {
       super.doClose();
+    } catch (RuntimeException | Error failure) {
+      closeFailure = failure;
+      throw failure;
     } finally {
-      afterClose.run();
+      try {
+        afterClose.run();
+      } catch (RuntimeException | Error callbackFailure) {
+        if (closeFailure != null) {
+          closeFailure.addSuppressed(callbackFailure);
+        } else {
+          throw callbackFailure;
+        }
+      }
     }
   }
 
