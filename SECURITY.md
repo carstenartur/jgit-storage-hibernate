@@ -2,13 +2,13 @@
 
 ## Supported versions
 
-Security fixes are provided for the latest released `0.10.x` version. Development snapshots and older releases are not supported independently; users should upgrade to the newest release before requesting a fix.
+Security fixes are provided for the latest released `0.11.x` version. Development snapshots and older releases are not supported independently; users should upgrade to the newest release before requesting a fix.
 
 | Version | Supported |
 |---|---|
-| Latest released `0.10.x` | Yes |
-| Older `0.10.x` releases | Upgrade required |
-| `0.10.x-SNAPSHOT` builds | No security support guarantee |
+| Latest released `0.11.x` | Yes |
+| Older `0.11.x` releases | Upgrade required |
+| `0.11.x-SNAPSHOT` builds | No security support guarantee |
 
 This policy will be updated automatically when the project introduces another supported release line.
 

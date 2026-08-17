@@ -15,7 +15,7 @@ Import the current public BOM once in `dependencyManagement`:
     <dependency>
       <groupId>io.github.carstenartur</groupId>
       <artifactId>jgit-storage-hibernate-bom</artifactId>
-      <version>0.10.0</version>
+      <version>0.11.0</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
