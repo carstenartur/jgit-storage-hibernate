@@ -1,0 +1,163 @@
+name: Recover Partial Release
+
+on:
+  push:
+    branches:
+      - 'release-recovery/**'
+    paths:
+      - '.github/release-recovery.json'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: jgit-storage-hibernate-release
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Validate and resume immutable release
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout authoritative main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+
+      - name: Resolve repository-owned recovery request
+        id: recovery
+        env:
+          REQUEST_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+
+          release_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+          snapshot_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$")
+          commit_pattern = re.compile(r"^[0-9a-f]{40}$")
+          branch = os.environ["REQUEST_BRANCH"]
+          prefix = "release-recovery/"
+          if not branch.startswith(prefix):
+              raise SystemExit(f"::error::Unexpected recovery branch {branch!r}")
+
+          subprocess.run(
+              [
+                  "git",
+                  "fetch",
+                  "origin",
+                  f"refs/heads/{branch}:refs/remotes/origin/{branch}",
+              ],
+              check=True,
+          )
+          marker = subprocess.check_output(
+              [
+                  "git",
+                  "show",
+                  f"refs/remotes/origin/{branch}:.github/release-recovery.json",
+              ],
+              text=True,
+          )
+          try:
+              request = json.loads(marker)
+          except json.JSONDecodeError as error:
+              raise SystemExit(
+                  f"::error::Invalid .github/release-recovery.json: {error}"
+              ) from error
+          if not isinstance(request, dict):
+              raise SystemExit("::error::Recovery request must be a JSON object")
+
+          release = str(request.get("release_version", "")).strip()
+          next_version = str(
+              request.get("next_development_version", "")
+          ).strip()
+          release_commit = str(request.get("release_commit", "")).strip()
+          published_source = str(
+              request.get("published_source_commit", "")
+          ).strip()
+          if release_pattern.fullmatch(release) is None:
+              raise SystemExit(
+                  f"::error::Invalid recovery release version {release!r}"
+              )
+          if snapshot_pattern.fullmatch(next_version) is None:
+              raise SystemExit(
+                  f"::error::Invalid next development version {next_version!r}"
+              )
+          for name, value in (
+              ("release_commit", release_commit),
+              ("published_source_commit", published_source),
+          ):
+              if commit_pattern.fullmatch(value) is None:
+                  raise SystemExit(f"::error::Invalid {name} {value!r}")
+          if branch.removeprefix(prefix) != release:
+              raise SystemExit(
+                  f"::error::Recovery branch {branch!r} does not match {release!r}"
+              )
+
+          main_commit = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"], text=True
+          ).strip()
+          if main_commit != release_commit:
+              raise SystemExit(
+                  "::error::Recovery request targets "
+                  f"{release_commit}, but authoritative main is {main_commit}"
+              )
+
+          release_tuple = tuple(map(int, release.split(".")))
+          next_tuple = tuple(
+              map(int, next_version.removesuffix("-SNAPSHOT").split("."))
+          )
+          if next_tuple <= release_tuple:
+              raise SystemExit(
+                  f"::error::{next_version} must be newer than {release}"
+              )
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              print(f"release_version={release}", file=handle)
+              print(f"next_version={next_version}", file=handle)
+              print(f"release_commit={release_commit}", file=handle)
+              print(f"published_source={published_source}", file=handle)
+          PY
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify source and complete build
+        run: |
+          set -euo pipefail
+          docker info >/dev/null
+          python3 .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/verify-security-policy.py
+          python3 .github/scripts/verify-public-repository-publishing.py
+          git diff --check
+          mvn -B verify
+
+      - name: Resume immutable release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          RELEASE_VERSION: ${{ steps.recovery.outputs.release_version }}
+          NEXT_DEVELOPMENT_VERSION: ${{ steps.recovery.outputs.next_version }}
+          RELEASE_COMMIT: ${{ steps.recovery.outputs.release_commit }}
+          PUBLISHED_SOURCE_COMMIT: ${{ steps.recovery.outputs.published_source }}
+          PUBLIC_REPOSITORY_URL: https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/
+        run: |
+          chmod +x \
+            .github/scripts/recover-partial-release.py \
+            .github/scripts/verify-public-repository-consumption.sh
+          python3 .github/scripts/recover-partial-release.py
