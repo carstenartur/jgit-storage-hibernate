@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -79,6 +80,9 @@ class RecoverPartialReleaseTest(unittest.TestCase):
             manifest.write_text(
                 json.dumps(
                     {
+                        "schemaVersion": 1,
+                        "groupId": "io.github.carstenartur",
+                        "version": "0.11.0",
                         "canonicalChecksums": ["sha256", "sha512"],
                         "compatibilityChecksums": ["sha1"],
                         "files": [entry],
@@ -101,6 +105,9 @@ class RecoverPartialReleaseTest(unittest.TestCase):
             manifest.write_text(
                 json.dumps(
                     {
+                        "schemaVersion": 1,
+                        "groupId": "io.github.carstenartur",
+                        "version": "0.11.0",
                         "canonicalChecksums": ["sha256", "sha512"],
                         "compatibilityChecksums": ["sha1"],
                         "files": [
@@ -119,6 +126,115 @@ class RecoverPartialReleaseTest(unittest.TestCase):
             with self.assertRaisesRegex(recovery.RecoveryError, "Unsafe manifest"):
                 recovery.validate_manifest(root, manifest, "0.11.0")
 
+    def test_manifest_requires_both_checksum_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifact = (
+                root
+                / "io/github/carstenartur/example/0.11.0/example-0.11.0.jar"
+            )
+            artifact.parent.mkdir(parents=True)
+            artifact.write_bytes(b"immutable artifact")
+            entry = {
+                "path": artifact.relative_to(root).as_posix(),
+                "size": artifact.stat().st_size,
+                **checksums(artifact),
+            }
+            manifest = root / "manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "groupId": "io.github.carstenartur",
+                        "version": "0.11.0",
+                        "canonicalChecksums": ["sha256", "sha512"],
+                        "files": [entry],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recovery.RecoveryError, "missing required field"
+            ):
+                recovery.validate_manifest(root, manifest, "0.11.0")
+
+    def test_manifest_rejects_short_non_maven_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifact = root / "artifact/0.11.0/example.jar"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_bytes(b"immutable artifact")
+            entry = {
+                "path": artifact.relative_to(root).as_posix(),
+                "size": artifact.stat().st_size,
+                **checksums(artifact),
+            }
+            manifest = root / "manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "groupId": "io.github.carstenartur",
+                        "version": "0.11.0",
+                        "canonicalChecksums": ["sha256", "sha512"],
+                        "compatibilityChecksums": ["sha1"],
+                        "files": [entry],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recovery.RecoveryError, "does not match"
+            ):
+                recovery.validate_manifest(root, manifest, "0.11.0")
+
+    def test_source_lineage_requires_real_ancestry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Test"], cwd=repository, check=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=repository,
+                check=True,
+            )
+            (repository / "README.md").write_text("published\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=repository, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "published"],
+                cwd=repository,
+                check=True,
+            )
+            published = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=repository, text=True
+            ).strip()
+
+            subprocess.run(
+                ["git", "switch", "--orphan", "unrelated"],
+                cwd=repository,
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            (repository / "README.md").write_text("unrelated\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=repository, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "unrelated"],
+                cwd=repository,
+                check=True,
+            )
+            unrelated = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=repository, text=True
+            ).strip()
+
+            with self.assertRaisesRegex(
+                recovery.RecoveryError, "is not an ancestor"
+            ):
+                recovery.validate_source_lineage(
+                    repository, published, unrelated
+                )
+
     def test_recovery_workflow_uses_a_repository_owned_marker(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("- 'release-recovery/**'", text)
@@ -126,7 +242,13 @@ class RecoverPartialReleaseTest(unittest.TestCase):
         self.assertIn("ref: main", text)
         self.assertIn("group: jgit-storage-hibernate-release", text)
         self.assertIn("contents: write", text)
+        self.assertNotIn("pull-requests: write", text)
+        self.assertNotIn(
+            "carstenartur/jgit-storage-hibernate/maven-repository", text
+        )
         self.assertIn("mvn -B verify", text)
+        script = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('required_environment("GITHUB_REPOSITORY")', script)
         self.assertIn("recover-partial-release.py", text)
 
     def test_recovery_never_pushes_directly_to_main(self) -> None:
