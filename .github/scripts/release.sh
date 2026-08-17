@@ -62,6 +62,9 @@ boolean DRY_RUN
 if [[ "$DRY_RUN" == false && -z "$RELEASE_AUTOMATION_TOKEN" ]]; then
   fail "RELEASE_GITHUB_TOKEN is required for non-dry-run release automation"
 fi
+if [[ "$DRY_RUN" == false ]]; then
+  export GH_TOKEN="$RELEASE_AUTOMATION_TOKEN"
+fi
 
 if [[ -n "$NEXT_VERSION_INPUT" ]]; then
   NEXT_VERSION=$NEXT_VERSION_INPUT

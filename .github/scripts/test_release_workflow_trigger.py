@@ -69,6 +69,7 @@ class ReleaseWorkflowTriggerTest(unittest.TestCase):
             self.script,
         )
         self.assertNotIn("No RELEASE_GITHUB_TOKEN is configured", self.script)
+        self.assertIn('export GH_TOKEN="$RELEASE_AUTOMATION_TOKEN"', self.script)
 
     def test_release_preparation_asserts_pull_request_exists(self) -> None:
         self.assertIn("Expected a protected pull request", self.script)
