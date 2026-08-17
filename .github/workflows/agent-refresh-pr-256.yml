@@ -1,0 +1,62 @@
+name: Refresh PR 256 onto current main
+
+on:
+  push:
+    branches: [ feature/security-smart-http-authentication-adapters ]
+    paths: [ '.github/workflows/agent-refresh-pr-256.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  merge-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feature/security-smart-http-authentication-adapters
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Merge current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Verify module and release boundaries
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_verify_module_boundaries.py
+          python3 .github/scripts/verify-module-boundaries.py
+          python3 .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/verify-security-policy.py
+          python3 .github/scripts/verify-public-repository-publishing.py
+          git diff --check
+
+      - name: Run complete Maven verification
+        run: |
+          docker info
+          mvn -B -ntp verify
+
+      - name: Publish verified branch update
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/agent-refresh-pr-256.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Remove temporary PR refresh workflow'
+          fi
+          git push origin HEAD:feature/security-smart-http-authentication-adapters
