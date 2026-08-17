@@ -28,24 +28,34 @@ jobs:
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
 
-      - name: Verify version is a snapshot
+      - name: Resolve snapshot publication
+        id: snapshot
         run: |
           VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
           case "$VERSION" in
-            *-SNAPSHOT) echo "Publishing snapshot $VERSION" ;;
-            *) echo "::error::Refusing to publish non-SNAPSHOT version $VERSION from snapshot workflow"; exit 1 ;;
+            *-SNAPSHOT)
+              echo "Publishing snapshot $VERSION"
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::notice::Skipping snapshot publication for release version $VERSION"
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              ;;
           esac
 
       - name: Verify Docker for PostgreSQL integration tests
+        if: steps.snapshot.outputs.publish == 'true'
         run: docker info
 
       - name: Verify release, security and publishing consistency
+        if: steps.snapshot.outputs.publish == 'true'
         run: |
           python3 .github/scripts/verify-release-consistency.py
           python3 .github/scripts/verify-security-policy.py
           python3 .github/scripts/verify-public-repository-publishing.py
 
       - name: Build and deploy snapshot
+        if: steps.snapshot.outputs.publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mvn -B -Pgithub-packages deploy

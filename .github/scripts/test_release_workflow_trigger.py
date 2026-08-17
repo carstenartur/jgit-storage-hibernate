@@ -3,11 +3,17 @@
 
 from pathlib import Path
 import re
+import subprocess
+import sys
 import unittest
 
 
 WORKFLOW = Path(__file__).parents[1] / "workflows" / "release.yml"
 RELEASE_SCRIPT = Path(__file__).with_name("release.sh")
+RECOVERY_REGRESSION_TESTS = (
+    Path(__file__).with_name("test_recover_partial_release.py"),
+    Path(__file__).with_name("test_publish_snapshot_workflow.py"),
+)
 
 
 class ReleaseWorkflowTriggerTest(unittest.TestCase):
@@ -41,7 +47,10 @@ class ReleaseWorkflowTriggerTest(unittest.TestCase):
     def test_publication_requires_a_merged_release_pull_request(self) -> None:
         self.assertIn("types: [ closed ]", self.text)
         self.assertIn("github.event.pull_request.merged == true", self.text)
-        self.assertIn("startsWith(github.event.pull_request.head.ref, 'release/prepare-')", self.text)
+        self.assertIn(
+            "startsWith(github.event.pull_request.head.ref, 'release/prepare-')",
+            self.text,
+        )
 
     def test_workflow_delegates_both_release_phases(self) -> None:
         self.assertIn("RELEASE_ACTION: prepare", self.text)
@@ -52,6 +61,12 @@ class ReleaseWorkflowTriggerTest(unittest.TestCase):
     def test_release_script_never_pushes_directly_to_main(self) -> None:
         self.assertNotIn("HEAD:main", self.script)
         self.assertNotIn("HEAD:refs/heads/main", self.script)
+
+    def test_recovery_regression_suites_are_executed(self) -> None:
+        for test in RECOVERY_REGRESSION_TESTS:
+            with self.subTest(test=test.name):
+                self.assertTrue(test.is_file(), f"Missing recovery test {test}")
+                subprocess.run([sys.executable, str(test)], check=True)
 
 
 if __name__ == "__main__":
