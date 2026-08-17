@@ -1,0 +1,87 @@
+--- a/.github/scripts/recover-partial-release.py
++++ b/.github/scripts/recover-partial-release.py
+@@ -131,6 +131,26 @@
+         if result.returncode != 0:
+             fail(f"Commit {commit!r} is not available in the release checkout")
+ 
++    ancestry = run(
++        [
++            "git",
++            "merge-base",
++            "--is-ancestor",
++            published_source_commit,
++            release_commit,
++        ],
++        cwd=repository,
++        check=False,
++        capture=True,
++    )
++    if ancestry.returncode == 1:
++        fail(
++            f"Published source commit {published_source_commit} is not an "
++            f"ancestor of release commit {release_commit}"
++        )
++    if ancestry.returncode != 0:
++        fail("Cannot verify published source ancestry")
++
+     changed = [
+         line
+         for line in output(
+@@ -186,15 +206,32 @@
+     if not isinstance(files, list) or not files:
+         fail("Release manifest must contain a non-empty files array")
+ 
+-    declared_algorithms: set[str] = set()
+-    for key in ("canonicalChecksums", "compatibilityChecksums"):
+-        values = document.get(key, [])
+-        if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
++    expected_checksum_fields = {
++        "canonicalChecksums": {"sha256", "sha512"},
++        "compatibilityChecksums": {"sha1"},
++    }
++    for key, expected in expected_checksum_fields.items():
++        if key not in document:
++            fail(f"Release manifest is missing required field {key}")
++        values = document[key]
++        if not isinstance(values, list) or not all(
++            isinstance(item, str) for item in values
++        ):
+             fail(f"Manifest field {key} must be an array of checksum names")
+-        declared_algorithms.update(values)
+-    if declared_algorithms != set(HASH_ALGORITHMS):
++        if set(values) != expected or len(values) != len(expected):
++            fail(
++                f"Manifest field {key} must contain exactly "
++                + ", ".join(sorted(expected))
++            )
++
++    if document.get("schemaVersion") != 1:
++        fail("Release manifest schemaVersion must be 1")
++    if document.get("groupId") != "io.github.carstenartur":
++        fail("Release manifest groupId must be io.github.carstenartur")
++    if document.get("version") != release_version:
+         fail(
+-            "Release manifest must declare exactly sha1, sha256 and sha512 checksums"
++            f"Release manifest version must be {release_version}, found "
++            f"{document.get('version')!r}"
+         )
+ 
+     validated: list[dict[str, Any]] = []
+@@ -207,10 +244,14 @@
+         if relative_text in seen_paths:
+             fail(f"Duplicate manifest path {relative_text}")
+         seen_paths.add(relative_text)
+-        if len(relative.parts) < 3 or relative.parts[-2] != release_version:
++        if (
++            len(relative.parts) < 6
++            or relative.parts[:3] != ("io", "github", "carstenartur")
++            or relative.parts[-2] != release_version
++        ):
+             fail(
+-                f"Manifest path {relative_text} does not belong to version "
+-                f"{release_version}"
++                f"Manifest path {relative_text} does not match "
++                f"io.github.carstenartur version {release_version}"
+             )
+ 
+         artifact = public_repository.joinpath(*relative.parts)
