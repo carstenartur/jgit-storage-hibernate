@@ -37,6 +37,7 @@ class SecurityPostgreSqlSchemaMigrationIntegrationTest {
             SecuritySchemaMigrations.POSTGRESQL_LOCATION,
             () -> {})) {
       SecuritySchemaMigrationIntegrationTest.verifyEmptyMigrationAndRestart(database);
+      ExternalPrincipalBindingDatabaseContract.verify(database);
     }
   }
 }

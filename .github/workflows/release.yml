@@ -23,10 +23,13 @@ on:
         type: boolean
         default: false
       dry_run:
-        description: 'Stage and verify the static Maven repository without publishing or tagging'
+        description: 'Prepare and verify the release without pushing a release branch'
         required: false
         type: boolean
         default: false
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
   push:
     branches:
       - 'release-request/**'
@@ -35,14 +38,16 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: jgit-storage-hibernate-release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish immutable release
+  prepare:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
+    name: Prepare protected release pull request
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -51,7 +56,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ github.token }}
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
 
       - name: Resolve repository-owned release plan
         id: request
@@ -122,9 +127,7 @@ jobs:
                       f"::error::Unexpected release request branch {request_branch!r}"
                   )
               branch_release = request_branch.removeprefix("release-request/")
-              subprocess.run(
-                  ["git", "fetch", "origin", request_branch], check=True
-              )
+              subprocess.run(["git", "fetch", "origin", request_branch], check=True)
               marker = subprocess.check_output(
                   [
                       "git",
@@ -199,16 +202,112 @@ jobs:
       - name: Verify security policy
         run: python3 .github/scripts/verify-security-policy.py
 
-      - name: Run release state machine
+      - name: Prepare release branch
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ACTION: prepare
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ steps.request.outputs.release_version }}
           NEXT_VERSION_INPUT: ${{ steps.request.outputs.next_version }}
           SKIP_TESTS: ${{ steps.request.outputs.skip_tests }}
           DRY_RUN: ${{ steps.request.outputs.dry_run }}
-          SOURCE_BRANCH: main
           REQUEST_BRANCH: ${{ steps.request.outputs.request_branch }}
+          PUBLIC_REPOSITORY_URL: https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/
+        run: |
+          chmod +x .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
+          python3 .github/scripts/verify-public-repository-publishing.py
+          .github/scripts/release.sh
+
+  finalize:
+    if: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/prepare-') }}
+    name: Publish merged immutable release
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout merged release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+
+      - name: Resolve merged release candidate
+        id: candidate
+        env:
+          RELEASE_PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import xml.etree.ElementTree as ET
+
+          release_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+          snapshot_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$")
+          branch = os.environ["RELEASE_PR_BRANCH"]
+          prefix = "release/prepare-"
+          if not branch.startswith(prefix):
+              raise SystemExit(f"::error::Unexpected release PR branch {branch!r}")
+
+          path = Path(".github/release-candidate.json")
+          if not path.is_file():
+              raise SystemExit(f"::error::Merged release PR has no {path}")
+          candidate = json.loads(path.read_text(encoding="utf-8"))
+          if not isinstance(candidate, dict):
+              raise SystemExit("::error::Release candidate must be a JSON object")
+
+          release = str(candidate.get("release_version", "")).strip()
+          next_version = str(candidate.get("next_development_version", "")).strip()
+          request_branch = str(candidate.get("request_branch", "")).strip()
+          if not release_pattern.fullmatch(release):
+              raise SystemExit(f"::error::Invalid candidate release version {release!r}")
+          if not snapshot_pattern.fullmatch(next_version):
+              raise SystemExit(f"::error::Invalid candidate next version {next_version!r}")
+          if branch.removeprefix(prefix) != release:
+              raise SystemExit(
+                  f"::error::Release PR branch {branch!r} does not match candidate {release!r}"
+              )
+
+          root = ET.parse("pom.xml").getroot()
+          project_version = root.findtext("{http://maven.apache.org/POM/4.0.0}version")
+          if project_version is None or project_version.strip() != release:
+              raise SystemExit(
+                  f"::error::Merged reactor version {project_version!r} does not match {release!r}"
+              )
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              print(f"release_version={release}", file=handle)
+              print(f"next_version={next_version}", file=handle)
+              print(f"request_branch={request_branch}", file=handle)
+          PY
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify security policy
+        run: python3 .github/scripts/verify-security-policy.py
+
+      - name: Publish release and prepare next development PR
+        env:
+          RELEASE_ACTION: finalize
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.candidate.outputs.release_version }}
+          NEXT_VERSION_INPUT: ${{ steps.candidate.outputs.next_version }}
+          REQUEST_BRANCH: ${{ steps.candidate.outputs.request_branch }}
+          RELEASE_PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          SKIP_TESTS: 'false'
+          DRY_RUN: 'false'
           PUBLIC_REPOSITORY_URL: https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/
         run: |
           chmod +x .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh

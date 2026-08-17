@@ -122,7 +122,7 @@ Security and Smart HTTP below describe the upcoming `0.11.0` line; they are not 
 
 ## Five-minute production setup
 
-The documented release line is **0.10.0**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; HSQLDB 2.7 is supported for embedded persistent Core deployments; H2 2.4.x remains supported for tests, demos and lightweight development.
+The documented release line is **0.11.0**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; HSQLDB 2.7 is supported for embedded persistent Core deployments; H2 2.4.x remains supported for tests, demos and lightweight development.
 
 ### 1. Configure the anonymous release repository
 
@@ -145,7 +145,7 @@ No GitHub token or Maven Central account is required.
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.10.0</version>
+  <version>0.11.0</version>
 </dependency>
 ```
 
