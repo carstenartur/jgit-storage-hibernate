@@ -3,9 +3,8 @@
 The BOM aligns independently selectable production modules without adding a runtime dependency,
 database driver, Hibernate Search backend or application framework by itself.
 
-The documented release line is **0.11.0**. The current public `0.11.0` BOM aligns Core,
-Security, Smart HTTP, Search, Java Analysis and Architecture without adding runtime capabilities by
-itself.
+The documented release line is **0.11.0**. Its public BOM aligns Core, Security, Smart HTTP, Search,
+Java Analysis and Architecture without adding runtime capabilities by itself.
 
 Import the current public BOM once in `dependencyManagement`:
 
@@ -24,7 +23,7 @@ Import the current public BOM once in `dependencyManagement`:
 ```
 
 After the import, declare only capabilities contained in that release and omit their versions. The
-published `0.11.0` production coordinates are:
+published production coordinates are:
 
 - `io.github.carstenartur:jgit-storage-hibernate-core`
 - `io.github.carstenartur:jgit-storage-hibernate-security`
