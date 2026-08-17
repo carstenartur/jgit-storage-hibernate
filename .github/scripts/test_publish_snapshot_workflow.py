@@ -9,6 +9,11 @@ WORKFLOW = Path(__file__).parents[1] / "workflows" / "publish-snapshot.yml"
 
 
 class PublishSnapshotWorkflowTest(unittest.TestCase):
+    def test_snapshot_version_enables_publication(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("id: snapshot", text)
+        self.assertIn("echo \"publish=true\" >> \"$GITHUB_OUTPUT\"", text)
+
     def test_release_commit_is_skipped_without_marking_main_failed(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("echo \"publish=false\" >> \"$GITHUB_OUTPUT\"", text)
