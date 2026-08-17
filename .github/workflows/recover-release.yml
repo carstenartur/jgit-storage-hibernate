@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: jgit-storage-hibernate-release
@@ -155,7 +154,6 @@ jobs:
           NEXT_DEVELOPMENT_VERSION: ${{ steps.recovery.outputs.next_version }}
           RELEASE_COMMIT: ${{ steps.recovery.outputs.release_commit }}
           PUBLISHED_SOURCE_COMMIT: ${{ steps.recovery.outputs.published_source }}
-          PUBLIC_REPOSITORY_URL: https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/
         run: |
           chmod +x \
             .github/scripts/recover-partial-release.py \
