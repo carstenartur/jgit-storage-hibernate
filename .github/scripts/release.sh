@@ -59,6 +59,9 @@ boolean DRY_RUN
   || fail "Real releases must run the complete test suite"
 [[ "$RELEASE_ACTION" != finalize || "$DRY_RUN" == false ]] \
   || fail "Release finalization cannot be a dry run"
+if [[ "$DRY_RUN" == false && -z "$RELEASE_AUTOMATION_TOKEN" ]]; then
+  fail "RELEASE_GITHUB_TOKEN is required for non-dry-run release automation"
+fi
 
 if [[ -n "$NEXT_VERSION_INPUT" ]]; then
   NEXT_VERSION=$NEXT_VERSION_INPUT
@@ -140,25 +143,33 @@ append_summary() {
 }
 
 open_pull_request_when_configured() {
-  local branch=$1 title=$2 body_file=$3
-  if [[ -z "$RELEASE_AUTOMATION_TOKEN" ]]; then
-    echo "No RELEASE_GITHUB_TOKEN is configured; branch $branch is ready for a protected pull request."
-    append_summary "Branch \`$branch\` is ready. Open its protected pull request to continue."
-    return 0
-  fi
+  local branch=$1 title=$2 body_file=$3 existing pr_url
+  [[ -n "$RELEASE_AUTOMATION_TOKEN" ]] \
+    || fail "RELEASE_GITHUB_TOKEN is required to create the protected pull request for $branch"
 
-  local existing
   existing=$(GH_TOKEN="$RELEASE_AUTOMATION_TOKEN" gh pr list \
     --head "$branch" --base main --state open --json number --jq '.[0].number // empty')
-  if [[ -n "$existing" ]]; then
-    echo "Pull request #$existing already exists for $branch"
-  else
+  if [[ -z "$existing" ]]; then
     GH_TOKEN="$RELEASE_AUTOMATION_TOKEN" gh pr create \
       --base main \
       --head "$branch" \
       --title "$title" \
-      --body-file "$body_file"
+      --body-file "$body_file" \
+      >/dev/null
+  else
+    echo "Pull request #$existing already exists for $branch"
   fi
+
+  existing=$(GH_TOKEN="$RELEASE_AUTOMATION_TOKEN" gh pr list \
+    --head "$branch" --base main --state open --json number --jq '.[0].number // empty')
+  [[ -n "$existing" ]] \
+    || fail "Expected a protected pull request for $branch after release preparation"
+  pr_url=$(GH_TOKEN="$RELEASE_AUTOMATION_TOKEN" gh pr view "$existing" \
+    --json url --jq '.url')
+  [[ -n "$pr_url" ]] \
+    || fail "Protected pull request #$existing for $branch has no URL"
+  echo "Protected pull request #$existing exists for $branch: $pr_url"
+  append_summary "Protected pull request [#$existing]($pr_url) exists for \`$branch\`."
 }
 
 write_release_candidate() {

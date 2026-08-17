@@ -46,6 +46,23 @@ REQUIRED_RELEASE_OPTIONS = (
     "--verify-tag",
     "--fail-on-no-commits",
 )
+RELEASE_STATUS_FILES = (
+    Path("README.md"),
+    Path("docs/consuming.md"),
+    Path("jgit-storage-hibernate-bom/README.md"),
+)
+CURRENT_PUBLIC_CLAIM = re.compile(
+    r"\b(?:current|latest)\s+public\b[^\n0-9]{0,64}`?"
+    r"([0-9]+\.[0-9]+\.[0-9]+)`?",
+    re.IGNORECASE,
+)
+UPCOMING_RELEASE_CLAIM = re.compile(
+    r"\bupcoming\b[^\n0-9]{0,64}`?([0-9]+\.[0-9]+\.[0-9]+)`?",
+    re.IGNORECASE,
+)
+SNAPSHOT_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9])([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)(?![A-Za-z0-9])"
+)
 
 
 def fail(errors: list[str], message: str) -> None:
@@ -326,6 +343,53 @@ def verify_documentation_snippets(
         fail(errors, f"README.md does not advertise the Java {java_version} baseline")
 
 
+def semantic_version(value: str) -> tuple[int, int, int]:
+    return tuple(map(int, value.removesuffix("-SNAPSHOT").split(".")))
+
+
+def verify_release_status_prose(
+    project_version: str, documented_version: str, errors: list[str]
+) -> None:
+    expected_sentence = f"The documented release line is **{documented_version}**."
+
+    for path in RELEASE_STATUS_FILES:
+        text = required_text(path, errors)
+        if not text:
+            continue
+        if expected_sentence not in text:
+            fail(
+                errors,
+                f"{path} must contain generated release-status sentence "
+                f"{expected_sentence!r}",
+            )
+
+        for match in CURRENT_PUBLIC_CLAIM.finditer(text):
+            current = match.group(1)
+            if current != documented_version:
+                fail(
+                    errors,
+                    f"{path} describes {current} as current/latest public release or BOM; "
+                    f"expected {documented_version}",
+                )
+
+        for match in UPCOMING_RELEASE_CLAIM.finditer(text):
+            upcoming = match.group(1)
+            if semantic_version(upcoming) <= semantic_version(documented_version):
+                fail(
+                    errors,
+                    f"{path} describes already released {upcoming} as upcoming; "
+                    f"documented release is {documented_version}",
+                )
+
+        for snapshot in SNAPSHOT_REFERENCE.findall(text):
+            if snapshot != project_version:
+                fail(
+                    errors,
+                    f"{path} contains stale snapshot reference {snapshot}; "
+                    f"reactor version is {project_version}",
+                )
+
+
 def verify_release_workflow(errors: list[str]) -> None:
     text = required_text(RELEASE_WORKFLOW_FILE, errors)
     if not text:
@@ -486,6 +550,7 @@ def main() -> None:
     verify_aligned_test_dependencies(errors)
     verify_metadata(project_version, java_version, errors)
     verify_documentation_snippets(documented_version, java_version, errors)
+    verify_release_status_prose(project_version, documented_version, errors)
     verify_release_workflow(errors)
     verify_release_notes_configuration(errors)
     verify_release_script(errors)

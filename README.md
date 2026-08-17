@@ -18,7 +18,7 @@ https://doi.org/10.5281/zenodo.21210132
 
 JGit is the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. `jgit-storage-hibernate` adds a relational storage backend plus persistent query models over that history: transaction-safe pack/ref publication, structured history queries and Lucene full-text search. The Java Analysis and Architecture modules additionally provide semantic in-memory analysis APIs; their module-owned database persistence is still incubating in the `0.1.x` line.
 
-The `0.11.0-SNAPSHOT` development line also contains optional principal-bound Security and secured JGit Smart HTTP capabilities. They keep users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core. These development modules are not contained in the current public `0.10.0` release.
+The documented release line is **0.11.0**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
 
 The important distinction is not merely that the library saves application code. It changes **when and how often** expensive work is performed:
 
@@ -99,8 +99,8 @@ See the complete [change-audit and Java-usage use case](docs/use-cases/change-au
 | Operate Git without a filesystem-backed `.git` directory | Hibernate-backed DFS/Reftable storage with chunked payloads and transactional publication | Supported Core contract |
 | Run repeated structured history queries | Materialized first-parent changed paths plus indexed author, committer and timestamp fields | Supported Search contract |
 | Search history content | Hibernate Search/Lucene indexes for messages, changed paths and selected changed-file text | Supported Search contract |
-| Enforce multi-user repository and protected-ref access | Explicit principal contexts, database grants/ref rules, final direct-JGit checks, revocable tokens and bounded audit | `0.11.0-SNAPSHOT` development capability |
-| Expose secured clone, fetch and push over JGit Smart HTTP | Request-bound resolver and upload/receive factories over the same Core publication checks | `0.11.0-SNAPSHOT` development capability |
+| Enforce multi-user repository and protected-ref access | Explicit principal contexts, database grants/ref rules, final direct-JGit checks, revocable tokens and bounded audit | Supported since `0.11.0` |
+| Expose secured clone, fetch and push over JGit Smart HTTP | Request-bound resolver and upload/receive factories over the same Core publication checks | Supported since `0.11.0` |
 | Understand Java evolution beyond tokens and lines | Binding-aware symbols, references, semantic diff, timelines and software graphs | Analysis API supported; persistence incubating |
 | Keep architecture intent connected to implementation | Versioned rules, evidence, code mapping and drift evaluation | Evaluation API supported; persistence incubating |
 
@@ -108,7 +108,7 @@ Git objects and refs remain authoritative. Search, Java Analysis and Architectur
 
 ## Module guide
 
-Security and Smart HTTP below describe the upcoming `0.11.0` line; they are not artifacts of the current public `0.10.0` release.
+Security and Smart HTTP are published artifacts in the documented `0.11.0` release.
 
 | Module | Choose it when... | Persistence/runtime contract |
 |---|---|---|
@@ -149,7 +149,7 @@ No GitHub token or Maven Central account is required.
 </dependency>
 ```
 
-Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security and Smart HTTP become independently selectable with the upcoming `0.11.0` release; source/reactor builds keep them aligned through `${project.version}`.
+Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security and Smart HTTP are independently selectable in the documented `0.11.0` release; source/reactor builds keep them aligned through `${project.version}`.
 
 ### 3. Apply the packaged migration before Hibernate starts
 
