@@ -27,7 +27,7 @@ RUNTIME_MODULES = {CORE, SECURITY, SMART_HTTP, SEARCH, JAVA_ANALYSIS, ARCHITECTU
 ALLOWED_INTERNAL = {
     CORE: set(),
     SECURITY: {CORE},
-    SMART_HTTP: {CORE},
+    SMART_HTTP: {CORE, SECURITY},
     SEARCH: {CORE},
     JAVA_ANALYSIS: {CORE},
     ARCHITECTURE: {JAVA_ANALYSIS},
@@ -182,6 +182,20 @@ def _check_internal_boundaries(modules: dict[str, Module], edges: dict[str, set[
         if BENCHMARKS in targets and source != BENCHMARKS:
             raise BoundaryError(f"{source} must never depend on the benchmark module in production")
 
+    smart_http_security = [
+        dependency
+        for dependency in modules[SMART_HTTP].dependencies
+        if dependency.production
+        and dependency.group_id == PROJECT_GROUP
+        and dependency.artifact_id == SECURITY
+    ]
+    if len(smart_http_security) > 1 or any(
+        not dependency.optional for dependency in smart_http_security
+    ):
+        raise BoundaryError(
+            f"{SMART_HTTP} may integrate Security only through one optional dependency"
+        )
+
     for source, targets in edges.items():
         if source == BOM or modules[source].packaging == "pom":
             continue
@@ -289,7 +303,7 @@ def graph_markdown(modules: dict[str, Module], edges: dict[str, set[str]]) -> st
             "",
             "- Core has no production dependency on Security, Smart HTTP, Search, Java Analysis, Architecture or Benchmarks.",
             "- Security may depend on Core only and never on Search, Servlet, Spring or HTTP runtimes.",
-            "- Smart HTTP may depend on Core only among project modules and exclusively owns JGit HTTP/Servlet integration.",
+            "- Smart HTTP depends on Core and may optionally integrate Security while exclusively owning JGit HTTP/Servlet types.",
             "- Search may depend on Core only among project runtime modules.",
             "- Java Analysis may depend on Core only among project runtime modules.",
             "- Architecture may depend on Java Analysis only among project runtime modules.",

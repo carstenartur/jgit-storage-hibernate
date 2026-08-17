@@ -28,6 +28,11 @@
       <artifactId>jgit-storage-hibernate-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-security</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit.http.server</artifactId>
       <version>${jgit.version}</version>

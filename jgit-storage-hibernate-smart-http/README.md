@@ -11,6 +11,8 @@ It provides:
 - strict and deterministic URL-name to `RepositoryName` mapping, including one optional `.git`
   suffix;
 - an application-supplied request authentication boundary;
+- optional strict UTF-8 Basic and one-way Bearer adapters for the Security credential service;
+- bounded `WWW-Authenticate` challenge filters for Git clients;
 - authenticated repository resolution that conceals both missing and undiscoverable repositories;
 - one request binding shared by `RepositoryResolver`, `UploadPackFactory` and
   `ReceivePackFactory`;
@@ -37,6 +39,61 @@ access-context provider may use the Security module's local password/access-toke
 LDAP adapter, or an already authenticated application session. It must return one immutable context
 accepted by the configured `SecuredHibernateRepositoryFactory`; missing authentication must raise
 JGit's `ServiceNotAuthorizedException`.
+
+## Local Security Basic and Bearer credentials
+
+The bridge to `jgit-storage-hibernate-security` is an **optional** Maven dependency. Applications
+using local passwords or access tokens must declare both artifacts; OIDC, LDAP and existing-session
+deployments can keep using the generic Smart HTTP boundary without selecting the Security schema.
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-security</artifactId>
+  <version>${project.version}</version>
+</dependency>
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-smart-http</artifactId>
+  <version>${project.version}</version>
+</dependency>
+```
+
+Create the adapter with trusted, bounded audit identifiers:
+
+```java
+SecuritySmartHttpAccessContextProvider authentication =
+    new SecuritySmartHttpAccessContextProvider(
+        credentialService,
+        Set.of(
+            SecuritySmartHttpAuthenticationMethod.BASIC,
+            SecuritySmartHttpAuthenticationMethod.BEARER),
+        request ->
+            SecurityAuthenticationTrace.withoutRemoteAddress(
+                trustedSessionId(request), trustedCorrelationId(request)));
+
+GitServlet servlet = SecuredSmartHttp.servlet(securedRepositoryFactory, authentication);
+SmartHttpAuthenticationChallengeFilter challenge =
+    SmartHttpAuthenticationChallengeFilter.basicAndBearer("Git");
+```
+
+Register the challenge filter before the servlet mapping. It adds `WWW-Authenticate` only when JGit
+emits a final 401, allowing clients to discover UTF-8 Basic or Bearer authentication without
+advertising challenges on successful responses. Insecure transport is rejected with HTTP 403 before
+credentials are parsed, so the filter does not solicit a password or token over plaintext HTTP.
+
+The credential adapter:
+
+- accepts exactly one bounded `Authorization` header;
+- requires `request.isSecure()` by default and maps insecure transport to HTTP 403;
+- decodes Basic credentials as UTF-8 and clears decoded byte/password buffers;
+- performs the credential service's dummy verifier path for malformed Basic input;
+- sends every credential, principal-state and token-state denial through the same generic 401;
+- preserves authentication-store and required identity-audit failures as HTTP 500.
+
+Behind a reverse proxy, configure the container so `request.isSecure()` reflects the trusted original
+connection, or inject a predicate backed by trusted proxy integration. Never inspect a
+caller-controlled `X-Forwarded-Proto` header directly.
 
 ## Explicit push admission
 
