@@ -106,7 +106,7 @@ messages or copy it into audit metadata.
 
 ## External Bearer plus local Git PAT
 
-Mixed SSO and Git-PAT deployments use a collision-resistant namespace instead of validator fallback:
+Mixed SSO and Git-PAT deployments use collision-resistant namespaces instead of validator fallback:
 
 ```java
 RoutingSmartHttpAccessContextProvider<AuthenticatedGitAccess> authentication =
@@ -122,14 +122,15 @@ Selection is deterministic:
 
 | Authorization value | Selected handler |
 |---|---|
-| `Bearer jsh_...` | Security access-token verifier only |
+| `Bearer jsh1_...` | current Security access-token verifier route only |
+| `Bearer jsh_...` | legacy Security access-token verifier route only |
 | any other syntactically valid `Bearer ...` | external Bearer handler only |
 | `Basic ...` | rejected in this mode |
 | unknown scheme, duplicate header or malformed value | generic authentication denial |
 
-A malformed or revoked `jsh_` value is still owned exclusively by the local token route. It is not
-retried as an external JWT. Conversely, an external token is never looked up in the Security token
-table.
+A malformed, revoked or unknown token beginning with either reserved local prefix remains owned by
+that local route. It is not retried as an external JWT. Conversely, an external token is never looked
+up in the Security token table.
 
 When a deployment intentionally maintains separate local passwords in addition to SSO and PATs, it
 must choose the deliberately explicit
@@ -153,29 +154,39 @@ This mode is exclusive: it does not combine with header routes, does not inspect
 requires application-owned challenges. The trusted layer must provide a stable identity and must not
 accept caller-controlled identity headers without authenticated proxy integration.
 
-## Local token namespace and versioning
+## Local token namespace and migration
 
-The historical local token format is now published as Security access-token format version 1:
+New Security access tokens use explicit format version 1:
+
+```text
+jsh1_<16-character non-secret lookup component>.<43-character random secret>
+```
+
+Tokens issued before explicit versioning use the legacy format:
 
 ```text
 jsh_<16-character non-secret lookup component>.<43-character random secret>
 ```
 
-`SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX` is `jsh_`. The short prefix is safe for route
-selection and format identification. The longer lookup component stored in the database is not an
-authorization decision and should not be copied into general request logs or audit metadata.
+`SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX` is `jsh1_`, while
+`SecurityAccessTokenNamespace.LEGACY_BEARER_PREFIX` is `jsh_`. Both namespaces route exclusively to
+the local verifier. Newly issued tokens use only `jsh1_`; existing `jsh_` values remain readable and
+valid until expiry or revocation. No database migration or forced cut-over is required.
 
-Version 1 remains fully compatible with existing issued tokens; no schema migration or forced token
-replacement is required. A future incompatible format must reserve a new prefix that does not begin
-with, contain or otherwise overlap an existing prefix. Startup validation rejects overlapping
-configured namespaces before the endpoint can serve traffic.
+The short namespace prefix is safe for route selection and format identification. The longer lookup
+component stored in the database is not an authorization decision and should not be copied into
+general request logs or audit metadata.
 
-Recommended rotation procedure:
+A future incompatible format must reserve a new prefix that does not overlap an accepted prefix.
+Startup validation rejects prefixes where either value starts with the other, so handler ordering
+cannot decide token ownership.
 
-1. issue a replacement token with the current format and the minimum required scopes;
+Recommended migration and rotation procedure:
+
+1. issue a replacement token; it will use the current `jsh1_` format;
 2. update the client through its protected secret-management channel;
 3. verify the new token against the intended repository operation;
-4. revoke the previous token;
+4. revoke the previous `jsh_` or older `jsh1_` token;
 5. confirm that later requests fail through the same generic authentication response.
 
 A token value is returned only once at issuance. Do not put it in a clone URL, repository config,
