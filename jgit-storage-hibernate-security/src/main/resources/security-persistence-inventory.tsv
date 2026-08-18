@@ -1,0 +1,12 @@
+entity_class	table_name	category	lifecycle	actor_policy	version_policy	notes
+SecurityAccessAuditEntity	git_security_access_audit	AUDIT	append-only	actor-and-subject-snapshot	none	Append-only authorization decision evidence.
+SecurityAccessTokenEntity	git_security_access_token	CREDENTIAL	mutable-revocable	issued/revoked-by-principal	security-version	Stores one-way token hash, scopes, expiry, revocation and safe lookup prefix.
+SecurityGroupEntity	git_security_group	MUTABLE_CONFIGURATION	mutable	principal-created/updated	optimistic-version	Stable group identity and lifecycle state.
+SecurityGroupMembershipEntity	git_security_group_membership	RELATIONSHIP	mutable	principal-created/removed	optimistic-version-or-guarded-replace	Principal-to-group relationship; removal actor belongs in identity audit.
+SecurityIdentityAuditEntity	git_security_identity_audit	AUDIT	append-only	actor-and-subject-snapshot	none	Append-only identity, credential and policy-management evidence.
+SecurityLocalCredentialEntity	git_security_local_credential	CREDENTIAL	mutable-secret-derived-state	password-changed-by-principal	security-version	Stores verifier material, lockout state and change time; never plaintext.
+SecurityManagedPolicyEntity	git_security_managed_policy	MUTABLE_CONFIGURATION	mutable	principal-created/updated	optimistic-version	Application-managed policy synchronization state.
+SecurityPrincipalEntity	git_security_principal	MUTABLE_CONFIGURATION	mutable	principal-created/updated	optimistic-version	Stable principal identity; login and display labels are mutable attributes.
+SecurityRefRuleEntity	git_security_ref_rule	MUTABLE_CONFIGURATION	mutable	principal-created/updated	optimistic-version	Exact/pattern ref authorization rule configuration.
+SecurityRepositoryGrantEntity	git_security_repository_grant	MUTABLE_CONFIGURATION	mutable	principal-created/updated	optimistic-version	Repository authorization grant configuration.
+SecurityVersionEntity	git_security_version	TECHNICAL_STATE	mutable-monotonic	system-managed	monotonic-security-version	Technical invalidation/version state; not business configuration.
