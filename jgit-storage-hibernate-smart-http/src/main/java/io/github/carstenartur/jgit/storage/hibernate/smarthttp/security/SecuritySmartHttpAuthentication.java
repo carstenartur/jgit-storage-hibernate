@@ -28,6 +28,7 @@ public final class SecuritySmartHttpAuthentication {
 
   private static final String LOCAL_BASIC_HANDLER_ID = "security-local-basic";
   private static final String LOCAL_TOKEN_HANDLER_ID = "security-access-token-v1";
+  private static final String LEGACY_TOKEN_HANDLER_ID = "security-access-token-legacy";
 
   private SecuritySmartHttpAuthentication() {}
 
@@ -56,10 +57,8 @@ public final class SecuritySmartHttpAuthentication {
         List.of(
             SmartHttpAuthenticationRoute.securityLocalBasic(
                 LOCAL_BASIC_HANDLER_ID, handlers.basic()),
-            SmartHttpAuthenticationRoute.securityAccessToken(
-                LOCAL_TOKEN_HANDLER_ID,
-                SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX,
-                handlers.bearer())),
+            currentTokenRoute(handlers.bearer()),
+            legacyTokenRoute(handlers.bearer())),
         challengeOwner,
         secureTransport);
   }
@@ -86,11 +85,7 @@ public final class SecuritySmartHttpAuthentication {
           Predicate<HttpServletRequest> secureTransport) {
     LocalHandlers handlers = localHandlers(credentialService, traceProvider);
     return router(
-        List.of(
-            SmartHttpAuthenticationRoute.securityAccessToken(
-                LOCAL_TOKEN_HANDLER_ID,
-                SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX,
-                handlers.bearer())),
+        List.of(currentTokenRoute(handlers.bearer()), legacyTokenRoute(handlers.bearer())),
         challengeOwner,
         secureTransport);
   }
@@ -98,7 +93,7 @@ public final class SecuritySmartHttpAuthentication {
   /**
    * Configure a host-validated external bearer plus clearly namespaced local Security tokens.
    *
-   * <p>Any bearer beginning with the reserved local namespace is sent only to the local verifier.
+   * <p>Any bearer beginning with a reserved local namespace is sent only to the local verifier.
    * Every other bearer is sent only to the application handler. A denial never falls back.
    */
   public static RoutingSmartHttpAccessContextProvider<AuthenticatedGitAccess>
@@ -129,10 +124,8 @@ public final class SecuritySmartHttpAuthentication {
     LocalHandlers handlers = localHandlers(credentialService, traceProvider);
     return router(
         List.of(
-            SmartHttpAuthenticationRoute.securityAccessToken(
-                LOCAL_TOKEN_HANDLER_ID,
-                SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX,
-                handlers.bearer()),
+            currentTokenRoute(handlers.bearer()),
+            legacyTokenRoute(handlers.bearer()),
             SmartHttpAuthenticationRoute.externalBearer(
                 externalHandlerId, externalBearerHandler)),
         challengeOwner,
@@ -176,14 +169,28 @@ public final class SecuritySmartHttpAuthentication {
         List.of(
             SmartHttpAuthenticationRoute.securityLocalBasic(
                 LOCAL_BASIC_HANDLER_ID, handlers.basic()),
-            SmartHttpAuthenticationRoute.securityAccessToken(
-                LOCAL_TOKEN_HANDLER_ID,
-                SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX,
-                handlers.bearer()),
+            currentTokenRoute(handlers.bearer()),
+            legacyTokenRoute(handlers.bearer()),
             SmartHttpAuthenticationRoute.externalBearer(
                 externalHandlerId, externalBearerHandler)),
         challengeOwner,
         secureTransport);
+  }
+
+  private static SmartHttpAuthenticationRoute<AuthenticatedGitAccess> currentTokenRoute(
+      SmartHttpAuthenticationHandler<AuthenticatedGitAccess> handler) {
+    return SmartHttpAuthenticationRoute.securityAccessToken(
+        LOCAL_TOKEN_HANDLER_ID,
+        SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX,
+        handler);
+  }
+
+  private static SmartHttpAuthenticationRoute<AuthenticatedGitAccess> legacyTokenRoute(
+      SmartHttpAuthenticationHandler<AuthenticatedGitAccess> handler) {
+    return SmartHttpAuthenticationRoute.securityAccessToken(
+        LEGACY_TOKEN_HANDLER_ID,
+        SecurityAccessTokenNamespace.LEGACY_BEARER_PREFIX,
+        handler);
   }
 
   private static RoutingSmartHttpAccessContextProvider<AuthenticatedGitAccess> router(
