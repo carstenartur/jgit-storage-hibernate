@@ -13,6 +13,7 @@ RELEASE_SCRIPT = Path(__file__).with_name("release.sh")
 RECOVERY_REGRESSION_TESTS = (
     Path(__file__).with_name("test_recover_partial_release.py"),
     Path(__file__).with_name("test_publish_snapshot_workflow.py"),
+    Path(__file__).with_name("test_release_status_consistency.py"),
 )
 
 
@@ -61,6 +62,18 @@ class ReleaseWorkflowTriggerTest(unittest.TestCase):
     def test_release_script_never_pushes_directly_to_main(self) -> None:
         self.assertNotIn("HEAD:main", self.script)
         self.assertNotIn("HEAD:refs/heads/main", self.script)
+
+    def test_non_dry_run_release_requires_automation_token(self) -> None:
+        self.assertIn(
+            "RELEASE_GITHUB_TOKEN is required for non-dry-run release automation",
+            self.script,
+        )
+        self.assertNotIn("No RELEASE_GITHUB_TOKEN is configured", self.script)
+        self.assertIn('export GH_TOKEN="$RELEASE_AUTOMATION_TOKEN"', self.script)
+
+    def test_release_preparation_asserts_pull_request_exists(self) -> None:
+        self.assertIn("Expected a protected pull request", self.script)
+        self.assertIn('gh pr view "$existing"', self.script)
 
     def test_recovery_regression_suites_are_executed(self) -> None:
         for test in RECOVERY_REGRESSION_TESTS:

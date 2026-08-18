@@ -3,9 +3,8 @@
 The BOM aligns independently selectable production modules without adding a runtime dependency,
 database driver, Hibernate Search backend or application framework by itself.
 
-The current public `0.10.0` BOM manages Core, Search, Java Analysis and Architecture. Security and
-Smart HTTP are development capabilities for the upcoming `0.11.0` line and are deliberately not
-claimed as published `0.10.0` artifacts.
+The documented release line is **0.11.0**. Its public BOM aligns Core, Security, Smart HTTP, Search,
+Java Analysis and Architecture without adding runtime capabilities by itself.
 
 Import the current public BOM once in `dependencyManagement`:
 
@@ -24,24 +23,21 @@ Import the current public BOM once in `dependencyManagement`:
 ```
 
 After the import, declare only capabilities contained in that release and omit their versions. The
-published `0.10.0` production coordinates are:
+published production coordinates are:
 
 - `io.github.carstenartur:jgit-storage-hibernate-core`
+- `io.github.carstenartur:jgit-storage-hibernate-security`
+- `io.github.carstenartur:jgit-storage-hibernate-smart-http`
 - `io.github.carstenartur:jgit-storage-hibernate-search`
 - `io.github.carstenartur:jgit-storage-hibernate-java-analysis`
 - `io.github.carstenartur:jgit-storage-hibernate-architecture`
-
-The development `0.11.0` BOM additionally aligns:
-
-- `io.github.carstenartur:jgit-storage-hibernate-security`
-- `io.github.carstenartur:jgit-storage-hibernate-smart-http`
 
 ## Capability selection
 
 Use `jgit-storage-hibernate-core` for packs, objects, refs, reflogs and transactions without indexed
 history. The application still selects its JDBC driver explicitly.
 
-Add `jgit-storage-hibernate-security` in the development line for the optional framework-neutral
+Add `jgit-storage-hibernate-security` from the public release for the optional framework-neutral
 principal/group ACL schema, local credentials/tokens, audit and deterministic repository/ref
 evaluator. It depends on Core and Hibernate ORM, not Hibernate Search, Spring or Servlet APIs.
 
