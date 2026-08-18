@@ -48,9 +48,9 @@ public final class HibernateSecurityCredentialService {
   private static final int TOKEN_LOOKUP_BYTES = 12;
   private static final int TOKEN_SECRET_BYTES = 32;
   private static final Pattern TOKEN_PATTERN =
-      Pattern.compile("^(jsh_[A-Za-z0-9_-]{16})\\.([A-Za-z0-9_-]{43})$");
+      Pattern.compile("^((?:jsh1_|jsh_)[A-Za-z0-9_-]{16})\\.([A-Za-z0-9_-]{43})$");
   private static final String DUMMY_TOKEN =
-      "jsh_AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+      "jsh1_AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
   private static final char[] DUMMY_PASSWORD = "invalid-credential-timing-value".toCharArray();
   private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
 
@@ -1004,7 +1004,7 @@ public final class HibernateSecurityCredentialService {
   private static String requiredTokenValue(String tokenValue) {
     if (tokenValue == null || !TOKEN_PATTERN.matcher(tokenValue).matches()) {
       throw new IllegalArgumentException(
-          "generated tokenValue must use the jsh_<lookup>.<secret> format");
+          "generated tokenValue must use the jsh1_<lookup>.<secret> or legacy jsh_<lookup>.<secret> format");
     }
     return tokenValue;
   }
@@ -1018,7 +1018,7 @@ public final class HibernateSecurityCredentialService {
   }
 
   private static String generateTokenValue() {
-    return "jsh_"
+    return "jsh1_"
         + randomBase64Url(TOKEN_RANDOM, TOKEN_LOOKUP_BYTES)
         + "."
         + randomBase64Url(TOKEN_RANDOM, TOKEN_SECRET_BYTES);
