@@ -18,31 +18,37 @@ import org.junit.jupiter.api.Test;
 class SecurityAccessTokenNamespaceTest {
 
   @Test
-  void publishesTheFrozenVersionOneBearerNamespace() {
+  void publishesCurrentAndLegacyBearerNamespaces() {
     assertEquals(1, SecurityAccessTokenNamespace.CURRENT_VERSION);
-    assertEquals("jsh_", SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX);
+    assertEquals("jsh1_", SecurityAccessTokenNamespace.VERSION_1_BEARER_PREFIX);
+    assertEquals("jsh_", SecurityAccessTokenNamespace.LEGACY_BEARER_PREFIX);
     assertEquals(
-        Set.of("jsh_"), SecurityAccessTokenNamespace.recognizedBearerPrefixes());
+        Set.of("jsh1_", "jsh_"), SecurityAccessTokenNamespace.bearerPrefixes());
   }
 
   @Test
-  void recognizesOnlyTheCompleteVersionOneTokenSyntax() {
-    String valid = "jsh_" + "A".repeat(16) + "." + "B".repeat(43);
-    assertTrue(SecurityAccessTokenNamespace.isVersion1Token(valid));
+  void recognizesCurrentAndLegacyCompleteTokenSyntax() {
+    String current = "jsh1_" + "A".repeat(16) + "." + "B".repeat(43);
+    String legacy = "jsh_" + "C".repeat(16) + "." + "D".repeat(43);
+    assertTrue(SecurityAccessTokenNamespace.isVersion1Token(current));
+    assertTrue(SecurityAccessTokenNamespace.isLegacyToken(legacy));
+    assertTrue(SecurityAccessTokenNamespace.isRecognizedToken(current));
+    assertTrue(SecurityAccessTokenNamespace.isRecognizedToken(legacy));
 
     assertFalse(SecurityAccessTokenNamespace.isVersion1Token(null));
-    assertFalse(SecurityAccessTokenNamespace.isVersion1Token(""));
+    assertFalse(SecurityAccessTokenNamespace.isLegacyToken(null));
+    assertFalse(SecurityAccessTokenNamespace.isRecognizedToken(""));
     assertFalse(
         SecurityAccessTokenNamespace.isVersion1Token(
-            "jsh_" + "A".repeat(15) + "." + "B".repeat(43)));
+            "jsh1_" + "A".repeat(15) + "." + "B".repeat(43)));
     assertFalse(
         SecurityAccessTokenNamespace.isVersion1Token(
-            "jsh_" + "A".repeat(16) + "." + "B".repeat(42)));
+            "jsh1_" + "A".repeat(16) + "." + "B".repeat(42)));
     assertFalse(
-        SecurityAccessTokenNamespace.isVersion1Token(
+        SecurityAccessTokenNamespace.isLegacyToken(
             "jwt_" + "A".repeat(16) + "." + "B".repeat(43)));
     assertFalse(
-        SecurityAccessTokenNamespace.isVersion1Token(
+        SecurityAccessTokenNamespace.isRecognizedToken(
             "jsh_" + "A".repeat(16) + "." + "!".repeat(43)));
   }
 }
