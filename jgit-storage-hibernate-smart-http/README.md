@@ -3,16 +3,19 @@
 This optional module binds JGit Smart HTTP requests to `SecuredHibernateRepositoryFactory` without
 adding Servlet or HTTP-server dependencies to Core or Security.
 
-> **Development status:** this module belongs to the upcoming `0.11.0` line and is not contained in
-> the current public `0.10.0` release.
+> **Development status:** this module is available in the public `0.11.0` release. The current
+> development line is `0.11.1-SNAPSHOT`.
 
 It provides:
 
 - strict and deterministic URL-name to `RepositoryName` mapping, including one optional `.git`
   suffix;
 - an application-supplied request authentication boundary;
+- explicit, startup-validated routing across external Bearer, versioned local PAT, local Basic,
+  service and already-authenticated application-context modes;
+- no credential-provider fallback after a route has been selected;
 - optional strict UTF-8 Basic and one-way Bearer adapters for the Security credential service;
-- bounded `WWW-Authenticate` challenge filters for Git clients;
+- bounded `WWW-Authenticate` challenge filters with explicit application-versus-library ownership;
 - authenticated repository resolution that conceals both missing and undiscoverable repositories;
 - one request binding shared by `RepositoryResolver`, `UploadPackFactory` and
   `ReceivePackFactory`;
@@ -23,7 +26,8 @@ It provides:
 - explicit disabling of dumb HTTP file service so it cannot bypass the secured resolver;
 - distinct missing/denied and infrastructure-failure results so outages are never disguised as 404s.
 
-See the complete [secured Smart HTTP operations guide](../docs/operations/secured-smart-http.md).
+See the complete [secured Smart HTTP operations guide](../docs/operations/secured-smart-http.md) and
+the [authentication-routing guide](../docs/operations/smart-http-authentication-routing.md).
 
 ## Fetch-only wiring
 
@@ -35,15 +39,70 @@ GitServlet servlet =
 ```
 
 This overload enables clone and fetch but deliberately leaves receive-pack disabled. The
-access-context provider may use the Security module's local password/access-token service, an OIDC or
-LDAP adapter, or an already authenticated application session. It must return one immutable context
-accepted by the configured `SecuredHibernateRepositoryFactory`; missing authentication must raise
-JGit's `ServiceNotAuthorizedException`.
+access-context provider must return one immutable context accepted by the configured
+`SecuredHibernateRepositoryFactory`; missing authentication must raise JGit's
+`ServiceNotAuthorizedException`.
 
-## Local Security Basic and Bearer credentials
+For one authentication mechanism, an application may implement `SmartHttpAccessContextProvider`
+directly. Deployments combining external OIDC/OAuth2 tokens, local Git PATs, local passwords or
+service credentials should use `RoutingSmartHttpAccessContextProvider` or the safe Security factory
+methods below. Do not implement composition by trying validators sequentially.
+
+## Choose an authentication mode
+
+| Deployment | Recommended provider |
+|---|---|
+| standalone with local credentials | `SecuritySmartHttpAuthentication.localBasicAndAccessToken(...)` |
+| local PAT only | `SecuritySmartHttpAuthentication.localAccessTokenOnly(...)` |
+| external OIDC/OAuth2 Bearer only | `RoutingSmartHttpAccessContextProvider.externalBearerOnly(...)` |
+| external Bearer plus local Git PAT | `SecuritySmartHttpAuthentication.externalBearerAndAccessToken(...)` |
+| already authenticated gateway/session | `RoutingSmartHttpAccessContextProvider.applicationContextOnly(...)` |
+
+Every router configuration names exactly one `SmartHttpChallengeOwner`:
+
+- `APPLICATION` means Spring Security, the container or gateway owns all challenges;
+- `LIBRARY` means the application registers exactly the filter returned by
+  `authentication.challengeFilter(realm)`.
+
+## External Bearer plus local Security PAT
+
+The most relevant mixed mode keeps JWT/OIDC validation application-owned while routing versioned
+local tokens only to the Security token verifier:
+
+```java
+RoutingSmartHttpAccessContextProvider<AuthenticatedGitAccess> authentication =
+    SecuritySmartHttpAuthentication.externalBearerAndAccessToken(
+        credentialService,
+        request ->
+            SecurityAuthenticationTrace.withoutRemoteAddress(
+                trustedSessionId(request), trustedCorrelationId(request)),
+        "oidc",
+        (request, rawBearer) -> externalAuthentication.requireGitAccess(rawBearer),
+        SmartHttpChallengeOwner.APPLICATION);
+
+GitServlet servlet = SecuredSmartHttp.servlet(securedRepositoryFactory, authentication);
+```
+
+Routing is deterministic:
+
+- `Bearer jsh1_...` selects the current local Security-PAT route;
+- `Bearer jsh_...` selects the legacy local Security-PAT route;
+- every other syntactically valid Bearer value selects the external handler;
+- Basic is disabled in this mode;
+- a denial never falls back to another handler.
+
+Newly issued local tokens use `jsh1_`. Existing `jsh_` tokens remain readable until expiry or
+revocation and can be replaced during ordinary credential rotation. Neither the raw JWT nor the raw
+PAT belongs in logs, exception causes, audit metadata, repository URLs or Git configuration.
+
+The host application remains responsible for validating external token signature, issuer, audience,
+expiry, claims and its chosen revocation policy. This module intentionally adds no OIDC, JWT, LDAP,
+Keycloak or Spring dependency.
+
+## Local Security Basic and PAT credentials
 
 The bridge to `jgit-storage-hibernate-security` is an **optional** Maven dependency. Applications
-using local passwords or access tokens must declare both artifacts; OIDC, LDAP and existing-session
+using local passwords or access tokens must declare both artifacts; external-only and session-based
 deployments can keep using the generic Smart HTTP boundary without selecting the Security schema.
 
 ```xml
@@ -59,22 +118,19 @@ deployments can keep using the generic Smart HTTP boundary without selecting the
 </dependency>
 ```
 
-Create the adapter with trusted, bounded audit identifiers:
+A standalone deployment can let the library own the Basic/Bearer challenge:
 
 ```java
-SecuritySmartHttpAccessContextProvider authentication =
-    new SecuritySmartHttpAccessContextProvider(
+RoutingSmartHttpAccessContextProvider<AuthenticatedGitAccess> authentication =
+    SecuritySmartHttpAuthentication.localBasicAndAccessToken(
         credentialService,
-        Set.of(
-            SecuritySmartHttpAuthenticationMethod.BASIC,
-            SecuritySmartHttpAuthenticationMethod.BEARER),
         request ->
             SecurityAuthenticationTrace.withoutRemoteAddress(
-                trustedSessionId(request), trustedCorrelationId(request)));
+                trustedSessionId(request), trustedCorrelationId(request)),
+        SmartHttpChallengeOwner.LIBRARY);
 
 GitServlet servlet = SecuredSmartHttp.servlet(securedRepositoryFactory, authentication);
-SmartHttpAuthenticationChallengeFilter challenge =
-    SmartHttpAuthenticationChallengeFilter.basicAndBearer("Git");
+SmartHttpAuthenticationChallengeFilter challenge = authentication.challengeFilter("Git");
 ```
 
 Register the challenge filter before the servlet mapping. It adds `WWW-Authenticate` only when JGit
@@ -82,13 +138,22 @@ emits a final 401, allowing clients to discover UTF-8 Basic or Bearer authentica
 advertising challenges on successful responses. Insecure transport is rejected with HTTP 403 before
 credentials are parsed, so the filter does not solicit a password or token over plaintext HTTP.
 
-The credential adapter:
+Local Basic authenticates only Security-module local credentials. It is not an OIDC/Keycloak password
+bridge. SSO deployments should leave it disabled unless they intentionally maintain a separate local
+authentication profile. The deliberately explicit
+`externalBearerAccessTokenAndLocalBasic(...)` factory exists for that exceptional mode.
+
+`SecuritySmartHttpAccessContextProvider` remains available as an exclusive-local compatibility
+adapter. New mixed deployments should use the routing factories so one component owns the header and
+handler selection.
+
+The local credential adapter:
 
 - accepts exactly one bounded `Authorization` header;
-- requires `request.isSecure()` by default and maps insecure transport to HTTP 403;
+- requires trusted secure transport and maps insecure transport to HTTP 403;
 - decodes Basic credentials as UTF-8 and clears decoded byte/password buffers;
 - performs the credential service's dummy verifier path for malformed Basic input;
-- sends every credential, principal-state and token-state denial through the same generic 401;
+- sends credential, principal-state and token-state denials through the same generic 401;
 - preserves authentication-store and required identity-audit failures as HTTP 500.
 
 Behind a reverse proxy, configure the container so `request.isSecure()` reflects the trusted original
@@ -126,4 +191,4 @@ principal propagation contract.
 
 The servlet container remains application-owned. Configure TLS at the container or trusted reverse
 proxy, set request/body/time limits there, and use framework-specific authentication only inside the
-`SmartHttpAccessContextProvider` adapter.
+selected application handler.
