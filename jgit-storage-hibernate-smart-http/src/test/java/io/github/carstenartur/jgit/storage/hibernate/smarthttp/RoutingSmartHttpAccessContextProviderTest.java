@@ -307,7 +307,9 @@ class RoutingSmartHttpAccessContextProviderTest {
     assertEquals(0, fixture.authorizationReads());
     assertEquals(SmartHttpAuthenticationKind.APPLICATION_CONTEXT, fixture.authenticationKind());
     assertEquals("gateway-session", fixture.authenticationHandler());
-    assertEquals(Set.of(SmartHttpAuthenticationKind.APPLICATION_CONTEXT), authentication.authenticationKinds());
+    assertEquals(
+        Set.of(SmartHttpAuthenticationKind.APPLICATION_CONTEXT),
+        authentication.authenticationKinds());
     assertEquals(Set.of("gateway-session"), authentication.handlerIds());
 
     assertThrows(
@@ -453,11 +455,11 @@ class RoutingSmartHttpAccessContextProviderTest {
 
   private record RequestFixture(
       HttpServletRequest request,
-      AtomicInteger authorizationReads,
+      AtomicInteger authorizationReadCounter,
       Map<String, Object> attributes) {
 
     int authorizationReads() {
-      return authorizationReads.get();
+      return authorizationReadCounter.get();
     }
 
     Object authenticationKind() {
