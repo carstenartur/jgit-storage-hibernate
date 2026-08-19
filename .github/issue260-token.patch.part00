@@ -1,0 +1,176 @@
+diff --git a/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/AccessTokenLifecycleProvenance.java b/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/AccessTokenLifecycleProvenance.java
+new file mode 100644
+index 0000000..35c343d
+--- /dev/null
++++ b/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/AccessTokenLifecycleProvenance.java
+@@ -0,0 +1,91 @@
++/*
++ * Copyright (C) 2026, Carsten Hammer and contributors.
++ *
++ * This program and the accompanying materials are made available under the
++ * terms of the BSD 3-Clause License.
++ *
++ * SPDX-License-Identifier: BSD-3-Clause
++ */
++package io.github.carstenartur.jgit.storage.hibernate.security;
++
++import java.time.Instant;
++import java.util.Objects;
++import java.util.regex.Pattern;
++
++/** Secret-free issuer and revocation provenance for one access token. */
++public record AccessTokenLifecycleProvenance(
++    String tokenId,
++    String principalId,
++    Instant issuedAt,
++    String issuedByPrincipalId,
++    Instant revokedAt,
++    String revokedByPrincipalId,
++    String revocationReasonCode,
++    long securityVersion) {
++
++  private static final Pattern REASON_CODE = Pattern.compile("[A-Z][A-Z0-9_]{0,127}");
++
++  /** Validate bounded stable identifiers without accepting credential material. */
++  public AccessTokenLifecycleProvenance {
++    tokenId = required("tokenId", tokenId, 128);
++    principalId = required("principalId", principalId, 128);
++    issuedAt = Objects.requireNonNull(issuedAt, "issuedAt");
++    issuedByPrincipalId = required("issuedByPrincipalId", issuedByPrincipalId, 128);
++    if (revokedAt == null) {
++      if (revokedByPrincipalId != null || revocationReasonCode != null) {
++        throw new IllegalArgumentException(
++            "revocation actor and reason require a revokedAt timestamp");
++      }
++    } else {
++      if (revokedAt.isBefore(issuedAt)) {
++        throw new IllegalArgumentException("revokedAt must not be before issuedAt");
++      }
++      if (revokedByPrincipalId != null) {
++        revokedByPrincipalId = required("revokedByPrincipalId", revokedByPrincipalId, 128);
++      }
++      if (revocationReasonCode != null
++          && !REASON_CODE.matcher(revocationReasonCode).matches()) {
++        throw new IllegalArgumentException(
++            "revocationReasonCode must be an uppercase bounded reason code");
++      }
++    }
++    if (securityVersion < 1) {
++      throw new IllegalArgumentException("securityVersion must be positive");
++    }
++  }
++
++  /** Return whether the token has been revoked. */
++  public boolean revoked() {
++    return revokedAt != null;
++  }
++
++  /** Return whether a legacy revoked row has incomplete trustworthy evidence. */
++  public boolean incompleteLegacyRevocationEvidence() {
++    return revokedAt != null
++        && (revokedByPrincipalId == null || revocationReasonCode == null);
++  }
++
++  static String validatedReasonCode(String value) {
++    String reason = required("revocationReasonCode", value, 128);
++    if (!REASON_CODE.matcher(reason).matches()) {
++      throw new IllegalArgumentException(
++          "revocationReasonCode must be an uppercase bounded reason code");
++    }
++    return reason;
++  }
++
++  private static String required(String name, String value, int maximumLength) {
++    if (value == null || value.isBlank()) {
++      throw new IllegalArgumentException(name + " must not be blank");
++    }
++    if (value.length() > maximumLength) {
++      throw new IllegalArgumentException(
++          name + " must contain at most " + maximumLength + " characters");
++    }
++    if (!value.equals(value.strip()) || value.chars().anyMatch(Character::isISOControl)) {
++      throw new IllegalArgumentException(
++          name + " must not contain surrounding whitespace or control characters");
++    }
++    return value;
++  }
++}
++diff --git a/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/AccessTokenMetadata.java b/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/AccessTokenMetadata.java
++index 1642048..e205508 100644
++--- a/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/AccessTokenMetadata.java
+++++ b/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/AccessTokenMetadata.java
++@@ -51,6 +51,11 @@ public record AccessTokenMetadata(
++     }
++   }
++ 
+++  /** Return the stable issuer principal ID using normalized terminology. */
+++  public String issuedByPrincipalId() {
+++    return issuedBy;
+++  }
+++
++   /** Return whether the token is revoked. */
++   public boolean revoked() {
++     return revokedAt != null;
++diff --git a/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/HibernateSecurityCredentialService.java b/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/HibernateSecurityCredentialService.java
++index db65ddd..f5f7e1b 100644
++--- a/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/HibernateSecurityCredentialService.java
+++++ b/jgit-storage-hibernate-security/src/main/java/io/github/carstenartur/jgit/storage/hibernate/security/HibernateSecurityCredentialService.java
++@@ -51,6 +51,7 @@ public final class HibernateSecurityCredentialService {
++       Pattern.compile("^((?:jsh1_|jsh_)[A-Za-z0-9_-]{16})\\.([A-Za-z0-9_-]{43})$");
++   private static final String DUMMY_TOKEN =
++       "jsh1_AAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+++  private static final String DEFAULT_REVOCATION_REASON = "EXPLICIT_REVOKE";
++   private static final char[] DUMMY_PASSWORD = "invalid-credential-timing-value".toCharArray();
++   private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
++ 
++@@ -300,7 +301,7 @@ public final class HibernateSecurityCredentialService {
++                 token.setExpiresAt(expiresAt);
++                 token.setLastUsedAt(null);
++                 token.setRevokedAt(null);
++-                token.setIssuedBy(request.actor().principalId());
+++                token.setIssuedByPrincipalId(request.actor().principalId());
++                 token.setSecurityVersion(1);
++                 session.persist(token);
++                 record(
++@@ -325,9 +326,22 @@ public final class HibernateSecurityCredentialService {
++     }
++   }
++ 
++-  /** Revoke an access token; repeated revocation returns the existing metadata unchanged. */
+++  /** Revoke an access token using the stable explicit-management reason code. */
++   public AccessTokenMetadata revokeAccessToken(SecurityManagementRequest request) {
+++    return revokeAccessToken(request, DEFAULT_REVOCATION_REASON);
+++  }
+++
+++  /**
+++   * Revoke an access token and persist the first actor and controlled reason atomically.
+++   *
+++   * <p>Repeated revocation is idempotent: it returns the existing metadata and never rewrites the
+++   * original actor, timestamp or reason.
+++   */
+++  public AccessTokenMetadata revokeAccessToken(
+++      SecurityManagementRequest request, String revocationReasonCode) {
++     requireOperation(request, SecurityManagementOperation.REVOKE_ACCESS_TOKEN);
+++    String reasonCode =
+++        AccessTokenLifecycleProvenance.validatedReasonCode(revocationReasonCode);
++     requireManagement(request, SecurityCredentialKind.ACCESS_TOKEN, request.credentialId());
++     try {
++       return sessionFactory.fromTransaction(
++@@ -345,6 +359,8 @@ public final class HibernateSecurityCredentialService {
++             boolean newlyRevoked = token.getRevokedAt() == null;
++             if (newlyRevoked) {
++               token.setRevokedAt(Instant.now(clock));
+++              token.setRevokedByPrincipalId(request.actor().principalId());
+++              token.setRevocationReasonCode(reasonCode);
++               token.setSecurityVersion(nextVersion(token.getSecurityVersion()));
++             }
++             record(
++@@ -453,6 +469,15 @@ public final class HibernateSecurityCredentialService {
++     }
++   }
++ 
+++  /** Find secret-free issuer and revocation provenance for one access token. */
+++  public Optional<AccessTokenLifecycleProvenance> findAccessTokenLifecycle(String tokenId) {
+++    String id = required("tokenId", tokenId, 128);
+++    try (Session session = sessionFactory.openSession()) {
++
