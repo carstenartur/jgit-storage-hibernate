@@ -42,11 +42,22 @@ Read-ahead is also represented in bytes. The evidence records both the byte requ
 
 The `Pack Storage Layout` workflow provides three scopes:
 
-- `smoke`: bounded HSQLDB matrix used by pull requests;
+- `smoke`: bounded HSQLDB and SQL Server matrices used by pull requests;
 - `full`: inline-boundary, write, sequential, short and random-read evidence through 128 MiB;
 - `capacity`: explicit 512-MiB write and sequential-read evidence.
 
-PostgreSQL full/capacity runs use Testcontainers and are manual or scheduled. Raw JMH JSON, console output, Surefire reports, converted comparison JSON and machine-readable decision evidence are retained together.
+PostgreSQL and SQL Server full/capacity runs use Testcontainers and are manual or scheduled. When both production-database jobs succeed, a separate aggregate job downloads the two raw JMH artifacts, verifies that both are non-empty, merges them and invokes the decision converter once. A single-database result cannot promote a candidate.
+
+The `Pack Storage Layout Network RTT` workflow adds a calibrated PostgreSQL/Toxiproxy slice:
+
+- pull-request smoke at 5 ms requested round-trip time;
+- full manual/scheduled measurements at 5, 20 and 50 ms;
+- a retained `SELECT 1` calibration CSV proving that the requested latency was applied;
+- the same current-layout baseline and byte-bounded candidate rules as the local-database matrix.
+
+The network profile uses a representative 16-MiB payload for the full run and compares write, sequential, short and random-read behavior. It supplements rather than replaces the local payload-size and capacity matrices.
+
+Raw JMH JSON, console output, Surefire reports, converted comparison JSON and machine-readable decision evidence are retained together.
 
 The converter records:
 
@@ -57,7 +68,7 @@ The converter records:
 - read-ahead chunks;
 - fetched, consumed and overfetched bytes;
 - allocation and GC evidence when JMH exposes it;
-- comparison with the current one-MiB/256-KiB layout under the same backend, payload, retained budget and read-ahead condition.
+- comparison with the current one-MiB/256-KiB layout under the same backend, deployment, payload, retained budget and read-ahead condition.
 
 A write-only improvement is insufficient. A candidate is eligible for later format design only when both PostgreSQL and SQL Server show write and sequential-read gains and sparse reads regress by no more than five percent. Until that cross-database condition is met, the generated decision remains:
 
@@ -66,6 +77,12 @@ retain-current-layout-pending-postgresql-and-sqlserver-evidence
 ```
 
 The converter never edits production settings.
+
+## Current preliminary observation
+
+The bounded SQL Server smoke run confirms that candidate layouts can be measured through the same real Hibernate entities and evidence converter as HSQLDB and PostgreSQL. In that small fixture, 256-KiB chunks improved some sequential reads but materially increased write cost and sparse-read overfetch/latency. This is evidence against changing the default from a smoke result, not a final production conclusion.
+
+The retained full, capacity, network and concurrency matrices remain authoritative for the final decision.
 
 ## Required compatibility design before any production change
 
@@ -101,7 +118,7 @@ The proposed metadata columns are small scalar values and can be added without r
 - keep inline and chunked payloads mutually exclusive;
 - pass `hbm2ddl.auto=validate`, upgrade, restart and mixed-layout tests.
 
-The first evidence PR runs HSQLDB smoke and PostgreSQL full/capacity matrices. SQL Server execution and the final cross-database decision remain mandatory follow-up work before issue #188 can close.
+SQL Server execution is now part of the benchmark workflow, and a fail-closed cross-database aggregate exists. The remaining evidence work is the retained full/capacity execution, calibrated network matrix and 1/4/16-reader/writer concurrency slice before issue #188 can close.
 
 ## Production decision
 
