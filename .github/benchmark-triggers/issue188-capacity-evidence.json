@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "issue": 188,
+  "profile": "capacity",
+  "requestedAt": "2026-08-20T18:50:00Z",
+  "baseCommit": "33ba8ab8837e3ba1401cda4fa8626961d5ab475e",
+  "purpose": "Retain the explicit 512-MiB PostgreSQL and SQL Server pack-layout evidence before finalizing issue #188."
+}
