@@ -38,6 +38,21 @@ def _secondary(result: dict[str, Any], name: str) -> float:
     raise ValueError(f"Concurrency result is missing secondary metric {name!r}")
 
 
+def _per_worker(result: dict[str, Any], name: str, threads: int) -> float:
+    """Normalize JMH EVENTS counters, which are summed across worker threads."""
+    return _secondary(result, name) / threads
+
+
+def _per_worker_int(result: dict[str, Any], name: str, threads: int) -> int:
+    value = _per_worker(result, name, threads)
+    rounded = round(value)
+    if not math.isclose(value, rounded, rel_tol=0.0, abs_tol=1e-6):
+        raise ValueError(
+            f"Concurrency structural metric {name!r} is not integral per worker: {value}"
+        )
+    return int(rounded)
+
+
 def _percentile(metric: dict[str, Any], name: str, fallback: float) -> float:
     values = metric.get("scorePercentiles")
     if not isinstance(values, dict) or name not in values:
@@ -56,6 +71,12 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     concurrency = int(params["concurrency"])
     if concurrency not in CONCURRENCY_LEVELS:
         raise ValueError(f"Unsupported concurrency level: {concurrency}")
+    threads = int(result.get("threads", 0))
+    if threads != concurrency:
+        raise ValueError(
+            f"JMH threads ({threads}) do not match concurrency parameter ({concurrency})"
+        )
+
     chunk_kib = int(params["chunkKiB"])
     inline_kib = int(params["inlineKiB"])
     payload_kib = int(params["payloadKiB"])
@@ -66,14 +87,39 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     score = _milliseconds(float(metric["score"]), str(metric["scoreUnit"]))
     if not math.isfinite(score) or score <= 0.0:
         raise ValueError("Concurrency latency must be finite and positive")
-    configured_concurrency = int(round(_secondary(result, "configuredConcurrency")))
-    configured_chunk_bytes = int(round(_secondary(result, "configuredChunkBytes")))
-    configured_budget = int(round(_secondary(result, "configuredRetainedBudgetBytes")))
-    actual_retained = int(round(_secondary(result, "actualRetainedChunkBytes")))
+
+    configured_concurrency = _per_worker_int(
+        result, "configuredConcurrency", threads
+    )
+    configured_chunk_bytes = _per_worker_int(
+        result, "configuredChunkBytes", threads
+    )
+    configured_inline_bytes = _per_worker_int(
+        result, "configuredInlineThresholdBytes", threads
+    )
+    configured_budget = _per_worker_int(
+        result, "configuredRetainedBudgetBytes", threads
+    )
+    actual_retained = _per_worker_int(
+        result, "actualRetainedChunkBytes", threads
+    )
+    configured_read_ahead = _per_worker_int(
+        result, "configuredReadAheadBytes", threads
+    )
+    logical_payload = _per_worker_int(result, "logicalPayloadBytes", threads)
+
     if configured_concurrency != concurrency:
-        raise ValueError("JMH concurrency parameter and structural counter disagree")
+        raise ValueError("JMH concurrency parameter and normalized counter disagree")
     if configured_chunk_bytes != chunk_kib * 1024:
-        raise ValueError("JMH chunk parameter and structural counter disagree")
+        raise ValueError("JMH chunk parameter and normalized counter disagree")
+    if configured_inline_bytes != inline_kib * 1024:
+        raise ValueError("JMH inline parameter and normalized counter disagree")
+    if configured_budget != retained_mib * 1024 * 1024:
+        raise ValueError("JMH retained-byte parameter and normalized counter disagree")
+    if configured_read_ahead != read_ahead_kib * 1024:
+        raise ValueError("JMH read-ahead parameter and normalized counter disagree")
+    if logical_payload != payload_kib * 1024:
+        raise ValueError("JMH payload parameter and normalized counter disagree")
     if actual_retained > configured_budget:
         raise ValueError("Concurrent writer retained more than its configured byte budget")
 
@@ -87,6 +133,7 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         "retainedMiB": retained_mib,
         "readAheadKiB": read_ahead_kib,
         "concurrency": concurrency,
+        "threads": threads,
         "scoreMillis": score,
         "scoreErrorMillis": _milliseconds(
             float(metric.get("scoreError", 0.0)), str(metric["scoreUnit"])
@@ -97,15 +144,23 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         "estimatedCapacityOpsPerSecond": concurrency * 1000.0 / score,
         "configuredRetainedBudgetBytes": configured_budget,
         "actualRetainedChunkBytes": actual_retained,
-        "readAheadChunks": int(round(_secondary(result, "readAheadChunks"))),
-        "chunksPerBatch": int(round(_secondary(result, "chunksPerBatch"))),
-        "logicalPayloadBytes": int(round(_secondary(result, "logicalPayloadBytes"))),
-        "chunkRows": int(round(_secondary(result, "chunkRows"))),
-        "jdbcBatchExecutions": float(_secondary(result, "jdbcBatchExecutions")),
-        "jdbcStatementExecutions": float(_secondary(result, "jdbcStatementExecutions")),
-        "databasePayloadBytes": float(_secondary(result, "databasePayloadBytes")),
-        "logicalBytesConsumed": float(_secondary(result, "logicalBytesConsumed")),
-        "overfetchBytes": float(_secondary(result, "overfetchBytes")),
+        "readAheadChunks": _per_worker_int(result, "readAheadChunks", threads),
+        "chunksPerBatch": _per_worker_int(result, "chunksPerBatch", threads),
+        "logicalPayloadBytes": logical_payload,
+        "chunkRows": _per_worker_int(result, "chunkRows", threads),
+        "jdbcBatchExecutionsPerWorker": _per_worker(
+            result, "jdbcBatchExecutions", threads
+        ),
+        "jdbcStatementExecutionsPerWorker": _per_worker(
+            result, "jdbcStatementExecutions", threads
+        ),
+        "databasePayloadBytesPerWorker": _per_worker(
+            result, "databasePayloadBytes", threads
+        ),
+        "logicalBytesConsumedPerWorker": _per_worker(
+            result, "logicalBytesConsumed", threads
+        ),
+        "overfetchBytesPerWorker": _per_worker(result, "overfetchBytes", threads),
         "jdkVersion": str(result.get("jdkVersion", "unknown")),
     }
 
@@ -192,9 +247,10 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
                     f"Estimated concurrent capacity: {row['estimatedCapacityOpsPerSecond']:.3f} ops/s",
                     f"Scaling efficiency versus one worker: {row['scalingEfficiencyPercent']:.3f}%",
                     f"Current-layout improvement: {row['relativeToCurrentPercent']:.3f}%",
-                    f"Chunk rows: {row['chunkRows']}",
+                    f"Chunk rows per worker: {row['chunkRows']}",
                     f"Retained chunk bytes per writer: {row['actualRetainedChunkBytes']}",
-                    f"Fetched/consumed/overfetch: {row['databasePayloadBytes']:.0f} / {row['logicalBytesConsumed']:.0f} / {row['overfetchBytes']:.0f}",
+                    f"JDBC batch/statement executions per worker: {row['jdbcBatchExecutionsPerWorker']:.3f} / {row['jdbcStatementExecutionsPerWorker']:.3f}",
+                    f"Fetched/consumed/overfetch per worker: {row['databasePayloadBytesPerWorker']:.0f} / {row['logicalBytesConsumedPerWorker']:.0f} / {row['overfetchBytesPerWorker']:.0f}",
                 ]
             ),
         }
@@ -277,6 +333,8 @@ def _write_markdown(report: dict[str, Any], target: Path) -> None:
         "# Pack storage layout concurrency evidence",
         "",
         f"Decision: `{report['decision']}`.",
+        "",
+        "JMH EVENTS auxiliary counters are summed across active worker threads. This report normalizes structural, byte and JDBC counters per worker before comparing layouts.",
         "",
         "The capacity figures are derived from measured per-operation latency and configured worker count. They are observational and never change production settings.",
         "",
