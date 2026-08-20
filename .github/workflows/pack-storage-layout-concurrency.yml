@@ -1,0 +1,99 @@
+name: Pack Storage Layout Concurrency
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Benchmark scope
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - full
+  schedule:
+    - cron: '47 5 3 * *'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/pack-storage-layout-concurrency.yml'
+      - '.github/scripts/convert-jmh-pack-storage-layout-concurrency.py'
+      - '.github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+      - 'docs/operations/pack-storage-layout.md'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/pack-storage-layout-concurrency.yml'
+      - '.github/scripts/convert-jmh-pack-storage-layout-concurrency.py'
+      - '.github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+      - 'docs/operations/pack-storage-layout.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  postgresql-concurrency:
+    name: PostgreSQL 1/4/16 workers ${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Validate concurrency evidence converter
+        run: |
+          python3 -m py_compile \
+            .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+
+      - name: Build benchmark module
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run 1/4/16-worker matrix
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/target/pack-storage-layout-concurrency"
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackStorageLayoutConcurrencyBenchmarkTest \
+            -Djgit.storage.benchmark.pack-layout.concurrency.enabled=true \
+            -Djgit.storage.benchmark.pack-layout.concurrency.profile="$PROFILE" \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/pack-storage-layout-concurrency/jmh-result.json"
+
+      - name: Convert retained concurrency evidence
+        run: |
+          python3 .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            target/pack-storage-layout-concurrency/jmh-result.json \
+            target/pack-storage-layout-concurrency/evidence
+          cat target/pack-storage-layout-concurrency/evidence/pack-storage-layout-concurrency-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload raw concurrency evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pack-storage-layout-postgresql-concurrency-${{ env.PROFILE }}
+          path: |
+            target/pack-storage-layout-concurrency/**
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: error
