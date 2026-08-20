@@ -152,6 +152,8 @@ class PerformanceInvestigationsBenchmarkIT {
                   RepositoryAgingBenchmark.NONE,
                   RepositoryAgingBenchmark.COMPACT_ONLY,
                   RepositoryAgingBenchmark.READ_OPTIMIZED)
+              .param(
+                  "cacheState", RepositoryAgingBenchmark.COLD, RepositoryAgingBenchmark.WARM)
               .param("deployment", deployment);
       case "concurrent-large-pack" ->
           builder
