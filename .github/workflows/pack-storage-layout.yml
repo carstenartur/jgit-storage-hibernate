@@ -21,6 +21,7 @@ on:
           - all
           - hsqldb
           - postgresql
+          - sqlserver
   schedule:
     - cron: '37 4 1 * *'
   pull_request:
@@ -173,4 +174,133 @@ jobs:
           path: |
             target/pack-storage-layout/postgresql/**
             jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: error
+
+  sqlserver:
+    name: SQL Server ${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.backend == 'all' || inputs.backend == 'sqlserver'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}
+      BACKEND: sqlserver
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Validate evidence converter
+        run: |
+          python3 -m py_compile \
+            .github/scripts/convert-jmh-pack-storage-layout.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
+
+      - name: Build benchmark module
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run SQL Server layout matrix
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/target/pack-storage-layout/$BACKEND"
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackStorageLayoutBenchmarkTest \
+            -Djgit.storage.benchmark.pack-layout.enabled=true \
+            -Djgit.storage.benchmark.pack-layout.backend="$BACKEND" \
+            -Djgit.storage.benchmark.pack-layout.profile="$PROFILE" \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/pack-storage-layout/$BACKEND/jmh-result.json"
+
+      - name: Convert retained evidence
+        run: |
+          python3 .github/scripts/convert-jmh-pack-storage-layout.py \
+            "target/pack-storage-layout/$BACKEND/jmh-result.json" \
+            "target/pack-storage-layout/$BACKEND/evidence"
+          cat "target/pack-storage-layout/$BACKEND/evidence/pack-storage-layout-evidence.md" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload raw SQL Server evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pack-storage-layout-sqlserver-${{ env.PROFILE }}
+          path: |
+            target/pack-storage-layout/sqlserver/**
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: error
+
+  production-decision:
+    name: Cross-database layout decision
+    needs: [postgresql, sqlserver]
+    if: >-
+      always() &&
+      needs.postgresql.result == 'success' &&
+      needs.sqlserver.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.profile || 'full' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download PostgreSQL evidence
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: pack-storage-layout-postgresql-${{ env.PROFILE }}
+          path: target/pack-storage-layout-aggregate/postgresql
+
+      - name: Download SQL Server evidence
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: pack-storage-layout-sqlserver-${{ env.PROFILE }}
+          path: target/pack-storage-layout-aggregate/sqlserver
+
+      - name: Merge production-database JMH results
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('target/pack-storage-layout-aggregate')
+          sources = sorted(root.rglob('jmh-result.json'))
+          if len(sources) != 2:
+              raise SystemExit(f'Expected two production-database JMH files, found {sources}')
+          merged = []
+          for source in sources:
+              value = json.loads(source.read_text(encoding='utf-8'))
+              if not isinstance(value, list) or not value:
+                  raise SystemExit(f'Invalid or empty JMH result: {source}')
+              merged.extend(value)
+          target = root / 'production-jmh-result.json'
+          target.write_text(json.dumps(merged, indent=2) + '\n', encoding='utf-8')
+          print(f'Merged {len(merged)} results from {sources}')
+          PY
+
+      - name: Derive cross-database decision
+        run: |
+          python3 .github/scripts/convert-jmh-pack-storage-layout.py \
+            target/pack-storage-layout-aggregate/production-jmh-result.json \
+            target/pack-storage-layout-aggregate/evidence
+          cat target/pack-storage-layout-aggregate/evidence/pack-storage-layout-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload cross-database evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pack-storage-layout-production-decision-${{ env.PROFILE }}
+          path: target/pack-storage-layout-aggregate/**
           if-no-files-found: error
