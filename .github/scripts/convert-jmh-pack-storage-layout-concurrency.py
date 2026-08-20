@@ -278,39 +278,48 @@ def _candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     candidates: list[dict[str, Any]] = []
     for (chunk_kib, inline_kib), values in sorted(grouped.items()):
-        writes = [
-            row["relativeToCurrentPercent"]
-            for row in values
-            if row["operation"] == "write"
+        write_rows = [row for row in values if row["operation"] == "write"]
+        sequential_rows = [
+            row for row in values if row["operation"] == "sequential-read"
         ]
+        sparse_rows = [
+            row for row in values if row["operation"] in SPARSE_OPERATIONS
+        ]
+        writes = [row["relativeToCurrentPercent"] for row in write_rows]
         sequential = [
-            row["relativeToCurrentPercent"]
-            for row in values
-            if row["operation"] == "sequential-read"
+            row["relativeToCurrentPercent"] for row in sequential_rows
         ]
-        sparse = [
-            row["relativeToCurrentPercent"]
-            for row in values
-            if row["operation"] in SPARSE_OPERATIONS
-        ]
+        sparse = [row["relativeToCurrentPercent"] for row in sparse_rows]
         scaling = [row["scalingEfficiencyPercent"] for row in values]
-        complete_levels = {
-            row["concurrency"] for row in values
+        complete_write_levels = {
+            row["concurrency"] for row in write_rows
         } == CONCURRENCY_LEVELS
+        complete_sequential_levels = {
+            row["concurrency"] for row in sequential_rows
+        } == CONCURRENCY_LEVELS
+        complete_sparse_levels = {
+            row["concurrency"] for row in sparse_rows
+        } == CONCURRENCY_LEVELS
+        complete_levels = (
+            complete_write_levels
+            and complete_sequential_levels
+            and complete_sparse_levels
+        )
         observational_candidate = (
             (chunk_kib != CURRENT_CHUNK_KIB or inline_kib != CURRENT_INLINE_KIB)
             and complete_levels
-            and writes
-            and sequential
             and min(writes) > 0.0
             and min(sequential) > 0.0
-            and (not sparse or min(sparse) >= -5.0)
+            and min(sparse) >= -5.0
         )
         candidates.append(
             {
                 "chunkKiB": chunk_kib,
                 "inlineKiB": inline_kib,
                 "completeConcurrencyLevels": complete_levels,
+                "completeWriteLevels": complete_write_levels,
+                "completeSequentialReadLevels": complete_sequential_levels,
+                "completeSparseReadLevels": complete_sparse_levels,
                 "observationalCandidate": observational_candidate,
                 "worstWriteImprovementPercent": min(writes) if writes else None,
                 "worstSequentialImprovementPercent": (
@@ -321,7 +330,11 @@ def _candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "reason": (
                     "Improves write and sequential reads at every measured worker level without a sparse-read regression beyond five percent."
                     if observational_candidate
-                    else "Does not provide a uniform net gain across 1/4/16 workers; production defaults stay unchanged."
+                    else (
+                        "Evidence is incomplete for write, sequential or sparse reads at one or more worker levels; production defaults stay unchanged."
+                        if not complete_levels
+                        else "Does not provide a uniform net gain across 1/4/16 workers; production defaults stay unchanged."
+                    )
                 ),
             }
         )
