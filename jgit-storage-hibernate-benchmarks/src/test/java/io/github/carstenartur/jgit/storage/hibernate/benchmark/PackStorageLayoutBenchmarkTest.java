@@ -26,6 +26,7 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.mssqlserver.MSSQLServerContainer;
 
 /** Runs the explicitly enabled pack-storage-layout benchmark matrix and retains raw JMH JSON. */
 class PackStorageLayoutBenchmarkTest {
@@ -208,10 +209,7 @@ class PackStorageLayoutBenchmarkTest {
     return switch (backend) {
       case HibernateRepositoryBenchmark.HSQLDB -> DatabaseTarget.local();
       case HibernateRepositoryBenchmark.POSTGRESQL -> DatabaseTarget.postgresql();
-      case PackStorageLayoutBenchmark.SQL_SERVER ->
-          throw new IllegalArgumentException(
-              "SQL Server execution is deliberately deferred until its benchmark dependency and "
-                  + "container workflow are added; the compatibility design is documented now");
+      case PackStorageLayoutBenchmark.SQL_SERVER -> DatabaseTarget.sqlServer();
       default -> throw new IllegalArgumentException("Unsupported layout backend " + backend);
     };
   }
@@ -261,15 +259,20 @@ class PackStorageLayoutBenchmarkTest {
 
   private static final class DatabaseTarget implements AutoCloseable {
     private final PostgreSQLContainer<?> postgresql;
+    private final MSSQLServerContainer sqlServer;
     private final List<String> jvmArguments;
 
-    private DatabaseTarget(PostgreSQLContainer<?> postgresql, List<String> jvmArguments) {
+    private DatabaseTarget(
+        PostgreSQLContainer<?> postgresql,
+        MSSQLServerContainer sqlServer,
+        List<String> jvmArguments) {
       this.postgresql = postgresql;
+      this.sqlServer = sqlServer;
       this.jvmArguments = List.copyOf(jvmArguments);
     }
 
     private static DatabaseTarget local() {
-      return new DatabaseTarget(null, List.of());
+      return new DatabaseTarget(null, null, List.of());
     }
 
     private static DatabaseTarget postgresql() {
@@ -281,6 +284,7 @@ class PackStorageLayoutBenchmarkTest {
       container.start();
       return new DatabaseTarget(
           container,
+          null,
           List.of(
               RepositoryBackendBenchmarkIT.systemProperty(
                   HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
@@ -293,6 +297,26 @@ class PackStorageLayoutBenchmarkTest {
                   container.getPassword())));
     }
 
+    private static DatabaseTarget sqlServer() {
+      MSSQLServerContainer container =
+          new MSSQLServerContainer("mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04")
+              .acceptLicense();
+      container.start();
+      return new DatabaseTarget(
+          null,
+          container,
+          List.of(
+              RepositoryBackendBenchmarkIT.systemProperty(
+                  PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY,
+                  container.getJdbcUrl()),
+              RepositoryBackendBenchmarkIT.systemProperty(
+                  PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY,
+                  container.getUsername()),
+              RepositoryBackendBenchmarkIT.systemProperty(
+                  PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY,
+                  container.getPassword())));
+    }
+
     private List<String> jvmArguments() {
       return jvmArguments;
     }
@@ -301,6 +325,9 @@ class PackStorageLayoutBenchmarkTest {
     public void close() {
       if (postgresql != null) {
         postgresql.stop();
+      }
+      if (sqlServer != null) {
+        sqlServer.stop();
       }
     }
   }
