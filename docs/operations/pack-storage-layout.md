@@ -67,7 +67,7 @@ The `Pack Storage Layout Concurrency` workflow measures 1, 4 and 16 active worke
 - the pull-request smoke profile compares one-MiB and four-MiB chunks with one-MiB payloads;
 - the full profile compares all four chunk sizes with 16-MiB payloads and write, sequential, short and random-read operations.
 
-The concurrency converter requires the current layout at every worker level and a one-worker scaling baseline for every candidate. It reports p50/p95/p99, a latency-derived concurrent capacity estimate, scaling efficiency, per-writer retained bytes, JDBC activity and overfetch. A result is only an observational candidate when it improves writes and sequential reads at all 1/4/16-worker levels without a sparse-read regression beyond five percent. It cannot change the production decision by itself.
+The concurrency converter requires the current layout at every worker level and a one-worker scaling baseline for every candidate. JMH `EVENTS` auxiliary counters are summed across active worker threads, so the converter first verifies the top-level JMH thread count and normalizes structural, JDBC and byte counters per worker. It then reports p50/p95/p99, a latency-derived concurrent capacity estimate, scaling efficiency, per-writer retained bytes, JDBC activity and overfetch. A result is only an observational candidate when it improves writes and sequential reads at all 1/4/16-worker levels without a sparse-read regression beyond five percent. It cannot change the production decision by itself.
 
 Raw JMH JSON, console output, Surefire reports, converted comparison JSON and machine-readable decision evidence are retained together.
 
@@ -96,7 +96,9 @@ The bounded [SQL Server smoke run](https://github.com/carstenartur/jgit-storage-
 
 The calibrated [PostgreSQL RTT smoke run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32391072877) requested 5 ms and measured a median `SELECT 1` latency of 6.062 ms. The four-MiB candidate improved the measured sequential-read point estimate by about 16.9% and the random-read point estimate by about 0.5%, but made the write point estimate about 16.1% slower. It therefore also fails the net-benefit rule.
 
-The retained full, capacity and 1/4/16-worker matrices remain authoritative for the final decision.
+The bounded [PostgreSQL concurrency smoke run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32394385287) completed the 1/4/16-worker matrix against a shared schema and pool. The four-MiB candidate did not provide a uniform gain: its worst point-estimate deltas across the measured worker levels were about -4.9% for writes, -24.3% for sequential reads and -14.4% for random reads. At some individual higher-concurrency points it improved latency, but the fail-closed rule correctly rejects a layout that regresses another worker level or access pattern. The current one-MiB layout remains the reference.
+
+The retained full and capacity matrices remain authoritative for the final decision.
 
 ## Required compatibility design before any production change
 
@@ -132,7 +134,7 @@ The proposed metadata columns are small scalar values and can be added without r
 - keep inline and chunked payloads mutually exclusive;
 - pass `hbm2ddl.auto=validate`, upgrade, restart and mixed-layout tests.
 
-SQL Server execution and calibrated PostgreSQL RTT evidence are now part of the benchmark workflow, and a fail-closed cross-database aggregate exists. The remaining evidence work is the retained full/capacity and full 1/4/16-worker execution before issue #188 can close.
+SQL Server execution, calibrated PostgreSQL RTT evidence and the bounded 1/4/16-worker concurrency contract are now part of the benchmark workflow, and a fail-closed cross-database aggregate exists. The remaining evidence work is the retained full and capacity execution before issue #188 can close.
 
 ## Production decision
 
