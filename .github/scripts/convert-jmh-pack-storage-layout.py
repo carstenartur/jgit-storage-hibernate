@@ -35,10 +35,45 @@ def _milliseconds(score: float, unit: str) -> float:
         raise ValueError(f"Unsupported pack-layout score unit: {unit!r}") from failure
 
 
-def _secondary(result: dict[str, Any], name: str, default: float = 0.0) -> float:
+def _secondary(
+    result: dict[str, Any],
+    name: str,
+    default: float = 0.0,
+    *,
+    require_constant: bool = False,
+) -> float:
+    """Return one per-iteration AuxCounters value instead of JMH's iteration sum."""
     for key, metric in result.get("secondaryMetrics", {}).items():
-        if key == name or key.endswith("." + name):
-            return float(metric.get("score", default))
+        if key != name and not key.endswith("." + name):
+            continue
+
+        raw_data = metric.get("rawData")
+        samples: list[float] = []
+        if isinstance(raw_data, list):
+            for fork in raw_data:
+                if not isinstance(fork, list):
+                    raise ValueError(f"Malformed rawData for secondary metric {name!r}")
+                for raw_value in fork:
+                    value = float(raw_value)
+                    if not math.isfinite(value):
+                        raise ValueError(
+                            f"Non-finite rawData for secondary metric {name!r}"
+                        )
+                    samples.append(value)
+        if samples:
+            if require_constant and any(
+                not math.isclose(value, samples[0], rel_tol=0.0, abs_tol=1e-6)
+                for value in samples[1:]
+            ):
+                raise ValueError(
+                    f"Secondary metric {name!r} changed across JMH iterations: {samples!r}"
+                )
+            return math.fsum(samples) / len(samples)
+
+        value = float(metric.get("score", default))
+        if not math.isfinite(value):
+            raise ValueError(f"Non-finite secondary metric {name!r}")
+        return value
     return default
 
 
@@ -81,18 +116,48 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     metric = result["primaryMetric"]
     score = _milliseconds(float(metric["score"]), str(metric["scoreUnit"]))
     error = _milliseconds(float(metric.get("scoreError", 0.0)), str(metric["scoreUnit"]))
-    configured_budget = int(round(_secondary(result, "configuredRetainedBudgetBytes")))
-    actual_retained = int(round(_secondary(result, "actualRetainedChunkBytes")))
-    configured_chunk = int(round(_secondary(result, "configuredChunkBytes")))
+    configured_budget = int(
+        round(
+            _secondary(
+                result, "configuredRetainedBudgetBytes", require_constant=True
+            )
+        )
+    )
+    actual_retained = int(
+        round(_secondary(result, "actualRetainedChunkBytes", require_constant=True))
+    )
+    configured_chunk = int(
+        round(_secondary(result, "configuredChunkBytes", require_constant=True))
+    )
+    configured_inline = int(
+        round(
+            _secondary(
+                result, "configuredInlineThresholdBytes", require_constant=True
+            )
+        )
+    )
+    configured_read_ahead = int(
+        round(_secondary(result, "configuredReadAheadBytes", require_constant=True))
+    )
     if configured_chunk != chunk_kib * 1024:
         raise ValueError("JMH parameter and configured chunk bytes disagree")
+    if configured_inline != inline_kib * 1024:
+        raise ValueError("JMH parameter and configured inline threshold disagree")
+    if configured_budget != retained_mib * 1024 * 1024:
+        raise ValueError("JMH parameter and configured retained-byte budget disagree")
+    if configured_read_ahead != read_ahead_kib * 1024:
+        raise ValueError("JMH parameter and configured read-ahead bytes disagree")
     if actual_retained > configured_budget or configured_budget - actual_retained >= configured_chunk:
         raise ValueError(
             "Retained chunk bytes must round the configured byte budget down by less than one chunk"
         )
 
-    logical_payload = int(round(_secondary(result, "logicalPayloadBytes")))
-    chunk_rows = int(round(_secondary(result, "chunkRows")))
+    logical_payload = int(
+        round(_secondary(result, "logicalPayloadBytes", require_constant=True))
+    )
+    if logical_payload != payload_kib * 1024:
+        raise ValueError("JMH parameter and logical payload bytes disagree")
+    chunk_rows = int(round(_secondary(result, "chunkRows", require_constant=True)))
     expected_chunk_rows = (
         0
         if logical_payload <= inline_kib * 1024
@@ -119,13 +184,21 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         "p99Millis": _percentile(metric, "99.0", score),
         "configuredRetainedBudgetBytes": configured_budget,
         "actualRetainedChunkBytes": actual_retained,
-        "chunksPerBatch": int(round(_secondary(result, "chunksPerBatch"))),
-        "readAheadChunks": int(round(_secondary(result, "readAheadChunks"))),
-        "proposedLayoutVersion": int(round(_secondary(result, "proposedLayoutVersion"))),
-        "packRows": int(round(_secondary(result, "packRows"))),
+        "chunksPerBatch": int(
+            round(_secondary(result, "chunksPerBatch", require_constant=True))
+        ),
+        "readAheadChunks": int(
+            round(_secondary(result, "readAheadChunks", require_constant=True))
+        ),
+        "proposedLayoutVersion": int(
+            round(_secondary(result, "proposedLayoutVersion", require_constant=True))
+        ),
+        "packRows": int(round(_secondary(result, "packRows", require_constant=True))),
         "chunkRows": chunk_rows,
         "jdbcBatchExecutions": int(round(_secondary(result, "jdbcBatchExecutions"))),
-        "jdbcStatementExecutions": int(round(_secondary(result, "jdbcStatementExecutions"))),
+        "jdbcStatementExecutions": int(
+            round(_secondary(result, "jdbcStatementExecutions"))
+        ),
         "preparedStatements": int(round(_secondary(result, "preparedStatements"))),
         "hibernateQueries": int(round(_secondary(result, "hibernateQueries"))),
         "flushes": int(round(_secondary(result, "flushes"))),
