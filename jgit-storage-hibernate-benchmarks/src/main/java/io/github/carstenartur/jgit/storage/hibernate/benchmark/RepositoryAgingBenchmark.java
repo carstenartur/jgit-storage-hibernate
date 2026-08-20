@@ -67,7 +67,8 @@ import org.openjdk.jmh.annotations.Warmup;
  * small-pack history whose crossover point is under investigation. The fixture closes and reopens
  * before and after optional maintenance. JMH sample-time output provides p50/p95/p99 while secondary
  * counters retain the structural condition needed to derive a policy instead of hard-coding a pack
- * count. The full scheduled profile overrides the smoke defaults with 1, 10, 100 and 1,000 pushes.
+ * count. The full scheduled profile covers 1, 10, 32, 100, 300 and 1,000 pushes with explicit cold
+ * and warm JGit-cache states.
  */
 @BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -81,6 +82,8 @@ public class RepositoryAgingBenchmark {
   static final String NONE = "none";
   static final String COMPACT_ONLY = "compact-only";
   static final String READ_OPTIMIZED = "read-optimized";
+  static final String COLD = "cold";
+  static final String WARM = "warm";
   static final String LOCAL_TESTCONTAINERS = "local-testcontainers";
   private static final int PAYLOAD_BYTES = 8 * 1024 + 257;
   private static final int SMALL_PACK_LIMIT_BYTES = 1024 * 1024;
@@ -96,6 +99,9 @@ public class RepositoryAgingBenchmark {
 
   @Param({NONE, COMPACT_ONLY, READ_OPTIMIZED})
   public String maintenanceMode;
+
+  @Param({COLD})
+  public String cacheState;
 
   @Param({LOCAL_TESTCONTAINERS})
   public String deployment;
@@ -124,6 +130,8 @@ public class RepositoryAgingBenchmark {
             + "-"
             + maintenanceMode
             + "-"
+            + cacheState
+            + "-"
             + Long.toHexString(System.nanoTime());
     provider = new HibernateSessionFactoryProvider(properties());
     statistics = provider.getSessionFactory().getStatistics();
@@ -137,11 +145,18 @@ public class RepositoryAgingBenchmark {
     verifyPersistedPackOrdering();
     verifyReachableFixture();
     inventory = inventory();
+    if (WARM.equals(cacheState)) {
+      warmRepositoryCache();
+    } else if (!COLD.equals(cacheState)) {
+      throw new IllegalArgumentException("Unsupported cache state " + cacheState);
+    }
   }
 
   @Setup(Level.Invocation)
   public void setupInvocation() {
-    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    if (COLD.equals(cacheState)) {
+      DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    }
     statistics.clear();
     bytesBeforeInvocation = repository.getStorageByteMetrics();
   }
@@ -159,7 +174,7 @@ public class RepositoryAgingBenchmark {
     commits.clear();
   }
 
-  /** Cache-cold object lookup whose object originated in the first incremental pack. */
+  /** Object lookup whose object originated in the first incremental pack. */
   @Benchmark
   public long lookupOldestObject(AgingCounters counters) throws Exception {
     long size = objectSize(oldestBlob);
@@ -167,7 +182,7 @@ public class RepositoryAgingBenchmark {
     return size;
   }
 
-  /** Cache-cold object lookup whose object originated in the newest incremental pack. */
+  /** Object lookup whose object originated in the newest incremental pack. */
   @Benchmark
   public long lookupNewestObject(AgingCounters counters) throws Exception {
     long size = objectSize(newestBlob);
@@ -175,7 +190,7 @@ public class RepositoryAgingBenchmark {
     return size;
   }
 
-  /** Cache-cold negative lookup across the aged pack catalog. */
+  /** Negative lookup across the aged pack catalog. */
   @Benchmark
   public boolean lookupMissingObject(AgingCounters counters) throws Exception {
     boolean present;
@@ -216,6 +231,24 @@ public class RepositoryAgingBenchmark {
         streamPayload(commit);
         count++;
       }
+    }
+    counters.capture(this);
+    return count;
+  }
+
+  /** Walk commit history without loading tree payloads. */
+  @Benchmark
+  public int revisionWalk(AgingCounters counters) throws Exception {
+    int count = 0;
+    try (RevWalk walk = new RevWalk(repository)) {
+      walk.markStart(walk.parseCommit(headCommit));
+      for (RevCommit ignored : walk) {
+        count++;
+      }
+    }
+    if (count != pushes) {
+      throw new IllegalStateException(
+          "Expected " + pushes + " commits in deterministic revision walk, found " + count);
     }
     counters.capture(this);
     return count;
@@ -317,6 +350,23 @@ public class RepositoryAgingBenchmark {
       repository.close();
     }
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+    statistics.clear();
+    bytesBeforeInvocation = repository.getStorageByteMetrics();
+  }
+
+  private void warmRepositoryCache() throws Exception {
+    objectSize(oldestBlob);
+    objectSize(newestBlob);
+    try (ObjectReader reader = repository.newObjectReader()) {
+      reader.has(MISSING_OBJECT);
+    }
+    repository.getRefDatabase().getRefsByPrefix("refs/");
+    try (RevWalk walk = new RevWalk(repository)) {
+      walk.markStart(walk.parseCommit(headCommit));
+      for (RevCommit ignored : walk) {
+        // Populate JGit's object and graph caches without adding benchmark counters.
+      }
+    }
     statistics.clear();
     bytesBeforeInvocation = repository.getStorageByteMetrics();
   }

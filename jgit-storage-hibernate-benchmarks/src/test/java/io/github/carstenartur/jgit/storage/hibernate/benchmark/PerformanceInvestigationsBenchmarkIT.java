@@ -144,12 +144,19 @@ class PerformanceInvestigationsBenchmarkIT {
                       : new String[] {HibernateRepositoryBenchmark.HSQLDB})
               .param(
                   "pushes",
-                  full ? new String[] {"1", "10", "100", "1000"} : new String[] {"1", "10"})
+                  full
+                      ? new String[] {"1", "10", "32", "100", "300", "1000"}
+                      : new String[] {"1", "10"})
               .param(
                   "maintenanceMode",
                   RepositoryAgingBenchmark.NONE,
                   RepositoryAgingBenchmark.COMPACT_ONLY,
                   RepositoryAgingBenchmark.READ_OPTIMIZED)
+              .param(
+                  "cacheState",
+                  full
+                      ? new String[] {RepositoryAgingBenchmark.COLD, RepositoryAgingBenchmark.WARM}
+                      : new String[] {RepositoryAgingBenchmark.COLD})
               .param("deployment", deployment);
       case "concurrent-large-pack" ->
           builder

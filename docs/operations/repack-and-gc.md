@@ -4,6 +4,8 @@ Long-lived repositories accumulate small `INSERT` and `RECEIVE` packs. Retaining
 
 Core exposes JGit's DFS garbage collector through `PackStorageMaintenance`. The service keeps the relational database as the durable authority while using the same atomic pack-publication path as ordinary writes. Persisted logical pack metadata keeps JGit's source, ordering and lifecycle decisions identical before and after a repository restart.
 
+The reproducible matrix, generated artifacts and break-even interpretation rules are defined in [Repository-aging policy evidence](repository-aging-policy-evidence.md).
+
 ## Read-optimized maintenance
 
 ```java
@@ -30,7 +32,7 @@ The read-optimized preset requests:
 
 Use `PackRepackOptions.compactOnly()` when the deployment wants fewer packs without paying the maintenance-time and storage cost of auxiliary read indexes. A custom immutable `PackRepackOptions` can select each feature independently; Bloom filters require commit-graph generation.
 
-JGit's current DFS garbage collector does not emit a persisted reverse-index extension. The JGit versions in the supported matrix also expose no DFS pack extension that Core can use as a persisted Multi-Pack-Index. Reverse and multi-pack lookup therefore remain available only through JGit's normal in-memory/on-demand mechanisms in this version range; the maintenance API does not advertise an unsupported MIDX shortcut.
+JGit's current DFS garbage collector does not emit a persisted reverse-index extension. Every supported JGit compatibility job now retains `jgit-dfs-midx-capability.json`, listing the exact selected version and exposed pack extensions. The maintenance API does not advertise a Multi-Pack-Index shortcut unless that version exposes a persistable DFS extension that this backend can store.
 
 ## Transaction and concurrency model
 
@@ -63,7 +65,7 @@ Maintenance for different logical repositories uses different lock rows and can 
 
 The deterministic smoke fixture creates one fresh pack per incremental push, closes and reopens the repository, verifies persisted `committedAt` ordering and then compares no maintenance, compact-only maintenance and the read-optimized preset.
 
-The smoke profile intentionally covers the first two bounded points, 1 and 10 pushes. The full scheduled/manual profile extends the same fixture to 100 and 1,000 pushes and PostgreSQL/HikariCP.
+The smoke profile intentionally covers 1 and 10 pushes. The full profile is configured for 1, 10, 32, 100, 300 and 1,000 pushes, cold and warm JGit cache states, HSQLDB as a reference, and PostgreSQL through both the built-in pool and HikariCP. Its raw JMH JSON is converted into structural comparison and break-even evidence; a successful full run must be retained before changing the automatic-maintenance default.
 
 ### Structural result
 
@@ -90,16 +92,28 @@ At ten pushes, both modes reduce ten ordinary packs to two. Compact-only also re
 
 The strongest smoke signal is repository reopen plus an old-object lookup: compact-only and read-optimized maintenance are both about 70% faster than the ten-pack baseline. Clone-style traversal also improves, although the microsecond-scale point estimates require caution.
 
-The smoke result does **not** justify a universal automatic threshold. It establishes only that the useful crossover lies somewhere above one pack and at or below roughly ten small incremental packs for this fixture. The 100/1,000-push and PostgreSQL profiles are still required before enabling automatic maintenance.
+The smoke result does **not** justify a universal automatic threshold. It establishes only that the useful crossover lies somewhere above one pack and at or below roughly ten small incremental packs for this fixture. The full PostgreSQL and equivalent SQL Server evidence, database-native telemetry and concurrency measurements are still required before enabling automatic maintenance.
+
+## Generated policy evidence
+
+For every complete measured condition, the converter compares the matching no-maintenance, compact-only and read-optimized results. It records:
+
+- operation latency and uncertainty;
+- pack reduction and stored-byte change;
+- maintenance duration;
+- latency saving relative to no maintenance;
+- the number of equivalent reads needed to repay maintenance cost.
+
+A candidate is emitted only when the mode both removes packs and improves the measured operation. The generated recommendation is observational evidence and never changes runtime configuration. Incomplete or duplicate matrices fail the workflow instead of silently producing a partial policy.
 
 ## Resulting operational guidance
 
 - Do not repack a newly created or one-pack repository.
-- Begin evaluating maintenance around ten small incremental packs when reopen, oldest-object lookup, clone/fetch or index-memory metrics have measurably degraded.
+- Begin evaluating maintenance around ten small incremental packs only when reopen, oldest-object lookup, clone/fetch or index-memory metrics have measurably degraded.
 - Prefer `compactOnly()` as the first intervention when the goal is simply fewer packs; it was faster and smaller than the read-optimized preset in the ten-push smoke fixture.
 - Use the read-optimized preset when clone/fetch negotiation or path-history workloads justify bitmap, commit-graph and Bloom-filter construction.
 - Trigger from a combination of active pack count, small-pack ratio, index bytes, unreachable bytes, measured lookup/fetch degradation and time since last maintenance—not from a single hard-coded count.
-- Keep automatic maintenance opt-in until the full aging matrix has established production breakpoints.
+- Keep automatic maintenance opt-in until repeated full PostgreSQL and SQL Server matrices establish stable breakpoints.
 
 A practical operator can record the condition before and after each maintenance run and retain `PackRepackResult` together with application latency. That deployment history is more reliable than assuming every repository has the same object mix and storage hardware.
 
