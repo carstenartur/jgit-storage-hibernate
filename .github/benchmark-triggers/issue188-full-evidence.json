@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "issue": 188,
+  "profile": "full",
+  "requestedAt": "2026-08-20T17:30:00Z",
+  "baseCommit": "ea3ee2b023dc9b0d2fb2094cd699a01f2c1d8707",
+  "purpose": "Retain cross-database, calibrated RTT and 1/4/16-worker evidence before deciding whether the production pack layout should change."
+}
