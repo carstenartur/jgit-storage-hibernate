@@ -1,0 +1,350 @@
+name: Pack Storage Layout Explicit Evidence
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/pack-storage-layout-explicit-evidence.yml'
+  push:
+    branches:
+      - 'benchmark/188-pack-layout-full-*'
+      - 'benchmark/188-pack-layout-capacity-*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Explicit evidence runner contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Validate evidence converters
+        run: |
+          python3 -m py_compile \
+            .github/scripts/convert-jmh-pack-storage-layout.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout.py \
+            .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+
+      - name: Compile benchmark harnesses
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am test -DskipTests
+
+      - name: Verify explicit branch selection contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          def profile(ref_name: str) -> str:
+              if ref_name.startswith('benchmark/188-pack-layout-capacity-'):
+                  return 'capacity'
+              if ref_name.startswith('benchmark/188-pack-layout-full-'):
+                  return 'full'
+              raise ValueError(ref_name)
+
+          assert profile('benchmark/188-pack-layout-full-20260820') == 'full'
+          assert profile('benchmark/188-pack-layout-capacity-20260820') == 'capacity'
+          try:
+              profile('feature/not-an-explicit-benchmark')
+          except ValueError:
+              pass
+          else:
+              raise SystemExit('ordinary branches must not select an expensive profile')
+          PY
+
+  layout-databases:
+    name: ${{ matrix.backend }} ${{ startsWith(github.ref_name, 'benchmark/188-pack-layout-capacity-') && 'capacity' || 'full' }}
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        backend:
+          - hsqldb
+          - postgresql
+          - sqlserver
+    env:
+      PROFILE: ${{ startsWith(github.ref_name, 'benchmark/188-pack-layout-capacity-') && 'capacity' || 'full' }}
+      BACKEND: ${{ matrix.backend }}
+
+    steps:
+      - name: Checkout exact evidence commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker for production databases
+        if: matrix.backend != 'hsqldb'
+        run: docker info
+
+      - name: Validate evidence converter
+        run: |
+          python3 -m py_compile \
+            .github/scripts/convert-jmh-pack-storage-layout.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
+
+      - name: Build benchmark module
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run explicit layout matrix
+        run: |
+          output="$GITHUB_WORKSPACE/target/pack-storage-layout-explicit/$BACKEND"
+          mkdir -p "$output"
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackStorageLayoutBenchmarkTest \
+            -Djgit.storage.benchmark.pack-layout.enabled=true \
+            -Djgit.storage.benchmark.pack-layout.backend="$BACKEND" \
+            -Djgit.storage.benchmark.pack-layout.profile="$PROFILE" \
+            -Dbenchmark.resultFile="$output/jmh-result.json"
+
+      - name: Convert retained database evidence
+        run: |
+          python3 .github/scripts/convert-jmh-pack-storage-layout.py \
+            "target/pack-storage-layout-explicit/$BACKEND/jmh-result.json" \
+            "target/pack-storage-layout-explicit/$BACKEND/evidence"
+          cat "target/pack-storage-layout-explicit/$BACKEND/evidence/pack-storage-layout-evidence.md" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write immutable environment manifest
+        shell: bash
+        run: |
+          target="target/pack-storage-layout-explicit/$BACKEND/environment.json"
+          python3 - "$target" <<'PY'
+          import json
+          import os
+          import platform
+          import sys
+          from pathlib import Path
+
+          target = Path(sys.argv[1])
+          target.write_text(
+              json.dumps(
+                  {
+                      'schemaVersion': 1,
+                      'commit': os.environ['GITHUB_SHA'],
+                      'workflowRunId': os.environ['GITHUB_RUN_ID'],
+                      'backend': os.environ['BACKEND'],
+                      'profile': os.environ['PROFILE'],
+                      'runnerOs': os.environ.get('RUNNER_OS'),
+                      'runnerArch': os.environ.get('RUNNER_ARCH'),
+                      'python': platform.python_version(),
+                  },
+                  indent=2,
+              )
+              + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Upload raw database evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pack-storage-layout-explicit-${{ matrix.backend }}-${{ env.PROFILE }}
+          path: |
+            target/pack-storage-layout-explicit/${{ matrix.backend }}/**
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: error
+
+  production-decision:
+    name: Explicit PostgreSQL and SQL Server decision
+    needs: [layout-databases]
+    if: github.event_name == 'push' && needs.layout-databases.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROFILE: ${{ startsWith(github.ref_name, 'benchmark/188-pack-layout-capacity-') && 'capacity' || 'full' }}
+
+    steps:
+      - name: Checkout exact evidence commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download PostgreSQL evidence
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: pack-storage-layout-explicit-postgresql-${{ env.PROFILE }}
+          path: target/pack-storage-layout-explicit-aggregate/postgresql
+
+      - name: Download SQL Server evidence
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: pack-storage-layout-explicit-sqlserver-${{ env.PROFILE }}
+          path: target/pack-storage-layout-explicit-aggregate/sqlserver
+
+      - name: Merge exact production-database results
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('target/pack-storage-layout-explicit-aggregate')
+          sources = sorted(root.rglob('jmh-result.json'))
+          if len(sources) != 2:
+              raise SystemExit(f'Expected exactly two production-database results, found {sources}')
+          merged = []
+          backends = set()
+          for source in sources:
+              value = json.loads(source.read_text(encoding='utf-8'))
+              if not isinstance(value, list) or not value:
+                  raise SystemExit(f'Invalid or empty JMH result: {source}')
+              backends.update(str(row.get('params', {}).get('backend', '')) for row in value)
+              merged.extend(value)
+          if backends != {'postgresql', 'sqlserver'}:
+              raise SystemExit(f'Expected PostgreSQL and SQL Server, found {sorted(backends)}')
+          target = root / 'production-jmh-result.json'
+          target.write_text(json.dumps(merged, indent=2) + '\n', encoding='utf-8')
+          (root / 'source-commit.txt').write_text(os.environ['GITHUB_SHA'] + '\n', encoding='utf-8')
+          print(f'Merged {len(merged)} rows from {sources}')
+          PY
+
+      - name: Derive fail-closed cross-database decision
+        run: |
+          python3 .github/scripts/convert-jmh-pack-storage-layout.py \
+            target/pack-storage-layout-explicit-aggregate/production-jmh-result.json \
+            target/pack-storage-layout-explicit-aggregate/evidence
+          cat target/pack-storage-layout-explicit-aggregate/evidence/pack-storage-layout-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload cross-database decision evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pack-storage-layout-explicit-production-decision-${{ env.PROFILE }}
+          path: target/pack-storage-layout-explicit-aggregate/**
+          if-no-files-found: error
+
+  postgresql-rtt:
+    name: Explicit PostgreSQL 5/20/50-ms RTT
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'benchmark/188-pack-layout-full-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout exact evidence commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Build benchmark module
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run calibrated full RTT matrix
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/target/pack-storage-layout-explicit-rtt"
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackStorageLayoutNetworkBenchmarkTest \
+            -Djgit.storage.benchmark.pack-layout.network.enabled=true \
+            -Djgit.storage.benchmark.pack-layout.network.profile=full \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/pack-storage-layout-explicit-rtt/jmh-result.json"
+
+      - name: Convert retained RTT evidence
+        run: |
+          python3 .github/scripts/convert-jmh-pack-storage-layout.py \
+            target/pack-storage-layout-explicit-rtt/jmh-result.json \
+            target/pack-storage-layout-explicit-rtt/evidence
+          cat target/pack-storage-layout-explicit-rtt/evidence/pack-storage-layout-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '### Calibrated RTT' >> "$GITHUB_STEP_SUMMARY"
+          cat target/pack-storage-layout-explicit-rtt/network-rtt-calibration.csv \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload full RTT evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pack-storage-layout-explicit-postgresql-rtt-full
+          path: |
+            target/pack-storage-layout-explicit-rtt/**
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: error
+
+  postgresql-concurrency:
+    name: Explicit PostgreSQL 1/4/16-worker full matrix
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'benchmark/188-pack-layout-full-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout exact evidence commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Validate concurrency evidence converter
+        run: |
+          python3 -m py_compile \
+            .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+
+      - name: Build benchmark module
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run full 1/4/16-worker matrix
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/target/pack-storage-layout-explicit-concurrency"
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackStorageLayoutConcurrencyBenchmarkTest \
+            -Djgit.storage.benchmark.pack-layout.concurrency.enabled=true \
+            -Djgit.storage.benchmark.pack-layout.concurrency.profile=full \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/pack-storage-layout-explicit-concurrency/jmh-result.json"
+
+      - name: Convert retained concurrency evidence
+        run: |
+          python3 .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            target/pack-storage-layout-explicit-concurrency/jmh-result.json \
+            target/pack-storage-layout-explicit-concurrency/evidence
+          cat target/pack-storage-layout-explicit-concurrency/evidence/pack-storage-layout-concurrency-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload full concurrency evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pack-storage-layout-explicit-postgresql-concurrency-full
+          path: |
+            target/pack-storage-layout-explicit-concurrency/**
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: error
