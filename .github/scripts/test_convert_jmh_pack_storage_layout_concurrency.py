@@ -47,6 +47,16 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
             "retain-current-layout-pending-full-cross-database-evidence",
             report["decision"],
         )
+        sixteen_worker = next(
+            row
+            for row in report["evidence"]
+            if row["concurrency"] == 16
+            and row["operation"] == "write"
+            and row["chunkKiB"] == 1024
+        )
+        self.assertEqual(16, sixteen_worker["configuredConcurrency"] if "configuredConcurrency" in sixteen_worker else sixteen_worker["concurrency"])
+        self.assertEqual(16 * 1024 * 1024, sixteen_worker["actualRetainedChunkBytes"])
+        self.assertEqual(1.0, sixteen_worker["jdbcBatchExecutionsPerWorker"])
 
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing current-layout"):
@@ -67,6 +77,13 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         self.assertFalse(candidate["completeConcurrencyLevels"])
         self.assertFalse(candidate["observationalCandidate"])
 
+    def test_jmh_thread_count_must_match_concurrency_parameter(self) -> None:
+        current = self.result("write", 4, 1024, 10.0)
+        candidate = self.result("write", 4, 4096, 9.0)
+        current["threads"] = 1
+        with self.assertRaisesRegex(ValueError, "JMH threads"):
+            CONVERTER.convert([current, candidate])
+
     @staticmethod
     def result(
         operation: str,
@@ -74,14 +91,14 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         chunk_kib: int,
         score: float,
     ) -> dict:
-        secondary = {
+        per_worker = {
             "configuredConcurrency": concurrency,
             "configuredChunkBytes": chunk_kib * 1024,
             "configuredInlineThresholdBytes": 256 * 1024,
             "configuredRetainedBudgetBytes": 16 * 1024 * 1024,
             "actualRetainedChunkBytes": 16 * 1024 * 1024,
             "configuredReadAheadBytes": 1024 * 1024,
-            "readAheadChunks": max(1, 1024 // chunk_kib),
+            "readAheadChunks": max(1, (1024 + chunk_kib - 1) // chunk_kib),
             "chunksPerBatch": (16 * 1024) // chunk_kib,
             "logicalPayloadBytes": 1024 * 1024,
             "chunkRows": 1 if chunk_kib >= 1024 else 4,
@@ -97,6 +114,8 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
                 "PackStorageLayoutConcurrencyBenchmark.execute"
             ),
             "mode": "sample",
+            "threads": concurrency,
+            "forks": 1,
             "jdkVersion": "21",
             "params": {
                 "backend": "postgresql",
@@ -120,8 +139,11 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
                 },
             },
             "secondaryMetrics": {
-                f"ConcurrencyCounters.{key}": {"score": value, "scoreUnit": "#"}
-                for key, value in secondary.items()
+                f"ConcurrencyCounters.{key}": {
+                    "score": value * concurrency,
+                    "scoreUnit": "#",
+                }
+                for key, value in per_worker.items()
             },
         }
 
