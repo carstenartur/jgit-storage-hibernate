@@ -48,8 +48,10 @@ jobs:
           tail -n 120 jgit-compatibility.log
           exit $status
 
+      - name: Require JGit DFS MIDX capability evidence
+        run: test -s jgit-storage-hibernate-benchmarks/target/jgit-dfs-midx-capability.json
+
       - name: Report JGit DFS MIDX capability
-        if: ${{ always() && hashFiles('jgit-storage-hibernate-benchmarks/target/jgit-dfs-midx-capability.json') != '' }}
         shell: bash
         run: |
           echo '### JGit DFS Multi-Pack-Index capability' >> "$GITHUB_STEP_SUMMARY"
