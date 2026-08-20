@@ -64,6 +64,41 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Retained chunk bytes"):
             CONVERTER.convert([result])
 
+    def test_multi_iteration_event_scores_are_normalized_from_raw_data(self) -> None:
+        results = self.matrix(["postgresql"], sparse_candidate=9.7)
+        for result in results:
+            for metric in result["secondaryMetrics"].values():
+                per_iteration = float(metric["score"])
+                metric["score"] = per_iteration * 2.0
+                metric["rawData"] = [[per_iteration, per_iteration]]
+        report = CONVERTER.convert(results)
+        self.assertEqual(6, len(report["evidence"]))
+        current_write = next(
+            row
+            for row in report["evidence"]
+            if row["operation"] == "write" and row["chunkKiB"] == 1024
+        )
+        self.assertEqual(
+            16 * 1024 * 1024, current_write["configuredRetainedBudgetBytes"]
+        )
+        self.assertEqual(
+            16 * 1024 * 1024, current_write["actualRetainedChunkBytes"]
+        )
+        self.assertEqual(16, current_write["chunksPerBatch"])
+        self.assertEqual(16, current_write["chunkRows"])
+        self.assertEqual(
+            16 * 1024 * 1024, current_write["databasePayloadBytes"]
+        )
+
+    def test_configured_metric_change_across_iterations_is_rejected(self) -> None:
+        result = self.result("postgresql", "write", 1024, 10.0)
+        metric = result["secondaryMetrics"]["LayoutCounters.configuredChunkBytes"]
+        expected = float(metric["score"])
+        metric["score"] = expected * 2.0
+        metric["rawData"] = [[expected, expected * 2.0]]
+        with self.assertRaisesRegex(ValueError, "changed across JMH iterations"):
+            CONVERTER.convert([result])
+
     def matrix(self, backends: list[str], sparse_candidate: float) -> list[dict]:
         results = []
         for backend in backends:
@@ -104,7 +139,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             "hibernateQueries": 1,
             "flushes": 2,
             "databasePayloadBytes": payload_bytes,
-            "logicalBytesConsumed": payload_bytes if operation != "write" else payload_bytes,
+            "logicalBytesConsumed": payload_bytes,
             "overfetchBytes": 0,
         }
         return {
