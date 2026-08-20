@@ -1,0 +1,201 @@
+name: Pack Storage Layout Evidence Dispatch
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened]
+    paths:
+      - '.github/workflows/pack-storage-layout-evidence-dispatch.yml'
+      - '.github/benchmark-triggers/issue188-full-evidence.json'
+      - '.github/benchmark-triggers/issue188-capacity-evidence.json'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  contract:
+    name: Explicit dispatch contract
+    if: >-
+      !startsWith(github.head_ref, 'benchmark/188-pack-layout-full-') &&
+      !startsWith(github.head_ref, 'benchmark/188-pack-layout-capacity-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify branch and workflow selection
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          def selection(ref_name: str) -> tuple[str, tuple[str, ...]]:
+              if ref_name.startswith('benchmark/188-pack-layout-full-'):
+                  return (
+                      'full',
+                      (
+                          'pack-storage-layout.yml',
+                          'pack-storage-layout-network.yml',
+                          'pack-storage-layout-concurrency.yml',
+                      ),
+                  )
+              if ref_name.startswith('benchmark/188-pack-layout-capacity-'):
+                  return ('capacity', ('pack-storage-layout.yml',))
+              raise ValueError(ref_name)
+
+          assert selection('benchmark/188-pack-layout-full-20260820')[0] == 'full'
+          assert len(selection('benchmark/188-pack-layout-full-20260820')[1]) == 3
+          assert selection('benchmark/188-pack-layout-capacity-20260820') == (
+              'capacity',
+              ('pack-storage-layout.yml',),
+          )
+          try:
+              selection('feature/ordinary-change')
+          except ValueError:
+              pass
+          else:
+              raise SystemExit('ordinary pull requests must not dispatch expensive evidence')
+          PY
+
+      - name: Verify dispatch targets expose workflow_dispatch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          targets = (
+              'pack-storage-layout.yml',
+              'pack-storage-layout-network.yml',
+              'pack-storage-layout-concurrency.yml',
+          )
+          for target in targets:
+              text = (Path('.github/workflows') / target).read_text(encoding='utf-8')
+              if 'workflow_dispatch:' not in text:
+                  raise SystemExit(f'{target} does not expose workflow_dispatch')
+          PY
+
+  dispatch:
+    name: Dispatch retained issue 188 evidence
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (startsWith(github.head_ref, 'benchmark/188-pack-layout-full-') ||
+       startsWith(github.head_ref, 'benchmark/188-pack-layout-capacity-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_REF: ${{ github.head_ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+    steps:
+      - name: Select bounded explicit profile
+        id: selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$HEAD_REF" in
+            benchmark/188-pack-layout-full-*)
+              profile=full
+              workflows='pack-storage-layout.yml pack-storage-layout-network.yml pack-storage-layout-concurrency.yml'
+              ;;
+            benchmark/188-pack-layout-capacity-*)
+              profile=capacity
+              workflows='pack-storage-layout.yml'
+              ;;
+            *)
+              echo "Unsupported explicit evidence branch: $HEAD_REF" >&2
+              exit 1
+              ;;
+          esac
+          echo "profile=$profile" >> "$GITHUB_OUTPUT"
+          echo "workflows=$workflows" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch exact benchmark branch
+        shell: bash
+        env:
+          PROFILE: ${{ steps.selection.outputs.profile }}
+          WORKFLOWS: ${{ steps.selection.outputs.workflows }}
+        run: |
+          set -euo pipefail
+          for workflow in $WORKFLOWS; do
+            case "$workflow" in
+              pack-storage-layout.yml)
+                gh workflow run "$workflow" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --ref "$HEAD_REF" \
+                  -f profile="$PROFILE" \
+                  -f backend=all
+                ;;
+              pack-storage-layout-network.yml|pack-storage-layout-concurrency.yml)
+                gh workflow run "$workflow" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --ref "$HEAD_REF" \
+                  -f profile=full
+                ;;
+              *)
+                echo "Unexpected workflow target: $workflow" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Require workflow runs for the exact commit
+        shell: bash
+        env:
+          WORKFLOWS: ${{ steps.selection.outputs.workflows }}
+        run: |
+          set -euo pipefail
+          : > dispatched-runs.tsv
+          for workflow in $WORKFLOWS; do
+            run_id=''
+            for attempt in $(seq 1 30); do
+              run_id="$(
+                gh api \
+                  -X GET \
+                  "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" \
+                  -f branch="$HEAD_REF" \
+                  -f event=workflow_dispatch \
+                  -f per_page=20 \
+                  --jq ".workflow_runs[] | select(.head_sha == \"$HEAD_SHA\") | .id" \
+                  | head -n 1
+              )"
+              if [ -n "$run_id" ]; then
+                break
+              fi
+              sleep 2
+            done
+            if [ -z "$run_id" ]; then
+              echo "No workflow_dispatch run appeared for $workflow at $HEAD_SHA" >&2
+              exit 1
+            fi
+            printf '%s\t%s\thttps://github.com/%s/actions/runs/%s\n' \
+              "$workflow" "$run_id" "$GITHUB_REPOSITORY" "$run_id" \
+              >> dispatched-runs.tsv
+          done
+
+      - name: Report dispatched immutable evidence runs
+        shell: bash
+        env:
+          PROFILE: ${{ steps.selection.outputs.profile }}
+        run: |
+          echo '### Explicit issue #188 evidence' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "- Profile: \`$PROFILE\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Branch: \`$HEAD_REF\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`$HEAD_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          while IFS=$'\t' read -r workflow run_id url; do
+            echo "- [$workflow run $run_id]($url)" >> "$GITHUB_STEP_SUMMARY"
+          done < dispatched-runs.tsv
+
+      - name: Upload dispatch receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue188-evidence-dispatch-${{ steps.selection.outputs.profile }}
+          path: dispatched-runs.tsv
+          if-no-files-found: error
