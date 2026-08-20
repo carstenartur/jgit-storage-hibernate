@@ -57,6 +57,18 @@ The `Pack Storage Layout Network RTT` workflow adds a calibrated PostgreSQL/Toxi
 
 The network profile uses a representative 16-MiB payload for the full run and compares write, sequential, short and random-read behavior. It supplements rather than replaces the local payload-size and capacity matrices.
 
+The `Pack Storage Layout Concurrency` workflow measures 1, 4 and 16 active workers against one shared PostgreSQL schema and one shared `SessionFactory`:
+
+- every worker owns an independent repository and pack identity;
+- readers use immutable per-worker fixtures;
+- writers create and remove one unique pack per invocation;
+- the connection pool is bounded to the measured worker count plus a small control margin;
+- no worker creates or drops schemas, so the measurement cannot be distorted by concurrent Hibernate bootstrap races;
+- the pull-request smoke profile compares one-MiB and four-MiB chunks with one-MiB payloads;
+- the full profile compares all four chunk sizes with 16-MiB payloads and write, sequential, short and random-read operations.
+
+The concurrency converter requires the current layout at every worker level and a one-worker scaling baseline for every candidate. It reports p50/p95/p99, a latency-derived concurrent capacity estimate, scaling efficiency, per-writer retained bytes, JDBC activity and overfetch. A result is only an observational candidate when it improves writes and sequential reads at all 1/4/16-worker levels without a sparse-read regression beyond five percent. It cannot change the production decision by itself.
+
 Raw JMH JSON, console output, Surefire reports, converted comparison JSON and machine-readable decision evidence are retained together.
 
 The converter records:
@@ -78,11 +90,13 @@ retain-current-layout-pending-postgresql-and-sqlserver-evidence
 
 The converter never edits production settings.
 
-## Current preliminary observation
+## Current preliminary observations
 
-The bounded SQL Server smoke run confirms that candidate layouts can be measured through the same real Hibernate entities and evidence converter as HSQLDB and PostgreSQL. In that small fixture, 256-KiB chunks improved some sequential reads but materially increased write cost and sparse-read overfetch/latency. This is evidence against changing the default from a smoke result, not a final production conclusion.
+The bounded [SQL Server smoke run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32389361783) confirms that candidate layouts can be measured through the same real Hibernate entities and evidence converter as HSQLDB and PostgreSQL. In that small fixture, 256-KiB chunks improved some sequential reads but materially increased write cost and sparse-read overfetch/latency. This is evidence against changing the default from a smoke result, not a final production conclusion.
 
-The retained full, capacity, network and concurrency matrices remain authoritative for the final decision.
+The calibrated [PostgreSQL RTT smoke run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32391072877) requested 5 ms and measured a median `SELECT 1` latency of 6.062 ms. The four-MiB candidate improved the measured sequential-read point estimate by about 16.9% and the random-read point estimate by about 0.5%, but made the write point estimate about 16.1% slower. It therefore also fails the net-benefit rule.
+
+The retained full, capacity and 1/4/16-worker matrices remain authoritative for the final decision.
 
 ## Required compatibility design before any production change
 
@@ -118,7 +132,7 @@ The proposed metadata columns are small scalar values and can be added without r
 - keep inline and chunked payloads mutually exclusive;
 - pass `hbm2ddl.auto=validate`, upgrade, restart and mixed-layout tests.
 
-SQL Server execution is now part of the benchmark workflow, and a fail-closed cross-database aggregate exists. The remaining evidence work is the retained full/capacity execution, calibrated network matrix and 1/4/16-reader/writer concurrency slice before issue #188 can close.
+SQL Server execution and calibrated PostgreSQL RTT evidence are now part of the benchmark workflow, and a fail-closed cross-database aggregate exists. The remaining evidence work is the retained full/capacity and full 1/4/16-worker execution before issue #188 can close.
 
 ## Production decision
 
