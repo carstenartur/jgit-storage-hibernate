@@ -38,6 +38,15 @@ class RepositoryAgingConverterTest(unittest.TestCase):
         self.assertEqual(7, candidate["breakEvenReads"])
         self.assertEqual("unsupported-by-selected-jgit-dfs", report["midx"]["decision"])
 
+        comparison = next(
+            entry
+            for entry in report["comparison"]
+            if "reopenAndLookupOldest" not in entry["name"]
+            and "Reopen and oldest-object lookup" in entry["name"]
+            and entry["name"].endswith("compact-only")
+        )
+        self.assertIn("p50/p95/p99:", comparison["extra"])
+
     def test_missing_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing no-maintenance baseline"):
             CONVERTER.convert(
@@ -52,6 +61,12 @@ class RepositoryAgingConverterTest(unittest.TestCase):
                     self.result("lookupOldestObject", "compact-only", 0.8, 10, 2),
                 ]
             )
+
+    def test_missing_percentile_is_rejected(self) -> None:
+        result = self.result("lookupOldestObject", "none", 1.0, 0, 0)
+        result["primaryMetric"]["scorePercentiles"].pop("95.0")
+        with self.assertRaisesRegex(ValueError, "missing the p95.0 JMH percentile"):
+            CONVERTER.convert([result])
 
     @staticmethod
     def result(
@@ -92,6 +107,11 @@ class RepositoryAgingConverterTest(unittest.TestCase):
                 "score": score,
                 "scoreError": 0.1,
                 "scoreUnit": "ms/op",
+                "scorePercentiles": {
+                    "50.0": score,
+                    "95.0": score * 1.1,
+                    "99.0": score * 1.2,
+                },
             },
             "secondaryMetrics": {
                 f"AgingCounters.{key}": {"score": value, "scoreUnit": "#"}
