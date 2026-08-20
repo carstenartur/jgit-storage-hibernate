@@ -17,6 +17,8 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/performance-investigations.yml'
+      - '.github/scripts/convert-jmh-repository-aging.py'
+      - '.github/scripts/test_convert_jmh_repository_aging.py'
       - 'pom.xml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -24,6 +26,8 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/performance-investigations.yml'
+      - '.github/scripts/convert-jmh-repository-aging.py'
+      - '.github/scripts/test_convert_jmh_repository_aging.py'
       - 'pom.xml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -60,6 +64,12 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Validate repository-aging evidence converter
+        if: matrix.investigation == 'repository-aging'
+        run: |
+          python3 -m py_compile .github/scripts/convert-jmh-repository-aging.py .github/scripts/test_convert_jmh_repository_aging.py
+          python3 .github/scripts/test_convert_jmh_repository_aging.py
+
       - name: Build benchmark module with Maven
         shell: bash
         run: |
@@ -79,6 +89,16 @@ jobs:
             -Djgit.storage.benchmark.investigation.profile="$profile" \
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/investigations/${{ matrix.investigation }}/jmh-result.json" 2>&1 \
             | tee "target/investigations/${{ matrix.investigation }}/maven-benchmark.log"
+
+      - name: Derive repository-aging policy evidence
+        if: matrix.investigation == 'repository-aging'
+        shell: bash
+        run: |
+          python3 .github/scripts/convert-jmh-repository-aging.py \
+            "target/investigations/repository-aging/jmh-result.json" \
+            "target/investigations/repository-aging/evidence"
+          cat target/investigations/repository-aging/evidence/repository-aging-policy-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload raw investigation results
         if: always()
@@ -100,6 +120,9 @@ jobs:
           echo '- Raw JMH JSON, console output, Maven logs and Failsafe reports are retained as one artifact.' >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ matrix.investigation }}" = 'write-queue' ]; then
             echo '- This existing experiment measures striped scheduling and backpressure. Atomic receiver record batching is implemented separately by the production `DurableStripedWriteQueue` and its Hibernate adapter.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ matrix.investigation }}" = 'repository-aging' ]; then
+            echo '- Generated comparison and policy-evidence JSON retain measured break-even reads; no automatic maintenance trigger is changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
           fi
 
   stateless-threshold:
