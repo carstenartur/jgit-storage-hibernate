@@ -41,6 +41,9 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
             if item["chunkKiB"] == 4096
         )
         self.assertTrue(candidate["completeConcurrencyLevels"])
+        self.assertTrue(candidate["completeWriteLevels"])
+        self.assertTrue(candidate["completeSequentialReadLevels"])
+        self.assertTrue(candidate["completeSparseReadLevels"])
         self.assertTrue(candidate["observationalCandidate"])
         self.assertFalse(report["productionDefaultsChanged"])
         self.assertEqual(
@@ -54,8 +57,10 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
             and row["operation"] == "write"
             and row["chunkKiB"] == 1024
         )
-        self.assertEqual(16, sixteen_worker["configuredConcurrency"] if "configuredConcurrency" in sixteen_worker else sixteen_worker["concurrency"])
-        self.assertEqual(16 * 1024 * 1024, sixteen_worker["actualRetainedChunkBytes"])
+        self.assertEqual(16, sixteen_worker["concurrency"])
+        self.assertEqual(
+            16 * 1024 * 1024, sixteen_worker["actualRetainedChunkBytes"]
+        )
         self.assertEqual(1.0, sixteen_worker["jdbcBatchExecutionsPerWorker"])
 
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
@@ -76,6 +81,26 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         )
         self.assertFalse(candidate["completeConcurrencyLevels"])
         self.assertFalse(candidate["observationalCandidate"])
+
+    def test_each_operation_must_cover_all_worker_levels(self) -> None:
+        results = []
+        for concurrency in (1, 4, 16):
+            for operation in ("write", "sequential-read", "random-read"):
+                results.append(self.result(operation, concurrency, 1024, 10.0))
+                if operation != "sequential-read" or concurrency != 16:
+                    results.append(self.result(operation, concurrency, 4096, 9.0))
+        report = CONVERTER.convert(results)
+        candidate = next(
+            item
+            for item in report["concurrencyCandidates"]
+            if item["chunkKiB"] == 4096
+        )
+        self.assertTrue(candidate["completeWriteLevels"])
+        self.assertFalse(candidate["completeSequentialReadLevels"])
+        self.assertTrue(candidate["completeSparseReadLevels"])
+        self.assertFalse(candidate["completeConcurrencyLevels"])
+        self.assertFalse(candidate["observationalCandidate"])
+        self.assertIn("incomplete", candidate["reason"].lower())
 
     def test_jmh_thread_count_must_match_concurrency_parameter(self) -> None:
         current = self.result("write", 4, 1024, 10.0)
