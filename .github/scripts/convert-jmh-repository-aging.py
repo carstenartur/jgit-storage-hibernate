@@ -62,6 +62,16 @@ def _normalized_primary(result: dict[str, Any]) -> tuple[float, float]:
     )
 
 
+def _normalized_percentile(result: dict[str, Any], percentile: str) -> float:
+    metric = result["primaryMetric"]
+    percentiles = metric.get("scorePercentiles")
+    if not isinstance(percentiles, dict) or percentile not in percentiles:
+        raise ValueError(
+            f"Repository-aging result is missing the p{percentile} JMH percentile"
+        )
+    return _milliseconds(float(percentiles[percentile]), str(metric["scoreUnit"]))
+
+
 def _row(result: dict[str, Any]) -> dict[str, Any]:
     benchmark = str(result["benchmark"])
     operation = benchmark.rsplit(".", 1)[-1]
@@ -88,6 +98,9 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         "maintenanceMode": mode,
         "scoreMillis": score,
         "scoreErrorMillis": error,
+        "p50Millis": _normalized_percentile(result, "50.0"),
+        "p95Millis": _normalized_percentile(result, "95.0"),
+        "p99Millis": _normalized_percentile(result, "99.0"),
         "activePacks": int(round(_metric_score(result, "activePacks"))),
         "packPayloadBytes": int(round(_metric_score(result, "packPayloadBytes"))),
         "packIndexBytes": int(round(_metric_score(result, "packIndexBytes"))),
@@ -173,6 +186,7 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
                             f"Pushes: {pushes}",
                             f"Cache: {cache_state}",
                             f"Maintenance: {mode}",
+                            f"p50/p95/p99: {candidate['p50Millis']:.6f} / {candidate['p95Millis']:.6f} / {candidate['p99Millis']:.6f} ms",
                             f"Active packs: {candidate['activePacks']}",
                             f"Small-pack ratio: {candidate['smallPackRatioBasisPoints'] / 100:.2f}%",
                             f"Pack index bytes: {candidate['packIndexBytes']}",
