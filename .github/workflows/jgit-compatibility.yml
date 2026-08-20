@@ -48,9 +48,23 @@ jobs:
           tail -n 120 jgit-compatibility.log
           exit $status
 
-      - name: Upload compatibility build log
+      - name: Report JGit DFS MIDX capability
+        if: ${{ always() && hashFiles('jgit-storage-hibernate-benchmarks/target/jgit-dfs-midx-capability.json') != '' }}
+        shell: bash
+        run: |
+          echo '### JGit DFS Multi-Pack-Index capability' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Selected JGit: `${{ matrix.jgit }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat jgit-storage-hibernate-benchmarks/target/jgit-dfs-midx-capability.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compatibility build and MIDX evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: jgit-compatibility-java-21-${{ matrix.jgit }}
-          path: jgit-compatibility.log
+          path: |
+            jgit-compatibility.log
+            jgit-storage-hibernate-benchmarks/target/jgit-dfs-midx-capability.json
+          if-no-files-found: warn
