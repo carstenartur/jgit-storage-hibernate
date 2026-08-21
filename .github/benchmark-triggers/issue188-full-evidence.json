@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "issue": 188,
+  "profile": "full",
+  "requestedAt": "2026-08-21T04:17:00Z",
+  "baseCommit": "33ba8ab8837e3ba1401cda4fa8626961d5ab475e",
+  "evidenceCodeCommit": "c44e7f3555054099f595ee059102404ab50e56a3",
+  "purpose": "Retain cross-database, calibrated RTT and 1/4/16-worker evidence after repairing JMH iteration normalization and duplicate full-profile coordinates."
+}

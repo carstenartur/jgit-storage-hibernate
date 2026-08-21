@@ -16,7 +16,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
@@ -81,6 +83,42 @@ class PackStorageLayoutBenchmarkTest {
     assertTrue(Files.size(resultFile) > 2);
   }
 
+  @Test
+  void fullAndCapacityProfilesDoNotRepeatBenchmarkCoordinates() {
+    assertUniqueCoordinates("full");
+    assertUniqueCoordinates("capacity");
+  }
+
+  private static void assertUniqueCoordinates(String profile) {
+    Set<String> coordinates = new HashSet<>();
+    for (Scenario scenario : scenarios(profile)) {
+      for (String operation : scenario.operations()) {
+        for (String payloadKiB : scenario.payloadKiB()) {
+          for (String chunkKiB : scenario.chunkKiB()) {
+            for (String inlineKiB : scenario.inlineKiB()) {
+              for (String retainedMiB : scenario.retainedMiB()) {
+                for (String readAheadKiB : scenario.readAheadKiB()) {
+                  String coordinate =
+                      String.join(
+                          ":",
+                          operation,
+                          payloadKiB,
+                          chunkKiB,
+                          inlineKiB,
+                          retainedMiB,
+                          readAheadKiB);
+                  assertTrue(
+                      coordinates.add(coordinate),
+                      () -> profile + " repeats benchmark coordinate " + coordinate);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   private static Options options(
       String backend,
       String profile,
@@ -132,7 +170,14 @@ class PackStorageLayoutBenchmarkTest {
           List.of(
               new Scenario(
                   operations(),
+                  new String[] {"64", "256"},
+                  new String[] {"1024"},
                   new String[] {"64", "256", "1024"},
+                  new String[] {"16"},
+                  new String[] {"1024"}),
+              new Scenario(
+                  readOperations(),
+                  new String[] {"1024"},
                   new String[] {"1024"},
                   new String[] {"64", "256", "1024"},
                   new String[] {"16"},
@@ -145,11 +190,7 @@ class PackStorageLayoutBenchmarkTest {
                   retainedBudgets(),
                   new String[] {"1024"}),
               new Scenario(
-                  new String[] {
-                    PackStorageLayoutBenchmark.SEQUENTIAL_READ,
-                    PackStorageLayoutBenchmark.SHORT_READ,
-                    PackStorageLayoutBenchmark.RANDOM_READ
-                  },
+                  readOperations(),
                   new String[] {"16384"},
                   chunkSizes(),
                   new String[] {"256"},
@@ -187,6 +228,14 @@ class PackStorageLayoutBenchmarkTest {
   private static String[] operations() {
     return new String[] {
       PackStorageLayoutBenchmark.WRITE,
+      PackStorageLayoutBenchmark.SEQUENTIAL_READ,
+      PackStorageLayoutBenchmark.SHORT_READ,
+      PackStorageLayoutBenchmark.RANDOM_READ
+    };
+  }
+
+  private static String[] readOperations() {
+    return new String[] {
       PackStorageLayoutBenchmark.SEQUENTIAL_READ,
       PackStorageLayoutBenchmark.SHORT_READ,
       PackStorageLayoutBenchmark.RANDOM_READ
