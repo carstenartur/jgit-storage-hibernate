@@ -57,6 +57,8 @@ class PackStorageLayoutBenchmarkTest {
     Files.createDirectories(resultFile.getParent());
     Path rawDirectory = resultFile.getParent().resolve("raw");
     Files.createDirectories(rawDirectory);
+    Path telemetryNdjson = rawDirectory.resolve("database-telemetry.ndjson");
+    Files.deleteIfExists(telemetryNdjson);
 
     List<Path> rawResults = new ArrayList<>();
     List<Path> rawOutputs = new ArrayList<>();
@@ -77,7 +79,15 @@ class PackStorageLayoutBenchmarkTest {
     }
 
     mergeJsonArrays(rawResults, resultFile);
-    mergeTextOutputs(rawOutputs, resultFile.resolveSibling("pack-storage-layout-jmh-output.txt"));
+    mergeTextOutputs(
+        rawOutputs, resultFile.resolveSibling("pack-storage-layout-jmh-output.txt"));
+    if (Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY)) {
+      Path telemetry =
+          resultFile.resolveSibling("pack-storage-layout-database-telemetry.json");
+      DatabaseTelemetryJson.writeAggregate(telemetryNdjson, telemetry);
+      assertTrue(Files.isRegularFile(telemetry));
+      assertTrue(Files.size(telemetry) > 32);
+    }
     assertTrue(resultCount > 0);
     assertTrue(Files.isRegularFile(resultFile));
     assertTrue(Files.size(resultFile) > 2);
@@ -165,6 +175,19 @@ class PackStorageLayoutBenchmarkTest {
     jvmArguments.add("-Xms512m");
     jvmArguments.add("capacity".equals(profile) ? "-Xmx3g" : "-Xmx2g");
     jvmArguments.addAll(target.jvmArguments());
+    if (Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY)
+        && !HibernateRepositoryBenchmark.HSQLDB.equals(backend)) {
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              DatabaseTelemetryCollectors.ENABLED_PROPERTY, "true"));
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              DatabaseTelemetryCollectors.OUTPUT_PROPERTY,
+              resultFile
+                  .getParent()
+                  .resolve("database-telemetry.ndjson")
+                  .toString()));
+    }
 
     return new OptionsBuilder()
         .include(PackStorageLayoutBenchmark.class.getName())
