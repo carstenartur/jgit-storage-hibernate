@@ -6,6 +6,7 @@ package io.github.carstenartur.jgit.storage.hibernate;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,6 +15,8 @@ import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateReposit
 import io.github.carstenartur.jgit.storage.hibernate.schema.CoreSchemaMigrations;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Properties;
@@ -115,10 +118,16 @@ class MultiInstancePostgreSqlIntegrationTest {
           start.countDown();
 
           List<RefUpdate.Result> results = List.of(resultA.get(), resultB.get());
-          assertEquals(1, results.stream().filter(MultiInstancePostgreSqlIntegrationTest::success).count());
           assertEquals(
               1,
-              results.stream().filter(result -> result == RefUpdate.Result.LOCK_FAILURE).count());
+              results.stream()
+                  .filter(MultiInstancePostgreSqlIntegrationTest::success)
+                  .count());
+          assertEquals(
+              1,
+              results.stream()
+                  .filter(result -> result == RefUpdate.Result.LOCK_FAILURE)
+                  .count());
         }
       }
     }
@@ -132,6 +141,56 @@ class MultiInstancePostgreSqlIntegrationTest {
           verifier.getReflogReader(Constants.R_HEADS + "main").getReverseEntries();
       assertEquals(2, entries.size());
       assertEquals(winner, entries.get(0).getNewId());
+    }
+  }
+
+  @Test
+  void staleReftableDescriptorIsReloadedUnderRepositoryLock() throws Exception {
+    String repositoryName = "stale-reftable-repository";
+    String mainRef = Constants.R_HEADS + "main";
+    String recoveredRef = Constants.R_HEADS + "recovered";
+
+    try (HibernateSessionFactoryProvider providerA = provider();
+        HibernateRepository repositoryA =
+            HibernateRepository.create(providerA.getSessionFactory(), repositoryName)) {
+      repositoryA.create(true);
+      ObjectId initial = createCommit(repositoryA, "initial", null);
+      assertEquals(
+          RefUpdate.Result.NEW,
+          update(repositoryA, mainRef, initial, ObjectId.zeroId()));
+
+      try (HibernateSessionFactoryProvider providerB = provider();
+          HibernateRepository repositoryB =
+              HibernateRepository.create(providerB.getSessionFactory(), repositoryName)) {
+        ObjectId candidateB = createCommit(repositoryB, "candidate-b", initial);
+        assertEquals(initial, repositoryB.resolve(mainRef));
+        String staleReftable = newestCommittedReftable(repositoryName);
+
+        ObjectId parent = initial;
+        int replacement = 0;
+        while (committedReftableExists(repositoryName, staleReftable) && replacement < 8) {
+          ObjectId next = createCommit(repositoryA, "replacement-" + replacement, parent);
+          assertEquals(
+              RefUpdate.Result.NEW,
+              update(
+                  repositoryA,
+                  Constants.R_HEADS + "replacement-" + replacement,
+                  next,
+                  ObjectId.zeroId()));
+          parent = next;
+          replacement++;
+        }
+        assertFalse(
+            committedReftableExists(repositoryName, staleReftable),
+            "the second repository must retain a descriptor for a replaced Reftable");
+
+        DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+
+        assertEquals(
+            RefUpdate.Result.NEW,
+            update(repositoryB, recoveredRef, candidateB, ObjectId.zeroId()));
+        assertEquals(candidateB, repositoryB.resolve(recoveredRef));
+      }
     }
   }
 
@@ -154,7 +213,16 @@ class MultiInstancePostgreSqlIntegrationTest {
 
   private static RefUpdate.Result update(
       HibernateRepository repository, ObjectId newId, ObjectId expectedOldId) throws Exception {
-    RefUpdate update = repository.updateRef(Constants.R_HEADS + "main");
+    return update(repository, Constants.R_HEADS + "main", newId, expectedOldId);
+  }
+
+  private static RefUpdate.Result update(
+      HibernateRepository repository,
+      String refName,
+      ObjectId newId,
+      ObjectId expectedOldId)
+      throws Exception {
+    RefUpdate update = repository.updateRef(refName);
     update.setExpectedOldObjectId(expectedOldId);
     update.setNewObjectId(newId);
     update.setRefLogMessage("multi-instance update", true);
@@ -180,6 +248,42 @@ class MultiInstancePostgreSqlIntegrationTest {
       ObjectId id = inserter.insert(commit);
       inserter.flush();
       return id;
+    }
+  }
+
+  private String newestCommittedReftable(String repositoryName) throws Exception {
+    try (Connection connection =
+            DriverManager.getConnection(
+                schemaUrl, POSTGRESQL.getUsername(), POSTGRESQL.getPassword());
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "select pack_name from git_packs "
+                    + "where repository_name = ? and pack_extension = 'ref' "
+                    + "and committed = true order by id desc limit 1")) {
+      statement.setString(1, repositoryName);
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next(), "expected one committed Reftable");
+        return result.getString(1);
+      }
+    }
+  }
+
+  private boolean committedReftableExists(String repositoryName, String packName)
+      throws Exception {
+    try (Connection connection =
+            DriverManager.getConnection(
+                schemaUrl, POSTGRESQL.getUsername(), POSTGRESQL.getPassword());
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "select count(*) from git_packs "
+                    + "where repository_name = ? and pack_name = ? "
+                    + "and pack_extension = 'ref' and committed = true")) {
+      statement.setString(1, repositoryName);
+      statement.setString(2, packName);
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next());
+        return result.getInt(1) != 0;
+      }
     }
   }
 
