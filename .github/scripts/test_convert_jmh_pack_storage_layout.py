@@ -95,6 +95,41 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 for evidence in candidate["backendEvidence"]
             )
         )
+        self.assertTrue(
+            all(
+                set(evidence["missingSparseOperations"])
+                == CONVERTER.SPARSE_OPERATIONS
+                for evidence in candidate["backendEvidence"]
+            )
+        )
+        self.assertEqual(
+            "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
+            report["decision"],
+        )
+
+    def test_incomplete_sparse_evidence_cannot_promote_a_candidate(self) -> None:
+        results = [
+            result
+            for result in self.matrix(
+                ["postgresql", "sqlserver"],
+                sparse_candidate=9.7,
+            )
+            if result["params"]["operation"] != "short-read"
+        ]
+        report = CONVERTER.convert(results)
+        candidate = next(
+            item
+            for item in report["layoutCandidates"]
+            if item["chunkKiB"] == 2048 and item["inlineKiB"] == 256
+        )
+        self.assertFalse(candidate["eligible"])
+        self.assertTrue(
+            all(
+                evidence["worstSparseImprovementPercent"] is None
+                and evidence["missingSparseOperations"] == ["short-read"]
+                for evidence in candidate["backendEvidence"]
+            )
+        )
         self.assertEqual(
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],
@@ -118,7 +153,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 metric["score"] = per_iteration * 2.0
                 metric["rawData"] = [[per_iteration, per_iteration]]
         report = CONVERTER.convert(results)
-        self.assertEqual(6, len(report["evidence"]))
+        self.assertEqual(8, len(report["evidence"]))
         current_write = next(
             row
             for row in report["evidence"]
@@ -245,6 +280,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             for operation, baseline, candidate in (
                 ("write", 10.0, 8.0),
                 ("sequential-read", 10.0, 8.5),
+                ("short-read", 10.0, sparse_candidate),
                 ("random-read", 10.0, sparse_candidate),
             ):
                 results.append(

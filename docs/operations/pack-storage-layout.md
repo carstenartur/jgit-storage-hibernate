@@ -82,7 +82,7 @@ The converter records:
 - allocation and GC evidence when JMH exposes it;
 - comparison with the current one-MiB/256-KiB layout under the same backend, deployment, payload, retained budget and read-ahead condition.
 
-A write-only improvement is insufficient. A candidate is eligible for later format design only when both PostgreSQL and SQL Server contain write, sequential-read and sparse-read comparisons, show write and sequential-read gains, and sparse reads regress by no more than five percent. Until that cross-database condition is met, the generated decision remains:
+A write-only improvement is insufficient. A candidate is eligible for later format design only when both PostgreSQL and SQL Server contain write, sequential-read, short-read and random-read comparisons, show write and sequential-read gains, and both sparse access patterns regress by no more than five percent. Until that cross-database condition is met, the generated decision remains:
 
 ```text
 retain-current-layout-pending-postgresql-and-sqlserver-evidence
