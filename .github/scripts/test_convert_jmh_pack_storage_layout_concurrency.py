@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
 import unittest
 from pathlib import Path
@@ -119,6 +120,64 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
                 self.assertIn(expected, message)
                 if name not in {"array", "result", "backend", "operation", "params"}:
                     self.assertIn("operation='write'", message)
+
+    def test_nan_score_error_becomes_json_null(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        current["primaryMetric"]["scoreError"] = math.nan
+
+        report = CONVERTER.convert([current, candidate])
+        current_row = next(
+            row
+            for row in report["evidence"]
+            if row["chunkKiB"] == 1024
+        )
+        self.assertIsNone(current_row["scoreErrorMillis"])
+        serialized = CONVERTER._strict_json(report)
+        self.assertNotIn("NaN", serialized)
+        self.assertIsNone(
+            next(
+                row
+                for row in json.loads(serialized)["evidence"]
+                if row["chunkKiB"] == 1024
+            )["scoreErrorMillis"]
+        )
+
+    def test_missing_score_error_becomes_json_null(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        del current["primaryMetric"]["scoreError"]
+        report = CONVERTER.convert([current, candidate])
+        self.assertIsNone(
+            next(
+                row
+                for row in report["evidence"]
+                if row["chunkKiB"] == 1024
+            )["scoreErrorMillis"]
+        )
+
+    def test_non_finite_primary_score_is_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, value)
+                candidate = self.result("write", 1, 4096, 9.0)
+                with self.assertRaisesRegex(ValueError, "primaryMetric score"):
+                    CONVERTER.convert([current, candidate])
+
+    def test_non_finite_primary_percentile_is_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, 10.0)
+                candidate = self.result("write", 1, 4096, 9.0)
+                current["primaryMetric"]["scorePercentiles"]["95.0"] = value
+                with self.assertRaisesRegex(
+                    ValueError, "primaryMetric percentile"
+                ):
+                    CONVERTER.convert([current, candidate])
+
+    def test_strict_json_rejects_unexpected_non_finite_values(self) -> None:
+        with self.assertRaises(ValueError):
+            CONVERTER._strict_json({"unexpected": math.nan})
 
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing current-layout"):

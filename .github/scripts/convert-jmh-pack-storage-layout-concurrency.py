@@ -38,6 +38,26 @@ PARAMETER_NAMES = (
 )
 
 
+def _finite(value: Any, context: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as failure:
+        raise ValueError(f"Malformed {context}") from failure
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite {context}")
+    return number
+
+
+def _optional_finite(value: Any, context: str) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as failure:
+        raise ValueError(f"Malformed {context}") from failure
+    return number if math.isfinite(number) else None
+
+
 def _milliseconds(value: float, unit: str) -> float:
     factors = {
         "ns/op": 1e-6,
@@ -47,9 +67,12 @@ def _milliseconds(value: float, unit: str) -> float:
         "s/op": 1000.0,
     }
     try:
-        return value * factors[unit]
+        converted = value * factors[unit]
     except KeyError as failure:
         raise ValueError(f"Unsupported concurrency score unit: {unit!r}") from failure
+    if not math.isfinite(converted):
+        raise ValueError("Non-finite concurrency score")
+    return converted
 
 
 def _secondary(
@@ -160,19 +183,15 @@ def _percentile(
     values = optional_object_field(metric, "scorePercentiles", context)
     if values is None or name not in values:
         return fallback
-    try:
-        value = float(values[name])
-    except (TypeError, ValueError) as failure:
-        raise ValueError(f"Malformed {context} percentile {name}") from failure
+    value = _finite(values[name], f"{context} percentile {name}")
     return _milliseconds(value, unit)
 
 
-def _score_error(metric: dict[str, Any], unit: str, context: str) -> float:
-    try:
-        value = float(metric.get("scoreError", 0.0))
-    except (TypeError, ValueError) as failure:
-        raise ValueError(f"Malformed {context} scoreError") from failure
-    return _milliseconds(value, unit)
+def _score_error(
+    metric: dict[str, Any], unit: str, context: str
+) -> float | None:
+    value = _optional_finite(metric.get("scoreError"), f"{context} scoreError")
+    return None if value is None else _milliseconds(value, unit)
 
 
 def _row(result: Any) -> dict[str, Any]:
@@ -204,10 +223,10 @@ def _row(result: Any) -> dict[str, Any]:
     metric = require_object_field(required_result, "primaryMetric", context)
     metric_context = f"{context} primaryMetric"
     unit = require_string_field(metric, "scoreUnit", metric_context)
-    try:
-        primary_score = float(require_field(metric, "score", metric_context))
-    except (TypeError, ValueError) as failure:
-        raise ValueError(f"Malformed {metric_context} score") from failure
+    primary_score = _finite(
+        require_field(metric, "score", metric_context),
+        f"{metric_context} score",
+    )
     score = _milliseconds(primary_score, unit)
     if not math.isfinite(score) or score <= 0.0:
         raise ValueError("Concurrency latency must be finite and positive")
@@ -503,6 +522,18 @@ def _format(value: float | None) -> str:
     return "–" if value is None else f"{value:.3f}%"
 
 
+def _strict_json(value: Any) -> str:
+    return (
+        json.dumps(
+            value,
+            indent=2,
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        + "\n"
+    )
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         raise SystemExit(
@@ -516,20 +547,17 @@ def main() -> None:
     report = convert(raw)
     output.mkdir(parents=True, exist_ok=True)
     (output / "pack-storage-layout-concurrency-comparison.json").write_text(
-        json.dumps(report["comparison"], indent=2, ensure_ascii=False) + "\n",
+        _strict_json(report["comparison"]),
         encoding="utf-8",
     )
     (output / "pack-storage-layout-concurrency-evidence.json").write_text(
-        json.dumps(
+        _strict_json(
             {
                 key: value
                 for key, value in report.items()
                 if key != "comparison"
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-        + "\n",
+            }
+        ),
         encoding="utf-8",
     )
     _write_markdown(report, output / "pack-storage-layout-concurrency-evidence.md")
