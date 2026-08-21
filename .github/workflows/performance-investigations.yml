@@ -67,8 +67,8 @@ jobs:
       - name: Validate repository-aging evidence converter
         if: matrix.investigation == 'repository-aging'
         run: |
-          python3 -m py_compile .github/scripts/convert-jmh-repository-aging.py .github/scripts/test_convert_jmh-repository-aging.py
-          python3 .github/scripts/test_convert_jmh-repository-aging.py
+          python3 -m py_compile .github/scripts/convert-jmh-repository-aging.py .github/scripts/test_convert_jmh_repository_aging.py
+          python3 .github/scripts/test_convert_jmh_repository_aging.py
 
       - name: Build benchmark module with Maven
         shell: bash
