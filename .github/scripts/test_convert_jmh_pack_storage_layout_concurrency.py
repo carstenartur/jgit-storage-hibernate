@@ -64,6 +64,62 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         )
         self.assertEqual(1.0, sixteen_worker["jdbcBatchExecutionsPerWorker"])
 
+    def test_malformed_schema_is_reported_as_contextual_value_error(self) -> None:
+        malformed_cases = []
+        malformed_cases.append(("array", {}, "expected JSON array"))
+        malformed_cases.append(("result", [None], "expected JSON object"))
+
+        for field in ("params", "primaryMetric", "secondaryMetrics"):
+            result = self.result("write", 1, 1024, 10.0)
+            result[field] = None
+            malformed_cases.append((field, [result], field))
+
+        for field in (
+            "backend",
+            "operation",
+            "payloadKiB",
+            "chunkKiB",
+            "inlineKiB",
+            "retainedMiB",
+            "readAheadKiB",
+            "concurrency",
+        ):
+            result = self.result("write", 1, 1024, 10.0)
+            del result["params"][field]
+            malformed_cases.append((field, [result], field))
+
+        result = self.result("write", 1, 1024, 10.0)
+        del result["threads"]
+        malformed_cases.append(("threads", [result], "threads"))
+
+        for field in ("score", "scoreUnit"):
+            result = self.result("write", 1, 1024, 10.0)
+            del result["primaryMetric"][field]
+            malformed_cases.append((field, [result], field))
+
+        result = self.result("write", 1, 1024, 10.0)
+        result["params"]["concurrency"] = "not-an-integer"
+        malformed_cases.append(("integer", [result], "concurrency"))
+
+        result = self.result("write", 1, 1024, 10.0)
+        result["primaryMetric"]["scorePercentiles"] = []
+        malformed_cases.append(("percentiles", [result], "scorePercentiles"))
+
+        result = self.result("write", 1, 1024, 10.0)
+        del result["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]["score"]
+        malformed_cases.append(("secondary score", [result], "configuredChunkBytes"))
+
+        for name, value, expected in malformed_cases:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as raised:
+                    CONVERTER.convert(value)
+                message = str(raised.exception)
+                self.assertIn(expected, message)
+                if name not in {"array", "result", "backend", "operation", "params"}:
+                    self.assertIn("operation='write'", message)
+
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing current-layout"):
             CONVERTER.convert([self.result("write", 1, 4096, 5.0)])
@@ -155,6 +211,17 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         metric["score"] = expected * 3.0
         metric["rawData"] = [[expected, expected * 2.0]]
         with self.assertRaisesRegex(ValueError, "changed across JMH iterations"):
+            CONVERTER.convert([current, candidate])
+
+    def test_inconsistent_raw_data_fork_lengths_are_rejected(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        metric = current["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]
+        expected = float(metric["score"])
+        metric["rawData"] = [[expected, expected], [expected]]
+        with self.assertRaisesRegex(ValueError, "fork lengths"):
             CONVERTER.convert([current, candidate])
 
     def test_present_but_invalid_raw_data_is_rejected(self) -> None:

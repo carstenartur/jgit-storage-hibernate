@@ -163,6 +163,59 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             report["decision"],
         )
 
+    def test_malformed_schema_is_reported_as_contextual_value_error(self) -> None:
+        valid = self.result("postgresql", "write", 1024, 10.0)
+        malformed_cases = []
+
+        malformed_cases.append(("array", {}, "expected JSON array"))
+        malformed_cases.append(("result", [None], "expected JSON object"))
+
+        for field in ("params", "primaryMetric", "secondaryMetrics"):
+            result = self.result("postgresql", "write", 1024, 10.0)
+            result[field] = None
+            malformed_cases.append((field, [result], field))
+
+        for field in (
+            "backend",
+            "operation",
+            "payloadKiB",
+            "chunkKiB",
+            "inlineKiB",
+            "retainedMiB",
+            "readAheadKiB",
+        ):
+            result = self.result("postgresql", "write", 1024, 10.0)
+            del result["params"][field]
+            malformed_cases.append((field, [result], field))
+
+        for field in ("score", "scoreUnit"):
+            result = self.result("postgresql", "write", 1024, 10.0)
+            del result["primaryMetric"][field]
+            malformed_cases.append((field, [result], field))
+
+        result = self.result("postgresql", "write", 1024, 10.0)
+        result["params"]["chunkKiB"] = "not-an-integer"
+        malformed_cases.append(("integer", [result], "chunkKiB"))
+
+        result = self.result("postgresql", "write", 1024, 10.0)
+        result["primaryMetric"]["scorePercentiles"] = []
+        malformed_cases.append(("percentiles", [result], "scorePercentiles"))
+
+        result = self.result("postgresql", "write", 1024, 10.0)
+        del result["secondaryMetrics"]["LayoutCounters.configuredChunkBytes"]["score"]
+        malformed_cases.append(("secondary score", [result], "configuredChunkBytes"))
+
+        for name, value, expected in malformed_cases:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as raised:
+                    CONVERTER.convert(value)
+                message = str(raised.exception)
+                self.assertIn(expected, message)
+                if name not in {"array", "result", "backend", "operation", "params"}:
+                    self.assertIn("operation='write'", message)
+
+        self.assertEqual("postgresql", valid["params"]["backend"])
+
     def test_retained_budget_rounding_violation_is_rejected(self) -> None:
         result = self.result("postgresql", "write", 1024, 10.0)
         result["secondaryMetrics"][
@@ -268,7 +321,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         for value in (math.nan, math.inf, -math.inf):
             with self.subTest(value=value):
                 result = self.result("postgresql", "write", 1024, value)
-                with self.assertRaisesRegex(ValueError, "primary score"):
+                with self.assertRaisesRegex(ValueError, "primaryMetric score"):
                     CONVERTER.convert([result])
 
     def test_non_finite_primary_percentile_is_rejected(self) -> None:
@@ -278,7 +331,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 result["primaryMetric"]["scorePercentiles"]["95.0"] = value
                 with self.assertRaisesRegex(
                     ValueError,
-                    "primary percentile",
+                    "primaryMetric percentile",
                 ):
                     CONVERTER.convert([result])
 
