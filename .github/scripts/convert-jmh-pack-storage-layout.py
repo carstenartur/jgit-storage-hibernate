@@ -21,6 +21,26 @@ OPERATIONS = {"write", "sequential-read", "short-read", "random-read"}
 SPARSE_OPERATIONS = {"short-read", "random-read"}
 
 
+def _finite(value: Any, name: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as failure:
+        raise ValueError(f"Malformed {name}") from failure
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite {name}")
+    return number
+
+
+def _optional_finite(value: Any, name: str) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as failure:
+        raise ValueError(f"Malformed {name}") from failure
+    return number if math.isfinite(number) else None
+
+
 def _milliseconds(score: float, unit: str) -> float:
     factors = {
         "ns/op": 1e-6,
@@ -30,9 +50,12 @@ def _milliseconds(score: float, unit: str) -> float:
         "s/op": 1000.0,
     }
     try:
-        return score * factors[unit]
+        value = score * factors[unit]
     except KeyError as failure:
         raise ValueError(f"Unsupported pack-layout score unit: {unit!r}") from failure
+    if not math.isfinite(value):
+        raise ValueError("Non-finite pack-layout score")
+    return value
 
 
 def _secondary(
@@ -54,44 +77,45 @@ def _secondary(
             if not isinstance(raw_data, list) or not raw_data:
                 raise ValueError(f"Malformed rawData for secondary metric {name!r}")
             samples: list[float] = []
+            iteration_count: int | None = None
             for fork in raw_data:
                 if not isinstance(fork, list) or not fork:
-                    raise ValueError(f"Malformed rawData for secondary metric {name!r}")
+                    raise ValueError(
+                        f"Malformed rawData for secondary metric {name!r}"
+                    )
+                if iteration_count is None:
+                    iteration_count = len(fork)
+                elif len(fork) != iteration_count:
+                    raise ValueError(
+                        f"Inconsistent rawData fork lengths for secondary metric {name!r}"
+                    )
                 for raw_value in fork:
-                    try:
-                        value = float(raw_value)
-                    except (TypeError, ValueError) as failure:
-                        raise ValueError(
-                            f"Malformed rawData for secondary metric {name!r}"
-                        ) from failure
-                    if not math.isfinite(value):
-                        raise ValueError(
-                            f"Non-finite rawData for secondary metric {name!r}"
-                        )
+                    value = _finite(
+                        raw_value, f"rawData for secondary metric {name!r}"
+                    )
                     samples.append(value)
             if require_constant and any(
                 not math.isclose(value, samples[0], rel_tol=0.0, abs_tol=1e-6)
                 for value in samples[1:]
             ):
                 raise ValueError(
-                    f"Secondary metric {name!r} changed across JMH iterations: {samples!r}"
+                    f"Secondary metric {name!r} changed across JMH iterations: "
+                    f"{samples!r}"
                 )
             return math.fsum(samples) / len(samples)
 
-        try:
-            value = float(metric.get("score", default))
-        except (TypeError, ValueError) as failure:
-            raise ValueError(f"Malformed secondary metric {name!r}") from failure
-        if not math.isfinite(value):
-            raise ValueError(f"Non-finite secondary metric {name!r}")
+        value = _finite(metric.get("score", default), f"secondary metric {name!r}")
         return value
     return default
 
 
 def _profiler(result: dict[str, Any], suffix: str) -> float | None:
     for key, metric in result.get("secondaryMetrics", {}).items():
-        if key.endswith(suffix):
-            return float(metric.get("score", 0.0))
+        if not key.endswith(suffix):
+            continue
+        if not isinstance(metric, dict):
+            raise ValueError(f"Malformed profiler metric {key!r}")
+        return _optional_finite(metric.get("score"), f"profiler metric {key!r}")
     return None
 
 
@@ -99,7 +123,8 @@ def _percentile(metric: dict[str, Any], percentile: str, fallback: float) -> flo
     values = metric.get("scorePercentiles")
     if not isinstance(values, dict) or percentile not in values:
         return fallback
-    return _milliseconds(float(values[percentile]), str(metric["scoreUnit"]))
+    score = _finite(values[percentile], f"primary percentile {percentile}")
+    return _milliseconds(score, str(metric["scoreUnit"]))
 
 
 def _row(result: dict[str, Any]) -> dict[str, Any]:
@@ -125,8 +150,12 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"Unsupported readAheadKiB: {read_ahead_kib}")
 
     metric = result["primaryMetric"]
-    score = _milliseconds(float(metric["score"]), str(metric["scoreUnit"]))
-    error = _milliseconds(float(metric.get("scoreError", 0.0)), str(metric["scoreUnit"]))
+    if not isinstance(metric, dict):
+        raise ValueError("Malformed primary metric")
+    unit = str(metric["scoreUnit"])
+    score = _milliseconds(_finite(metric["score"], "primary score"), unit)
+    raw_error = _optional_finite(metric.get("scoreError"), "primary score error")
+    error = None if raw_error is None else _milliseconds(raw_error, unit)
     configured_budget = int(
         round(
             _secondary(
@@ -158,9 +187,13 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("JMH parameter and configured retained-byte budget disagree")
     if configured_read_ahead != read_ahead_kib * 1024:
         raise ValueError("JMH parameter and configured read-ahead bytes disagree")
-    if actual_retained > configured_budget or configured_budget - actual_retained >= configured_chunk:
+    if (
+        actual_retained > configured_budget
+        or configured_budget - actual_retained >= configured_chunk
+    ):
         raise ValueError(
-            "Retained chunk bytes must round the configured byte budget down by less than one chunk"
+            "Retained chunk bytes must round the configured byte budget down by "
+            "less than one chunk"
         )
 
     logical_payload = int(
@@ -168,7 +201,9 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     )
     if logical_payload != payload_kib * 1024:
         raise ValueError("JMH parameter and logical payload bytes disagree")
-    chunk_rows = int(round(_secondary(result, "chunkRows", require_constant=True)))
+    chunk_rows = int(
+        round(_secondary(result, "chunkRows", require_constant=True))
+    )
     expected_chunk_rows = (
         0
         if logical_payload <= inline_kib * 1024
@@ -176,7 +211,8 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     )
     if chunk_rows != expected_chunk_rows:
         raise ValueError(
-            f"Chunk row count mismatch: expected {expected_chunk_rows}, got {chunk_rows}"
+            f"Chunk row count mismatch: expected {expected_chunk_rows}, "
+            f"got {chunk_rows}"
         )
 
     return {
@@ -204,17 +240,29 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         "proposedLayoutVersion": int(
             round(_secondary(result, "proposedLayoutVersion", require_constant=True))
         ),
-        "packRows": int(round(_secondary(result, "packRows", require_constant=True))),
+        "packRows": int(
+            round(_secondary(result, "packRows", require_constant=True))
+        ),
         "chunkRows": chunk_rows,
-        "jdbcBatchExecutions": int(round(_secondary(result, "jdbcBatchExecutions"))),
+        "jdbcBatchExecutions": int(
+            round(_secondary(result, "jdbcBatchExecutions"))
+        ),
         "jdbcStatementExecutions": int(
             round(_secondary(result, "jdbcStatementExecutions"))
         ),
-        "preparedStatements": int(round(_secondary(result, "preparedStatements"))),
-        "hibernateQueries": int(round(_secondary(result, "hibernateQueries"))),
+        "preparedStatements": int(
+            round(_secondary(result, "preparedStatements"))
+        ),
+        "hibernateQueries": int(
+            round(_secondary(result, "hibernateQueries"))
+        ),
         "flushes": int(round(_secondary(result, "flushes"))),
-        "databasePayloadBytes": int(round(_secondary(result, "databasePayloadBytes"))),
-        "logicalBytesConsumed": int(round(_secondary(result, "logicalBytesConsumed"))),
+        "databasePayloadBytes": int(
+            round(_secondary(result, "databasePayloadBytes"))
+        ),
+        "logicalBytesConsumed": int(
+            round(_secondary(result, "logicalBytesConsumed"))
+        ),
         "overfetchBytes": int(round(_secondary(result, "overfetchBytes"))),
         "allocationBytesPerOperation": _profiler(result, "gc.alloc.rate.norm"),
         "gcCount": _profiler(result, "gc.count"),
@@ -238,12 +286,16 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
     evidence: list[dict[str, Any]] = []
     comparisons: list[dict[str, Any]] = []
     for row in rows:
-        baseline = keyed.get(_condition_key(row) + (CURRENT_CHUNK_KIB, CURRENT_INLINE_KIB))
+        baseline = keyed.get(
+            _condition_key(row) + (CURRENT_CHUNK_KIB, CURRENT_INLINE_KIB)
+        )
         relative = None
         if baseline is not None and baseline["scoreMillis"] > 0.0:
-            relative = (baseline["scoreMillis"] - row["scoreMillis"]) * 100.0 / baseline[
-                "scoreMillis"
-            ]
+            relative = (
+                (baseline["scoreMillis"] - row["scoreMillis"])
+                * 100.0
+                / baseline["scoreMillis"]
+            )
         enriched = {**row, "relativeToCurrentPercent": relative}
         evidence.append(enriched)
         comparisons.append(
@@ -251,25 +303,42 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
                 "name": (
                     f"Pack layout {row['operation']} — {row['backend']}, "
                     f"{row['payloadKiB']} KiB, chunk {row['chunkKiB']} KiB, "
-                    f"inline {row['inlineKiB']} KiB, retained {row['retainedMiB']} MiB, "
-                    f"read-ahead {row['readAheadKiB']} KiB"
+                    f"inline {row['inlineKiB']} KiB, retained "
+                    f"{row['retainedMiB']} MiB, read-ahead "
+                    f"{row['readAheadKiB']} KiB"
                 ),
                 "unit": CANONICAL_UNIT,
                 "value": row["scoreMillis"],
                 "range": row["scoreErrorMillis"],
                 "extra": "\n".join(
                     [
-                        f"p50/p95/p99: {row['p50Millis']:.6f} / {row['p95Millis']:.6f} / {row['p99Millis']:.6f} ms",
+                        (
+                            "p50/p95/p99: "
+                            f"{row['p50Millis']:.6f} / "
+                            f"{row['p95Millis']:.6f} / "
+                            f"{row['p99Millis']:.6f} ms"
+                        ),
                         f"Rows: {row['packRows'] + row['chunkRows']}",
                         f"Chunk rows: {row['chunkRows']}",
                         f"Chunks per batch: {row['chunksPerBatch']}",
-                        f"Retained chunk bytes: {row['actualRetainedChunkBytes']}",
+                        (
+                            "Retained chunk bytes: "
+                            f"{row['actualRetainedChunkBytes']}"
+                        ),
                         f"Read-ahead chunks: {row['readAheadChunks']}",
-                        f"Fetched/consumed/overfetch: {row['databasePayloadBytes']} / {row['logicalBytesConsumed']} / {row['overfetchBytes']}",
+                        (
+                            "Fetched/consumed/overfetch: "
+                            f"{row['databasePayloadBytes']} / "
+                            f"{row['logicalBytesConsumed']} / "
+                            f"{row['overfetchBytes']}"
+                        ),
                         (
                             "Current-layout comparison: unavailable"
                             if relative is None
-                            else f"Current-layout improvement: {relative:.3f}%"
+                            else (
+                                "Current-layout improvement: "
+                                f"{relative:.3f}%"
+                            )
                         ),
                     ]
                 ),
@@ -289,7 +358,10 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
         "schemaVersion": 1,
         "decision": decision,
         "productionDefaultsChanged": False,
-        "currentLayout": {"chunkKiB": CURRENT_CHUNK_KIB, "inlineKiB": CURRENT_INLINE_KIB},
+        "currentLayout": {
+            "chunkKiB": CURRENT_CHUNK_KIB,
+            "inlineKiB": CURRENT_INLINE_KIB,
+        },
         "backends": backends,
         "comparison": sorted(comparisons, key=lambda item: item["name"]),
         "evidence": evidence,
@@ -346,12 +418,15 @@ def _layout_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "backend": backend,
                     "writeMedianImprovementPercent": _median(write),
                     "sequentialMedianImprovementPercent": _median(sequential),
-                    "worstSparseImprovementPercent": min(sparse) if sparse else None,
+                    "worstSparseImprovementPercent": (
+                        min(sparse) if sparse else None
+                    ),
                     "comparisonCount": len(backend_values),
                 }
             )
         eligible = (
-            chunk_kib != CURRENT_CHUNK_KIB or inline_kib != CURRENT_INLINE_KIB
+            chunk_kib != CURRENT_CHUNK_KIB
+            or inline_kib != CURRENT_INLINE_KIB
         ) and len(backend_summaries) >= 2 and all(
             summary["writeMedianImprovementPercent"] is not None
             and summary["writeMedianImprovementPercent"] > 0.0
@@ -370,9 +445,13 @@ def _layout_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "eligible": eligible,
                 "backendEvidence": backend_summaries,
                 "reason": (
-                    "Write and sequential-read gains with at most five-percent sparse-read regression on both production databases."
+                    "Write and sequential-read gains with at most five-percent "
+                    "sparse-read regression on both production databases."
                     if eligible
-                    else "Insufficient cross-database net benefit; keep the current production layout."
+                    else (
+                        "Insufficient cross-database net benefit; keep the "
+                        "current production layout."
+                    )
                 ),
             }
         )
@@ -395,7 +474,11 @@ def _write_markdown(report: dict[str, Any], target: Path) -> None:
         "",
         f"Decision: `{report['decision']}`.",
         "",
-        "The converter never changes production settings. Candidate layouts require matching PostgreSQL and SQL Server evidence plus a versioned compatibility design.",
+        (
+            "The converter never changes production settings. Candidate layouts "
+            "require matching PostgreSQL and SQL Server evidence plus a versioned "
+            "compatibility design."
+        ),
         "",
         "| Chunk KiB | Inline KiB | Eligible | Reason |",
         "|---:|---:|---|---|",
@@ -403,21 +486,40 @@ def _write_markdown(report: dict[str, Any], target: Path) -> None:
     for candidate in report["layoutCandidates"]:
         lines.append(
             f"| {candidate['chunkKiB']} | {candidate['inlineKiB']} | "
-            f"{'yes' if candidate['eligible'] else 'no'} | {candidate['reason']} |"
+            f"{'yes' if candidate['eligible'] else 'no'} | "
+            f"{candidate['reason']} |"
         )
     lines.extend(
         [
             "",
-            "Legacy rows without explicit layout metadata remain one-MiB chunk rows. Inline rows remain distinguishable through the existing payload column. No existing repository is rewritten by this benchmark.",
+            (
+                "Legacy rows without explicit layout metadata remain one-MiB "
+                "chunk rows. Inline rows remain distinguishable through the "
+                "existing payload column. No existing repository is rewritten "
+                "by this benchmark."
+            ),
         ]
     )
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _strict_json(value: Any) -> str:
+    return (
+        json.dumps(
+            value,
+            indent=2,
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        + "\n"
+    )
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         raise SystemExit(
-            "usage: convert-jmh-pack-storage-layout.py <jmh-result.json> <output-directory>"
+            "usage: convert-jmh-pack-storage-layout.py "
+            "<jmh-result.json> <output-directory>"
         )
     source = Path(sys.argv[1])
     output = Path(sys.argv[2])
@@ -427,16 +529,13 @@ def main() -> None:
     report = convert(raw)
     output.mkdir(parents=True, exist_ok=True)
     (output / "pack-storage-layout-comparison.json").write_text(
-        json.dumps(report["comparison"], indent=2, ensure_ascii=False) + "\n",
+        _strict_json(report["comparison"]),
         encoding="utf-8",
     )
     (output / "pack-storage-layout-evidence.json").write_text(
-        json.dumps(
-            {key: value for key, value in report.items() if key != "comparison"},
-            indent=2,
-            ensure_ascii=False,
-        )
-        + "\n",
+        _strict_json(
+            {key: value for key, value in report.items() if key != "comparison"}
+        ),
         encoding="utf-8",
     )
     _write_markdown(report, output / "pack-storage-layout-evidence.md")
