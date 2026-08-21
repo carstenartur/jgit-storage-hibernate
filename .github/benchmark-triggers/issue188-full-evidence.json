@@ -2,7 +2,8 @@
   "schemaVersion": 1,
   "issue": 188,
   "profile": "full",
-  "requestedAt": "2026-08-20T17:30:00Z",
-  "baseCommit": "ea3ee2b023dc9b0d2fb2094cd699a01f2c1d8707",
-  "purpose": "Retain cross-database, calibrated RTT and 1/4/16-worker evidence before deciding whether the production pack layout should change."
+  "requestedAt": "2026-08-21T04:17:00Z",
+  "baseCommit": "33ba8ab8837e3ba1401cda4fa8626961d5ab475e",
+  "evidenceCodeCommit": "c44e7f3555054099f595ee059102404ab50e56a3",
+  "purpose": "Retain cross-database, calibrated RTT and 1/4/16-worker evidence after repairing JMH iteration normalization and duplicate full-profile coordinates."
 }
