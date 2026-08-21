@@ -605,7 +605,7 @@ layout_tests = replace_once(
                     CONVERTER.convert(value)
                 message = str(raised.exception)
                 self.assertIn(expected, message)
-                if name not in {"array", "result", "backend", "params"}:
+                if name not in {"array", "result", "backend", "operation", "params"}:
                     self.assertIn("operation='write'", message)
 
         self.assertEqual("postgresql", valid["params"]["backend"])
@@ -613,6 +613,18 @@ layout_tests = replace_once(
     def test_retained_budget_rounding_violation_is_rejected(self) -> None:
 ''',
     "layout schema regression tests",
+)
+layout_tests = replace_once(
+    layout_tests,
+    'with self.assertRaisesRegex(ValueError, "primary score"):',
+    'with self.assertRaisesRegex(ValueError, "primaryMetric score"):',
+    "layout primary-score diagnostic expectation",
+)
+layout_tests = replace_once(
+    layout_tests,
+    '"primary percentile",',
+    '"primaryMetric percentile",',
+    "layout primary-percentile diagnostic expectation",
 )
 layout_test_path.write_text(layout_tests, encoding="utf-8")
 
@@ -678,7 +690,7 @@ concurrency_tests = replace_once(
                     CONVERTER.convert(value)
                 message = str(raised.exception)
                 self.assertIn(expected, message)
-                if name not in {"array", "result", "backend", "params"}:
+                if name not in {"array", "result", "backend", "operation", "params"}:
                     self.assertIn("operation='write'", message)
 
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
