@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 import unittest
 from pathlib import Path
 
@@ -98,6 +99,17 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         metric["rawData"] = [[expected, expected * 2.0]]
         with self.assertRaisesRegex(ValueError, "changed across JMH iterations"):
             CONVERTER.convert([result])
+
+    def test_present_but_invalid_raw_data_is_rejected(self) -> None:
+        invalid_values = (None, {}, [], [[]], [[math.nan]], [["not-a-number"]])
+        for raw_data in invalid_values:
+            with self.subTest(raw_data=raw_data):
+                result = self.result("postgresql", "write", 1024, 10.0)
+                result["secondaryMetrics"][
+                    "LayoutCounters.configuredChunkBytes"
+                ]["rawData"] = raw_data
+                with self.assertRaisesRegex(ValueError, "rawData"):
+                    CONVERTER.convert([result])
 
     def matrix(self, backends: list[str], sparse_candidate: float) -> list[dict]:
         results = []
