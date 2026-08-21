@@ -1,27 +1,30 @@
 name: Apply issue 187 telemetry hardening
 
 on:
-  push:
-    branches:
-      - feat/187-database-native-telemetry
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
 
 concurrency:
-  group: apply-issue187-telemetry-hardening
+  group: apply-issue187-telemetry-hardening-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
 
     steps:
       - name: Checkout telemetry branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: feat/187-database-native-telemetry
+          ref: ${{ env.HEAD_REF }}
           fetch-depth: 0
 
       - name: Set up JDK 21
@@ -36,6 +39,9 @@ jobs:
 
       - name: Apply deterministic short-window hardening
         run: python3 .github/scripts/apply-issue187-telemetry-hardening.py
+
+      - name: Apply credential redaction
+        run: python3 .github/scripts/apply-issue187-credential-redaction.py
 
       - name: Build benchmark dependencies
         run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
@@ -72,7 +78,7 @@ jobs:
             -Djgit.storage.benchmark.database-telemetry.enabled=true \
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/issue187-hardened-pack-layout/jmh-result.json"
 
-      - name: Verify immediate WAL, stable JSON and window boundaries
+      - name: Verify immediate WAL, stable JSON and clean evidence
         shell: bash
         run: |
           python3 - <<'PY'
@@ -86,9 +92,6 @@ jobs:
           text = telemetry_path.read_text(encoding='utf-8')
           if 'NaN' in text or 'Infinity' in text:
               raise SystemExit('Telemetry output is not strict JSON')
-          for forbidden in ('jdbc:', 'localhost', 'jgit_storage', 'telemetry-password'):
-              if forbidden in text:
-                  raise SystemExit(f'Telemetry leaked forbidden token {forbidden!r}')
 
           value = json.loads(text)
           observations = value['observations']
@@ -122,9 +125,42 @@ jobs:
               raise SystemExit(
                   f'JMH/telemetry cardinality mismatch: {len(jmh)} != {len(observations)}'
               )
+
+          forbidden = (
+              'jgit.storage.benchmark.postgresql.url=',
+              'jgit.storage.benchmark.postgresql.user=',
+              'jgit.storage.benchmark.postgresql.password=',
+              'jgit.storage.benchmark.sqlserver.url=',
+              'jgit.storage.benchmark.sqlserver.user=',
+              'jgit.storage.benchmark.sqlserver.password=',
+              'jdbc:postgresql://',
+              'jdbc:sqlserver://',
+              'Database JDBC URL',
+              'Default catalog/schema',
+              'telemetry-password',
+          )
+          scan_roots = [root, Path('jgit-storage-hibernate-benchmarks/target/surefire-reports')]
+          for scan_root in scan_roots:
+              if not scan_root.exists():
+                  continue
+              for path in scan_root.rglob('*'):
+                  if not path.is_file():
+                      continue
+                  try:
+                      content = path.read_text(encoding='utf-8')
+                  except UnicodeDecodeError:
+                      continue
+                  for token in forbidden:
+                      if token in content:
+                          raise SystemExit(f'Sensitive token {token!r} found in {path}')
+
+          leftovers = list(Path('/tmp').glob('jgit-storage-benchmark-connection-*.properties'))
+          if leftovers:
+              raise SystemExit(f'Temporary credential files were not deleted: {leftovers}')
           print(
               f'Validated {len(observations)} sorted observations; '
-              f'all {len(writes)} writes have positive immediate WAL deltas'
+              f'all {len(writes)} writes have positive immediate WAL deltas; '
+              'retained evidence is credential-free'
           )
           PY
 
@@ -139,12 +175,19 @@ jobs:
             jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetryCollectors.java
           grep -F 'Collections.unmodifiableMap' \
             jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetrySnapshot.java
+          grep -F 'CONNECTION_PROPERTIES_FILE_PROPERTY' \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackStorageLayoutBenchmark.java
+          grep -F 'rw-------' \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackStorageLayoutBenchmarkTest.java
           grep -F 'cumulative statistics whose publication can lag' \
+            docs/operations/database-native-telemetry.md
+          grep -F 'short-lived owner-readable properties file' \
             docs/operations/database-native-telemetry.md
 
       - name: Remove one-shot hardening tooling
         run: |
           rm .github/scripts/apply-issue187-telemetry-hardening.py
+          rm .github/scripts/apply-issue187-credential-redaction.py
           rm .github/workflows/apply-issue187-telemetry-hardening.yml
 
       - name: Commit validated hardening
@@ -156,24 +199,25 @@ jobs:
           git add -- \
             jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetryCollectors.java \
             jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetrySnapshot.java \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackStorageLayoutBenchmark.java \
             jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseNativeTelemetryIntegrationTest.java \
             jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetrySnapshotTest.java \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackStorageLayoutBenchmarkTest.java \
             docs/operations/database-native-telemetry.md \
             .github/scripts/apply-issue187-telemetry-hardening.py \
+            .github/scripts/apply-issue187-credential-redaction.py \
             .github/workflows/apply-issue187-telemetry-hardening.yml
           if git diff --cached --quiet; then
             echo 'Expected issue #187 hardening produced no staged changes' >&2
             exit 1
           fi
-          git commit -m 'Harden native telemetry window evidence'
-          git push origin HEAD:feat/187-database-native-telemetry
+          git commit -m 'Harden native telemetry evidence boundaries'
+          git push origin "HEAD:${HEAD_REF}"
 
       - name: Upload hardened telemetry evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: issue187-hardened-postgresql-telemetry
-          path: |
-            target/issue187-hardened-pack-layout/**
-            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
-          if-no-files-found: warn
+          path: target/issue187-hardened-pack-layout/**
+          if-no-files-found: error
