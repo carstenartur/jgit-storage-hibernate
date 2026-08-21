@@ -1,0 +1,289 @@
+name: Validate issue 187 repository-aging telemetry
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: validate-issue187-repository-aging-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      - name: Checkout telemetry branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Detect pending transformation
+        id: helper
+        shell: bash
+        run: |
+          if test -f .github/scripts/apply-issue187-repository-aging-telemetry.py; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo 'Validated repository-aging source has already been published.'
+          fi
+
+      - name: Apply repository-aging telemetry integration
+        if: steps.helper.outputs.exists == 'true'
+        run: python3 .github/scripts/apply-issue187-repository-aging-telemetry.py
+
+      - name: Build benchmark dependencies
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run telemetry and queue regression contracts
+        run: |
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=DatabaseTelemetrySnapshotTest,DurableStripedWriteQueueTest
+
+      - name: Run exact PostgreSQL repository-aging telemetry smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf target/issue187-repository-aging
+          mkdir -p target/issue187-repository-aging
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pperformance-investigations \
+            -Dtest=DatabaseTelemetrySnapshotTest \
+            -Djgit.storage.benchmark.investigation=repository-aging \
+            -Djgit.storage.benchmark.investigation.profile=smoke \
+            -Djgit.storage.benchmark.repository-aging.native-smoke=true \
+            -Djgit.storage.benchmark.database-telemetry.enabled=true \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/issue187-repository-aging/jmh-result.json"
+
+      - name: Validate phase attribution, exact coordinates and privacy
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import collections
+          import datetime
+          import json
+          from pathlib import Path
+
+          root = Path('target/issue187-repository-aging')
+          telemetry_path = root / 'repository-aging-database-telemetry.json'
+          ndjson_path = root / 'repository-aging-database-telemetry.ndjson'
+          jmh_path = root / 'jmh-result.json'
+          output_path = root / 'repository-aging-jmh-output.txt'
+          for path in (telemetry_path, ndjson_path, jmh_path, output_path):
+              if not path.is_file() or path.stat().st_size < 3:
+                  raise SystemExit(f'Missing retained repository-aging evidence {path}')
+
+          telemetry_text = telemetry_path.read_text(encoding='utf-8')
+          if 'NaN' in telemetry_text or 'Infinity' in telemetry_text:
+              raise SystemExit('Repository-aging telemetry is not strict JSON')
+          observations = json.loads(telemetry_text)['observations']
+          jmh = json.loads(jmh_path.read_text(encoding='utf-8'))
+          if len(jmh) != 9:
+              raise SystemExit(f'Expected 9 focused JMH results, found {len(jmh)}')
+          if len(observations) != 27:
+              raise SystemExit(f'Expected 27 phase observations, found {len(observations)}')
+
+          def base_from_jmh(item):
+              params = item['params']
+              return (
+                  item['benchmark'].rsplit('.', 1)[-1],
+                  params['backend'],
+                  params['pushes'],
+                  params['maintenanceMode'],
+                  params['cacheState'],
+                  params['deployment'],
+              )
+
+          def base_from_observation(item):
+              coordinate = item['coordinate']
+              return (
+                  coordinate['benchmarkMethod'],
+                  coordinate['backend'],
+                  coordinate['pushes'],
+                  coordinate['maintenanceMode'],
+                  coordinate['cacheState'],
+                  coordinate['deployment'],
+              )
+
+          jmh_bases = {base_from_jmh(item) for item in jmh}
+          phase_counts = collections.Counter(
+              (base_from_observation(item), item['coordinate']['phase'])
+              for item in observations
+          )
+          if {base for base, _ in phase_counts} != jmh_bases:
+              raise SystemExit(
+                  'JMH and telemetry base coordinates differ: '
+                  f'{jmh_bases ^ {base for base, _ in phase_counts}}'
+              )
+          expected_phases = {'fixture-build', 'maintenance', 'measurement'}
+          for base in jmh_bases:
+              phases = {
+                  phase
+                  for (candidate, phase), count in phase_counts.items()
+                  if candidate == base and count == 1
+              }
+              if phases != expected_phases:
+                  raise SystemExit(f'Incomplete phase attribution for {base}: {phases}')
+
+          wal_by_phase = collections.defaultdict(list)
+          for item in observations:
+              coordinate = item['coordinate']
+              phase = coordinate['phase']
+              if item['backend'] != 'postgresql':
+                  raise SystemExit(f'Unexpected telemetry backend: {item["backend"]}')
+              if coordinate['databaseBackend'] != 'postgresql':
+                  raise SystemExit(f'Unexpected database coordinate: {coordinate}')
+              expected_iteration = '1' if phase == 'measurement' else '0'
+              if coordinate['measurementIteration'] != expected_iteration:
+                  raise SystemExit(f'Unexpected phase iteration: {coordinate}')
+              for field in ('coordinate', 'counters', 'gauges', 'metadata', 'unsupported'):
+                  keys = list(item[field])
+                  if keys != sorted(keys):
+                      raise SystemExit(
+                          f'{field} keys are not deterministic for {coordinate}: {keys}'
+                      )
+              wal = item['counters'].get('postgresql.wal.insert_lsn_bytes')
+              if wal is None or wal < 0:
+                  raise SystemExit(f'Missing immediate WAL delta for {coordinate}: {wal}')
+              wal_by_phase[phase].append(wal)
+              if phase == 'fixture-build' and wal <= 0:
+                  raise SystemExit(f'Fixture build produced no WAL: {coordinate}')
+              if (
+                  phase == 'maintenance'
+                  and coordinate['maintenanceMode'] != 'none'
+                  and wal <= 0
+              ):
+                  raise SystemExit(f'Maintenance produced no WAL: {coordinate}')
+              start = datetime.datetime.fromisoformat(
+                  item['startedAt'].replace('Z', '+00:00')
+              )
+              end = datetime.datetime.fromisoformat(
+                  item['completedAt'].replace('Z', '+00:00')
+              )
+              if end < start:
+                  raise SystemExit(f'Negative telemetry window for {coordinate}')
+
+          ndjson_lines = [
+              line for line in ndjson_path.read_text(encoding='utf-8').splitlines() if line
+          ]
+          if len(ndjson_lines) != len(observations):
+              raise SystemExit(
+                  f'NDJSON/aggregate count mismatch: {len(ndjson_lines)} != {len(observations)}'
+              )
+          for line in ndjson_lines:
+              json.loads(line)
+
+          forbidden = (
+              'jgit.storage.benchmark.postgresql.url=',
+              'jgit.storage.benchmark.postgresql.user=',
+              'jgit.storage.benchmark.postgresql.password=',
+              'jdbc:postgresql://',
+              'Database JDBC URL',
+              'Default catalog/schema',
+          )
+          for path in root.rglob('*'):
+              if not path.is_file():
+                  continue
+              content = path.read_bytes().decode('utf-8', errors='replace')
+              for token in forbidden:
+                  if token in content:
+                      raise SystemExit(f'Sensitive token {token!r} found in {path}')
+          leftovers = list(
+              Path('/tmp').glob('jgit-storage-benchmark-connection-*.properties')
+          )
+          if leftovers:
+              raise SystemExit(f'Temporary credential files remain: {leftovers}')
+
+          print(
+              'Validated 9 repository-aging coordinates and 27 exact phases; '
+              + ', '.join(
+                  f'{phase} WAL {min(values)}..{max(values)} bytes'
+                  for phase, values in sorted(wal_by_phase.items())
+              )
+          )
+          PY
+
+      - name: Verify source contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          grep -F 'captureSetupPhase("fixture-build"' \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmark.java
+          grep -F 'captureSetupPhase("maintenance"' \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmark.java
+          grep -F 'REPOSITORY_AGING_NATIVE_SMOKE_PROPERTY' \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java
+          grep -F 'Validate repository-aging native telemetry' \
+            .github/workflows/performance-investigations.yml
+          grep -F 'three boundaries' docs/operations/database-native-telemetry.md
+
+      - name: Retain generated durable workflow and prepare source-only commit
+        if: steps.helper.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/issue187-generated-workflow
+          cp .github/workflows/performance-investigations.yml \
+            target/issue187-generated-workflow/performance-investigations.yml
+          sha256sum target/issue187-generated-workflow/performance-investigations.yml \
+            > target/issue187-generated-workflow/SHA256SUMS
+          git checkout -- .github/workflows/performance-investigations.yml
+          rm .github/scripts/apply-issue187-repository-aging-telemetry.py
+          git diff --check
+
+      - name: Commit validated source and documentation
+        if: steps.helper.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmark.java \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java \
+            docs/operations/database-native-telemetry.md \
+            docs/performance-status.md \
+            .github/scripts/apply-issue187-repository-aging-telemetry.py
+          if git diff --cached --quiet; then
+            echo 'Expected validated repository-aging source changes were not staged' >&2
+            exit 1
+          fi
+          git commit -m 'Integrate native telemetry with repository aging'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload exact repository-aging evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue187-repository-aging-native-telemetry
+          path: target/issue187-repository-aging/**
+          if-no-files-found: warn
+
+      - name: Upload generated durable workflow
+        if: steps.helper.outputs.exists == 'true' && always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue187-generated-aging-workflow
+          path: target/issue187-generated-workflow/**
+          if-no-files-found: error
