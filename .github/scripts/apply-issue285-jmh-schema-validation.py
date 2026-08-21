@@ -11,6 +11,12 @@ def replace_once(text: str, old: str, new: str, description: str) -> str:
     return text.replace(old, new)
 
 
+def replace_first(text: str, old: str, new: str, description: str) -> str:
+    if old not in text:
+        raise SystemExit(f"Expected at least one {description} match")
+    return text.replace(old, new, 1)
+
+
 schema_path = Path(".github/scripts/jmh_evidence_schema.py")
 schema_path.write_text(
     '''#!/usr/bin/env python3
@@ -139,7 +145,7 @@ PARAMETER_NAMES = (
 ''',
     "layout parameter names",
 )
-layout = replace_once(
+layout = replace_first(
     layout,
     '    for key, metric in result.get("secondaryMetrics", {}).items():\n',
     '''    context = result_context(result, "pack-layout result", PARAMETER_NAMES)
