@@ -1,0 +1,126 @@
+name: Apply issue 285 concurrency strict JSON
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: apply-issue285-concurrency-json-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      CONCURRENCY_RUN_ID: '32445552863'
+
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          fetch-depth: 0
+
+      - name: Retain current concurrency converter
+        run: |
+          mkdir -p /tmp/issue285-concurrency-baseline
+          cp .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            /tmp/issue285-concurrency-baseline/convert-jmh-pack-storage-layout-concurrency.py
+          cp .github/scripts/jmh_evidence_schema.py \
+            /tmp/issue285-concurrency-baseline/jmh_evidence_schema.py
+
+      - name: Apply strict serialization completion
+        run: python3 .github/scripts/apply-issue285-concurrency-strict-json.py
+
+      - name: Run both converter regression suites
+        run: |
+          python3 -m py_compile \
+            .github/scripts/jmh_evidence_schema.py \
+            .github/scripts/convert-jmh-pack-storage-layout.py \
+            .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+
+      - name: Download retained concurrency source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/issue285-concurrency-source
+          gh run download "$CONCURRENCY_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name pack-storage-layout-postgresql-concurrency-smoke \
+            --dir target/issue285-concurrency-source
+          test -s target/issue285-concurrency-source/target/pack-storage-layout-concurrency/jmh-result.json
+
+      - name: Prove finite valid output remains byte-identical and strict
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=target/issue285-concurrency-source/target/pack-storage-layout-concurrency/jmh-result.json
+          python3 /tmp/issue285-concurrency-baseline/convert-jmh-pack-storage-layout-concurrency.py \
+            "$source" target/issue285-concurrency-equivalence/baseline
+          python3 .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            "$source" target/issue285-concurrency-equivalence/current
+          diff -ru \
+            target/issue285-concurrency-equivalence/baseline \
+            target/issue285-concurrency-equivalence/current
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          for path in Path('target/issue285-concurrency-equivalence/current').glob('*.json'):
+              text = path.read_text(encoding='utf-8')
+              json.loads(text)
+              assert 'NaN' not in text
+              assert 'Infinity' not in text
+          PY
+
+      - name: Verify final patch shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          grep -F 'allow_nan=False' .github/scripts/convert-jmh-pack-storage-layout-concurrency.py
+          grep -F 'test_nan_score_error_becomes_json_null' .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
+
+      - name: Remove one-shot completion tooling
+        run: |
+          rm .github/scripts/apply-issue285-concurrency-strict-json.py
+          rm .github/workflows/apply-issue285-concurrency-strict-json.yml
+
+      - name: Commit validated completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py \
+            .github/scripts/apply-issue285-concurrency-strict-json.py \
+            .github/workflows/apply-issue285-concurrency-strict-json.yml
+          if git diff --cached --quiet; then
+            echo 'Expected concurrency strict-JSON completion produced no staged changes' >&2
+            exit 1
+          fi
+          git commit -m 'Make concurrency evidence strict JSON'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload strict equivalence evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue285-concurrency-strict-equivalence
+          path: target/issue285-concurrency-equivalence/**
+          if-no-files-found: error
