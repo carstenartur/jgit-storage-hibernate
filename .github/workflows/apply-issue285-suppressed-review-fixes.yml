@@ -31,7 +31,19 @@ jobs:
           ref: ${{ env.HEAD_REF }}
           fetch-depth: 0
 
+      - name: Detect pending one-shot repair
+        id: helper
+        shell: bash
+        run: |
+          if test -f .github/scripts/apply-issue285-suppressed-review-fixes.py; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo 'The validated one-shot repair has already been committed.'
+          fi
+
       - name: Retain reviewed converters
+        if: steps.helper.outputs.exists == 'true'
         run: |
           mkdir -p /tmp/issue285-suppressed-baseline
           cp .github/scripts/jmh_evidence_schema.py \
@@ -42,9 +54,11 @@ jobs:
             /tmp/issue285-suppressed-baseline/convert-jmh-pack-storage-layout-concurrency.py
 
       - name: Apply remaining review fixes
+        if: steps.helper.outputs.exists == 'true'
         run: python3 .github/scripts/apply-issue285-suppressed-review-fixes.py
 
       - name: Compile and run all converter regressions
+        if: steps.helper.outputs.exists == 'true'
         run: |
           python3 -m py_compile \
             .github/scripts/jmh_evidence_schema.py \
@@ -56,6 +70,7 @@ jobs:
           python3 .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
 
       - name: Download retained valid sources
+        if: steps.helper.outputs.exists == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,6 +93,7 @@ jobs:
             --dir target/issue285-suppressed-source/concurrency
 
       - name: Prove valid output is unchanged
+        if: steps.helper.outputs.exists == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -105,6 +121,7 @@ jobs:
             target/issue285-suppressed-equivalence/current-concurrency
 
       - name: Verify workflow and diagnostic contracts
+        if: steps.helper.outputs.exists == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -120,12 +137,19 @@ jobs:
             .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
           git diff --check
 
-      - name: Remove one-shot review tooling
+      - name: Prepare code-only validated commit
+        if: steps.helper.outputs.exists == 'true'
+        shell: bash
         run: |
+          set -euo pipefail
+          git checkout -- \
+            .github/workflows/pack-storage-layout.yml \
+            .github/workflows/pack-storage-layout-concurrency.yml
           rm .github/scripts/apply-issue285-suppressed-review-fixes.py
-          rm .github/workflows/apply-issue285-suppressed-review-fixes.yml
+          git diff --check
 
       - name: Commit validated remaining review fixes
+        if: steps.helper.outputs.exists == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -135,10 +159,7 @@ jobs:
             .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
             .github/scripts/test_convert_jmh_pack_storage_layout.py \
             .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py \
-            .github/workflows/pack-storage-layout.yml \
-            .github/workflows/pack-storage-layout-concurrency.yml \
-            .github/scripts/apply-issue285-suppressed-review-fixes.py \
-            .github/workflows/apply-issue285-suppressed-review-fixes.yml
+            .github/scripts/apply-issue285-suppressed-review-fixes.py
           if git diff --cached --quiet; then
             echo 'Expected remaining issue #285 review fixes produced no staged changes' >&2
             exit 1
@@ -147,6 +168,7 @@ jobs:
           git push origin "HEAD:${HEAD_REF}"
 
       - name: Upload remaining-review equivalence evidence
+        if: steps.helper.outputs.exists == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: issue285-suppressed-review-equivalence
