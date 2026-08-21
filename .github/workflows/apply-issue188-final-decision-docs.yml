@@ -1,0 +1,68 @@
+name: Apply issue 188 final decision documentation
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-issue188-final-docs-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      - name: Checkout documentation branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          fetch-depth: 0
+
+      - name: Apply final benchmark decision
+        run: python3 .github/scripts/apply-issue188-final-decision-docs.py
+
+      - name: Verify documented evidence contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'complete 512-MiB capacity run' docs/operations/pack-storage-layout.md
+          grep -F '| 4 MiB | +16.63% | +12.28% | -95.05% | +22.43% | +5.43% | -105.31% |' docs/operations/pack-storage-layout.md
+          grep -F 'one-MiB chunks** and a **256-KiB inline threshold' docs/operations/pack-storage-layout.md
+          grep -F '| Persisted pack layout | One-MiB chunks; 256-KiB inline threshold |' docs/performance-status.md
+          if grep -Fq 'remaining evidence work is the retained full and capacity execution' docs/operations/pack-storage-layout.md; then
+            echo 'Obsolete pending-evidence statement remains' >&2
+            exit 1
+          fi
+          git diff --check
+
+      - name: Remove one-shot documentation tooling
+        run: |
+          rm .github/scripts/apply-issue188-final-decision-docs.py
+          rm .github/workflows/apply-issue188-final-decision-docs.yml
+
+      - name: Commit validated documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            docs/operations/pack-storage-layout.md \
+            docs/performance-status.md \
+            .github/scripts/apply-issue188-final-decision-docs.py \
+            .github/workflows/apply-issue188-final-decision-docs.yml
+          if git diff --cached --quiet; then
+            echo 'Expected issue #188 documentation update produced no staged changes' >&2
+            exit 1
+          fi
+          git commit -m 'Document final pack-layout benchmark decision'
+          git push origin "HEAD:${HEAD_REF}"
