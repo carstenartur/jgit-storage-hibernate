@@ -13,12 +13,18 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSett
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -37,6 +43,8 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.IterationParams;
+import org.openjdk.jmh.runner.IterationType;
 
 /**
  * Measures candidate chunk sizes and inline thresholds without changing the production format.
@@ -69,6 +77,8 @@ public class PackStorageLayoutBenchmark {
       "jgit.storage.benchmark.sqlserver.user";
   public static final String SQL_SERVER_PASSWORD_PROPERTY =
       "jgit.storage.benchmark.sqlserver.password";
+  static final String CONNECTION_PROPERTIES_FILE_PROPERTY =
+      "jgit.storage.benchmark.connection-properties-file";
 
   private static final int SHORT_READ_BYTES = 64 * 1024;
   private static final int RANDOM_READ_BYTES = 4 * 1024;
@@ -110,9 +120,12 @@ public class PackStorageLayoutBenchmark {
   private String repositoryName;
   private Long fixturePackId;
   private Long invocationPackId;
+  private DatabaseTelemetryCollector telemetryCollector;
+  private DatabaseTelemetrySnapshot invocationTelemetryBefore;
 
   @Setup(Level.Trial)
   public void setupTrial() {
+    suppressConnectionMetadataLogging();
     requireOperation(operation);
     payloadBytes = Math.multiplyExact((long) payloadKiB, 1024L);
     candidate =
@@ -133,26 +146,49 @@ public class PackStorageLayoutBenchmark {
     if (!WRITE.equals(operation)) {
       fixturePackId = persistLayout("fixture");
     }
+    telemetryCollector = databaseTelemetryCollector();
   }
 
   @Setup(Level.Invocation)
-  public void setupInvocation() {
+  public void setupInvocation(IterationParams iterationParams) {
     invocationPackId = null;
+    invocationTelemetryBefore = null;
     statistics.clear();
     JdbcBatchMetricsSessionEventListener.resetCurrentThread();
+    if (telemetryCollector.enabled()
+        && iterationParams.getType() == IterationType.MEASUREMENT) {
+      invocationTelemetryBefore = telemetryCollector.capture();
+    }
   }
 
   @TearDown(Level.Invocation)
-  public void tearDownInvocation() {
-    if (invocationPackId != null) {
-      deletePack(invocationPackId);
-      invocationPackId = null;
+  public void tearDownInvocation(IterationParams iterationParams) throws IOException {
+    try {
+      if (invocationTelemetryBefore != null
+          && iterationParams.getType() == IterationType.MEASUREMENT) {
+        DatabaseTelemetrySnapshot after = telemetryCollector.capture();
+        DatabaseTelemetryJson.appendNdjson(
+            requiredTelemetryOutput(),
+            new DatabaseTelemetryObservation(
+                telemetryCoordinate(), invocationTelemetryBefore.deltaTo(after)));
+      }
+    } finally {
+      invocationTelemetryBefore = null;
+      if (invocationPackId != null) {
+        deletePack(invocationPackId);
+        invocationPackId = null;
+      }
     }
   }
 
   @TearDown(Level.Trial)
   public void tearDownTrial() {
     fixturePackId = null;
+    invocationTelemetryBefore = null;
+    if (telemetryCollector != null) {
+      telemetryCollector.close();
+      telemetryCollector = null;
+    }
     statistics = null;
     sessionFactory = null;
     if (provider != null) {
@@ -301,6 +337,50 @@ public class PackStorageLayoutBenchmark {
         });
   }
 
+  private DatabaseTelemetryCollector databaseTelemetryCollector() {
+    boolean enabled = Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
+    return switch (backend) {
+      case HibernateRepositoryBenchmark.POSTGRESQL ->
+          DatabaseTelemetryCollectors.create(
+              backend,
+              enabled,
+              requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY),
+              requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY),
+              requiredSystemProperty(
+                  HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+      case SQL_SERVER ->
+          DatabaseTelemetryCollectors.create(
+              backend,
+              enabled,
+              requiredSystemProperty(SQL_SERVER_URL_PROPERTY),
+              requiredSystemProperty(SQL_SERVER_USER_PROPERTY),
+              requiredSystemProperty(SQL_SERVER_PASSWORD_PROPERTY));
+      default -> DatabaseTelemetryCollectors.disabled(backend, "unsupported-backend");
+    };
+  }
+
+  private Path requiredTelemetryOutput() {
+    String value = System.getProperty(DatabaseTelemetryCollectors.OUTPUT_PROPERTY);
+    if (value == null || value.isBlank()) {
+      throw new IllegalStateException(
+          "Missing benchmark system property "
+              + DatabaseTelemetryCollectors.OUTPUT_PROPERTY);
+    }
+    return Path.of(value);
+  }
+
+  private Map<String, String> telemetryCoordinate() {
+    return Map.of(
+        "backend", backend,
+        "deployment", deployment,
+        "operation", operation,
+        "payloadKiB", Integer.toString(payloadKiB),
+        "chunkKiB", Integer.toString(chunkKiB),
+        "inlineKiB", Integer.toString(inlineKiB),
+        "retainedMiB", Integer.toString(retainedMiB),
+        "readAheadKiB", Integer.toString(readAheadKiB));
+  }
+
   private Properties properties() {
     Properties properties = new Properties();
     properties.put("hibernate.hbm2ddl.auto", "create-drop");
@@ -371,10 +451,37 @@ public class PackStorageLayoutBenchmark {
 
   private static String requiredSystemProperty(String name) {
     String value = System.getProperty(name);
+    if (value != null && !value.isBlank()) {
+      return value;
+    }
+
+    String connectionPropertiesFile =
+        System.getProperty(CONNECTION_PROPERTIES_FILE_PROPERTY);
+    if (connectionPropertiesFile != null && !connectionPropertiesFile.isBlank()) {
+      Properties connectionProperties = new Properties();
+      try (InputStream input =
+          Files.newInputStream(Path.of(connectionPropertiesFile))) {
+        connectionProperties.load(input);
+      } catch (IOException failure) {
+        throw new IllegalStateException(
+            "Cannot read temporary benchmark connection properties", failure);
+      }
+      value = connectionProperties.getProperty(name);
+    }
     if (value == null || value.isBlank()) {
       throw new IllegalStateException("Missing benchmark system property " + name);
     }
     return value;
+  }
+
+  private static void suppressConnectionMetadataLogging() {
+    java.util.logging.Level warning = java.util.logging.Level.WARNING;
+    Logger.getLogger("").setLevel(warning);
+    Logger.getLogger("org.hibernate").setLevel(warning);
+    Logger.getLogger("org.hibernate.orm.connections.pooling").setLevel(warning);
+    Logger.getLogger(
+            "org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
+        .setLevel(warning);
   }
 
   private static byte[] deterministicPattern() {

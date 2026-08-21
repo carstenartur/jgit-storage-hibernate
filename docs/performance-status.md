@@ -58,7 +58,7 @@ current elapsed time
 
 This page therefore distinguishes:
 
-- **Physical ceiling:** host, network, database and storage-device throughput. WAL/fsync and physical database bytes are not yet recorded together, so this ceiling is not known.
+- **Physical ceiling:** host, network, database and storage-device throughput. The benchmark telemetry SPI now captures PostgreSQL WAL/I/O and SQL Server log/file-I/O deltas outside timed invocations for the pack-layout path. This is the first direct evidence toward that ceiling; broader benchmark coverage and calibrated attribution remain open in #187.
 - **Semantic ceiling:** the fastest implementation preserving atomic publication, rollback, lifecycle, lease and multi-instance contracts.
 - **Practical comparison ceiling:** JGit `FileRepository` on the same benchmark workload. This is useful but not proof of a physical maximum because the durability and caching paths differ.
 
