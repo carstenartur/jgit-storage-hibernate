@@ -1,0 +1,202 @@
+name: Apply issue 188 alternative candidate review
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: apply-issue188-alternative-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      FULL_RUN_ID: '32445558882'
+      CAPACITY_RUN_ID: '32505334226'
+
+    steps:
+      - name: Checkout final-decision branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          fetch-depth: 0
+
+      - name: Apply alternative-candidate completeness repair
+        run: python3 .github/scripts/apply-issue188-alternative-candidate-review.py
+
+      - name: Verify converter regressions and documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
+          grep -F 'baseline-only result without any alternative layout' docs/operations/pack-storage-layout.md
+          grep -F 'combined retained full and capacity production-database measurements' docs/operations/pack-storage-layout.md
+          git diff --check
+
+      - name: Remove one-shot review tooling
+        run: |
+          rm .github/scripts/apply-issue188-alternative-candidate-review.py
+          rm .github/workflows/apply-issue188-alternative-candidate-review.yml
+
+      - name: Commit validated review repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            .github/scripts/convert-jmh-pack-storage-layout.py \
+            .github/scripts/test_convert_jmh_pack_storage_layout.py \
+            docs/operations/pack-storage-layout.md \
+            .github/scripts/apply-issue188-alternative-candidate-review.py \
+            .github/workflows/apply-issue188-alternative-candidate-review.yml
+          if git diff --cached --quiet; then
+            echo 'Expected issue #188 review repair produced no staged changes' >&2
+            exit 1
+          fi
+          git commit -m 'Require alternative layout evidence before final decision'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Download retained full and capacity source evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/issue188-source/full target/issue188-source/capacity
+          gh run download "$FULL_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name pack-storage-layout-production-decision-full \
+            --dir target/issue188-source/full
+          gh run download "$CAPACITY_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name pack-storage-layout-production-decision-capacity \
+            --dir target/issue188-source/capacity
+          test -s target/issue188-source/full/production-jmh-result.json
+          test -s target/issue188-source/capacity/production-jmh-result.json
+
+      - name: Merge retained source matrices
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('target/issue188-source')
+          sources = [
+              root / 'full' / 'production-jmh-result.json',
+              root / 'capacity' / 'production-jmh-result.json',
+          ]
+          merged = []
+          for source in sources:
+              rows = json.loads(source.read_text(encoding='utf-8'))
+              if not isinstance(rows, list) or not rows:
+                  raise SystemExit(f'Invalid retained JMH source: {source}')
+              merged.extend(rows)
+          target = root / 'combined-production-jmh-result.json'
+          target.write_text(json.dumps(merged, indent=2) + '\n', encoding='utf-8')
+          print(f'Merged {len(merged)} retained rows from {sources}')
+          PY
+
+      - name: Replay comprehensive final decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/convert-jmh-pack-storage-layout.py \
+            target/issue188-source/combined-production-jmh-result.json \
+            target/issue188-final-decision/evidence
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('target/issue188-final-decision/evidence')
+          evidence_path = root / 'pack-storage-layout-evidence.json'
+          comparison_path = root / 'pack-storage-layout-comparison.json'
+          evidence_text = evidence_path.read_text(encoding='utf-8')
+          comparison_text = comparison_path.read_text(encoding='utf-8')
+          evidence = json.loads(evidence_text)
+          comparison = json.loads(comparison_text)
+
+          assert evidence['decision'] == 'retain-current-layout-no-cross-database-net-benefit'
+          assert evidence['crossDatabaseEvidenceComplete'] is True
+          assert evidence['backends'] == ['postgresql', 'sqlserver']
+          assert len(evidence['evidence']) == 322
+          assert len(comparison) == 322
+          assert {row['operation'] for row in evidence['evidence']} == {
+              'write', 'sequential-read', 'short-read', 'random-read'
+          }
+          candidates = {
+              (candidate['chunkKiB'], candidate['inlineKiB']): candidate
+              for candidate in evidence['layoutCandidates']
+          }
+          assert set(candidates) == {
+              (256, 256),
+              (1024, 64),
+              (1024, 256),
+              (1024, 1024),
+              (2048, 256),
+              (4096, 256),
+          }
+          assert all(not candidate['eligible'] for candidate in candidates.values())
+          assert all(
+              not backend['missingSparseOperations']
+              for candidate in candidates.values()
+              for backend in candidate['backendEvidence']
+          )
+          for text in (evidence_text, comparison_text):
+              assert 'NaN' not in text
+              assert 'Infinity' not in text
+          PY
+          mkdir -p target/issue188-final-decision
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          metadata = {
+              'schemaVersion': 2,
+              'benchmarkRuns': {
+                  'full': int(os.environ['FULL_RUN_ID']),
+                  'capacity': int(os.environ['CAPACITY_RUN_ID']),
+              },
+              'benchmarkHeads': {
+                  'full': 'c44e7f3555054099f595ee059102404ab50e56a3',
+                  'capacity': '1ab124b9f5940910d82af586ee21c8d3a2f5d553',
+              },
+              'converterCommit': subprocess.check_output(
+                  ['git', 'rev-parse', 'HEAD'], text=True
+              ).strip(),
+              'decision': 'retain-current-layout-no-cross-database-net-benefit',
+              'combinedEvidenceRows': 322,
+          }
+          Path('target/issue188-final-decision/replay-metadata.json').write_text(
+              json.dumps(metadata, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
+
+      - name: Report comprehensive final decision
+        shell: bash
+        run: |
+          cat target/issue188-final-decision/evidence/pack-storage-layout-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "Retained full run: $FULL_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "Retained capacity run: $CAPACITY_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "Converter commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload comprehensive final machine decision
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue188-comprehensive-final-layout-decision
+          path: target/issue188-final-decision/**
+          if-no-files-found: error
