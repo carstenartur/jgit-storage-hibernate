@@ -29,6 +29,7 @@ on:
     paths:
       - '.github/workflows/pack-storage-layout.yml'
       - '.github/scripts/convert-jmh-pack-storage-layout.py'
+      - '.github/scripts/jmh_evidence_schema.py'
       - '.github/scripts/test_convert_jmh_pack_storage_layout.py'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -38,6 +39,7 @@ on:
     paths:
       - '.github/workflows/pack-storage-layout.yml'
       - '.github/scripts/convert-jmh-pack-storage-layout.py'
+      - '.github/scripts/jmh_evidence_schema.py'
       - '.github/scripts/test_convert_jmh_pack_storage_layout.py'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -77,6 +79,7 @@ jobs:
       - name: Validate evidence converter
         run: |
           python3 -m py_compile \
+            .github/scripts/jmh_evidence_schema.py \
             .github/scripts/convert-jmh-pack-storage-layout.py \
             .github/scripts/test_convert_jmh_pack_storage_layout.py
           python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
@@ -141,6 +144,7 @@ jobs:
       - name: Validate evidence converter
         run: |
           python3 -m py_compile \
+            .github/scripts/jmh_evidence_schema.py \
             .github/scripts/convert-jmh-pack-storage-layout.py \
             .github/scripts/test_convert_jmh_pack_storage_layout.py
           python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
@@ -206,6 +210,7 @@ jobs:
       - name: Validate evidence converter
         run: |
           python3 -m py_compile \
+            .github/scripts/jmh_evidence_schema.py \
             .github/scripts/convert-jmh-pack-storage-layout.py \
             .github/scripts/test_convert_jmh_pack_storage_layout.py
           python3 .github/scripts/test_convert_jmh_pack_storage_layout.py

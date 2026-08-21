@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
 import unittest
 from pathlib import Path
@@ -63,6 +64,186 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
             16 * 1024 * 1024, sixteen_worker["actualRetainedChunkBytes"]
         )
         self.assertEqual(1.0, sixteen_worker["jdbcBatchExecutionsPerWorker"])
+
+    def test_malformed_schema_is_reported_as_contextual_value_error(self) -> None:
+        malformed_cases = []
+        malformed_cases.append(("array", {}, "expected JSON array"))
+        malformed_cases.append(("result", [None], "expected JSON object"))
+
+        for field in ("params", "primaryMetric", "secondaryMetrics"):
+            result = self.result("write", 1, 1024, 10.0)
+            result[field] = None
+            malformed_cases.append((field, [result], field))
+
+        for field in (
+            "backend",
+            "operation",
+            "payloadKiB",
+            "chunkKiB",
+            "inlineKiB",
+            "retainedMiB",
+            "readAheadKiB",
+            "concurrency",
+        ):
+            result = self.result("write", 1, 1024, 10.0)
+            del result["params"][field]
+            malformed_cases.append((field, [result], field))
+
+        result = self.result("write", 1, 1024, 10.0)
+        del result["threads"]
+        malformed_cases.append(("threads", [result], "threads"))
+
+        for field in ("score", "scoreUnit"):
+            result = self.result("write", 1, 1024, 10.0)
+            del result["primaryMetric"][field]
+            malformed_cases.append((field, [result], field))
+
+        result = self.result("write", 1, 1024, 10.0)
+        result["params"]["concurrency"] = "not-an-integer"
+        malformed_cases.append(("integer", [result], "concurrency"))
+
+        result = self.result("write", 1, 1024, 10.0)
+        result["primaryMetric"]["scorePercentiles"] = []
+        malformed_cases.append(("percentiles", [result], "scorePercentiles"))
+
+        result = self.result("write", 1, 1024, 10.0)
+        del result["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]["score"]
+        malformed_cases.append(("secondary score", [result], "configuredChunkBytes"))
+
+        for name, value, expected in malformed_cases:
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as raised:
+                    CONVERTER.convert(value)
+                message = str(raised.exception)
+                self.assertIn(expected, message)
+                if name not in {"array", "result", "backend", "operation", "params"}:
+                    self.assertIn("operation='write'", message)
+
+    def test_nan_score_error_becomes_json_null(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        current["primaryMetric"]["scoreError"] = math.nan
+
+        report = CONVERTER.convert([current, candidate])
+        current_row = next(
+            row
+            for row in report["evidence"]
+            if row["chunkKiB"] == 1024
+        )
+        self.assertIsNone(current_row["scoreErrorMillis"])
+        serialized = CONVERTER._strict_json(report)
+        self.assertNotIn("NaN", serialized)
+        self.assertIsNone(
+            next(
+                row
+                for row in json.loads(serialized)["evidence"]
+                if row["chunkKiB"] == 1024
+            )["scoreErrorMillis"]
+        )
+
+    def test_missing_score_error_becomes_json_null(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        del current["primaryMetric"]["scoreError"]
+        report = CONVERTER.convert([current, candidate])
+        self.assertIsNone(
+            next(
+                row
+                for row in report["evidence"]
+                if row["chunkKiB"] == 1024
+            )["scoreErrorMillis"]
+        )
+
+    def test_non_finite_primary_score_is_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, value)
+                candidate = self.result("write", 1, 4096, 9.0)
+                with self.assertRaisesRegex(ValueError, "primaryMetric score"):
+                    CONVERTER.convert([current, candidate])
+
+    def test_non_finite_primary_percentile_is_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, 10.0)
+                candidate = self.result("write", 1, 4096, 9.0)
+                current["primaryMetric"]["scorePercentiles"]["95.0"] = value
+                with self.assertRaisesRegex(
+                    ValueError, "primaryMetric percentile"
+                ):
+                    CONVERTER.convert([current, candidate])
+
+    def test_strict_json_rejects_unexpected_non_finite_values(self) -> None:
+        with self.assertRaises(ValueError):
+            CONVERTER._strict_json({"unexpected": math.nan})
+
+    def test_boolean_primary_values_are_rejected(self) -> None:
+        for field in ("score", "percentile"):
+            with self.subTest(field=field):
+                current = self.result("write", 1, 1024, 10.0)
+                candidate = self.result("write", 1, 4096, 9.0)
+                if field == "score":
+                    current["primaryMetric"]["score"] = True
+                else:
+                    current["primaryMetric"]["scorePercentiles"]["95.0"] = True
+                with self.assertRaisesRegex(ValueError, "operation='write'"):
+                    CONVERTER.convert([current, candidate])
+
+    def test_non_integral_and_infinite_integer_parameters_are_rejected(self) -> None:
+        for value in (1.5, math.inf, -math.inf):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, 10.0)
+                candidate = self.result("write", 1, 4096, 9.0)
+                current["params"]["concurrency"] = value
+                with self.assertRaisesRegex(ValueError, "concurrency"):
+                    CONVERTER.convert([current, candidate])
+
+    def test_unsupported_score_unit_preserves_coordinate_context(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        current["primaryMetric"]["scoreUnit"] = "bogus"
+        with self.assertRaises(ValueError) as raised:
+            CONVERTER.convert([current, candidate])
+        message = str(raised.exception)
+        self.assertIn("Unsupported", message)
+        self.assertIn("operation='write'", message)
+        self.assertIn("concurrency='1'", message)
+
+    def test_non_positive_primary_score_preserves_coordinate_context(self) -> None:
+        for value in (0.0, -1.0):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, value)
+                candidate = self.result("write", 1, 4096, 9.0)
+                with self.assertRaises(ValueError) as raised:
+                    CONVERTER.convert([current, candidate])
+                message = str(raised.exception)
+                self.assertIn("score must be positive", message)
+                self.assertIn("operation='write'", message)
+                self.assertIn("concurrency='1'", message)
+
+    def test_missing_secondary_score_preserves_field_detail(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        del current["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]["score"]
+        with self.assertRaises(ValueError) as raised:
+            CONVERTER.convert([current, candidate])
+        message = str(raised.exception)
+        self.assertIn("missing field 'score'", message)
+        self.assertIn("operation='write'", message)
+        self.assertIn("concurrency='1'", message)
+
+    def test_boolean_secondary_values_are_rejected(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        current["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]["score"] = True
+        with self.assertRaisesRegex(ValueError, "configuredChunkBytes"):
+            CONVERTER.convert([current, candidate])
 
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing current-layout"):
@@ -156,6 +337,21 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         metric["rawData"] = [[expected, expected * 2.0]]
         with self.assertRaisesRegex(ValueError, "changed across JMH iterations"):
             CONVERTER.convert([current, candidate])
+
+    def test_inconsistent_raw_data_fork_lengths_are_rejected(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        metric = current["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]
+        expected = float(metric["score"])
+        metric["rawData"] = [[expected, expected], [expected]]
+        with self.assertRaises(ValueError) as raised:
+            CONVERTER.convert([current, candidate])
+        message = str(raised.exception)
+        self.assertIn("fork lengths", message)
+        self.assertIn("operation='write'", message)
+        self.assertIn("concurrency='1'", message)
 
     def test_present_but_invalid_raw_data_is_rejected(self) -> None:
         invalid_values = (None, {}, [], [[]], [[math.nan]], [["not-a-number"]])

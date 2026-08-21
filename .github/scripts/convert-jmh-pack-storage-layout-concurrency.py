@@ -10,14 +10,59 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from jmh_evidence_schema import (
+    optional_object_field,
+    require_array,
+    require_field,
+    require_int_field,
+    require_object,
+    require_object_field,
+    require_string_field,
+    result_context,
+)
+
 CURRENT_CHUNK_KIB = 1024
 CURRENT_INLINE_KIB = 256
 CONCURRENCY_LEVELS = {1, 4, 16}
 OPERATIONS = {"write", "sequential-read", "short-read", "random-read"}
 SPARSE_OPERATIONS = {"short-read", "random-read"}
+PARAMETER_NAMES = (
+    "backend",
+    "operation",
+    "payloadKiB",
+    "chunkKiB",
+    "inlineKiB",
+    "retainedMiB",
+    "readAheadKiB",
+    "concurrency",
+)
 
 
-def _milliseconds(value: float, unit: str) -> float:
+def _finite(value: Any, context: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {context}")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as failure:
+        raise ValueError(f"Malformed {context}") from failure
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite {context}")
+    return number
+
+
+def _optional_finite(value: Any, context: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {context}")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as failure:
+        raise ValueError(f"Malformed {context}") from failure
+    return number if math.isfinite(number) else None
+
+
+def _milliseconds(value: float, unit: str, context: str) -> float:
     factors = {
         "ns/op": 1e-6,
         "us/op": 1e-3,
@@ -26,9 +71,14 @@ def _milliseconds(value: float, unit: str) -> float:
         "s/op": 1000.0,
     }
     try:
-        return value * factors[unit]
+        converted = value * factors[unit]
     except KeyError as failure:
-        raise ValueError(f"Unsupported concurrency score unit: {unit!r}") from failure
+        raise ValueError(
+            f"Unsupported {context} score unit: {unit!r}"
+        ) from failure
+    if not math.isfinite(converted):
+        raise ValueError(f"Non-finite {context} score")
+    return converted
 
 
 def _secondary(
@@ -38,55 +88,59 @@ def _secondary(
     require_constant: bool = False,
 ) -> float:
     """Return one per-iteration aggregate instead of JMH's iteration sum."""
-    for key, metric in result.get("secondaryMetrics", {}).items():
+    context = result_context(result, "concurrency result", PARAMETER_NAMES)
+    required_result = require_object(result, context)
+    secondary_metrics = require_object_field(
+        required_result, "secondaryMetrics", context
+    )
+    for key, metric in secondary_metrics.items():
         if key != name and not key.endswith("." + name):
             continue
         if not isinstance(metric, dict):
-            raise ValueError(f"Malformed concurrency secondary metric {name!r}")
+            raise ValueError(f"Malformed {context} concurrency secondary metric {name!r}")
 
         if "rawData" in metric:
             raw_data = metric["rawData"]
             if not isinstance(raw_data, list) or not raw_data:
                 raise ValueError(
-                    f"Malformed rawData for concurrency secondary metric {name!r}"
+                    f"Malformed {context} rawData for concurrency secondary metric {name!r}"
                 )
             samples: list[float] = []
+            iteration_count: int | None = None
             for fork in raw_data:
                 if not isinstance(fork, list) or not fork:
                     raise ValueError(
-                        f"Malformed rawData for concurrency secondary metric {name!r}"
+                        f"Malformed {context} rawData for concurrency secondary metric {name!r}"
+                    )
+                if iteration_count is None:
+                    iteration_count = len(fork)
+                elif len(fork) != iteration_count:
+                    raise ValueError(
+                        f"Inconsistent {context} rawData fork lengths for concurrency "
+                        f"secondary metric {name!r}"
                     )
                 for raw_value in fork:
-                    try:
-                        value = float(raw_value)
-                    except (TypeError, ValueError) as failure:
-                        raise ValueError(
-                            f"Malformed rawData for concurrency secondary metric {name!r}"
-                        ) from failure
-                    if not math.isfinite(value):
-                        raise ValueError(
-                            f"Non-finite rawData for concurrency secondary metric {name!r}"
+                    samples.append(
+                        _finite(
+                            raw_value,
+                            f"{context} rawData for concurrency secondary metric {name!r}",
                         )
-                    samples.append(value)
+                    )
             if require_constant and any(
                 not math.isclose(value, samples[0], rel_tol=0.0, abs_tol=1e-6)
                 for value in samples[1:]
             ):
                 raise ValueError(
-                    f"Concurrency secondary metric {name!r} changed across JMH iterations: {samples!r}"
+                    f"{context} concurrency secondary metric {name!r} changed across JMH iterations: {samples!r}"
                 )
             return math.fsum(samples) / len(samples)
 
-        try:
-            value = float(metric.get("score", 0.0))
-        except (TypeError, ValueError) as failure:
-            raise ValueError(
-                f"Malformed concurrency secondary metric {name!r}"
-            ) from failure
-        if not math.isfinite(value):
-            raise ValueError(f"Non-finite concurrency secondary metric {name!r}")
-        return value
-    raise ValueError(f"Concurrency result is missing secondary metric {name!r}")
+        metric_context = f"{context} concurrency secondary metric {name!r}"
+        return _finite(
+            require_field(metric, "score", metric_context),
+            f"{metric_context} score",
+        )
+    raise ValueError(f"{context} is missing secondary metric {name!r}")
 
 
 def _per_worker(
@@ -110,40 +164,67 @@ def _per_worker_int(result: dict[str, Any], name: str, threads: int) -> int:
     return int(rounded)
 
 
-def _percentile(metric: dict[str, Any], name: str, fallback: float) -> float:
-    values = metric.get("scorePercentiles")
-    if not isinstance(values, dict) or name not in values:
+def _percentile(
+    metric: dict[str, Any],
+    name: str,
+    fallback: float,
+    unit: str,
+    context: str,
+) -> float:
+    values = optional_object_field(metric, "scorePercentiles", context)
+    if values is None or name not in values:
         return fallback
-    return _milliseconds(float(values[name]), str(metric["scoreUnit"]))
+    value = _finite(values[name], f"{context} percentile {name}")
+    return _milliseconds(value, unit, context)
 
 
-def _row(result: dict[str, Any]) -> dict[str, Any]:
-    params = result.get("params", {})
-    operation = str(params.get("operation", ""))
+def _score_error(
+    metric: dict[str, Any], unit: str, context: str
+) -> float | None:
+    value = _optional_finite(metric.get("scoreError"), f"{context} scoreError")
+    return (
+        None
+        if value is None
+        else _milliseconds(value, unit, f"{context} scoreError")
+    )
+
+
+def _row(result: Any) -> dict[str, Any]:
+    context = result_context(result, "concurrency result", PARAMETER_NAMES)
+    required_result = require_object(result, context)
+    params = require_object_field(required_result, "params", context)
+    require_object_field(required_result, "secondaryMetrics", context)
+    context = result_context(required_result, "concurrency result", PARAMETER_NAMES)
+    params_context = f"{context} params"
+    operation = require_string_field(params, "operation", params_context)
     if operation not in OPERATIONS:
-        raise ValueError(f"Unsupported concurrency operation: {operation!r}")
-    backend = str(params.get("backend", ""))
-    if not backend:
-        raise ValueError("Concurrency result is missing backend")
-    concurrency = int(params["concurrency"])
+        raise ValueError(f"Unsupported concurrency operation in {context}: {operation!r}")
+    backend = require_string_field(params, "backend", params_context)
+    concurrency = require_int_field(params, "concurrency", params_context)
     if concurrency not in CONCURRENCY_LEVELS:
-        raise ValueError(f"Unsupported concurrency level: {concurrency}")
-    threads = int(result.get("threads", 0))
+        raise ValueError(f"Unsupported concurrency level in {context}: {concurrency}")
+    threads = require_int_field(required_result, "threads", context)
     if threads != concurrency:
         raise ValueError(
             f"JMH threads ({threads}) do not match concurrency parameter ({concurrency})"
         )
 
-    chunk_kib = int(params["chunkKiB"])
-    inline_kib = int(params["inlineKiB"])
-    payload_kib = int(params["payloadKiB"])
-    retained_mib = int(params["retainedMiB"])
-    read_ahead_kib = int(params["readAheadKiB"])
+    chunk_kib = require_int_field(params, "chunkKiB", params_context)
+    inline_kib = require_int_field(params, "inlineKiB", params_context)
+    payload_kib = require_int_field(params, "payloadKiB", params_context)
+    retained_mib = require_int_field(params, "retainedMiB", params_context)
+    read_ahead_kib = require_int_field(params, "readAheadKiB", params_context)
 
-    metric = result["primaryMetric"]
-    score = _milliseconds(float(metric["score"]), str(metric["scoreUnit"]))
-    if not math.isfinite(score) or score <= 0.0:
-        raise ValueError("Concurrency latency must be finite and positive")
+    metric = require_object_field(required_result, "primaryMetric", context)
+    metric_context = f"{context} primaryMetric"
+    unit = require_string_field(metric, "scoreUnit", metric_context)
+    primary_score = _finite(
+        require_field(metric, "score", metric_context),
+        f"{metric_context} score",
+    )
+    score = _milliseconds(primary_score, unit, metric_context)
+    if score <= 0.0:
+        raise ValueError(f"Malformed {metric_context}: score must be positive")
 
     configured_concurrency = _per_worker_int(
         result, "configuredConcurrency", threads
@@ -192,12 +273,10 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         "concurrency": concurrency,
         "threads": threads,
         "scoreMillis": score,
-        "scoreErrorMillis": _milliseconds(
-            float(metric.get("scoreError", 0.0)), str(metric["scoreUnit"])
-        ),
-        "p50Millis": _percentile(metric, "50.0", score),
-        "p95Millis": _percentile(metric, "95.0", score),
-        "p99Millis": _percentile(metric, "99.0", score),
+        "scoreErrorMillis": _score_error(metric, unit, metric_context),
+        "p50Millis": _percentile(metric, "50.0", score, unit, metric_context),
+        "p95Millis": _percentile(metric, "95.0", score, unit, metric_context),
+        "p99Millis": _percentile(metric, "99.0", score, unit, metric_context),
         "estimatedCapacityOpsPerSecond": concurrency * 1000.0 / score,
         "configuredRetainedBudgetBytes": configured_budget,
         "actualRetainedChunkBytes": actual_retained,
@@ -245,8 +324,9 @@ def _layout_condition(row: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
-    rows = [_row(result) for result in results]
+def convert(results: Any) -> dict[str, Any]:
+    required_results = require_array(results, "concurrency JMH result")
+    rows = [_row(result) for result in required_results]
     if not rows:
         raise ValueError("Concurrency JMH result is empty")
 
@@ -437,6 +517,18 @@ def _format(value: float | None) -> str:
     return "–" if value is None else f"{value:.3f}%"
 
 
+def _strict_json(value: Any) -> str:
+    return (
+        json.dumps(
+            value,
+            indent=2,
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        + "\n"
+    )
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         raise SystemExit(
@@ -450,20 +542,17 @@ def main() -> None:
     report = convert(raw)
     output.mkdir(parents=True, exist_ok=True)
     (output / "pack-storage-layout-concurrency-comparison.json").write_text(
-        json.dumps(report["comparison"], indent=2, ensure_ascii=False) + "\n",
+        _strict_json(report["comparison"]),
         encoding="utf-8",
     )
     (output / "pack-storage-layout-concurrency-evidence.json").write_text(
-        json.dumps(
+        _strict_json(
             {
                 key: value
                 for key, value in report.items()
                 if key != "comparison"
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-        + "\n",
+            }
+        ),
         encoding="utf-8",
     )
     _write_markdown(report, output / "pack-storage-layout-concurrency-evidence.md")

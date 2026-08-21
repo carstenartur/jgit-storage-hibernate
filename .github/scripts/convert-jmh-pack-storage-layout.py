@@ -10,6 +10,17 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from jmh_evidence_schema import (
+    optional_object_field,
+    require_array,
+    require_field,
+    require_int_field,
+    require_object,
+    require_object_field,
+    require_string_field,
+    result_context,
+)
+
 CANONICAL_UNIT = "ms/op"
 CURRENT_CHUNK_KIB = 1024
 CURRENT_INLINE_KIB = 256
@@ -19,9 +30,20 @@ RETAINED_MIB = {8, 16, 32}
 READ_AHEAD_KIB = {256, 1024, 4096, 16384}
 OPERATIONS = {"write", "sequential-read", "short-read", "random-read"}
 SPARSE_OPERATIONS = {"short-read", "random-read"}
+PARAMETER_NAMES = (
+    "backend",
+    "operation",
+    "payloadKiB",
+    "chunkKiB",
+    "inlineKiB",
+    "retainedMiB",
+    "readAheadKiB",
+)
 
 
 def _finite(value: Any, name: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {name}")
     try:
         number = float(value)
     except (TypeError, ValueError) as failure:
@@ -34,6 +56,8 @@ def _finite(value: Any, name: str) -> float:
 def _optional_finite(value: Any, name: str) -> float | None:
     if value is None:
         return None
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {name}")
     try:
         number = float(value)
     except (TypeError, ValueError) as failure:
@@ -41,7 +65,7 @@ def _optional_finite(value: Any, name: str) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _milliseconds(score: float, unit: str) -> float:
+def _milliseconds(score: float, unit: str, context: str) -> float:
     factors = {
         "ns/op": 1e-6,
         "us/op": 1e-3,
@@ -52,9 +76,11 @@ def _milliseconds(score: float, unit: str) -> float:
     try:
         value = score * factors[unit]
     except KeyError as failure:
-        raise ValueError(f"Unsupported pack-layout score unit: {unit!r}") from failure
+        raise ValueError(
+            f"Unsupported {context} score unit: {unit!r}"
+        ) from failure
     if not math.isfinite(value):
-        raise ValueError("Non-finite pack-layout score")
+        raise ValueError(f"Non-finite {context} score")
     return value
 
 
@@ -66,32 +92,37 @@ def _secondary(
     require_constant: bool = False,
 ) -> float:
     """Return one per-iteration AuxCounters value instead of JMH's iteration sum."""
-    for key, metric in result.get("secondaryMetrics", {}).items():
+    context = result_context(result, "pack-layout result", PARAMETER_NAMES)
+    required_result = require_object(result, context)
+    secondary_metrics = require_object_field(
+        required_result, "secondaryMetrics", context
+    )
+    for key, metric in secondary_metrics.items():
         if key != name and not key.endswith("." + name):
             continue
         if not isinstance(metric, dict):
-            raise ValueError(f"Malformed secondary metric {name!r}")
+            raise ValueError(f"Malformed {context} secondary metric {name!r}")
 
         if "rawData" in metric:
             raw_data = metric["rawData"]
             if not isinstance(raw_data, list) or not raw_data:
-                raise ValueError(f"Malformed rawData for secondary metric {name!r}")
+                raise ValueError(f"Malformed {context} rawData for secondary metric {name!r}")
             samples: list[float] = []
             iteration_count: int | None = None
             for fork in raw_data:
                 if not isinstance(fork, list) or not fork:
                     raise ValueError(
-                        f"Malformed rawData for secondary metric {name!r}"
+                        f"Malformed {context} rawData for secondary metric {name!r}"
                     )
                 if iteration_count is None:
                     iteration_count = len(fork)
                 elif len(fork) != iteration_count:
                     raise ValueError(
-                        f"Inconsistent rawData fork lengths for secondary metric {name!r}"
+                        f"Inconsistent {context} rawData fork lengths for secondary metric {name!r}"
                     )
                 for raw_value in fork:
                     value = _finite(
-                        raw_value, f"rawData for secondary metric {name!r}"
+                        raw_value, f"{context} rawData for secondary metric {name!r}"
                     )
                     samples.append(value)
             if require_constant and any(
@@ -99,47 +130,73 @@ def _secondary(
                 for value in samples[1:]
             ):
                 raise ValueError(
-                    f"Secondary metric {name!r} changed across JMH iterations: "
+                    f"{context} secondary metric {name!r} changed across JMH iterations: "
                     f"{samples!r}"
                 )
             return math.fsum(samples) / len(samples)
 
-        value = _finite(metric.get("score", default), f"secondary metric {name!r}")
+        value = _finite(
+            require_field(
+                metric,
+                "score",
+                f"{context} secondary metric {name!r}",
+            ),
+            f"{context} secondary metric {name!r}",
+        )
         return value
     return default
 
 
 def _profiler(result: dict[str, Any], suffix: str) -> float | None:
-    for key, metric in result.get("secondaryMetrics", {}).items():
+    context = result_context(result, "pack-layout result", PARAMETER_NAMES)
+    required_result = require_object(result, context)
+    secondary_metrics = require_object_field(
+        required_result, "secondaryMetrics", context
+    )
+    for key, metric in secondary_metrics.items():
         if not key.endswith(suffix):
             continue
         if not isinstance(metric, dict):
-            raise ValueError(f"Malformed profiler metric {key!r}")
-        return _optional_finite(metric.get("score"), f"profiler metric {key!r}")
+            raise ValueError(f"Malformed {context} profiler metric {key!r}")
+        return _optional_finite(
+            require_field(metric, "score", f"{context} profiler metric {key!r}"),
+            f"{context} profiler metric {key!r}",
+        )
     return None
 
 
-def _percentile(metric: dict[str, Any], percentile: str, fallback: float) -> float:
-    values = metric.get("scorePercentiles")
-    if not isinstance(values, dict) or percentile not in values:
+def _percentile(
+    metric: dict[str, Any],
+    percentile: str,
+    fallback: float,
+    unit: str,
+    context: str,
+) -> float:
+    values = optional_object_field(metric, "scorePercentiles", context)
+    if values is None or percentile not in values:
         return fallback
-    score = _finite(values[percentile], f"primary percentile {percentile}")
-    return _milliseconds(score, str(metric["scoreUnit"]))
+    score = _finite(
+        values[percentile], f"{context} percentile {percentile}"
+    )
+    return _milliseconds(score, unit, context)
 
 
-def _row(result: dict[str, Any]) -> dict[str, Any]:
-    params = result.get("params", {})
-    operation = str(params.get("operation", ""))
+def _row(result: Any) -> dict[str, Any]:
+    context = result_context(result, "pack-layout result", PARAMETER_NAMES)
+    required_result = require_object(result, context)
+    params = require_object_field(required_result, "params", context)
+    require_object_field(required_result, "secondaryMetrics", context)
+    context = result_context(required_result, "pack-layout result", PARAMETER_NAMES)
+    params_context = f"{context} params"
+    operation = require_string_field(params, "operation", params_context)
     if operation not in OPERATIONS:
-        raise ValueError(f"Unsupported pack-layout operation: {operation!r}")
-    backend = str(params.get("backend", ""))
-    if not backend:
-        raise ValueError("Pack-layout result is missing backend")
-    payload_kib = int(params["payloadKiB"])
-    chunk_kib = int(params["chunkKiB"])
-    inline_kib = int(params["inlineKiB"])
-    retained_mib = int(params["retainedMiB"])
-    read_ahead_kib = int(params["readAheadKiB"])
+        raise ValueError(f"Unsupported pack-layout operation in {context}: {operation!r}")
+    backend = require_string_field(params, "backend", params_context)
+    payload_kib = require_int_field(params, "payloadKiB", params_context)
+    chunk_kib = require_int_field(params, "chunkKiB", params_context)
+    inline_kib = require_int_field(params, "inlineKiB", params_context)
+    retained_mib = require_int_field(params, "retainedMiB", params_context)
+    read_ahead_kib = require_int_field(params, "readAheadKiB", params_context)
     if chunk_kib not in CHUNK_KIB:
         raise ValueError(f"Unsupported chunkKiB: {chunk_kib}")
     if inline_kib not in INLINE_KIB:
@@ -149,13 +206,25 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     if read_ahead_kib not in READ_AHEAD_KIB:
         raise ValueError(f"Unsupported readAheadKiB: {read_ahead_kib}")
 
-    metric = result["primaryMetric"]
-    if not isinstance(metric, dict):
-        raise ValueError("Malformed primary metric")
-    unit = str(metric["scoreUnit"])
-    score = _milliseconds(_finite(metric["score"], "primary score"), unit)
-    raw_error = _optional_finite(metric.get("scoreError"), "primary score error")
-    error = None if raw_error is None else _milliseconds(raw_error, unit)
+    metric = require_object_field(required_result, "primaryMetric", context)
+    metric_context = f"{context} primaryMetric"
+    unit = require_string_field(metric, "scoreUnit", metric_context)
+    score = _milliseconds(
+        _finite(
+            require_field(metric, "score", metric_context),
+            f"{metric_context} score",
+        ),
+        unit,
+        metric_context,
+    )
+    raw_error = _optional_finite(
+        metric.get("scoreError"), f"{metric_context} scoreError"
+    )
+    error = (
+        None
+        if raw_error is None
+        else _milliseconds(raw_error, unit, f"{metric_context} scoreError")
+    )
     configured_budget = int(
         round(
             _secondary(
@@ -226,9 +295,9 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
         "readAheadKiB": read_ahead_kib,
         "scoreMillis": score,
         "scoreErrorMillis": error,
-        "p50Millis": _percentile(metric, "50.0", score),
-        "p95Millis": _percentile(metric, "95.0", score),
-        "p99Millis": _percentile(metric, "99.0", score),
+        "p50Millis": _percentile(metric, "50.0", score, unit, metric_context),
+        "p95Millis": _percentile(metric, "95.0", score, unit, metric_context),
+        "p99Millis": _percentile(metric, "99.0", score, unit, metric_context),
         "configuredRetainedBudgetBytes": configured_budget,
         "actualRetainedChunkBytes": actual_retained,
         "chunksPerBatch": int(
@@ -271,8 +340,9 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
-    rows = [_row(result) for result in results]
+def convert(results: Any) -> dict[str, Any]:
+    required_results = require_array(results, "pack-layout JMH result")
+    rows = [_row(result) for result in required_results]
     if not rows:
         raise ValueError("Pack-layout JMH result is empty")
 

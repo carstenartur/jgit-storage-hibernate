@@ -18,6 +18,7 @@ on:
     paths:
       - '.github/workflows/pack-storage-layout-concurrency.yml'
       - '.github/scripts/convert-jmh-pack-storage-layout-concurrency.py'
+      - '.github/scripts/jmh_evidence_schema.py'
       - '.github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -27,6 +28,7 @@ on:
     paths:
       - '.github/workflows/pack-storage-layout-concurrency.yml'
       - '.github/scripts/convert-jmh-pack-storage-layout-concurrency.py'
+      - '.github/scripts/jmh_evidence_schema.py'
       - '.github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -64,6 +66,7 @@ jobs:
       - name: Validate concurrency evidence converter
         run: |
           python3 -m py_compile \
+            .github/scripts/jmh_evidence_schema.py \
             .github/scripts/convert-jmh-pack-storage-layout-concurrency.py \
             .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
           python3 .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
