@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "issue": 188,
+  "profile": "capacity",
+  "requestedAt": "2026-08-21T16:54:00Z",
+  "baseCommit": "5e685cb433fda42647382785c8652c312d0bfb0e",
+  "evidenceCodeCommit": "5e685cb433fda42647382785c8652c312d0bfb0e",
+  "purpose": "Retain strict-JSON 512 MiB write, sequential, short and random-read evidence on HSQLDB, PostgreSQL and SQL Server after making both sparse access patterns mandatory for promotion."
+}
