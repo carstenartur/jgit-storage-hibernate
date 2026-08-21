@@ -29,8 +29,32 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],
         )
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
         self.assertFalse(report["productionDefaultsChanged"])
         self.assertTrue(report["compatibility"]["legacyRowsRemainOneMiB"])
+
+    def test_cross_database_baseline_only_evidence_is_pending(self) -> None:
+        results = [
+            result
+            for result in self.matrix(
+                ["postgresql", "sqlserver"],
+                sparse_candidate=9.7,
+            )
+            if result["params"]["chunkKiB"] == "1024"
+        ]
+        report = CONVERTER.convert(results)
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
+        self.assertEqual(
+            "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
+            report["decision"],
+        )
+        self.assertEqual(
+            [(1024, 256)],
+            [
+                (candidate["chunkKiB"], candidate["inlineKiB"])
+                for candidate in report["layoutCandidates"]
+            ],
+        )
 
     def test_cross_database_net_gain_can_only_propose_a_versioned_candidate(
         self,
@@ -51,6 +75,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             if item["chunkKiB"] == 2048 and item["inlineKiB"] == 256
         )
         self.assertTrue(candidate["eligible"])
+        self.assertTrue(report["crossDatabaseEvidenceComplete"])
         self.assertFalse(report["productionDefaultsChanged"])
 
     def test_sparse_read_regression_rejects_a_write_optimized_candidate(
@@ -68,8 +93,9 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             if item["chunkKiB"] == 2048 and item["inlineKiB"] == 256
         )
         self.assertFalse(candidate["eligible"])
+        self.assertTrue(report["crossDatabaseEvidenceComplete"])
         self.assertEqual(
-            "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
+            "retain-current-layout-no-cross-database-net-benefit",
             report["decision"],
         )
 
@@ -102,6 +128,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 for evidence in candidate["backendEvidence"]
             )
         )
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
         self.assertEqual(
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],
@@ -130,6 +157,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 for evidence in candidate["backendEvidence"]
             )
         )
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
         self.assertEqual(
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],
