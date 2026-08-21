@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
 import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).with_name("convert-jmh-pack-storage-layout.py")
-SPEC = importlib.util.spec_from_file_location("convert_jmh_pack_storage_layout", SCRIPT)
+SPEC = importlib.util.spec_from_file_location(
+    "convert_jmh_pack_storage_layout", SCRIPT
+)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"Could not load {SCRIPT}")
 CONVERTER = importlib.util.module_from_spec(SPEC)
@@ -19,7 +22,9 @@ SPEC.loader.exec_module(CONVERTER)
 class PackStorageLayoutConverterTest(unittest.TestCase):
 
     def test_one_database_never_changes_the_production_layout(self) -> None:
-        report = CONVERTER.convert(self.matrix(["postgresql"], sparse_candidate=9.7))
+        report = CONVERTER.convert(
+            self.matrix(["postgresql"], sparse_candidate=9.7)
+        )
         self.assertEqual(
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],
@@ -27,12 +32,18 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         self.assertFalse(report["productionDefaultsChanged"])
         self.assertTrue(report["compatibility"]["legacyRowsRemainOneMiB"])
 
-    def test_cross_database_net_gain_can_only_propose_a_versioned_candidate(self) -> None:
+    def test_cross_database_net_gain_can_only_propose_a_versioned_candidate(
+        self,
+    ) -> None:
         report = CONVERTER.convert(
-            self.matrix(["postgresql", "sqlserver"], sparse_candidate=10.3)
+            self.matrix(
+                ["postgresql", "sqlserver"],
+                sparse_candidate=10.3,
+            )
         )
         self.assertEqual(
-            "candidate-layout-ready-for-versioned-format-design", report["decision"]
+            "candidate-layout-ready-for-versioned-format-design",
+            report["decision"],
         )
         candidate = next(
             item
@@ -42,9 +53,14 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         self.assertTrue(candidate["eligible"])
         self.assertFalse(report["productionDefaultsChanged"])
 
-    def test_sparse_read_regression_rejects_a_write_optimized_candidate(self) -> None:
+    def test_sparse_read_regression_rejects_a_write_optimized_candidate(
+        self,
+    ) -> None:
         report = CONVERTER.convert(
-            self.matrix(["postgresql", "sqlserver"], sparse_candidate=12.0)
+            self.matrix(
+                ["postgresql", "sqlserver"],
+                sparse_candidate=12.0,
+            )
         )
         candidate = next(
             item
@@ -65,7 +81,9 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Retained chunk bytes"):
             CONVERTER.convert([result])
 
-    def test_multi_iteration_event_scores_are_normalized_from_raw_data(self) -> None:
+    def test_multi_iteration_event_scores_are_normalized_from_raw_data(
+        self,
+    ) -> None:
         results = self.matrix(["postgresql"], sparse_candidate=9.7)
         for result in results:
             for metric in result["secondaryMetrics"].values():
@@ -80,28 +98,45 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             if row["operation"] == "write" and row["chunkKiB"] == 1024
         )
         self.assertEqual(
-            16 * 1024 * 1024, current_write["configuredRetainedBudgetBytes"]
+            16 * 1024 * 1024,
+            current_write["configuredRetainedBudgetBytes"],
         )
         self.assertEqual(
-            16 * 1024 * 1024, current_write["actualRetainedChunkBytes"]
+            16 * 1024 * 1024,
+            current_write["actualRetainedChunkBytes"],
         )
         self.assertEqual(16, current_write["chunksPerBatch"])
         self.assertEqual(16, current_write["chunkRows"])
         self.assertEqual(
-            16 * 1024 * 1024, current_write["databasePayloadBytes"]
+            16 * 1024 * 1024,
+            current_write["databasePayloadBytes"],
         )
 
-    def test_configured_metric_change_across_iterations_is_rejected(self) -> None:
+    def test_configured_metric_change_across_iterations_is_rejected(
+        self,
+    ) -> None:
         result = self.result("postgresql", "write", 1024, 10.0)
-        metric = result["secondaryMetrics"]["LayoutCounters.configuredChunkBytes"]
+        metric = result["secondaryMetrics"][
+            "LayoutCounters.configuredChunkBytes"
+        ]
         expected = float(metric["score"])
         metric["score"] = expected * 2.0
         metric["rawData"] = [[expected, expected * 2.0]]
-        with self.assertRaisesRegex(ValueError, "changed across JMH iterations"):
+        with self.assertRaisesRegex(
+            ValueError,
+            "changed across JMH iterations",
+        ):
             CONVERTER.convert([result])
 
     def test_present_but_invalid_raw_data_is_rejected(self) -> None:
-        invalid_values = (None, {}, [], [[]], [[math.nan]], [["not-a-number"]])
+        invalid_values = (
+            None,
+            {},
+            [],
+            [[]],
+            [[math.nan]],
+            [["not-a-number"]],
+        )
         for raw_data in invalid_values:
             with self.subTest(raw_data=raw_data):
                 result = self.result("postgresql", "write", 1024, 10.0)
@@ -111,7 +146,73 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "rawData"):
                     CONVERTER.convert([result])
 
-    def matrix(self, backends: list[str], sparse_candidate: float) -> list[dict]:
+    def test_inconsistent_raw_data_fork_lengths_are_rejected(self) -> None:
+        result = self.result("postgresql", "write", 1024, 10.0)
+        metric = result["secondaryMetrics"][
+            "LayoutCounters.configuredChunkBytes"
+        ]
+        expected = float(metric["score"])
+        metric["rawData"] = [[expected, expected], [expected]]
+        with self.assertRaisesRegex(ValueError, "fork lengths"):
+            CONVERTER.convert([result])
+
+    def test_nan_score_error_becomes_json_null(self) -> None:
+        result = self.result("postgresql", "write", 1024, 10.0)
+        result["primaryMetric"]["scoreError"] = math.nan
+        report = CONVERTER.convert([result])
+        self.assertIsNone(report["evidence"][0]["scoreErrorMillis"])
+        self.assertIsNone(report["comparison"][0]["range"])
+        serialized = CONVERTER._strict_json(report)
+        self.assertNotIn("NaN", serialized)
+        self.assertIsNone(
+            json.loads(serialized)["evidence"][0]["scoreErrorMillis"]
+        )
+
+    def test_missing_score_error_becomes_json_null(self) -> None:
+        result = self.result("postgresql", "write", 1024, 10.0)
+        del result["primaryMetric"]["scoreError"]
+        report = CONVERTER.convert([result])
+        self.assertIsNone(report["evidence"][0]["scoreErrorMillis"])
+
+    def test_non_finite_primary_score_is_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf):
+            with self.subTest(value=value):
+                result = self.result("postgresql", "write", 1024, value)
+                with self.assertRaisesRegex(ValueError, "primary score"):
+                    CONVERTER.convert([result])
+
+    def test_non_finite_primary_percentile_is_rejected(self) -> None:
+        for value in (math.nan, math.inf, -math.inf):
+            with self.subTest(value=value):
+                result = self.result("postgresql", "write", 1024, 10.0)
+                result["primaryMetric"]["scorePercentiles"]["95.0"] = value
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "primary percentile",
+                ):
+                    CONVERTER.convert([result])
+
+    def test_non_finite_profiler_value_becomes_json_null(self) -> None:
+        result = self.result("postgresql", "write", 1024, 10.0)
+        result["secondaryMetrics"]["·gc.alloc.rate.norm"] = {
+            "score": math.nan,
+            "scoreUnit": "B/op",
+        }
+        report = CONVERTER.convert([result])
+        self.assertIsNone(
+            report["evidence"][0]["allocationBytesPerOperation"]
+        )
+        self.assertNotIn("NaN", CONVERTER._strict_json(report))
+
+    def test_strict_json_rejects_unexpected_non_finite_values(self) -> None:
+        with self.assertRaises(ValueError):
+            CONVERTER._strict_json({"unexpected": math.nan})
+
+    def matrix(
+        self,
+        backends: list[str],
+        sparse_candidate: float,
+    ) -> list[dict]:
         results = []
         for backend in backends:
             for operation, baseline, candidate in (
@@ -119,12 +220,21 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 ("sequential-read", 10.0, 8.5),
                 ("random-read", 10.0, sparse_candidate),
             ):
-                results.append(self.result(backend, operation, 1024, baseline))
-                results.append(self.result(backend, operation, 2048, candidate))
+                results.append(
+                    self.result(backend, operation, 1024, baseline)
+                )
+                results.append(
+                    self.result(backend, operation, 2048, candidate)
+                )
         return results
 
     @staticmethod
-    def result(backend: str, operation: str, chunk_kib: int, score: float) -> dict:
+    def result(
+        backend: str,
+        operation: str,
+        chunk_kib: int,
+        score: float,
+    ) -> dict:
         payload_kib = 16384
         retained_mib = 16
         inline_kib = 256
@@ -132,14 +242,18 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         payload_bytes = payload_kib * 1024
         chunk_bytes = chunk_kib * 1024
         chunk_rows = (payload_bytes + chunk_bytes - 1) // chunk_bytes
-        actual_retained = (retained_mib * 1024 * 1024 // chunk_bytes) * chunk_bytes
+        actual_retained = (
+            retained_mib * 1024 * 1024 // chunk_bytes
+        ) * chunk_bytes
         counters = {
             "configuredChunkBytes": chunk_bytes,
             "configuredInlineThresholdBytes": inline_kib * 1024,
             "configuredRetainedBudgetBytes": retained_mib * 1024 * 1024,
             "actualRetainedChunkBytes": actual_retained,
             "configuredReadAheadBytes": read_ahead_kib * 1024,
-            "readAheadChunks": (read_ahead_kib + chunk_kib - 1) // chunk_kib,
+            "readAheadChunks": (
+                read_ahead_kib + chunk_kib - 1
+            ) // chunk_kib,
             "chunksPerBatch": actual_retained // chunk_bytes,
             "proposedLayoutVersion": 1 if chunk_kib == 1024 else 2,
             "logicalPayloadBytes": payload_bytes,
@@ -182,7 +296,10 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 },
             },
             "secondaryMetrics": {
-                f"LayoutCounters.{key}": {"score": value, "scoreUnit": "#"}
+                f"LayoutCounters.{key}": {
+                    "score": value,
+                    "scoreUnit": "#",
+                }
                 for key, value in counters.items()
             },
         }
