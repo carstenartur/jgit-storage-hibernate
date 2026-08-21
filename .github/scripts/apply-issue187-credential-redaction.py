@@ -103,9 +103,13 @@ benchmark = replace_once(
   }
 
   private static void suppressConnectionMetadataLogging() {
+    java.util.logging.Level warning = java.util.logging.Level.WARNING;
+    Logger.getLogger("").setLevel(warning);
+    Logger.getLogger("org.hibernate").setLevel(warning);
+    Logger.getLogger("org.hibernate.orm.connections.pooling").setLevel(warning);
     Logger.getLogger(
             "org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
-        .setLevel(java.util.logging.Level.WARNING);
+        .setLevel(warning);
   }
 ''',
     "connection-file property loading",
