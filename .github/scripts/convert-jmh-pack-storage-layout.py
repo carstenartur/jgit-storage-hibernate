@@ -346,12 +346,18 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
         )
 
     candidates = _layout_candidates(evidence)
+    alternative_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate["chunkKiB"] != CURRENT_CHUNK_KIB
+        or candidate["inlineKiB"] != CURRENT_INLINE_KIB
+    ]
     backends = sorted({row["backend"] for row in evidence})
     required_backends = {"postgresql", "sqlserver"}
     cross_database = required_backends.issubset(backends)
     cross_database_evidence_complete = (
         cross_database
-        and bool(candidates)
+        and bool(alternative_candidates)
         and all(
             required_backends.issubset(
                 summary["backend"] for summary in candidate["backendEvidence"]

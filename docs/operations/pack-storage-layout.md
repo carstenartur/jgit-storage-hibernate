@@ -90,7 +90,7 @@ retain-current-layout-no-cross-database-net-benefit
 candidate-layout-ready-for-versioned-format-design
 ```
 
-The pending state is reserved for missing backends or required operations. A complete matrix with no eligible candidate records the no-net-benefit decision explicitly.
+The pending state is reserved for missing backends, required operations or a baseline-only result without any alternative layout. A complete matrix with at least one real alternative and no eligible candidate records the no-net-benefit decision explicitly.
 
 The converter never edits production settings.
 
@@ -117,7 +117,7 @@ Positive values are improvements relative to the current one-MiB layout. “Wors
 
 The result explains the trade-off rather than merely selecting a winner. Smaller chunks reduce sparse overfetch but increase row, statement and sequential-transfer cost. Larger chunks reduce row/JDBC overhead and improve large writes and sequential reads, but sparse reads fetch far more payload than requested. The regression is large and consistent enough that neither a global larger default nor a special large-PACK layout is justified by this evidence.
 
-The final machine decision is `retain-current-layout-no-cross-database-net-benefit`. The pending state is no longer overloaded for a completed rejection: it is emitted only when a production backend or required access pattern is missing.
+The final machine decision is `retain-current-layout-no-cross-database-net-benefit`. It is replayed from the combined retained full and capacity production-database measurements. The pending state is no longer overloaded for a completed rejection: it is emitted when a production backend, required access pattern or real alternative layout is missing.
 
 ## Required compatibility design before any production change
 

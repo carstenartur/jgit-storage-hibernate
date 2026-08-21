@@ -33,6 +33,29 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         self.assertFalse(report["productionDefaultsChanged"])
         self.assertTrue(report["compatibility"]["legacyRowsRemainOneMiB"])
 
+    def test_cross_database_baseline_only_evidence_is_pending(self) -> None:
+        results = [
+            result
+            for result in self.matrix(
+                ["postgresql", "sqlserver"],
+                sparse_candidate=9.7,
+            )
+            if result["params"]["chunkKiB"] == "1024"
+        ]
+        report = CONVERTER.convert(results)
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
+        self.assertEqual(
+            "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
+            report["decision"],
+        )
+        self.assertEqual(
+            [(1024, 256)],
+            [
+                (candidate["chunkKiB"], candidate["inlineKiB"])
+                for candidate in report["layoutCandidates"]
+            ],
+        )
+
     def test_cross_database_net_gain_can_only_propose_a_versioned_candidate(
         self,
     ) -> None:
