@@ -83,12 +83,165 @@ jobs:
         run: |
           set -o pipefail
           profile="${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}"
+          telemetry_args=()
+          if [ "${{ matrix.investigation }}" = 'write-queue' ]; then
+            telemetry_args+=(
+              '-Djgit.storage.benchmark.database-telemetry.enabled=true'
+            )
+          fi
           mvn -B -pl jgit-storage-hibernate-benchmarks verify \
             -Pperformance-investigations \
+            -Dtest=DatabaseTelemetrySnapshotTest,DurableStripedWriteQueueTest \
             -Djgit.storage.benchmark.investigation="${{ matrix.investigation }}" \
             -Djgit.storage.benchmark.investigation.profile="$profile" \
+            "${telemetry_args[@]}" \
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/investigations/${{ matrix.investigation }}/jmh-result.json" 2>&1 \
             | tee "target/investigations/${{ matrix.investigation }}/maven-benchmark.log"
+
+      - name: Validate write-queue native telemetry
+        if: matrix.investigation == 'write-queue'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import collections
+          import datetime
+          import json
+          from pathlib import Path
+
+          root = Path('target/investigations/write-queue')
+          telemetry_path = root / 'write-queue-database-telemetry.json'
+          jmh_path = root / 'jmh-result.json'
+          telemetry_text = telemetry_path.read_text(encoding='utf-8')
+          if 'NaN' in telemetry_text or 'Infinity' in telemetry_text:
+              raise SystemExit('Write-queue telemetry is not strict JSON')
+          observations = json.loads(telemetry_text)['observations']
+          jmh = json.loads(jmh_path.read_text(encoding='utf-8'))
+          profile = '${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}'
+          iterations = 3 if profile == 'full' else 1
+          expected = 96 if profile == 'full' else 16
+          if len(observations) != expected:
+              raise SystemExit(
+                  f'Expected {expected} write-queue observations, found {len(observations)}'
+              )
+
+          def jmh_coordinate(item):
+              method = item['benchmark'].rsplit('.', 1)[-1]
+              params = item['params']
+              scope = (
+                  'shared'
+                  if method == 'publishToSameRepository'
+                  else 'isolated'
+              )
+              stripes = {
+                  'direct': '0',
+                  'queue-1': '1',
+                  'queue-4': '4',
+                  'queue-8': '8',
+              }[params['executionMode']]
+              return (
+                  method,
+                  params['backend'],
+                  params['executionMode'],
+                  params['payloadKiB'],
+                  str(item['threads']),
+                  scope,
+                  stripes,
+                  '2',
+              )
+
+          def telemetry_coordinate(item):
+              coordinate = item['coordinate']
+              return (
+                  coordinate['benchmarkMethod'],
+                  coordinate['backend'],
+                  coordinate['executionMode'],
+                  coordinate['payloadKiB'],
+                  coordinate['threads'],
+                  coordinate['repositoryScope'],
+                  coordinate['stripes'],
+                  coordinate['poolSize'],
+              )
+
+          jmh_coordinates = {jmh_coordinate(item) for item in jmh}
+          telemetry_counts = collections.Counter(
+              telemetry_coordinate(item) for item in observations
+          )
+          if set(telemetry_counts) != jmh_coordinates:
+              raise SystemExit(
+                  'JMH and native telemetry coordinate sets differ: '
+                  f'{jmh_coordinates ^ set(telemetry_counts)}'
+              )
+          if any(count != iterations for count in telemetry_counts.values()):
+              raise SystemExit(
+                  f'Unexpected per-coordinate iteration counts: {telemetry_counts}'
+              )
+
+          iteration_numbers = collections.defaultdict(set)
+          for item in observations:
+              coordinate = item['coordinate']
+              if item['backend'] != 'postgresql':
+                  raise SystemExit(f'Unexpected telemetry backend: {item["backend"]}')
+              if coordinate['databaseBackend'] != 'postgresql':
+                  raise SystemExit(f'Unexpected database coordinate: {coordinate}')
+              base = telemetry_coordinate(item)
+              iteration_numbers[base].add(int(coordinate['measurementIteration']))
+              for field in ('coordinate', 'counters', 'gauges', 'metadata', 'unsupported'):
+                  keys = list(item[field])
+                  if keys != sorted(keys):
+                      raise SystemExit(
+                          f'{field} keys are not deterministic for {coordinate}: {keys}'
+                      )
+              wal = item['counters'].get('postgresql.wal.insert_lsn_bytes')
+              if wal is None or wal <= 0:
+                  raise SystemExit(
+                      f'Expected positive immediate WAL delta for {coordinate}: {wal}'
+                  )
+              start = datetime.datetime.fromisoformat(
+                  item['startedAt'].replace('Z', '+00:00')
+              )
+              end = datetime.datetime.fromisoformat(
+                  item['completedAt'].replace('Z', '+00:00')
+              )
+              if end < start:
+                  raise SystemExit(f'Negative telemetry window for {coordinate}')
+          expected_iterations = set(range(1, iterations + 1))
+          if any(values != expected_iterations for values in iteration_numbers.values()):
+              raise SystemExit(
+                  f'Measurement iteration numbering is incomplete: {iteration_numbers}'
+              )
+
+          forbidden = (
+              'jgit.storage.benchmark.postgresql.url=',
+              'jgit.storage.benchmark.postgresql.user=',
+              'jgit.storage.benchmark.postgresql.password=',
+              'jdbc:postgresql://',
+              'Database JDBC URL',
+              'Default catalog/schema',
+          )
+          scan_roots = [
+              root,
+              Path('jgit-storage-hibernate-benchmarks/target/failsafe-reports'),
+          ]
+          for scan_root in scan_roots:
+              if not scan_root.exists():
+                  continue
+              for path in scan_root.rglob('*'):
+                  if not path.is_file():
+                      continue
+                  content = path.read_bytes().decode('utf-8', errors='replace')
+                  for token in forbidden:
+                      if token in content:
+                          raise SystemExit(f'Sensitive token {token!r} found in {path}')
+          leftovers = list(
+              Path('/tmp').glob('jgit-storage-benchmark-connection-*.properties')
+          )
+          if leftovers:
+              raise SystemExit(f'Temporary credential files remain: {leftovers}')
+          print(
+              f'Validated {len(observations)} native write-queue iteration observations '
+              f'across {len(jmh_coordinates)} exact JMH coordinates'
+          )
+          PY
 
       - name: Derive repository-aging policy evidence
         if: matrix.investigation == 'repository-aging'
@@ -119,7 +272,8 @@ jobs:
           echo '- Profile: `${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}`' >> "$GITHUB_STEP_SUMMARY"
           echo '- Raw JMH JSON, console output, Maven logs and Failsafe reports are retained as one artifact.' >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ matrix.investigation }}" = 'write-queue' ]; then
-            echo '- This existing experiment measures striped scheduling and backpressure. Atomic receiver record batching is implemented separately by the production `DurableStripedWriteQueue` and its Hibernate adapter.' >> "$GITHUB_STEP_SUMMARY"
+            echo '- This existing experiment measures striped scheduling and backpressure. Native PostgreSQL WAL/I/O/wait telemetry is retained per measurement iteration because concurrent invocations overlap and cannot be attributed safely one by one.' >> "$GITHUB_STEP_SUMMARY"
+            echo '- Atomic receiver record batching is implemented separately by the production `DurableStripedWriteQueue` and its Hibernate adapter.' >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "${{ matrix.investigation }}" = 'repository-aging' ]; then
             echo '- Generated comparison and policy-evidence JSON retain measured break-even reads; no automatic maintenance trigger is changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"

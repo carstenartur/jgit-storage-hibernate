@@ -10,7 +10,7 @@ Native telemetry is disabled by default:
 jgit.storage.benchmark.database-telemetry.enabled=false
 ```
 
-When disabled, the benchmark performs no telemetry connection or telemetry SQL. When explicitly enabled, a snapshot is taken immediately before and after a JMH **measurement invocation**. Both snapshots and JSON serialization are outside the timed benchmark method. Write-path telemetry is captured before benchmark cleanup removes the temporary logical pack.
+When disabled, the benchmark performs no telemetry connection or telemetry SQL. When explicitly enabled, snapshots bracket the narrowest boundary that can be attributed safely. The single-threaded pack-layout path captures one exact **measurement invocation** before cleanup. The concurrent write-queue path captures one complete **measurement iteration**, after all worker invocations have drained, because overlapping invocations share cluster-wide counters and cannot be attributed independently without double counting. Snapshot queries and JSON serialization remain outside timed benchmark methods.
 
 Telemetry is diagnostic evidence, not an application runtime dependency. Core, Search and consumer APIs do not depend on the collector classes.
 
@@ -25,13 +25,14 @@ Each exact benchmark coordinate produces one strict JSON observation containing:
 - relevant non-sensitive server settings;
 - explicit unsupported capabilities and normalized failure categories.
 
-The pack-layout runner retains the companion file:
+The integrated runners retain companion files beside raw JMH evidence:
 
 ```text
 pack-storage-layout-database-telemetry.json
+write-queue-database-telemetry.json
 ```
 
-beside raw JMH JSON, console output, converted comparison evidence and Surefire reports.
+The write-queue coordinate includes the benchmark method, shared versus isolated repository scope, backend/pool variant, execution mode, stripe count, pool size, payload, thread count and measurement-iteration number.
 
 Counter resets and a counter missing from either snapshot are never converted to an invented value. They appear under `unsupported` as `counter-reset`, `missing-before-snapshot` or `missing-after-snapshot`. JSON serialization accepts only integral values and never emits `NaN` or Infinity.
 
@@ -98,12 +99,18 @@ The first integration is the real pack-layout benchmark because it already provi
 
 The counters are observational. Cluster-wide PostgreSQL WAL/I/O and server-wide SQL Server waits can include background work. Production decisions still require repeated measurements and the existing cross-database correctness and regression budgets.
 
+## Concurrent write-queue interpretation
+
+The second integration brackets complete measurement iterations of `DurableWriteQueueBenchmark`. It covers direct publication and one/four/eight-stripe queues, shared-repository contention and independent repositories, and the internal Hibernate pool versus HikariCP at the same pool size. Iteration-level WAL, I/O and wait deltas can therefore be compared with JMH latency, queue delay, storage transactions, repository-lock time and payload amplification without pretending that a cluster-wide counter belongs to one overlapping invocation.
+
+This is evidence for the durable scheduling/publication path, not completion of Git-aware combined receiver-record batching. A queued command still performs its full object insertion and ref update. The narrower atomic multi-record processor and its batch-size distribution remain work in #162 and #187.
+
 ## Remaining issue #187 work
 
 This foundation does not close #187. Follow-up integrations must apply the same contract to:
 
 1. repository aging, MIDX and repack;
-2. durable receiver batches;
+2. atomic durable receiver-record batches beyond queue scheduling;
 3. Hibernate Search incremental indexing and rebuild;
 4. representative history queries;
 5. safe focused plan capture without copying sensitive parameters or arbitrary SQL into artifacts;
