@@ -1,0 +1,1 @@
+Temporary same-repository CI trigger after repairing the issue #285 patch helper.
