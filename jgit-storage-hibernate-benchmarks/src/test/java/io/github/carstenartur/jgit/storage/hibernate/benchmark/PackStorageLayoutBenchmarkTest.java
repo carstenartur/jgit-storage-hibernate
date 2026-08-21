@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -26,6 +27,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.results.format.ResultFormatType;
@@ -38,6 +40,8 @@ import org.testcontainers.mssqlserver.MSSQLServerContainer;
 
 /** Runs the explicitly enabled pack-storage-layout benchmark matrix and retains raw JMH JSON. */
 class PackStorageLayoutBenchmarkTest {
+
+  @TempDir Path temporaryDirectory;
 
   private static final String ENABLED_PROPERTY =
       "jgit.storage.benchmark.pack-layout.enabled";
@@ -98,6 +102,16 @@ class PackStorageLayoutBenchmarkTest {
     assertTrue(Files.isRegularFile(resultFile));
     assertTrue(Files.size(resultFile) > 2);
     assertCredentialFreeEvidence(resultFile.getParent());
+  }
+
+  @Test
+  void credentialScanToleratesNonUtf8Artifacts() throws Exception {
+    Path dumpStream = temporaryDirectory.resolve("surefire.dumpstream");
+    Files.write(
+        dumpStream,
+        new byte[] {(byte) 0xc3, (byte) 0x28, 0x00, (byte) 0xff});
+
+    assertCredentialFreeEvidence(temporaryDirectory);
   }
 
   @Test
@@ -388,7 +402,8 @@ class PackStorageLayoutBenchmarkTest {
             "Default catalog/schema");
     try (Stream<Path> files = Files.walk(root)) {
       for (Path file : files.filter(Files::isRegularFile).toList()) {
-        String content = Files.readString(file);
+        String content =
+            new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         for (String token : forbidden) {
           assertFalse(
               content.contains(token),
