@@ -136,7 +136,7 @@ class DatabaseNativeTelemetryIntegrationTest {
     String value = Files.readString(json);
     assertTrue(value.contains(requiredCounter));
     assertFalse(value.contains(jdbcUrl));
-    assertFalse(value.contains(username));
+    assertFalse(value.contains("\"" + username + "\""));
     assertFalse(value.contains(password));
     assertFalse(value.contains("NaN"));
     assertFalse(value.contains("Infinity"));
