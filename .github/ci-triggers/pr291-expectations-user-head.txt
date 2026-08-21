@@ -1,0 +1,1 @@
+Temporary same-repository CI trigger after aligning contextual diagnostic tests.
