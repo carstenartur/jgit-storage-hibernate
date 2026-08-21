@@ -120,17 +120,12 @@ def _secondary(
                         f"secondary metric {name!r}"
                     )
                 for raw_value in fork:
-                    try:
-                        value = float(raw_value)
-                    except (TypeError, ValueError) as failure:
-                        raise ValueError(
-                            f"Malformed {context} rawData for concurrency secondary metric {name!r}"
-                        ) from failure
-                    if not math.isfinite(value):
-                        raise ValueError(
-                            f"Non-finite {context} rawData for concurrency secondary metric {name!r}"
+                    samples.append(
+                        _finite(
+                            raw_value,
+                            f"{context} rawData for concurrency secondary metric {name!r}",
                         )
-                    samples.append(value)
+                    )
             if require_constant and any(
                 not math.isclose(value, samples[0], rel_tol=0.0, abs_tol=1e-6)
                 for value in samples[1:]
@@ -140,21 +135,11 @@ def _secondary(
                 )
             return math.fsum(samples) / len(samples)
 
-        try:
-            value = float(
-                require_field(
-                    metric,
-                    "score",
-                    f"{context} concurrency secondary metric {name!r}",
-                )
-            )
-        except (TypeError, ValueError) as failure:
-            raise ValueError(
-                f"Malformed {context} concurrency secondary metric {name!r}"
-            ) from failure
-        if not math.isfinite(value):
-            raise ValueError(f"Non-finite {context} concurrency secondary metric {name!r}")
-        return value
+        metric_context = f"{context} concurrency secondary metric {name!r}"
+        return _finite(
+            require_field(metric, "score", metric_context),
+            f"{metric_context} score",
+        )
     raise ValueError(f"{context} is missing secondary metric {name!r}")
 
 
@@ -238,8 +223,8 @@ def _row(result: Any) -> dict[str, Any]:
         f"{metric_context} score",
     )
     score = _milliseconds(primary_score, unit, metric_context)
-    if not math.isfinite(score) or score <= 0.0:
-        raise ValueError("Concurrency latency must be finite and positive")
+    if score <= 0.0:
+        raise ValueError(f"Malformed {metric_context}: score must be positive")
 
     configured_concurrency = _per_worker_int(
         result, "configuredConcurrency", threads

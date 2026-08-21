@@ -245,6 +245,17 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         self.assertIn("operation='write'", message)
         self.assertIn("chunkKiB='1024'", message)
 
+    def test_missing_secondary_score_preserves_field_detail(self) -> None:
+        result = self.result("postgresql", "write", 1024, 10.0)
+        del result["secondaryMetrics"][
+            "LayoutCounters.configuredChunkBytes"
+        ]["score"]
+        with self.assertRaises(ValueError) as raised:
+            CONVERTER.convert([result])
+        message = str(raised.exception)
+        self.assertIn("missing field 'score'", message)
+        self.assertIn("operation='write'", message)
+
     def test_retained_budget_rounding_violation_is_rejected(self) -> None:
         result = self.result("postgresql", "write", 1024, 10.0)
         result["secondaryMetrics"][

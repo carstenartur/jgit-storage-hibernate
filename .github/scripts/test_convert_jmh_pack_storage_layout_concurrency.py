@@ -211,6 +211,40 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         self.assertIn("operation='write'", message)
         self.assertIn("concurrency='1'", message)
 
+    def test_non_positive_primary_score_preserves_coordinate_context(self) -> None:
+        for value in (0.0, -1.0):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, value)
+                candidate = self.result("write", 1, 4096, 9.0)
+                with self.assertRaises(ValueError) as raised:
+                    CONVERTER.convert([current, candidate])
+                message = str(raised.exception)
+                self.assertIn("score must be positive", message)
+                self.assertIn("operation='write'", message)
+                self.assertIn("concurrency='1'", message)
+
+    def test_missing_secondary_score_preserves_field_detail(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        del current["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]["score"]
+        with self.assertRaises(ValueError) as raised:
+            CONVERTER.convert([current, candidate])
+        message = str(raised.exception)
+        self.assertIn("missing field 'score'", message)
+        self.assertIn("operation='write'", message)
+        self.assertIn("concurrency='1'", message)
+
+    def test_boolean_secondary_values_are_rejected(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        current["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]["score"] = True
+        with self.assertRaisesRegex(ValueError, "configuredChunkBytes"):
+            CONVERTER.convert([current, candidate])
+
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing current-layout"):
             CONVERTER.convert([self.result("write", 1, 4096, 5.0)])
