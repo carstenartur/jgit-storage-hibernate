@@ -12,9 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.objects.ReadAheadPolicyBenchmark;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
@@ -62,24 +71,131 @@ class PerformanceInvestigationsBenchmarkIT {
     Path outputFile = resultFile.resolveSibling(investigation + "-jmh-output.txt");
 
     OptionsBuilder builder = baseOptions(resultFile, outputFile, full);
-    builder.jvmArgsAppend(
-        "-Xms1g",
-        full ? "-Xmx3g" : "-Xmx1536m",
-        RepositoryBackendBenchmarkIT.systemProperty(
-            HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY, POSTGRESQL.getJdbcUrl()),
-        RepositoryBackendBenchmarkIT.systemProperty(
-            HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY, POSTGRESQL.getUsername()),
-        RepositoryBackendBenchmarkIT.systemProperty(
-            HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
-            POSTGRESQL.getPassword()));
+    boolean writeQueue = "write-queue".equals(investigation);
+    boolean telemetryEnabled =
+        writeQueue
+            && Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
+    Path telemetryNdjson =
+        resultFile.resolveSibling("write-queue-database-telemetry.ndjson");
+    Path telemetryJson =
+        resultFile.resolveSibling("write-queue-database-telemetry.json");
+    Path connectionPropertiesFile = null;
+    List<String> jvmArguments = new ArrayList<>();
+    jvmArguments.add("-Xms1g");
+    jvmArguments.add(full ? "-Xmx3g" : "-Xmx1536m");
+    if (writeQueue) {
+      connectionPropertiesFile = writeConnectionProperties();
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY,
+              connectionPropertiesFile.toString()));
+    } else {
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
+              POSTGRESQL.getJdbcUrl()));
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
+              POSTGRESQL.getUsername()));
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+              POSTGRESQL.getPassword()));
+    }
+    if (telemetryEnabled) {
+      Files.deleteIfExists(telemetryNdjson);
+      Files.deleteIfExists(telemetryJson);
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              DatabaseTelemetryCollectors.ENABLED_PROPERTY, "true"));
+      jvmArguments.add(
+          RepositoryBackendBenchmarkIT.systemProperty(
+              DatabaseTelemetryCollectors.OUTPUT_PROPERTY,
+              telemetryNdjson.toString()));
+    }
+    builder.jvmArgsAppend(jvmArguments.toArray(String[]::new));
 
     configure(builder, investigation, full, deployment, threads);
-    Collection<RunResult> results = new Runner(builder.build()).run();
+    Collection<RunResult> results;
+    try {
+      results = new Runner(builder.build()).run();
+    } finally {
+      if (connectionPropertiesFile != null) {
+        Files.deleteIfExists(connectionPropertiesFile);
+      }
+    }
 
+    if (telemetryEnabled) {
+      DatabaseTelemetryJson.writeAggregate(telemetryNdjson, telemetryJson);
+      assertTrue(
+          Files.isRegularFile(telemetryJson),
+          "Write-queue telemetry JSON was not written");
+      assertTrue(
+          Files.size(telemetryJson) > 32,
+          "Write-queue telemetry JSON is empty");
+    }
     assertFalse(results.isEmpty(), "Selected investigation produced no JMH results");
     assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
     assertTrue(Files.size(resultFile) > 2, "JMH JSON result is empty");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
+    if (writeQueue) {
+      assertCredentialFreeEvidence(resultFile.getParent());
+    }
+  }
+
+  private static Path writeConnectionProperties() throws IOException {
+    Path target =
+        Files.createTempFile(
+            "jgit-storage-benchmark-connection-", ".properties");
+    try {
+      Files.setPosixFilePermissions(
+          target, PosixFilePermissions.fromString("rw-------"));
+    } catch (UnsupportedOperationException ignored) {
+      // Supported CI performance runners use POSIX filesystems.
+    }
+    Properties properties = new Properties();
+    Map.of(
+            HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
+            POSTGRESQL.getJdbcUrl(),
+            HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
+            POSTGRESQL.getUsername(),
+            HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+            POSTGRESQL.getPassword())
+        .forEach(properties::setProperty);
+    try (OutputStream output = Files.newOutputStream(target)) {
+      properties.store(output, "ephemeral benchmark connection properties");
+    } catch (IOException failure) {
+      try {
+        Files.deleteIfExists(target);
+      } catch (IOException cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+    return target;
+  }
+
+  private static void assertCredentialFreeEvidence(Path root) throws IOException {
+    List<String> forbidden =
+        List.of(
+            HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY + "=",
+            HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY + "=",
+            HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY + "=",
+            "jdbc:postgresql://",
+            "Database JDBC URL",
+            "Default catalog/schema");
+    try (Stream<Path> files = Files.walk(root)) {
+      for (Path file : files.filter(Files::isRegularFile).toList()) {
+        String content =
+            new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+        for (String token : forbidden) {
+          assertFalse(
+              content.contains(token),
+              () -> "Retained evidence " + file + " contains " + token);
+        }
+      }
+    }
   }
 
   private static OptionsBuilder baseOptions(Path resultFile, Path outputFile, boolean full) {

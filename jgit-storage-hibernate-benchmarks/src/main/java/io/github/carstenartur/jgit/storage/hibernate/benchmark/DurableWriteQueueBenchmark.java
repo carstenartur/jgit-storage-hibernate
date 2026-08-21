@@ -16,10 +16,16 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMet
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Logger;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -39,7 +45,10 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.BenchmarkParams;
+import org.openjdk.jmh.infra.IterationParams;
 import org.openjdk.jmh.infra.ThreadParams;
+import org.openjdk.jmh.runner.IterationType;
 
 /**
  * Compares direct durable writes with one-, four- and eight-stripe bounded writer queues.
@@ -77,13 +86,17 @@ public class DurableWriteQueueBenchmark {
   @Param({"64", "384"})
   public int payloadKiB;
 
+  private final AtomicInteger measurementIteration = new AtomicInteger();
   private String sharedRepositoryName;
   private String[] isolatedRepositoryNames;
   private HibernateSessionFactoryProvider schemaProvider;
   private DurableStripedWriteQueue queue;
+  private DatabaseTelemetryCollector telemetryCollector;
+  private DatabaseTelemetrySnapshot iterationTelemetryBefore;
 
   @Setup(Level.Trial)
   public void setupTrial() throws Exception {
+    suppressConnectionMetadataLogging();
     String trialId = Long.toHexString(System.nanoTime());
     sharedRepositoryName = "jmh-queue-shared-" + trialId;
     isolatedRepositoryNames = new String[MAX_THREADS];
@@ -97,10 +110,44 @@ public class DurableWriteQueueBenchmark {
     if (stripes > 0) {
       queue = new DurableStripedWriteQueue(DurableStripedWriteQueue.Limits.benchmarkDefaults(stripes));
     }
+    telemetryCollector = databaseTelemetryCollector();
+  }
+
+  @Setup(Level.Iteration)
+  public void setupIteration(IterationParams iterationParams) {
+    iterationTelemetryBefore = null;
+    if (telemetryCollector.enabled()
+        && iterationParams.getType() == IterationType.MEASUREMENT) {
+      iterationTelemetryBefore = telemetryCollector.capture();
+    }
+  }
+
+  @TearDown(Level.Iteration)
+  public void tearDownIteration(
+      BenchmarkParams benchmarkParams, IterationParams iterationParams) throws IOException {
+    try {
+      if (iterationTelemetryBefore != null
+          && iterationParams.getType() == IterationType.MEASUREMENT) {
+        DatabaseTelemetrySnapshot after = telemetryCollector.capture();
+        DatabaseTelemetryJson.appendNdjson(
+            requiredTelemetryOutput(),
+            new DatabaseTelemetryObservation(
+                telemetryCoordinate(
+                    benchmarkParams, measurementIteration.incrementAndGet()),
+                iterationTelemetryBefore.deltaTo(after)));
+      }
+    } finally {
+      iterationTelemetryBefore = null;
+    }
   }
 
   @TearDown(Level.Trial)
   public void tearDownTrial() {
+    iterationTelemetryBefore = null;
+    if (telemetryCollector != null) {
+      telemetryCollector.close();
+      telemetryCollector = null;
+    }
     if (queue != null) {
       queue.close();
       queue = null;
@@ -170,6 +217,56 @@ public class DurableWriteQueueBenchmark {
     return result;
   }
 
+  private DatabaseTelemetryCollector databaseTelemetryCollector() {
+    boolean enabled = Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
+    if (!enabled) {
+      return DatabaseTelemetryCollectors.disabled(
+          "postgresql", "disabled-by-configuration");
+    }
+    return DatabaseTelemetryCollectors.create(
+        "postgresql",
+        true,
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY),
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY),
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+  }
+
+  private Path requiredTelemetryOutput() {
+    String value = System.getProperty(DatabaseTelemetryCollectors.OUTPUT_PROPERTY);
+    if (value == null || value.isBlank()) {
+      throw new IllegalStateException(
+          "Missing benchmark system property "
+              + DatabaseTelemetryCollectors.OUTPUT_PROPERTY);
+    }
+    return Path.of(value);
+  }
+
+  private Map<String, String> telemetryCoordinate(
+      BenchmarkParams benchmarkParams, int iteration) {
+    String benchmark = benchmarkParams.getBenchmark();
+    String benchmarkMethod =
+        benchmark.substring(benchmark.lastIndexOf('.') + 1);
+    String repositoryScope =
+        switch (benchmarkMethod) {
+          case "publishToSameRepository" -> "shared";
+          case "publishToDifferentRepositories" -> "isolated";
+          default ->
+              throw new IllegalArgumentException(
+                  "Unsupported write-queue benchmark method " + benchmarkMethod);
+        };
+    return Map.of(
+        "backend", backend,
+        "benchmarkMethod", benchmarkMethod,
+        "databaseBackend", "postgresql",
+        "executionMode", executionMode,
+        "measurementIteration", Integer.toString(iteration),
+        "payloadKiB", Integer.toString(payloadKiB),
+        "poolSize", "2",
+        "repositoryScope", repositoryScope,
+        "stripes", Integer.toString(stripes(executionMode)),
+        "threads", Integer.toString(benchmarkParams.getThreads()));
+  }
+
   private void createRepository(String repositoryName) throws IOException {
     try (HibernateRepository repository =
         HibernateRepository.create(schemaProvider.getSessionFactory(), repositoryName)) {
@@ -209,10 +306,38 @@ public class DurableWriteQueueBenchmark {
 
   private static String requiredProperty(String name) {
     String value = System.getProperty(name);
+    if (value != null && !value.isBlank()) {
+      return value;
+    }
+
+    String connectionPropertiesFile =
+        System.getProperty(
+            PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY);
+    if (connectionPropertiesFile != null && !connectionPropertiesFile.isBlank()) {
+      Properties connectionProperties = new Properties();
+      try (InputStream input =
+          Files.newInputStream(Path.of(connectionPropertiesFile))) {
+        connectionProperties.load(input);
+      } catch (IOException failure) {
+        throw new IllegalStateException(
+            "Cannot read temporary benchmark connection properties", failure);
+      }
+      value = connectionProperties.getProperty(name);
+    }
     if (value == null || value.isBlank()) {
       throw new IllegalStateException("Missing benchmark system property " + name);
     }
     return value;
+  }
+
+  private static void suppressConnectionMetadataLogging() {
+    java.util.logging.Level warning = java.util.logging.Level.WARNING;
+    Logger.getLogger("").setLevel(warning);
+    Logger.getLogger("org.hibernate").setLevel(warning);
+    Logger.getLogger("org.hibernate.orm.connections.pooling").setLevel(warning);
+    Logger.getLogger(
+            "org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
+        .setLevel(warning);
   }
 
   private static int stripes(String mode) {
