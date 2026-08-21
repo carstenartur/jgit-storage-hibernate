@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 import unittest
 from pathlib import Path
 
@@ -108,6 +109,65 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         current["threads"] = 1
         with self.assertRaisesRegex(ValueError, "JMH threads"):
             CONVERTER.convert([current, candidate])
+
+    def test_multi_iteration_event_scores_are_normalized_from_raw_data(self) -> None:
+        results = []
+        for concurrency in (1, 4, 16):
+            for operation, baseline in (
+                ("write", 10.0 + concurrency),
+                ("sequential-read", 8.0 + concurrency),
+                ("random-read", 2.0 + concurrency / 10.0),
+            ):
+                results.append(self.result(operation, concurrency, 1024, baseline))
+                results.append(
+                    self.result(operation, concurrency, 4096, baseline * 0.90)
+                )
+        for result in results:
+            for metric in result["secondaryMetrics"].values():
+                per_iteration_aggregate = float(metric["score"])
+                metric["score"] = per_iteration_aggregate * 2.0
+                metric["rawData"] = [
+                    [per_iteration_aggregate, per_iteration_aggregate]
+                ]
+
+        report = CONVERTER.convert(results)
+        sixteen_worker = next(
+            row
+            for row in report["evidence"]
+            if row["concurrency"] == 16
+            and row["operation"] == "write"
+            and row["chunkKiB"] == 1024
+        )
+        self.assertEqual(16, sixteen_worker["concurrency"])
+        self.assertEqual(
+            16 * 1024 * 1024, sixteen_worker["actualRetainedChunkBytes"]
+        )
+        self.assertEqual(1.0, sixteen_worker["jdbcBatchExecutionsPerWorker"])
+        self.assertEqual(2.0, sixteen_worker["jdbcStatementExecutionsPerWorker"])
+
+    def test_structural_metric_change_across_iterations_is_rejected(self) -> None:
+        current = self.result("write", 4, 1024, 10.0)
+        candidate = self.result("write", 4, 4096, 9.0)
+        metric = current["secondaryMetrics"][
+            "ConcurrencyCounters.configuredChunkBytes"
+        ]
+        expected = float(metric["score"])
+        metric["score"] = expected * 3.0
+        metric["rawData"] = [[expected, expected * 2.0]]
+        with self.assertRaisesRegex(ValueError, "changed across JMH iterations"):
+            CONVERTER.convert([current, candidate])
+
+    def test_present_but_invalid_raw_data_is_rejected(self) -> None:
+        invalid_values = (None, {}, [], [[]], [[math.nan]], [["not-a-number"]])
+        for raw_data in invalid_values:
+            with self.subTest(raw_data=raw_data):
+                current = self.result("write", 1, 1024, 10.0)
+                candidate = self.result("write", 1, 4096, 9.0)
+                current["secondaryMetrics"][
+                    "ConcurrencyCounters.configuredChunkBytes"
+                ]["rawData"] = raw_data
+                with self.assertRaisesRegex(ValueError, "rawData"):
+                    CONVERTER.convert([current, candidate])
 
     @staticmethod
     def result(
