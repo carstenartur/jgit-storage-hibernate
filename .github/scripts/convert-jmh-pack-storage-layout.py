@@ -408,10 +408,23 @@ def _layout_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 for value in backend_values
                 if value["operation"] == "sequential-read"
             ]
+            sparse_by_operation = {
+                operation: [
+                    value["relativeToCurrentPercent"]
+                    for value in backend_values
+                    if value["operation"] == operation
+                ]
+                for operation in SPARSE_OPERATIONS
+            }
+            missing_sparse_operations = sorted(
+                operation
+                for operation, comparisons in sparse_by_operation.items()
+                if not comparisons
+            )
             sparse = [
-                value["relativeToCurrentPercent"]
-                for value in backend_values
-                if value["operation"] in SPARSE_OPERATIONS
+                comparison
+                for comparisons in sparse_by_operation.values()
+                for comparison in comparisons
             ]
             backend_summaries.append(
                 {
@@ -419,8 +432,9 @@ def _layout_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "writeMedianImprovementPercent": _median(write),
                     "sequentialMedianImprovementPercent": _median(sequential),
                     "worstSparseImprovementPercent": (
-                        min(sparse) if sparse else None
+                        min(sparse) if not missing_sparse_operations else None
                     ),
+                    "missingSparseOperations": missing_sparse_operations,
                     "comparisonCount": len(backend_values),
                 }
             )
@@ -432,10 +446,8 @@ def _layout_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             and summary["writeMedianImprovementPercent"] > 0.0
             and summary["sequentialMedianImprovementPercent"] is not None
             and summary["sequentialMedianImprovementPercent"] > 0.0
-            and (
-                summary["worstSparseImprovementPercent"] is None
-                or summary["worstSparseImprovementPercent"] >= -5.0
-            )
+            and summary["worstSparseImprovementPercent"] is not None
+            and summary["worstSparseImprovementPercent"] >= -5.0
             for summary in backend_summaries
         )
         candidates.append(
