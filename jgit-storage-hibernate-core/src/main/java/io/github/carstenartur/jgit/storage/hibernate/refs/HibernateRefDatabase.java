@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate.refs;
 
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Objects;
 import org.eclipse.jgit.internal.storage.dfs.DfsReftableDatabase;
@@ -53,7 +54,7 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
   @Override
   public RefUpdate newUpdate(String refName, boolean detach) throws IOException {
     boolean detachingSymbolicRef = false;
-    Ref ref = exactRef(refName);
+    Ref ref = exactRefForUpdate(refName);
     if (ref == null) {
       ref = new ObjectIdRef.Unpeeled(Ref.Storage.NEW, refName, null);
     } else {
@@ -65,6 +66,22 @@ public class HibernateRefDatabase extends DfsReftableDatabase {
       update.setDetachingSymbolicRef();
     }
     return update;
+  }
+
+  private Ref exactRefForUpdate(String refName) throws IOException {
+    try {
+      return exactRef(refName);
+    } catch (FileNotFoundException staleReftable) {
+      // Another repository instance may have compacted and deleted the cached Reftable between
+      // JGit's pack-list read and this lookup. Re-resolve once after the durable repository lock has
+      // refreshed both DFS caches. A genuinely missing row still fails from the authoritative read.
+      try {
+        return inTransaction(session -> exactRef(refName));
+      } catch (FileNotFoundException authoritativeFailure) {
+        authoritativeFailure.addSuppressed(staleReftable);
+        throw authoritativeFailure;
+      }
+    }
   }
 
   @Override
