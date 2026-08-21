@@ -1,0 +1,9 @@
+{
+  "issue": 188,
+  "profile": "capacity",
+  "evidenceCodeCommit": "9680b45521930eb5020c1dd3a6e53c91a8e5f09c",
+  "baseCommit": "9680b45521930eb5020c1dd3a6e53c91a8e5f09c",
+  "requestedBy": "codex",
+  "requestedAt": "2026-08-21T15:20:30Z",
+  "evidenceContract": "strict-json"
+}
