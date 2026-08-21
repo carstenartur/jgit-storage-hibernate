@@ -82,11 +82,15 @@ The converter records:
 - allocation and GC evidence when JMH exposes it;
 - comparison with the current one-MiB/256-KiB layout under the same backend, deployment, payload, retained budget and read-ahead condition.
 
-A write-only improvement is insufficient. A candidate is eligible for later format design only when both PostgreSQL and SQL Server contain write, sequential-read, short-read and random-read comparisons, show write and sequential-read gains, and both sparse access patterns regress by no more than five percent. Until that cross-database condition is met, the generated decision remains:
+A write-only improvement is insufficient. A candidate is eligible for later format design only when both PostgreSQL and SQL Server contain write, sequential-read, short-read and random-read comparisons, show write and sequential-read gains, and both sparse access patterns regress by no more than five percent. Machine-readable evidence distinguishes three states:
 
 ```text
 retain-current-layout-pending-postgresql-and-sqlserver-evidence
+retain-current-layout-no-cross-database-net-benefit
+candidate-layout-ready-for-versioned-format-design
 ```
+
+The pending state is reserved for missing backends or required operations. A complete matrix with no eligible candidate records the no-net-benefit decision explicitly.
 
 The converter never edits production settings.
 
@@ -113,7 +117,7 @@ Positive values are improvements relative to the current one-MiB layout. “Wors
 
 The result explains the trade-off rather than merely selecting a winner. Smaller chunks reduce sparse overfetch but increase row, statement and sequential-transfer cost. Larger chunks reduce row/JDBC overhead and improve large writes and sequential reads, but sparse reads fetch far more payload than requested. The regression is large and consistent enough that neither a global larger default nor a special large-PACK layout is justified by this evidence.
 
-The machine decision remains `retain-current-layout-pending-postgresql-and-sqlserver-evidence`; in this completed matrix that label means that no candidate passed, not that a production-database run is still missing. The authoritative operational conclusion is therefore to retain the current layout.
+The final machine decision is `retain-current-layout-no-cross-database-net-benefit`. The pending state is no longer overloaded for a completed rejection: it is emitted only when a production backend or required access pattern is missing.
 
 ## Required compatibility design before any production change
 

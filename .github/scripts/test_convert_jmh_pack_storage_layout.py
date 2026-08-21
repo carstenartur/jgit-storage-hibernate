@@ -29,6 +29,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],
         )
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
         self.assertFalse(report["productionDefaultsChanged"])
         self.assertTrue(report["compatibility"]["legacyRowsRemainOneMiB"])
 
@@ -51,6 +52,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             if item["chunkKiB"] == 2048 and item["inlineKiB"] == 256
         )
         self.assertTrue(candidate["eligible"])
+        self.assertTrue(report["crossDatabaseEvidenceComplete"])
         self.assertFalse(report["productionDefaultsChanged"])
 
     def test_sparse_read_regression_rejects_a_write_optimized_candidate(
@@ -68,8 +70,9 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             if item["chunkKiB"] == 2048 and item["inlineKiB"] == 256
         )
         self.assertFalse(candidate["eligible"])
+        self.assertTrue(report["crossDatabaseEvidenceComplete"])
         self.assertEqual(
-            "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
+            "retain-current-layout-no-cross-database-net-benefit",
             report["decision"],
         )
 
@@ -102,6 +105,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 for evidence in candidate["backendEvidence"]
             )
         )
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
         self.assertEqual(
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],
@@ -130,6 +134,7 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
                 for evidence in candidate["backendEvidence"]
             )
         )
+        self.assertFalse(report["crossDatabaseEvidenceComplete"])
         self.assertEqual(
             "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
             report["decision"],

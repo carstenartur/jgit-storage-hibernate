@@ -347,16 +347,36 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
 
     candidates = _layout_candidates(evidence)
     backends = sorted({row["backend"] for row in evidence})
-    cross_database = "postgresql" in backends and "sqlserver" in backends
-    eligible = [candidate for candidate in candidates if candidate["eligible"]]
-    decision = (
-        "candidate-layout-ready-for-versioned-format-design"
-        if cross_database and eligible
-        else "retain-current-layout-pending-postgresql-and-sqlserver-evidence"
+    required_backends = {"postgresql", "sqlserver"}
+    cross_database = required_backends.issubset(backends)
+    cross_database_evidence_complete = (
+        cross_database
+        and bool(candidates)
+        and all(
+            required_backends.issubset(
+                summary["backend"] for summary in candidate["backendEvidence"]
+            )
+            and all(
+                summary["writeMedianImprovementPercent"] is not None
+                and summary["sequentialMedianImprovementPercent"] is not None
+                and not summary["missingSparseOperations"]
+                for summary in candidate["backendEvidence"]
+                if summary["backend"] in required_backends
+            )
+            for candidate in candidates
+        )
     )
+    eligible = [candidate for candidate in candidates if candidate["eligible"]]
+    if cross_database_evidence_complete and eligible:
+        decision = "candidate-layout-ready-for-versioned-format-design"
+    elif cross_database_evidence_complete:
+        decision = "retain-current-layout-no-cross-database-net-benefit"
+    else:
+        decision = "retain-current-layout-pending-postgresql-and-sqlserver-evidence"
     return {
         "schemaVersion": 1,
         "decision": decision,
+        "crossDatabaseEvidenceComplete": cross_database_evidence_complete,
         "productionDefaultsChanged": False,
         "currentLayout": {
             "chunkKiB": CURRENT_CHUNK_KIB,
