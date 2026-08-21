@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 
@@ -77,9 +78,13 @@ def require_int_field(mapping: Any, key: str, context: str) -> int:
     value = require_field(mapping, key, context)
     if isinstance(value, bool):
         raise ValueError(f"Malformed {context}: field {key!r} must be an integer")
+    if isinstance(value, float) and (
+        not math.isfinite(value) or not value.is_integer()
+    ):
+        raise ValueError(f"Malformed {context}: field {key!r} must be an integer")
     try:
         return int(value)
-    except (TypeError, ValueError) as failure:
+    except (TypeError, ValueError, OverflowError) as failure:
         raise ValueError(
             f"Malformed {context}: field {key!r} must be an integer"
         ) from failure

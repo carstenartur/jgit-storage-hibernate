@@ -42,6 +42,8 @@ PARAMETER_NAMES = (
 
 
 def _finite(value: Any, name: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {name}")
     try:
         number = float(value)
     except (TypeError, ValueError) as failure:
@@ -54,6 +56,8 @@ def _finite(value: Any, name: str) -> float:
 def _optional_finite(value: Any, name: str) -> float | None:
     if value is None:
         return None
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {name}")
     try:
         number = float(value)
     except (TypeError, ValueError) as failure:
@@ -61,7 +65,7 @@ def _optional_finite(value: Any, name: str) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _milliseconds(score: float, unit: str) -> float:
+def _milliseconds(score: float, unit: str, context: str) -> float:
     factors = {
         "ns/op": 1e-6,
         "us/op": 1e-3,
@@ -72,9 +76,11 @@ def _milliseconds(score: float, unit: str) -> float:
     try:
         value = score * factors[unit]
     except KeyError as failure:
-        raise ValueError(f"Unsupported pack-layout score unit: {unit!r}") from failure
+        raise ValueError(
+            f"Unsupported {context} score unit: {unit!r}"
+        ) from failure
     if not math.isfinite(value):
-        raise ValueError("Non-finite pack-layout score")
+        raise ValueError(f"Non-finite {context} score")
     return value
 
 
@@ -95,28 +101,28 @@ def _secondary(
         if key != name and not key.endswith("." + name):
             continue
         if not isinstance(metric, dict):
-            raise ValueError(f"Malformed secondary metric {name!r}")
+            raise ValueError(f"Malformed {context} secondary metric {name!r}")
 
         if "rawData" in metric:
             raw_data = metric["rawData"]
             if not isinstance(raw_data, list) or not raw_data:
-                raise ValueError(f"Malformed rawData for secondary metric {name!r}")
+                raise ValueError(f"Malformed {context} rawData for secondary metric {name!r}")
             samples: list[float] = []
             iteration_count: int | None = None
             for fork in raw_data:
                 if not isinstance(fork, list) or not fork:
                     raise ValueError(
-                        f"Malformed rawData for secondary metric {name!r}"
+                        f"Malformed {context} rawData for secondary metric {name!r}"
                     )
                 if iteration_count is None:
                     iteration_count = len(fork)
                 elif len(fork) != iteration_count:
                     raise ValueError(
-                        f"Inconsistent rawData fork lengths for secondary metric {name!r}"
+                        f"Inconsistent {context} rawData fork lengths for secondary metric {name!r}"
                     )
                 for raw_value in fork:
                     value = _finite(
-                        raw_value, f"rawData for secondary metric {name!r}"
+                        raw_value, f"{context} rawData for secondary metric {name!r}"
                     )
                     samples.append(value)
             if require_constant and any(
@@ -124,7 +130,7 @@ def _secondary(
                 for value in samples[1:]
             ):
                 raise ValueError(
-                    f"Secondary metric {name!r} changed across JMH iterations: "
+                    f"{context} secondary metric {name!r} changed across JMH iterations: "
                     f"{samples!r}"
                 )
             return math.fsum(samples) / len(samples)
@@ -151,7 +157,7 @@ def _profiler(result: dict[str, Any], suffix: str) -> float | None:
         if not key.endswith(suffix):
             continue
         if not isinstance(metric, dict):
-            raise ValueError(f"Malformed profiler metric {key!r}")
+            raise ValueError(f"Malformed {context} profiler metric {key!r}")
         return _optional_finite(
             require_field(metric, "score", f"{context} profiler metric {key!r}"),
             f"{context} profiler metric {key!r}",
@@ -172,7 +178,7 @@ def _percentile(
     score = _finite(
         values[percentile], f"{context} percentile {percentile}"
     )
-    return _milliseconds(score, unit)
+    return _milliseconds(score, unit, context)
 
 
 def _row(result: Any) -> dict[str, Any]:
@@ -209,11 +215,16 @@ def _row(result: Any) -> dict[str, Any]:
             f"{metric_context} score",
         ),
         unit,
+        metric_context,
     )
     raw_error = _optional_finite(
         metric.get("scoreError"), f"{metric_context} scoreError"
     )
-    error = None if raw_error is None else _milliseconds(raw_error, unit)
+    error = (
+        None
+        if raw_error is None
+        else _milliseconds(raw_error, unit, f"{metric_context} scoreError")
+    )
     configured_budget = int(
         round(
             _secondary(

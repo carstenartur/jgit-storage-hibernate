@@ -216,6 +216,35 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
 
         self.assertEqual("postgresql", valid["params"]["backend"])
 
+    def test_boolean_primary_values_are_rejected(self) -> None:
+        for field in ("score", "percentile"):
+            with self.subTest(field=field):
+                result = self.result("postgresql", "write", 1024, 10.0)
+                if field == "score":
+                    result["primaryMetric"]["score"] = True
+                else:
+                    result["primaryMetric"]["scorePercentiles"]["95.0"] = True
+                with self.assertRaisesRegex(ValueError, "operation='write'"):
+                    CONVERTER.convert([result])
+
+    def test_non_integral_and_infinite_integer_parameters_are_rejected(self) -> None:
+        for value in (1024.5, math.inf, -math.inf):
+            with self.subTest(value=value):
+                result = self.result("postgresql", "write", 1024, 10.0)
+                result["params"]["chunkKiB"] = value
+                with self.assertRaisesRegex(ValueError, "chunkKiB"):
+                    CONVERTER.convert([result])
+
+    def test_unsupported_score_unit_preserves_coordinate_context(self) -> None:
+        result = self.result("postgresql", "write", 1024, 10.0)
+        result["primaryMetric"]["scoreUnit"] = "bogus"
+        with self.assertRaises(ValueError) as raised:
+            CONVERTER.convert([result])
+        message = str(raised.exception)
+        self.assertIn("Unsupported", message)
+        self.assertIn("operation='write'", message)
+        self.assertIn("chunkKiB='1024'", message)
+
     def test_retained_budget_rounding_violation_is_rejected(self) -> None:
         result = self.result("postgresql", "write", 1024, 10.0)
         result["secondaryMetrics"][
@@ -296,8 +325,11 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
         ]
         expected = float(metric["score"])
         metric["rawData"] = [[expected, expected], [expected]]
-        with self.assertRaisesRegex(ValueError, "fork lengths"):
+        with self.assertRaises(ValueError) as raised:
             CONVERTER.convert([result])
+        message = str(raised.exception)
+        self.assertIn("fork lengths", message)
+        self.assertIn("operation='write'", message)
 
     def test_nan_score_error_becomes_json_null(self) -> None:
         result = self.result("postgresql", "write", 1024, 10.0)

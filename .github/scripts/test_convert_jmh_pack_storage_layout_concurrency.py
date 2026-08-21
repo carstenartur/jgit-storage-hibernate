@@ -179,6 +179,38 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             CONVERTER._strict_json({"unexpected": math.nan})
 
+    def test_boolean_primary_values_are_rejected(self) -> None:
+        for field in ("score", "percentile"):
+            with self.subTest(field=field):
+                current = self.result("write", 1, 1024, 10.0)
+                candidate = self.result("write", 1, 4096, 9.0)
+                if field == "score":
+                    current["primaryMetric"]["score"] = True
+                else:
+                    current["primaryMetric"]["scorePercentiles"]["95.0"] = True
+                with self.assertRaisesRegex(ValueError, "operation='write'"):
+                    CONVERTER.convert([current, candidate])
+
+    def test_non_integral_and_infinite_integer_parameters_are_rejected(self) -> None:
+        for value in (1.5, math.inf, -math.inf):
+            with self.subTest(value=value):
+                current = self.result("write", 1, 1024, 10.0)
+                candidate = self.result("write", 1, 4096, 9.0)
+                current["params"]["concurrency"] = value
+                with self.assertRaisesRegex(ValueError, "concurrency"):
+                    CONVERTER.convert([current, candidate])
+
+    def test_unsupported_score_unit_preserves_coordinate_context(self) -> None:
+        current = self.result("write", 1, 1024, 10.0)
+        candidate = self.result("write", 1, 4096, 9.0)
+        current["primaryMetric"]["scoreUnit"] = "bogus"
+        with self.assertRaises(ValueError) as raised:
+            CONVERTER.convert([current, candidate])
+        message = str(raised.exception)
+        self.assertIn("Unsupported", message)
+        self.assertIn("operation='write'", message)
+        self.assertIn("concurrency='1'", message)
+
     def test_missing_current_layout_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing current-layout"):
             CONVERTER.convert([self.result("write", 1, 4096, 5.0)])
@@ -280,8 +312,12 @@ class PackStorageLayoutConcurrencyConverterTest(unittest.TestCase):
         ]
         expected = float(metric["score"])
         metric["rawData"] = [[expected, expected], [expected]]
-        with self.assertRaisesRegex(ValueError, "fork lengths"):
+        with self.assertRaises(ValueError) as raised:
             CONVERTER.convert([current, candidate])
+        message = str(raised.exception)
+        self.assertIn("fork lengths", message)
+        self.assertIn("operation='write'", message)
+        self.assertIn("concurrency='1'", message)
 
     def test_present_but_invalid_raw_data_is_rejected(self) -> None:
         invalid_values = (None, {}, [], [[]], [[math.nan]], [["not-a-number"]])

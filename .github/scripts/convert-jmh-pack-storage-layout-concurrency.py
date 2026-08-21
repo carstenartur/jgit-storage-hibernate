@@ -39,6 +39,8 @@ PARAMETER_NAMES = (
 
 
 def _finite(value: Any, context: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {context}")
     try:
         number = float(value)
     except (TypeError, ValueError) as failure:
@@ -51,6 +53,8 @@ def _finite(value: Any, context: str) -> float:
 def _optional_finite(value: Any, context: str) -> float | None:
     if value is None:
         return None
+    if isinstance(value, bool):
+        raise ValueError(f"Malformed {context}")
     try:
         number = float(value)
     except (TypeError, ValueError) as failure:
@@ -58,7 +62,7 @@ def _optional_finite(value: Any, context: str) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _milliseconds(value: float, unit: str) -> float:
+def _milliseconds(value: float, unit: str, context: str) -> float:
     factors = {
         "ns/op": 1e-6,
         "us/op": 1e-3,
@@ -69,9 +73,11 @@ def _milliseconds(value: float, unit: str) -> float:
     try:
         converted = value * factors[unit]
     except KeyError as failure:
-        raise ValueError(f"Unsupported concurrency score unit: {unit!r}") from failure
+        raise ValueError(
+            f"Unsupported {context} score unit: {unit!r}"
+        ) from failure
     if not math.isfinite(converted):
-        raise ValueError("Non-finite concurrency score")
+        raise ValueError(f"Non-finite {context} score")
     return converted
 
 
@@ -91,26 +97,26 @@ def _secondary(
         if key != name and not key.endswith("." + name):
             continue
         if not isinstance(metric, dict):
-            raise ValueError(f"Malformed concurrency secondary metric {name!r}")
+            raise ValueError(f"Malformed {context} concurrency secondary metric {name!r}")
 
         if "rawData" in metric:
             raw_data = metric["rawData"]
             if not isinstance(raw_data, list) or not raw_data:
                 raise ValueError(
-                    f"Malformed rawData for concurrency secondary metric {name!r}"
+                    f"Malformed {context} rawData for concurrency secondary metric {name!r}"
                 )
             samples: list[float] = []
             iteration_count: int | None = None
             for fork in raw_data:
                 if not isinstance(fork, list) or not fork:
                     raise ValueError(
-                        f"Malformed rawData for concurrency secondary metric {name!r}"
+                        f"Malformed {context} rawData for concurrency secondary metric {name!r}"
                     )
                 if iteration_count is None:
                     iteration_count = len(fork)
                 elif len(fork) != iteration_count:
                     raise ValueError(
-                        "Inconsistent rawData fork lengths for concurrency "
+                        f"Inconsistent {context} rawData fork lengths for concurrency "
                         f"secondary metric {name!r}"
                     )
                 for raw_value in fork:
@@ -118,11 +124,11 @@ def _secondary(
                         value = float(raw_value)
                     except (TypeError, ValueError) as failure:
                         raise ValueError(
-                            f"Malformed rawData for concurrency secondary metric {name!r}"
+                            f"Malformed {context} rawData for concurrency secondary metric {name!r}"
                         ) from failure
                     if not math.isfinite(value):
                         raise ValueError(
-                            f"Non-finite rawData for concurrency secondary metric {name!r}"
+                            f"Non-finite {context} rawData for concurrency secondary metric {name!r}"
                         )
                     samples.append(value)
             if require_constant and any(
@@ -130,7 +136,7 @@ def _secondary(
                 for value in samples[1:]
             ):
                 raise ValueError(
-                    f"Concurrency secondary metric {name!r} changed across JMH iterations: {samples!r}"
+                    f"{context} concurrency secondary metric {name!r} changed across JMH iterations: {samples!r}"
                 )
             return math.fsum(samples) / len(samples)
 
@@ -147,9 +153,9 @@ def _secondary(
                 f"Malformed {context} concurrency secondary metric {name!r}"
             ) from failure
         if not math.isfinite(value):
-            raise ValueError(f"Non-finite concurrency secondary metric {name!r}")
+            raise ValueError(f"Non-finite {context} concurrency secondary metric {name!r}")
         return value
-    raise ValueError(f"Concurrency result is missing secondary metric {name!r}")
+    raise ValueError(f"{context} is missing secondary metric {name!r}")
 
 
 def _per_worker(
@@ -184,14 +190,18 @@ def _percentile(
     if values is None or name not in values:
         return fallback
     value = _finite(values[name], f"{context} percentile {name}")
-    return _milliseconds(value, unit)
+    return _milliseconds(value, unit, context)
 
 
 def _score_error(
     metric: dict[str, Any], unit: str, context: str
 ) -> float | None:
     value = _optional_finite(metric.get("scoreError"), f"{context} scoreError")
-    return None if value is None else _milliseconds(value, unit)
+    return (
+        None
+        if value is None
+        else _milliseconds(value, unit, f"{context} scoreError")
+    )
 
 
 def _row(result: Any) -> dict[str, Any]:
@@ -227,7 +237,7 @@ def _row(result: Any) -> dict[str, Any]:
         require_field(metric, "score", metric_context),
         f"{metric_context} score",
     )
-    score = _milliseconds(primary_score, unit)
+    score = _milliseconds(primary_score, unit, metric_context)
     if not math.isfinite(score) or score <= 0.0:
         raise ValueError("Concurrency latency must be finite and positive")
 
