@@ -1,0 +1,1 @@
+Temporary same-repository trigger for the issue #187 telemetry integration workflow.
