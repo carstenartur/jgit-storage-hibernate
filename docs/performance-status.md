@@ -15,6 +15,7 @@ The large-pack write path is now substantially better understood:
 - automatic writer selection uses ordinary stateful Hibernate below 16 MiB and a shared-transaction `StatelessSession` at or above 16 MiB;
 - a production receiver queue can commit up to 50 compatible records in one transaction and one observed JDBC batch, or flush a smaller batch after a configurable collection window;
 - read-ahead remains access-pattern-aware instead of forcing one global window;
+- the complete 512-MiB PostgreSQL/SQL Server matrix retains one-MiB chunks and a 256-KiB inline threshold: larger chunks improve sequential work but regress sparse reads by 37–171%, while 256-KiB chunks regress writes and sequential reads;
 - repository maintenance is not enabled automatically: the smoke fixture shows no value at one pack and a strong crossover by ten small packs, but the 100/1,000-push production matrix is still required.
 
 ## Current production decisions
@@ -23,6 +24,7 @@ The large-pack write path is now substantially better understood:
 |---|---|---|
 | Hibernate JDBC batch size | Default 16 when the bundled provider owns the setting | Best saved network exchanges per additional retained MiB in the 8/16/32/50 Toxiproxy matrix. |
 | Pack chunk window | Default 16, configurable 1–64 | One-MiB chunks make the peak retained payload per active writer explicit and bounded. |
+| Persisted pack layout | One-MiB chunks; 256-KiB inline threshold | Complete 512-MiB PostgreSQL and SQL Server evidence rejects 256-KiB, two-MiB and four-MiB alternatives: each regresses either write/sequential or sparse access beyond the promotion budget. |
 | Pack chunk writer | `auto`; stateful below 16 MiB, stateless at or above 16 MiB | Stateless saves about 16–18% allocation at 16/128/512 MiB, reduces flush/GC work and preserves identical JDBC shape and reopen integrity. |
 | PgJDBC rewrite | Disabled by the library | Slightly slower in the local and calibrated network matrices; no RTT-slope reduction. |
 | Receiver batching | 50 records or 64 MiB, two-millisecond default wait, four stripes | Allows one transaction/JDBC batch for a burst while bounding sparse-stream delay and heap. |

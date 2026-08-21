@@ -1,6 +1,6 @@
 # Pack chunk size, inline threshold and versioned layout compatibility
 
-The current production format stores payloads up to 256 KiB in `git_packs.data`. Larger payloads use one-MiB rows in `git_pack_chunks`. These defaults are stable and remain unchanged while alternative layouts are measured.
+The current production format stores payloads up to 256 KiB in `git_packs.data`. Larger payloads use one-MiB rows in `git_pack_chunks`. The completed PostgreSQL and SQL Server evidence retains these values as the production decision: no alternative chunk size provides a net benefit across sequential and sparse access.
 
 Issue [#188](https://github.com/carstenartur/jgit-storage-hibernate/issues/188) evaluates whether fewer, larger chunk rows can reduce JDBC, index and protocol overhead without making short or random reads materially worse. The benchmark also measures whether a different inline threshold reduces small-payload round trips without retaining too much binary data in pack metadata rows.
 
@@ -90,7 +90,7 @@ retain-current-layout-pending-postgresql-and-sqlserver-evidence
 
 The converter never edits production settings.
 
-## Current preliminary observations
+## Retained observations and final capacity decision
 
 The bounded [SQL Server smoke run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32389361783) confirms that candidate layouts can be measured through the same real Hibernate entities and evidence converter as HSQLDB and PostgreSQL. In that small fixture, 256-KiB chunks improved some sequential reads but materially increased write cost and sparse-read overfetch/latency. This is evidence against changing the default from a smoke result, not a final production conclusion.
 
@@ -98,7 +98,22 @@ The calibrated [PostgreSQL RTT smoke run](https://github.com/carstenartur/jgit-s
 
 The bounded [PostgreSQL concurrency smoke run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32394385287) completed the 1/4/16-worker matrix against a shared schema and pool. The four-MiB candidate did not provide a uniform gain: its worst point-estimate deltas across the measured worker levels were about -4.9% for writes, -24.3% for sequential reads and -14.4% for random reads. At some individual higher-concurrency points it improved latency, but the fail-closed rule correctly rejects a layout that regresses another worker level or access pattern. The current one-MiB layout remains the reference.
 
-The retained full and capacity matrices remain authoritative for the final decision.
+The retained full matrix and the final [complete 512-MiB capacity run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32505334226) are now complete. The capacity aggregate contains 64 validated PostgreSQL and SQL Server rows: write, sequential read, 64-KiB short read and deterministic random 4-KiB reads for every candidate chunk size. Both sparse operations are present on both production databases, and the converted decision artifacts are strict JSON.
+
+### Final 512-MiB cross-database comparison
+
+Positive values are improvements relative to the current one-MiB layout. “Worst sparse” is the worse result across short and random reads; the promotion budget permits no regression below -5%.
+
+| Chunk size | PostgreSQL write | PostgreSQL sequential | PostgreSQL worst sparse | SQL Server write | SQL Server sequential | SQL Server worst sparse | Decision |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 256 KiB | -8.25% | -14.18% | +21.31% | -7.67% | -5.68% | +16.53% | reject: write and sequential regress |
+| 1 MiB | baseline | baseline | baseline | baseline | baseline | baseline | retain current layout |
+| 2 MiB | +5.60% | +0.62% | -36.99% | +32.32% | +1.95% | -170.91% | reject: sparse regression |
+| 4 MiB | +16.63% | +12.28% | -95.05% | +22.43% | +5.43% | -105.31% | reject: sparse regression |
+
+The result explains the trade-off rather than merely selecting a winner. Smaller chunks reduce sparse overfetch but increase row, statement and sequential-transfer cost. Larger chunks reduce row/JDBC overhead and improve large writes and sequential reads, but sparse reads fetch far more payload than requested. The regression is large and consistent enough that neither a global larger default nor a special large-PACK layout is justified by this evidence.
+
+The machine decision remains `retain-current-layout-pending-postgresql-and-sqlserver-evidence`; in this completed matrix that label means that no candidate passed, not that a production-database run is still missing. The authoritative operational conclusion is therefore to retain the current layout.
 
 ## Required compatibility design before any production change
 
@@ -134,8 +149,10 @@ The proposed metadata columns are small scalar values and can be added without r
 - keep inline and chunked payloads mutually exclusive;
 - pass `hbm2ddl.auto=validate`, upgrade, restart and mixed-layout tests.
 
-SQL Server execution, calibrated PostgreSQL RTT evidence and the bounded 1/4/16-worker concurrency contract are now part of the benchmark workflow, and a fail-closed cross-database aggregate exists. The remaining evidence work is the retained full and capacity execution before issue #188 can close.
+SQL Server execution, calibrated PostgreSQL RTT evidence and the bounded 1/4/16-worker concurrency contract are part of the benchmark workflow, and the retained full and complete sparse-aware capacity executions have succeeded. The cross-database aggregate rejects every alternative layout, so no schema migration or mixed-layout implementation is required for the current production decision.
 
 ## Production decision
 
-No production default changes in this benchmark slice. The authoritative values remain one-MiB chunks and a 256-KiB inline threshold. A later implementation PR is justified only by retained net-benefit evidence and must introduce the additive versioned layout contract above together with old/new mixed-row tests.
+The authoritative production values remain **one-MiB chunks** and a **256-KiB inline threshold**. The completed local, RTT, concurrency, full and 512-MiB capacity evidence does not justify a global, extension-specific or payload-class adaptive persisted layout. No migration is introduced, and legacy repositories remain readable without rewrite.
+
+A future format change requires new evidence that passes the same complete PostgreSQL and SQL Server write, sequential, short-read and random-read contract. Such a change must then introduce the additive versioned layout metadata above together with legacy/new mixed-row, restart, rollback and corruption tests.
