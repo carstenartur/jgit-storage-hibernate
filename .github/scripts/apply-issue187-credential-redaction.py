@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 ''',
     '''import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 ''',
     "benchmark logging imports",
@@ -106,7 +105,7 @@ benchmark = replace_once(
   private static void suppressConnectionMetadataLogging() {
     Logger.getLogger(
             "org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
-        .setLevel(Level.WARNING);
+        .setLevel(java.util.logging.Level.WARNING);
   }
 ''',
     "connection-file property loading",
