@@ -31,20 +31,77 @@ def _milliseconds(value: float, unit: str) -> float:
         raise ValueError(f"Unsupported concurrency score unit: {unit!r}") from failure
 
 
-def _secondary(result: dict[str, Any], name: str) -> float:
+def _secondary(
+    result: dict[str, Any],
+    name: str,
+    *,
+    require_constant: bool = False,
+) -> float:
+    """Return one per-iteration aggregate instead of JMH's iteration sum."""
     for key, metric in result.get("secondaryMetrics", {}).items():
-        if key == name or key.endswith("." + name):
-            return float(metric.get("score", 0.0))
+        if key != name and not key.endswith("." + name):
+            continue
+        if not isinstance(metric, dict):
+            raise ValueError(f"Malformed concurrency secondary metric {name!r}")
+
+        if "rawData" in metric:
+            raw_data = metric["rawData"]
+            if not isinstance(raw_data, list) or not raw_data:
+                raise ValueError(
+                    f"Malformed rawData for concurrency secondary metric {name!r}"
+                )
+            samples: list[float] = []
+            for fork in raw_data:
+                if not isinstance(fork, list) or not fork:
+                    raise ValueError(
+                        f"Malformed rawData for concurrency secondary metric {name!r}"
+                    )
+                for raw_value in fork:
+                    try:
+                        value = float(raw_value)
+                    except (TypeError, ValueError) as failure:
+                        raise ValueError(
+                            f"Malformed rawData for concurrency secondary metric {name!r}"
+                        ) from failure
+                    if not math.isfinite(value):
+                        raise ValueError(
+                            f"Non-finite rawData for concurrency secondary metric {name!r}"
+                        )
+                    samples.append(value)
+            if require_constant and any(
+                not math.isclose(value, samples[0], rel_tol=0.0, abs_tol=1e-6)
+                for value in samples[1:]
+            ):
+                raise ValueError(
+                    f"Concurrency secondary metric {name!r} changed across JMH iterations: {samples!r}"
+                )
+            return math.fsum(samples) / len(samples)
+
+        try:
+            value = float(metric.get("score", 0.0))
+        except (TypeError, ValueError) as failure:
+            raise ValueError(
+                f"Malformed concurrency secondary metric {name!r}"
+            ) from failure
+        if not math.isfinite(value):
+            raise ValueError(f"Non-finite concurrency secondary metric {name!r}")
+        return value
     raise ValueError(f"Concurrency result is missing secondary metric {name!r}")
 
 
-def _per_worker(result: dict[str, Any], name: str, threads: int) -> float:
-    """Normalize JMH EVENTS counters, which are summed across worker threads."""
-    return _secondary(result, name) / threads
+def _per_worker(
+    result: dict[str, Any],
+    name: str,
+    threads: int,
+    *,
+    require_constant: bool = False,
+) -> float:
+    """Normalize JMH EVENTS counters per iteration and active worker thread."""
+    return _secondary(result, name, require_constant=require_constant) / threads
 
 
 def _per_worker_int(result: dict[str, Any], name: str, threads: int) -> int:
-    value = _per_worker(result, name, threads)
+    value = _per_worker(result, name, threads, require_constant=True)
     rounded = round(value)
     if not math.isclose(value, rounded, rel_tol=0.0, abs_tol=1e-6):
         raise ValueError(
@@ -347,7 +404,7 @@ def _write_markdown(report: dict[str, Any], target: Path) -> None:
         "",
         f"Decision: `{report['decision']}`.",
         "",
-        "JMH EVENTS auxiliary counters are summed across active worker threads. This report normalizes structural, byte and JDBC counters per worker before comparing layouts.",
+        "JMH EVENTS auxiliary counters are summed across active worker threads. This report normalizes them first per measurement iteration and then per worker before comparing layouts.",
         "",
         "The capacity figures are derived from measured per-operation latency and configured worker count. They are observational and never change production settings.",
         "",
