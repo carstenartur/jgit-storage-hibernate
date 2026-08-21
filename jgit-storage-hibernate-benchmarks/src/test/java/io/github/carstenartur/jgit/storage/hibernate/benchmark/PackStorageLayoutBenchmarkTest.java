@@ -89,6 +89,41 @@ class PackStorageLayoutBenchmarkTest {
     assertUniqueCoordinates("capacity");
   }
 
+  @Test
+  void capacityProfileIncludesSparseReadsForEveryChunkSize() {
+    Set<String> coordinates = new HashSet<>();
+    for (Scenario scenario : scenarios("capacity")) {
+      for (String operation : scenario.operations()) {
+        if (!PackStorageLayoutBenchmark.SHORT_READ.equals(operation)
+            && !PackStorageLayoutBenchmark.RANDOM_READ.equals(operation)) {
+          continue;
+        }
+        for (String payloadKiB : scenario.payloadKiB()) {
+          if (!"524288".equals(payloadKiB)) {
+            continue;
+          }
+          for (String readAheadKiB : scenario.readAheadKiB()) {
+            if (!"1024".equals(readAheadKiB)) {
+              continue;
+            }
+            for (String chunkKiB : scenario.chunkKiB()) {
+              coordinates.add(operation + ":" + chunkKiB);
+            }
+          }
+        }
+      }
+    }
+
+    for (String chunkKiB : chunkSizes()) {
+      assertTrue(
+          coordinates.contains(PackStorageLayoutBenchmark.SHORT_READ + ":" + chunkKiB),
+          () -> "Capacity profile is missing short-read evidence for chunk " + chunkKiB);
+      assertTrue(
+          coordinates.contains(PackStorageLayoutBenchmark.RANDOM_READ + ":" + chunkKiB),
+          () -> "Capacity profile is missing random-read evidence for chunk " + chunkKiB);
+    }
+  }
+
   private static void assertUniqueCoordinates(String profile) {
     Set<String> coordinates = new HashSet<>();
     for (Scenario scenario : scenarios(profile)) {
@@ -218,7 +253,17 @@ class PackStorageLayoutBenchmarkTest {
                   chunkSizes(),
                   new String[] {"256"},
                   new String[] {"16"},
-                  new String[] {"1024", "4096", "16384"}));
+                  new String[] {"1024", "4096", "16384"}),
+              new Scenario(
+                  new String[] {
+                    PackStorageLayoutBenchmark.SHORT_READ,
+                    PackStorageLayoutBenchmark.RANDOM_READ
+                  },
+                  new String[] {"524288"},
+                  chunkSizes(),
+                  new String[] {"256"},
+                  new String[] {"16"},
+                  new String[] {"1024"}));
       default ->
           throw new IllegalArgumentException(
               PROFILE_PROPERTY + " must be smoke, full or capacity but was " + profile);

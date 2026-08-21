@@ -73,6 +73,33 @@ class PackStorageLayoutConverterTest(unittest.TestCase):
             report["decision"],
         )
 
+    def test_missing_sparse_evidence_cannot_promote_a_candidate(self) -> None:
+        results = [
+            result
+            for result in self.matrix(
+                ["postgresql", "sqlserver"],
+                sparse_candidate=9.7,
+            )
+            if result["params"]["operation"] not in CONVERTER.SPARSE_OPERATIONS
+        ]
+        report = CONVERTER.convert(results)
+        candidate = next(
+            item
+            for item in report["layoutCandidates"]
+            if item["chunkKiB"] == 2048 and item["inlineKiB"] == 256
+        )
+        self.assertFalse(candidate["eligible"])
+        self.assertTrue(
+            all(
+                evidence["worstSparseImprovementPercent"] is None
+                for evidence in candidate["backendEvidence"]
+            )
+        )
+        self.assertEqual(
+            "retain-current-layout-pending-postgresql-and-sqlserver-evidence",
+            report["decision"],
+        )
+
     def test_retained_budget_rounding_violation_is_rejected(self) -> None:
         result = self.result("postgresql", "write", 1024, 10.0)
         result["secondaryMetrics"][

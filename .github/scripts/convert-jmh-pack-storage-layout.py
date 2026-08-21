@@ -432,10 +432,8 @@ def _layout_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             and summary["writeMedianImprovementPercent"] > 0.0
             and summary["sequentialMedianImprovementPercent"] is not None
             and summary["sequentialMedianImprovementPercent"] > 0.0
-            and (
-                summary["worstSparseImprovementPercent"] is None
-                or summary["worstSparseImprovementPercent"] >= -5.0
-            )
+            and summary["worstSparseImprovementPercent"] is not None
+            and summary["worstSparseImprovementPercent"] >= -5.0
             for summary in backend_summaries
         )
         candidates.append(
