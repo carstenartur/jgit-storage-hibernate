@@ -46,21 +46,29 @@ def _secondary(
     for key, metric in result.get("secondaryMetrics", {}).items():
         if key != name and not key.endswith("." + name):
             continue
+        if not isinstance(metric, dict):
+            raise ValueError(f"Malformed secondary metric {name!r}")
 
-        raw_data = metric.get("rawData")
-        samples: list[float] = []
-        if isinstance(raw_data, list):
+        if "rawData" in metric:
+            raw_data = metric["rawData"]
+            if not isinstance(raw_data, list) or not raw_data:
+                raise ValueError(f"Malformed rawData for secondary metric {name!r}")
+            samples: list[float] = []
             for fork in raw_data:
-                if not isinstance(fork, list):
+                if not isinstance(fork, list) or not fork:
                     raise ValueError(f"Malformed rawData for secondary metric {name!r}")
                 for raw_value in fork:
-                    value = float(raw_value)
+                    try:
+                        value = float(raw_value)
+                    except (TypeError, ValueError) as failure:
+                        raise ValueError(
+                            f"Malformed rawData for secondary metric {name!r}"
+                        ) from failure
                     if not math.isfinite(value):
                         raise ValueError(
                             f"Non-finite rawData for secondary metric {name!r}"
                         )
                     samples.append(value)
-        if samples:
             if require_constant and any(
                 not math.isclose(value, samples[0], rel_tol=0.0, abs_tol=1e-6)
                 for value in samples[1:]
@@ -70,7 +78,10 @@ def _secondary(
                 )
             return math.fsum(samples) / len(samples)
 
-        value = float(metric.get("score", default))
+        try:
+            value = float(metric.get("score", default))
+        except (TypeError, ValueError) as failure:
+            raise ValueError(f"Malformed secondary metric {name!r}") from failure
         if not math.isfinite(value):
             raise ValueError(f"Non-finite secondary metric {name!r}")
         return value
