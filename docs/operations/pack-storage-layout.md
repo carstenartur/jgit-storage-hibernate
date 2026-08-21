@@ -44,9 +44,9 @@ The `Pack Storage Layout` workflow provides three scopes:
 
 - `smoke`: bounded HSQLDB and SQL Server matrices used by pull requests;
 - `full`: inline-boundary, write, sequential, short and random-read evidence through 128 MiB;
-- `capacity`: explicit 512-MiB write and sequential-read evidence.
+- `capacity`: explicit 512-MiB write, sequential, short and deterministic random-read evidence; sparse reads use one representative one-MiB read-ahead window to keep the profile bounded.
 
-PostgreSQL and SQL Server full/capacity runs use Testcontainers and are manual or scheduled. When both production-database jobs succeed, a separate aggregate job downloads the two raw JMH artifacts, verifies that both are non-empty, merges them and invokes the decision converter once. A single-database result cannot promote a candidate.
+PostgreSQL and SQL Server full/capacity runs use Testcontainers and are manual or scheduled. When both production-database jobs succeed, a separate aggregate job downloads the two raw JMH artifacts, verifies that both are non-empty, merges them and invokes the decision converter once. A single-database result cannot promote a candidate. The decision also requires sparse-read evidence for every candidate on both production databases; missing sparse evidence fails closed rather than being treated as zero regression.
 
 The `Pack Storage Layout Network RTT` workflow adds a calibrated PostgreSQL/Toxiproxy slice:
 
@@ -82,7 +82,7 @@ The converter records:
 - allocation and GC evidence when JMH exposes it;
 - comparison with the current one-MiB/256-KiB layout under the same backend, deployment, payload, retained budget and read-ahead condition.
 
-A write-only improvement is insufficient. A candidate is eligible for later format design only when both PostgreSQL and SQL Server show write and sequential-read gains and sparse reads regress by no more than five percent. Until that cross-database condition is met, the generated decision remains:
+A write-only improvement is insufficient. A candidate is eligible for later format design only when both PostgreSQL and SQL Server contain write, sequential-read and sparse-read comparisons, show write and sequential-read gains, and sparse reads regress by no more than five percent. Until that cross-database condition is met, the generated decision remains:
 
 ```text
 retain-current-layout-pending-postgresql-and-sqlserver-evidence
