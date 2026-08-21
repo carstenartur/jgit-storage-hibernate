@@ -37,14 +37,14 @@ Counter resets and a counter missing from either snapshot are never converted to
 
 ## Privacy and redaction contract
 
-Artifacts do not contain:
+The native telemetry companion JSON does not contain:
 
-- JDBC URLs or host names;
-- database names;
-- usernames or passwords;
+- JDBC URLs, database names, usernames or passwords;
 - SQL parameters;
 - statement or query text;
 - raw JDBC exception messages.
+
+Pack-layout Testcontainers credentials are passed to JMH forks through a short-lived owner-readable properties file outside the retained artifact directory. The file path, but not its contents, may appear in JMH VM arguments. The runner deletes the file before evidence is uploaded and scans raw JMH JSON and console output for direct connection properties and JDBC URLs.
 
 A failed capability is represented by a normalized SQL state and vendor code, for example:
 
@@ -58,6 +58,7 @@ This keeps permission and extension failures actionable without copying deployme
 
 The PostgreSQL collector currently reads only cumulative statistics and non-sensitive settings:
 
+- current WAL insert and flush positions converted to monotonic byte counters for immediate short-window deltas;
 - `pg_stat_wal`: WAL records, full-page images, bytes, buffer-full events, writes, syncs and available write/sync timing;
 - `pg_stat_database`: commits, rollbacks, block hits/reads, tuple activity, temporary files/bytes, deadlocks and available block timing;
 - `pg_stat_io`: operation counts, byte estimates, timing, buffer hits, evictions, reuse and fsync evidence;
@@ -67,6 +68,10 @@ The PostgreSQL collector currently reads only cumulative statistics and non-sens
 `pg_stat_statements` query text is deliberately not selected. If the extension is absent, not preloaded or unavailable to the benchmark user, that capability is marked unsupported while the remaining benchmark continues.
 
 The artifact also records whether `track_io_timing` and `track_wal_io_timing` are enabled. A zero timing delta is not interpreted as proof of zero physical I/O when the relevant timing setting is disabled.
+
+`pg_stat_wal`, `pg_stat_database` and `pg_stat_io` are cumulative statistics whose publication can lag a very short invocation. The WAL insert/flush-position deltas are therefore the primary immediate PostgreSQL byte signal; the statistics-view deltas remain complementary evidence. All cumulative views are observational and can include background work plus the collector's own read-only statements. The JSON metadata records this scope explicitly.
+
+The serialized `startedAt`/`completedAt` interval begins only after the pre-invocation snapshot has completed and ends immediately before the post-invocation snapshot starts. Snapshot-query duration is therefore not presented as benchmark-window duration.
 
 ## SQL Server evidence
 

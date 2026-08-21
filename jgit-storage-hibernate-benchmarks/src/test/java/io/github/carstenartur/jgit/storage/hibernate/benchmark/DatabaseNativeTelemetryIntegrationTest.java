@@ -58,8 +58,8 @@ class DatabaseNativeTelemetryIntegrationTest {
           container.getUsername(),
           container.getPassword(),
           "bytea",
-          "postgresql.wal.bytes",
-          "postgresql.database.blocks_hit");
+          "postgresql.wal.insert_lsn_bytes",
+          "postgresql.wal.bytes");
     } finally {
       container.stop();
     }
@@ -125,6 +125,10 @@ class DatabaseNativeTelemetryIntegrationTest {
     assertTrue(
         after.counters().containsKey(secondRequiredCounter),
         after.unsupported().toString());
+    assertTrue(delta.counters().containsKey(requiredCounter), delta.unsupported().toString());
+    assertTrue(
+        delta.counters().get(requiredCounter) > 0L,
+        () -> "Expected positive " + requiredCounter + " delta but got " + delta.counters());
 
     Path ndjson = temporaryDirectory.resolve(backend + "-telemetry.ndjson");
     Path json = temporaryDirectory.resolve(backend + "-telemetry.json");

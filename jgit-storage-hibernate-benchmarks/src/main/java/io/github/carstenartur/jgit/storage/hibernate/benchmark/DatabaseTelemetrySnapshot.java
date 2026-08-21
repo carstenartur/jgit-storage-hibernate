@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -17,7 +18,8 @@ import java.util.TreeMap;
 record DatabaseTelemetrySnapshot(
     String backend,
     boolean enabled,
-    Instant capturedAt,
+    Instant captureStartedAt,
+    Instant captureCompletedAt,
     String serverVersion,
     Map<String, Long> counters,
     Map<String, Long> gauges,
@@ -26,7 +28,13 @@ record DatabaseTelemetrySnapshot(
 
   DatabaseTelemetrySnapshot {
     backend = requireNotBlank(backend, "backend");
-    capturedAt = Objects.requireNonNull(capturedAt, "capturedAt");
+    captureStartedAt = Objects.requireNonNull(captureStartedAt, "captureStartedAt");
+    captureCompletedAt =
+        Objects.requireNonNull(captureCompletedAt, "captureCompletedAt");
+    if (captureCompletedAt.isBefore(captureStartedAt)) {
+      throw new IllegalArgumentException(
+          "captureCompletedAt must not precede captureStartedAt");
+    }
     serverVersion = serverVersion == null ? "unknown" : serverVersion;
     counters = immutableLongMap(counters, "counters");
     gauges = immutableLongMap(gauges, "gauges");
@@ -35,10 +43,12 @@ record DatabaseTelemetrySnapshot(
   }
 
   static DatabaseTelemetrySnapshot disabled(String backend, String reason) {
+    Instant capturedAt = Instant.now();
     return new DatabaseTelemetrySnapshot(
         backend,
         false,
-        Instant.now(),
+        capturedAt,
+        capturedAt,
         "unknown",
         Map.of(),
         Map.of(),
@@ -82,8 +92,8 @@ record DatabaseTelemetrySnapshot(
     return new DatabaseTelemetryDelta(
         backend,
         enabled && after.enabled,
-        capturedAt,
-        after.capturedAt,
+        captureCompletedAt,
+        after.captureStartedAt,
         after.serverVersion,
         deltas,
         after.gauges,
@@ -98,7 +108,7 @@ record DatabaseTelemetrySnapshot(
         (key, item) -> {
           result.put(requireNotBlank(key, name + " key"), Objects.requireNonNull(item, key));
         });
-    return Map.copyOf(result);
+    return Collections.unmodifiableMap(result);
   }
 
   private static Map<String, String> immutableStringMap(
@@ -110,7 +120,7 @@ record DatabaseTelemetrySnapshot(
             result.put(
                 requireNotBlank(key, name + " key"),
                 requireNotBlank(item, name + " value for " + key)));
-    return Map.copyOf(result);
+    return Collections.unmodifiableMap(result);
   }
 
   private static String requireNotBlank(String value, String name) {
@@ -139,11 +149,11 @@ record DatabaseTelemetryDelta(
     startedAt = Objects.requireNonNull(startedAt, "startedAt");
     completedAt = Objects.requireNonNull(completedAt, "completedAt");
     serverVersion = Objects.requireNonNull(serverVersion, "serverVersion");
-    counters = Map.copyOf(new TreeMap<>(Objects.requireNonNull(counters, "counters")));
-    gauges = Map.copyOf(new TreeMap<>(Objects.requireNonNull(gauges, "gauges")));
-    metadata = Map.copyOf(new TreeMap<>(Objects.requireNonNull(metadata, "metadata")));
+    counters = Collections.unmodifiableMap(new TreeMap<>(Objects.requireNonNull(counters, "counters")));
+    gauges = Collections.unmodifiableMap(new TreeMap<>(Objects.requireNonNull(gauges, "gauges")));
+    metadata = Collections.unmodifiableMap(new TreeMap<>(Objects.requireNonNull(metadata, "metadata")));
     unsupported =
-        Map.copyOf(new TreeMap<>(Objects.requireNonNull(unsupported, "unsupported")));
+        Collections.unmodifiableMap(new TreeMap<>(Objects.requireNonNull(unsupported, "unsupported")));
   }
 }
 
@@ -153,7 +163,7 @@ record DatabaseTelemetryObservation(
 
   DatabaseTelemetryObservation {
     coordinate =
-        Map.copyOf(new TreeMap<>(Objects.requireNonNull(coordinate, "coordinate")));
+        Collections.unmodifiableMap(new TreeMap<>(Objects.requireNonNull(coordinate, "coordinate")));
     telemetry = Objects.requireNonNull(telemetry, "telemetry");
   }
 }

@@ -89,6 +89,68 @@ class DatabaseTelemetrySnapshotTest {
   }
 
   @Test
+  void usesCompletedPreCaptureAndStartedPostCaptureAsWindowBoundaries() {
+    DatabaseTelemetrySnapshot before =
+        new DatabaseTelemetrySnapshot(
+            "postgresql",
+            true,
+            Instant.parse("2026-08-21T10:00:00Z"),
+            Instant.parse("2026-08-21T10:00:01Z"),
+            "17.10",
+            Map.of("wal.bytes", 1L),
+            Map.of(),
+            Map.of(),
+            Map.of());
+    DatabaseTelemetrySnapshot after =
+        new DatabaseTelemetrySnapshot(
+            "postgresql",
+            true,
+            Instant.parse("2026-08-21T10:00:03Z"),
+            Instant.parse("2026-08-21T10:00:04Z"),
+            "17.10",
+            Map.of("wal.bytes", 2L),
+            Map.of(),
+            Map.of(),
+            Map.of());
+
+    DatabaseTelemetryDelta delta = before.deltaTo(after);
+
+    assertEquals(Instant.parse("2026-08-21T10:00:01Z"), delta.startedAt());
+    assertEquals(Instant.parse("2026-08-21T10:00:03Z"), delta.completedAt());
+  }
+
+  @Test
+  void serializesCoordinateAndMetricKeysInStableSortedOrder() {
+    DatabaseTelemetrySnapshot before =
+        snapshot(
+            Instant.parse("2026-08-21T10:00:00Z"),
+            Map.of("z-counter", 1L, "a-counter", 1L),
+            Map.of("z-gauge", 2L, "a-gauge", 2L));
+    DatabaseTelemetrySnapshot after =
+        snapshot(
+            Instant.parse("2026-08-21T10:00:01Z"),
+            Map.of("z-counter", 2L, "a-counter", 3L),
+            Map.of("z-gauge", 3L, "a-gauge", 4L));
+    DatabaseTelemetryObservation observation =
+        new DatabaseTelemetryObservation(
+            Map.of("z-coordinate", "2", "a-coordinate", "1"),
+            before.deltaTo(after));
+
+    String value = DatabaseTelemetryJson.observationJson(observation);
+
+    assertTrue(
+        value.contains(
+            "\"coordinate\":{\"a-coordinate\":\"1\","
+                + "\"z-coordinate\":\"2\"}"));
+    assertTrue(
+        value.contains(
+            "\"counters\":{\"a-counter\":2,\"z-counter\":1}"));
+    assertTrue(
+        value.contains(
+            "\"gauges\":{\"a-gauge\":4,\"z-gauge\":3}"));
+  }
+
+  @Test
   void missingCounterOnEitherSideRemainsExplicit() {
     DatabaseTelemetrySnapshot before =
         snapshot(
@@ -116,6 +178,7 @@ class DatabaseTelemetrySnapshotTest {
     return new DatabaseTelemetrySnapshot(
         "postgresql",
         true,
+        capturedAt,
         capturedAt,
         "17.10",
         counters,

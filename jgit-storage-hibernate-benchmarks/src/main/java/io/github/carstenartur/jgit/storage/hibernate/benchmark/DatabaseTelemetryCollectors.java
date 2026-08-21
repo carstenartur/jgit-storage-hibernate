@@ -170,6 +170,25 @@ final class DatabaseTelemetryCollectors {
       queryOne(
           connection,
           snapshot,
+          "postgresql.wal_positions",
+          """
+          SELECT pg_wal_lsn_diff(pg_current_wal_insert_lsn(), '0/0')::bigint
+                   AS insert_lsn_bytes,
+                 pg_wal_lsn_diff(pg_current_wal_flush_lsn(), '0/0')::bigint
+                   AS flush_lsn_bytes
+          """,
+          (result, value) -> {
+            value.counter(
+                "postgresql.wal.insert_lsn_bytes",
+                result.getLong("insert_lsn_bytes"));
+            value.counter(
+                "postgresql.wal.flush_lsn_bytes",
+                result.getLong("flush_lsn_bytes"));
+          });
+
+      queryOne(
+          connection,
+          snapshot,
           "postgresql.pg_stat_wal",
           """
           SELECT wal_records,
@@ -643,7 +662,7 @@ final class DatabaseTelemetryCollectors {
 
   private static final class SnapshotBuilder {
     private final String backend;
-    private final Instant capturedAt = Instant.now();
+    private final Instant captureStartedAt = Instant.now();
     private final TreeMap<String, Long> counters = new TreeMap<>();
     private final TreeMap<String, Long> gauges = new TreeMap<>();
     private final TreeMap<String, String> metadata = new TreeMap<>();
@@ -652,6 +671,10 @@ final class DatabaseTelemetryCollectors {
 
     private SnapshotBuilder(String backend) {
       this.backend = backend;
+      metadata.put(
+          "telemetry.window.boundary",
+          "pre-capture-complete-to-post-capture-start");
+      metadata.put("telemetry.counter.scope", "cumulative-observational");
     }
 
     private void serverVersion(String value) {
@@ -682,7 +705,8 @@ final class DatabaseTelemetryCollectors {
       return new DatabaseTelemetrySnapshot(
           backend,
           true,
-          capturedAt,
+          captureStartedAt,
+          Instant.now(),
           serverVersion,
           counters,
           gauges,

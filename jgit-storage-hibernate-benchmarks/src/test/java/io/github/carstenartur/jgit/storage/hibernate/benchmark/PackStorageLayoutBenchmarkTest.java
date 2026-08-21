@@ -12,13 +12,19 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
@@ -91,6 +97,7 @@ class PackStorageLayoutBenchmarkTest {
     assertTrue(resultCount > 0);
     assertTrue(Files.isRegularFile(resultFile));
     assertTrue(Files.size(resultFile) > 2);
+    assertCredentialFreeEvidence(resultFile.getParent());
   }
 
   @Test
@@ -366,6 +373,31 @@ class PackStorageLayoutBenchmarkTest {
     Files.writeString(target, merged);
   }
 
+  private static void assertCredentialFreeEvidence(Path root) throws IOException {
+    List<String> forbidden =
+        List.of(
+            HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY + "=",
+            HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY + "=",
+            HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY + "=",
+            PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY + "=",
+            PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY + "=",
+            PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY + "=",
+            "jdbc:postgresql://",
+            "jdbc:sqlserver://",
+            "Database JDBC URL",
+            "Default catalog/schema");
+    try (Stream<Path> files = Files.walk(root)) {
+      for (Path file : files.filter(Files::isRegularFile).toList()) {
+        String content = Files.readString(file);
+        for (String token : forbidden) {
+          assertFalse(
+              content.contains(token),
+              () -> "Retained evidence " + file + " contains " + token);
+        }
+      }
+    }
+  }
+
   private record Scenario(
       String[] operations,
       String[] payloadKiB,
@@ -377,19 +409,22 @@ class PackStorageLayoutBenchmarkTest {
   private static final class DatabaseTarget implements AutoCloseable {
     private final PostgreSQLContainer<?> postgresql;
     private final MSSQLServerContainer sqlServer;
+    private final Path connectionPropertiesFile;
     private final List<String> jvmArguments;
 
     private DatabaseTarget(
         PostgreSQLContainer<?> postgresql,
         MSSQLServerContainer sqlServer,
+        Path connectionPropertiesFile,
         List<String> jvmArguments) {
       this.postgresql = postgresql;
       this.sqlServer = sqlServer;
+      this.connectionPropertiesFile = connectionPropertiesFile;
       this.jvmArguments = List.copyOf(jvmArguments);
     }
 
     private static DatabaseTarget local() {
-      return new DatabaseTarget(null, null, List.of());
+      return new DatabaseTarget(null, null, null, List.of());
     }
 
     private static DatabaseTarget postgresql() {
@@ -399,19 +434,28 @@ class PackStorageLayoutBenchmarkTest {
               .withUsername("benchmark")
               .withPassword("benchmark");
       container.start();
-      return new DatabaseTarget(
-          container,
-          null,
-          List.of(
-              RepositoryBackendBenchmarkIT.systemProperty(
-                  HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
-                  container.getJdbcUrl()),
-              RepositoryBackendBenchmarkIT.systemProperty(
-                  HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
-                  container.getUsername()),
-              RepositoryBackendBenchmarkIT.systemProperty(
-                  HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
-                  container.getPassword())));
+      try {
+        Path connectionPropertiesFile =
+            writeConnectionProperties(
+                Map.of(
+                    HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
+                    container.getJdbcUrl(),
+                    HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
+                    container.getUsername(),
+                    HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+                    container.getPassword()));
+        return new DatabaseTarget(
+            container,
+            null,
+            connectionPropertiesFile,
+            List.of(
+                RepositoryBackendBenchmarkIT.systemProperty(
+                    PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY,
+                    connectionPropertiesFile.toString())));
+      } catch (RuntimeException failure) {
+        container.stop();
+        throw failure;
+      }
     }
 
     private static DatabaseTarget sqlServer() {
@@ -419,19 +463,59 @@ class PackStorageLayoutBenchmarkTest {
           new MSSQLServerContainer("mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04")
               .acceptLicense();
       container.start();
-      return new DatabaseTarget(
-          null,
-          container,
-          List.of(
-              RepositoryBackendBenchmarkIT.systemProperty(
-                  PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY,
-                  container.getJdbcUrl()),
-              RepositoryBackendBenchmarkIT.systemProperty(
-                  PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY,
-                  container.getUsername()),
-              RepositoryBackendBenchmarkIT.systemProperty(
-                  PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY,
-                  container.getPassword())));
+      try {
+        Path connectionPropertiesFile =
+            writeConnectionProperties(
+                Map.of(
+                    PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY,
+                    container.getJdbcUrl(),
+                    PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY,
+                    container.getUsername(),
+                    PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY,
+                    container.getPassword()));
+        return new DatabaseTarget(
+            null,
+            container,
+            connectionPropertiesFile,
+            List.of(
+                RepositoryBackendBenchmarkIT.systemProperty(
+                    PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY,
+                    connectionPropertiesFile.toString())));
+      } catch (RuntimeException failure) {
+        container.stop();
+        throw failure;
+      }
+    }
+
+    private static Path writeConnectionProperties(Map<String, String> values) {
+      Path target = null;
+      try {
+        target =
+            Files.createTempFile(
+                "jgit-storage-benchmark-connection-", ".properties");
+        try {
+          Files.setPosixFilePermissions(
+              target, PosixFilePermissions.fromString("rw-------"));
+        } catch (UnsupportedOperationException ignored) {
+          // The CI and supported production benchmark runners use POSIX filesystems.
+        }
+        Properties properties = new Properties();
+        values.forEach(properties::setProperty);
+        try (OutputStream output = Files.newOutputStream(target)) {
+          properties.store(output, "ephemeral benchmark connection properties");
+        }
+        return target;
+      } catch (IOException failure) {
+        if (target != null) {
+          try {
+            Files.deleteIfExists(target);
+          } catch (IOException cleanupFailure) {
+            failure.addSuppressed(cleanupFailure);
+          }
+        }
+        throw new IllegalStateException(
+            "Cannot create temporary benchmark connection properties", failure);
+      }
     }
 
     private List<String> jvmArguments() {
@@ -440,11 +524,32 @@ class PackStorageLayoutBenchmarkTest {
 
     @Override
     public void close() {
-      if (postgresql != null) {
-        postgresql.stop();
+      RuntimeException stopFailure = null;
+      try {
+        if (postgresql != null) {
+          postgresql.stop();
+        }
+        if (sqlServer != null) {
+          sqlServer.stop();
+        }
+      } catch (RuntimeException failure) {
+        stopFailure = failure;
       }
-      if (sqlServer != null) {
-        sqlServer.stop();
+      try {
+        if (connectionPropertiesFile != null) {
+          Files.deleteIfExists(connectionPropertiesFile);
+        }
+      } catch (IOException cleanupFailure) {
+        if (stopFailure != null) {
+          stopFailure.addSuppressed(cleanupFailure);
+        } else {
+          throw new IllegalStateException(
+              "Cannot delete temporary benchmark connection properties",
+              cleanupFailure);
+        }
+      }
+      if (stopFailure != null) {
+        throw stopFailure;
       }
     }
   }
