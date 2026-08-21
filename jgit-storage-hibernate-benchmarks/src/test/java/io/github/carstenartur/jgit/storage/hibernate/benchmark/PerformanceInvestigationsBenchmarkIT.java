@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
@@ -140,7 +139,14 @@ class PerformanceInvestigationsBenchmarkIT {
     assertTrue(Files.size(resultFile) > 2, "JMH JSON result is empty");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
     if (writeQueue) {
-      assertCredentialFreeEvidence(resultFile.getParent());
+      List<Path> retainedEvidence = new ArrayList<>();
+      retainedEvidence.add(resultFile);
+      retainedEvidence.add(outputFile);
+      if (telemetryEnabled) {
+        retainedEvidence.add(telemetryNdjson);
+        retainedEvidence.add(telemetryJson);
+      }
+      assertCredentialFreeEvidence(retainedEvidence);
     }
   }
 
@@ -176,7 +182,7 @@ class PerformanceInvestigationsBenchmarkIT {
     return target;
   }
 
-  private static void assertCredentialFreeEvidence(Path root) throws IOException {
+  private static void assertCredentialFreeEvidence(Collection<Path> files) throws IOException {
     List<String> forbidden =
         List.of(
             HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY + "=",
@@ -185,15 +191,13 @@ class PerformanceInvestigationsBenchmarkIT {
             "jdbc:postgresql://",
             "Database JDBC URL",
             "Default catalog/schema");
-    try (Stream<Path> files = Files.walk(root)) {
-      for (Path file : files.filter(Files::isRegularFile).toList()) {
-        String content =
-            new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
-        for (String token : forbidden) {
-          assertFalse(
-              content.contains(token),
-              () -> "Retained evidence " + file + " contains " + token);
-        }
+    for (Path file : files) {
+      String content =
+          new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+      for (String token : forbidden) {
+        assertFalse(
+            content.contains(token),
+            () -> "Retained evidence " + file + " contains " + token);
       }
     }
   }
