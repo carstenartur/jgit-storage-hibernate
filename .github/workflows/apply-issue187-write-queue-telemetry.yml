@@ -1,27 +1,30 @@
 name: Apply issue 187 write-queue telemetry
 
 on:
-  push:
-    branches:
-      - feat/187-write-queue-telemetry
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
 
 concurrency:
-  group: apply-issue187-write-queue-telemetry
+  group: apply-issue187-write-queue-telemetry-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
 
     steps:
       - name: Checkout write-queue telemetry branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: feat/187-write-queue-telemetry
+          ref: ${{ env.HEAD_REF }}
           fetch-depth: 0
 
       - name: Set up JDK 21
@@ -34,7 +37,19 @@ jobs:
       - name: Verify Docker
         run: docker info
 
+      - name: Detect pending integration helper
+        id: helper
+        shell: bash
+        run: |
+          if test -f .github/scripts/apply-issue187-write-queue-telemetry.py; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo 'The validated write-queue integration is already committed.'
+          fi
+
       - name: Apply write-queue telemetry integration
+        if: steps.helper.outputs.exists == 'true'
         run: |
           python3 .github/scripts/apply-issue187-write-queue-telemetry.py
           python3 .github/scripts/repair-issue187-write-queue-password-scan.py
@@ -51,6 +66,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf target/issue187-write-queue
           mkdir -p target/issue187-write-queue
           mvn -B -pl jgit-storage-hibernate-benchmarks verify \
             -Pperformance-investigations \
@@ -165,7 +181,11 @@ jobs:
               if end < start:
                   raise SystemExit(f'Negative telemetry window for {coordinate}')
 
-          ndjson_lines = [line for line in ndjson_path.read_text(encoding='utf-8').splitlines() if line]
+          ndjson_lines = [
+              line
+              for line in ndjson_path.read_text(encoding='utf-8').splitlines()
+              if line
+          ]
           if len(ndjson_lines) != len(observations):
               raise SystemExit(
                   f'NDJSON/aggregate count mismatch: {len(ndjson_lines)} != {len(observations)}'
@@ -224,9 +244,9 @@ jobs:
 
       - name: Remove one-shot integration tooling
         run: |
-          rm .github/scripts/apply-issue187-write-queue-telemetry.py
-          rm .github/scripts/repair-issue187-write-queue-password-scan.py
-          rm .github/workflows/apply-issue187-write-queue-telemetry.yml
+          rm -f .github/scripts/apply-issue187-write-queue-telemetry.py
+          rm -f .github/scripts/repair-issue187-write-queue-password-scan.py
+          rm -f .github/workflows/apply-issue187-write-queue-telemetry.yml
 
       - name: Commit validated write-queue telemetry
         shell: bash
@@ -239,16 +259,21 @@ jobs:
             jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java \
             .github/workflows/performance-investigations.yml \
             docs/operations/database-native-telemetry.md \
-            docs/performance-status.md \
+            docs/performance-status.md
+          for path in \
             .github/scripts/apply-issue187-write-queue-telemetry.py \
             .github/scripts/repair-issue187-write-queue-password-scan.py \
-            .github/workflows/apply-issue187-write-queue-telemetry.yml
+            .github/workflows/apply-issue187-write-queue-telemetry.yml; do
+            if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              git add -u -- "$path"
+            fi
+          done
           if git diff --cached --quiet; then
-            echo 'Expected write-queue telemetry integration produced no staged changes' >&2
-            exit 1
+            echo 'Validated source already matches the branch; no commit required.'
+            exit 0
           fi
           git commit -m 'Integrate native telemetry with write-queue benchmarks'
-          git push origin HEAD:feat/187-write-queue-telemetry
+          git push origin "HEAD:${HEAD_REF}"
 
       - name: Upload exact write-queue telemetry evidence
         if: always()
@@ -258,4 +283,4 @@ jobs:
           path: |
             target/issue187-write-queue/**
             jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
-          if-no-files-found: warn
+          if-no-files-found: error
