@@ -1,19 +1,20 @@
 name: Apply issue 162 reflog migration contract
 
 on:
-  push:
-    branches:
-      - feat/162-git-aware-reflog-batching
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
 
 concurrency:
-  group: apply-issue162-reflog-migration-contract
+  group: apply-issue162-reflog-migration-contract-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
