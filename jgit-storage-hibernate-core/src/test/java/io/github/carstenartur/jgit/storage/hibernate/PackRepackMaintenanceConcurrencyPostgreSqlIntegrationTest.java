@@ -25,8 +25,8 @@ class PackRepackMaintenanceConcurrencyPostgreSqlIntegrationTest {
           .withPassword("postgres");
 
   @Test
-  @Timeout(value = 360, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
-  void preservesReadersAndIndependentRepositoryProgress() throws Exception {
+  @Timeout(value = 420, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+  void preservesReadersIndependentProgressAndProviderRestart() throws Exception {
     PackRepackMaintenanceConcurrencyContract.DatabaseFixture database =
         PackRepackMaintenanceConcurrencyContract.DatabaseFixture.jdbc(
             "postgresql",
@@ -38,5 +38,6 @@ class PackRepackMaintenanceConcurrencyPostgreSqlIntegrationTest {
 
     PackRepackMaintenanceConcurrencyContract.verifyReaderVisibility(database);
     PackRepackMaintenanceConcurrencyContract.verifyIndependentRepositoryMaintenance(database);
+    PackRepackMaintenanceConcurrencyContract.verifyProviderRestartAfterMaintenance(database);
   }
 }
