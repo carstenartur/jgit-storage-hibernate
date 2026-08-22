@@ -9,8 +9,8 @@
 package io.github.carstenartur.jgit.storage.hibernate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
 import jakarta.persistence.Column;
@@ -38,6 +38,7 @@ class GitReflogEntityMappingTest {
 
     assertNotNull(deliveryId.getAnnotation(Nationalized.class));
     assertNotNull(column);
-    assertFalse(column.nullable(), "legacy standalone reflogs require a nullable delivery ID");
+    assertTrue(column.nullable(), "legacy standalone reflogs require a nullable delivery ID");
+    assertEquals(GitReflogEntity.MAX_DELIVERY_ID_LENGTH, column.length());
   }
 }
