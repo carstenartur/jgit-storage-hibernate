@@ -348,26 +348,45 @@ public class RepositoryAgingBenchmark {
 
   private DatabaseTelemetryCollector databaseTelemetryCollector() {
     boolean enabled = Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
+    String databaseBackend = databaseBackend();
     if (!enabled) {
       return DatabaseTelemetryCollectors.disabled(
-          databaseBackend(), "disabled-by-configuration");
+          databaseBackend, "disabled-by-configuration");
     }
-    if (HibernateRepositoryBenchmark.HSQLDB.equals(backend)) {
-      return DatabaseTelemetryCollectors.disabled(
-          HibernateRepositoryBenchmark.HSQLDB, "unsupported-backend");
-    }
-    return DatabaseTelemetryCollectors.create(
-        "postgresql",
-        true,
-        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY),
-        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY),
-        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+    return switch (databaseBackend) {
+      case HibernateRepositoryBenchmark.HSQLDB ->
+          DatabaseTelemetryCollectors.disabled(
+              HibernateRepositoryBenchmark.HSQLDB, "unsupported-backend");
+      case HibernateRepositoryBenchmark.POSTGRESQL ->
+          DatabaseTelemetryCollectors.create(
+              HibernateRepositoryBenchmark.POSTGRESQL,
+              true,
+              requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY),
+              requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY),
+              requiredProperty(
+                  HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+      case PackStorageLayoutBenchmark.SQL_SERVER ->
+          DatabaseTelemetryCollectors.create(
+              PackStorageLayoutBenchmark.SQL_SERVER,
+              true,
+              requiredProperty(PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY),
+              requiredProperty(PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY),
+              requiredProperty(PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY));
+      default ->
+          throw new IllegalArgumentException(
+              "Unsupported aging telemetry backend " + databaseBackend);
+    };
   }
 
   private String databaseBackend() {
-    return HibernateRepositoryBenchmark.HSQLDB.equals(backend)
-        ? HibernateRepositoryBenchmark.HSQLDB
-        : "postgresql";
+    return switch (backend) {
+      case HibernateRepositoryBenchmark.HSQLDB -> HibernateRepositoryBenchmark.HSQLDB;
+      case HibernateRepositoryBenchmark.POSTGRESQL,
+          HibernateRepositoryBenchmark.POSTGRESQL_HIKARI ->
+          HibernateRepositoryBenchmark.POSTGRESQL;
+      case PackStorageLayoutBenchmark.SQL_SERVER -> PackStorageLayoutBenchmark.SQL_SERVER;
+      default -> throw new IllegalArgumentException("Unsupported aging backend " + backend);
+    };
   }
 
   private Path requiredTelemetryOutput() {
@@ -635,6 +654,22 @@ public class RepositoryAgingBenchmark {
         } else {
           properties.put("hibernate.connection.pool_size", "4");
         }
+      }
+      case PackStorageLayoutBenchmark.SQL_SERVER -> {
+        properties.put(
+            "hibernate.connection.url",
+            requiredProperty(PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY));
+        properties.put(
+            "hibernate.connection.username",
+            requiredProperty(PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY));
+        properties.put(
+            "hibernate.connection.password",
+            requiredProperty(PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY));
+        properties.put(
+            "hibernate.connection.driver_class",
+            "com.microsoft.sqlserver.jdbc.SQLServerDriver");
+        properties.put("hibernate.dialect", "org.hibernate.dialect.SQLServerDialect");
+        properties.put("hibernate.connection.pool_size", "4");
       }
       default -> throw new IllegalArgumentException("Unsupported aging backend " + backend);
     }
