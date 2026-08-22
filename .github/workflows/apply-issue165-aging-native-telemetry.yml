@@ -1,0 +1,137 @@
+name: Apply issue 165 repository-aging telemetry
+
+on:
+  push:
+    branches:
+      - feat/165-aging-native-telemetry
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-issue165-aging-native-telemetry
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/165-aging-native-telemetry
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Apply bounded aging telemetry integration
+        run: python3 .github/scripts/apply-issue165-aging-native-telemetry.py
+
+      - name: Verify patch shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          grep -F '@Setup(Level.Iteration)' \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmark.java
+          grep -F 'repository-aging-database-telemetry.json' \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingNativeTelemetryBenchmarkIT.java
+          grep -F 'Repository Aging Native Telemetry' \
+            .github/workflows/repository-aging-native-telemetry.yml
+
+      - name: Build benchmark module and test sources
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run exact PostgreSQL aging telemetry smoke
+        run: |
+          mkdir -p target/repository-aging-native-telemetry
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=RepositoryAgingNativeTelemetryBenchmarkIT \
+            -Djgit.storage.benchmark.repository-aging.native-telemetry.enabled=true \
+            -Dbenchmark.outputDirectory="$GITHUB_WORKSPACE/target/repository-aging-native-telemetry"
+
+      - name: Independently verify retained evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('target/repository-aging-native-telemetry')
+          jmh_path = root / 'repository-aging-jmh-result.json'
+          telemetry_path = root / 'repository-aging-database-telemetry.json'
+          output_path = root / 'repository-aging-jmh-output.txt'
+          for path in (jmh_path, telemetry_path, output_path):
+              if not path.is_file() or path.stat().st_size == 0:
+                  raise SystemExit(f'Missing retained evidence: {path}')
+
+          jmh = json.loads(jmh_path.read_text(encoding='utf-8'))
+          telemetry_text = telemetry_path.read_text(encoding='utf-8')
+          telemetry = json.loads(telemetry_text)
+          observations = telemetry['observations']
+          if len(observations) != len(jmh) or not observations:
+              raise SystemExit(
+                  f'JMH/telemetry cardinality mismatch: {len(jmh)} != {len(observations)}'
+              )
+          for observation in observations:
+              coordinate = observation['coordinate']
+              for required in ('benchmarkMethod', 'measurementIteration', 'threads'):
+                  if required not in coordinate:
+                      raise SystemExit(f'Missing {required}: {coordinate}')
+              if observation['backend'] != 'postgresql':
+                  raise SystemExit(f'Unexpected backend: {observation["backend"]}')
+              if 'postgresql.wal.insert_lsn_bytes' not in observation['counters']:
+                  raise SystemExit(f'Missing immediate WAL counter: {coordinate}')
+          for forbidden in ('NaN', 'Infinity', 'aging-telemetry-password', 'jdbc:postgresql://'):
+              for path in root.iterdir():
+                  if path.is_file() and forbidden.encode() in path.read_bytes():
+                      raise SystemExit(f'{path} contains forbidden token {forbidden!r}')
+          print(f'Validated {len(observations)} exact aging/repack observations')
+          PY
+
+      - name: Remove one-shot integration tooling
+        run: |
+          rm .github/scripts/apply-issue165-aging-native-telemetry.py
+          rm .github/workflows/apply-issue165-aging-native-telemetry.yml
+
+      - name: Commit validated implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmark.java \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingNativeTelemetryBenchmarkIT.java \
+            docs/operations/database-native-telemetry.md \
+            .github/workflows/repository-aging-native-telemetry.yml \
+            .github/scripts/apply-issue165-aging-native-telemetry.py \
+            .github/workflows/apply-issue165-aging-native-telemetry.yml
+          if git diff --cached --quiet; then
+            echo 'Expected repository-aging telemetry integration produced no staged changes' >&2
+            exit 1
+          fi
+          git diff --cached --check
+          git commit -m 'Capture native telemetry for repository aging'
+          git push origin HEAD:feat/165-aging-native-telemetry
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: issue165-repository-aging-native-telemetry
+          path: |
+            target/repository-aging-native-telemetry/**
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: warn
