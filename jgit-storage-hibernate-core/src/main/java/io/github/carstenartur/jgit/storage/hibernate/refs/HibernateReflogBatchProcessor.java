@@ -16,9 +16,13 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.ReflogAppendResult.Sta
 import io.github.carstenartur.jgit.storage.hibernate.refs.ReflogBatchRejectedException.Reason;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +42,11 @@ import org.hibernate.SessionFactory;
  * insert, and commits all new entries in one transaction. Exact delivery-ID replays return {@link
  * Status#ALREADY_APPLIED}; conflicting reuses reject the complete batch.
  *
+ * <p>New rows use one JDBC {@link PreparedStatement} batch. The identity primary key is deliberately
+ * omitted because the durable result is the caller's delivery ID, not a database-generated row ID.
+ * This avoids Hibernate's identity-generation batch split while retaining the same mapped table and
+ * transaction.
+ *
  * <p>This processor deliberately does not combine complete pushes or mutate refs. It is the narrow
  * first Git-semantic batch requested by the durable queue contract: an append-only projection whose
  * ordering, idempotency and rollback behavior can be proven independently.
@@ -45,6 +54,14 @@ import org.hibernate.SessionFactory;
 public final class HibernateReflogBatchProcessor
     implements DurableStripedWriteQueue.DurableBatchProcessor<
         ReflogAppendCommand, ReflogAppendResult> {
+
+  private static final String INSERT_SQL =
+      """
+      INSERT INTO git_reflog
+          (version, repository_name, delivery_id, ref_name, ref_name_key,
+           old_id, new_id, who_name, who_email, who_when, message)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      """;
 
   /** Caller action after a failed batch. */
   public enum RetryAdvice {
@@ -101,26 +118,17 @@ public final class HibernateReflogBatchProcessor
     validateExistingPayloads(commands, existing);
 
     Set<String> refsWithNewCommands = new LinkedHashSet<>();
+    List<ReflogAppendCommand> newCommands = new ArrayList<>();
     for (ReflogAppendCommand command : commands) {
       if (!existing.containsKey(command.deliveryId())) {
         refsWithNewCommands.add(command.refName());
+        newCommands.add(command);
       }
     }
     Map<String, String> latestNewIdByRef =
         loadLatestNewIds(session, repositoryName, refsWithNewCommands);
     validateNewCommandChains(commands, existing, latestNewIdByRef);
-
-    Map<String, GitReflogEntity> inserted = new HashMap<>();
-    for (ReflogAppendCommand command : commands) {
-      if (existing.containsKey(command.deliveryId())) {
-        continue;
-      }
-      GitReflogEntity entity = newEntry(repositoryName, command);
-      session.persist(entity);
-      inserted.put(command.deliveryId(), entity);
-    }
-    // Force every SQL/constraint failure inside the owning transaction before results are returned.
-    session.flush();
+    insertJdbcBatch(session, repositoryName, newCommands);
 
     List<ReflogAppendResult> results = new ArrayList<>(commands.size());
     for (ReflogAppendCommand command : commands) {
@@ -128,13 +136,50 @@ public final class HibernateReflogBatchProcessor
           existing.containsKey(command.deliveryId())
               ? Status.ALREADY_APPLIED
               : Status.APPENDED;
-      if (status == Status.APPENDED && inserted.get(command.deliveryId()).getId() == null) {
-        throw new IOException(
-            "Hibernate did not assign a reflog identity for " + command.deliveryId());
-      }
       results.add(new ReflogAppendResult(command.deliveryId(), status));
     }
     return List.copyOf(results);
+  }
+
+  private static void insertJdbcBatch(
+      Session session, String repositoryName, List<ReflogAppendCommand> commands) {
+    if (commands.isEmpty()) {
+      return;
+    }
+    session.doWork(
+        connection -> {
+          try (PreparedStatement statement = connection.prepareStatement(INSERT_SQL)) {
+            for (ReflogAppendCommand command : commands) {
+              statement.setLong(1, 0L);
+              statement.setString(2, repositoryName);
+              statement.setString(3, command.deliveryId());
+              statement.setString(4, command.refName());
+              statement.setString(5, GitReflogEntity.refNameKey(command.refName()));
+              statement.setString(6, command.oldIdName());
+              statement.setString(7, command.newIdName());
+              statement.setString(8, command.whoName());
+              statement.setString(9, command.whoEmail());
+              statement.setObject(
+                  10, OffsetDateTime.ofInstant(command.when(), ZoneOffset.UTC));
+              statement.setString(11, command.message());
+              statement.addBatch();
+            }
+            validateBatchCounts(statement.executeBatch(), commands.size());
+          }
+        });
+  }
+
+  private static void validateBatchCounts(int[] counts, int expected) throws SQLException {
+    if (counts.length != expected) {
+      throw new SQLException(
+          "JDBC reflog batch returned " + counts.length + " counts for " + expected + " rows");
+    }
+    for (int index = 0; index < counts.length; index++) {
+      if (counts[index] == Statement.EXECUTE_FAILED || counts[index] == 0) {
+        throw new SQLException(
+            "JDBC reflog batch rejected row " + index + " with count " + counts[index]);
+      }
+    }
   }
 
   private static LinkedHashSet<String> validateUniqueDeliveryIds(
@@ -257,21 +302,6 @@ public final class HibernateReflogBatchProcessor
         && Objects.equals(normalize(row.getWhoEmail()), command.whoEmail())
         && Objects.equals(row.getWhen(), command.when())
         && Objects.equals(row.getMessage(), command.message());
-  }
-
-  private static GitReflogEntity newEntry(
-      String repositoryName, ReflogAppendCommand command) {
-    GitReflogEntity entry = new GitReflogEntity();
-    entry.setRepositoryName(repositoryName);
-    entry.setDeliveryId(command.deliveryId());
-    entry.setRefName(command.refName());
-    entry.setOldId(command.oldIdName());
-    entry.setNewId(command.newIdName());
-    entry.setWhoName(command.whoName());
-    entry.setWhoEmail(command.whoEmail());
-    entry.setWhen(command.when());
-    entry.setMessage(command.message());
-    return entry;
   }
 
   private static String normalize(String value) {
