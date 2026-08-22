@@ -16,15 +16,21 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
 import org.eclipse.jgit.internal.storage.dfs.DfsBlockCacheConfig;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
@@ -59,6 +65,9 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.BenchmarkParams;
+import org.openjdk.jmh.infra.IterationParams;
+import org.openjdk.jmh.runner.IterationType;
 
 /**
  * Reproducible repository-aging fixture for lookup, clone/fetch-style traversal, refs and reopen.
@@ -119,9 +128,23 @@ public class RepositoryAgingBenchmark {
   private Inventory inventory;
   private PackRepackResult repackResult;
   private long unreachableLogicalBytes;
+  private final AtomicInteger measurementIteration = new AtomicInteger();
+  private DatabaseTelemetryCollector telemetryCollector;
+  private DatabaseTelemetrySnapshot iterationTelemetryBefore;
+  private String benchmarkMethod;
 
   @Setup(Level.Trial)
+  public void setupTrial(BenchmarkParams benchmarkParams) throws Exception {
+    setupTrial(benchmarkMethod(benchmarkParams));
+  }
+
   public void setupTrial() throws Exception {
+    setupTrial("unit-test");
+  }
+
+  private void setupTrial(String benchmarkMethod) throws Exception {
+    suppressConnectionMetadataLogging();
+    this.benchmarkMethod = benchmarkMethod;
     repositoryName =
         "jmh-aging-"
             + backend
@@ -137,10 +160,11 @@ public class RepositoryAgingBenchmark {
     statistics = provider.getSessionFactory().getStatistics();
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     repository.create(true);
-    buildDeterministicHistory();
+    telemetryCollector = databaseTelemetryCollector();
+    captureSetupPhase("fixture-build", this::buildDeterministicHistory);
     closeAndReopen();
     verifyPersistedPackOrdering();
-    applyMaintenance();
+    captureSetupPhase("maintenance", this::applyMaintenance);
     closeAndReopen();
     verifyPersistedPackOrdering();
     verifyReachableFixture();
@@ -149,6 +173,31 @@ public class RepositoryAgingBenchmark {
       warmRepositoryCache();
     } else if (!COLD.equals(cacheState)) {
       throw new IllegalArgumentException("Unsupported cache state " + cacheState);
+    }
+  }
+
+  @Setup(Level.Iteration)
+  public void setupIteration(IterationParams iterationParams) {
+    iterationTelemetryBefore = null;
+    if (telemetryCollector.enabled()
+        && iterationParams.getType() == IterationType.MEASUREMENT) {
+      iterationTelemetryBefore = telemetryCollector.capture();
+    }
+  }
+
+  @TearDown(Level.Iteration)
+  public void tearDownIteration(IterationParams iterationParams) throws IOException {
+    try {
+      if (iterationTelemetryBefore != null
+          && iterationParams.getType() == IterationType.MEASUREMENT) {
+        DatabaseTelemetrySnapshot after = telemetryCollector.capture();
+        appendTelemetry(
+            "measurement",
+            measurementIteration.incrementAndGet(),
+            iterationTelemetryBefore.deltaTo(after));
+      }
+    } finally {
+      iterationTelemetryBefore = null;
     }
   }
 
@@ -163,6 +212,11 @@ public class RepositoryAgingBenchmark {
 
   @TearDown(Level.Trial)
   public void tearDownTrial() {
+    iterationTelemetryBefore = null;
+    if (telemetryCollector != null) {
+      telemetryCollector.close();
+      telemetryCollector = null;
+    }
     if (repository != null) {
       repository.close();
       repository = null;
@@ -269,6 +323,79 @@ public class RepositoryAgingBenchmark {
     long size = objectSize(oldestBlob);
     counters.capture(this);
     return size;
+  }
+
+  private void captureSetupPhase(String phase, CheckedAction action)
+      throws Exception {
+    if (!telemetryCollector.enabled()) {
+      action.run();
+      return;
+    }
+    DatabaseTelemetrySnapshot before = telemetryCollector.capture();
+    action.run();
+    DatabaseTelemetrySnapshot after = telemetryCollector.capture();
+    appendTelemetry(phase, 0, before.deltaTo(after));
+  }
+
+  private void appendTelemetry(
+      String phase, int iteration, DatabaseTelemetryDelta telemetry)
+      throws IOException {
+    DatabaseTelemetryJson.appendNdjson(
+        requiredTelemetryOutput(),
+        new DatabaseTelemetryObservation(
+            telemetryCoordinate(phase, iteration), telemetry));
+  }
+
+  private DatabaseTelemetryCollector databaseTelemetryCollector() {
+    boolean enabled = Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
+    if (!enabled) {
+      return DatabaseTelemetryCollectors.disabled(
+          databaseBackend(), "disabled-by-configuration");
+    }
+    if (HibernateRepositoryBenchmark.HSQLDB.equals(backend)) {
+      return DatabaseTelemetryCollectors.disabled(
+          HibernateRepositoryBenchmark.HSQLDB, "unsupported-backend");
+    }
+    return DatabaseTelemetryCollectors.create(
+        "postgresql",
+        true,
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY),
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY),
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+  }
+
+  private String databaseBackend() {
+    return HibernateRepositoryBenchmark.HSQLDB.equals(backend)
+        ? HibernateRepositoryBenchmark.HSQLDB
+        : "postgresql";
+  }
+
+  private Path requiredTelemetryOutput() {
+    String value = System.getProperty(DatabaseTelemetryCollectors.OUTPUT_PROPERTY);
+    if (value == null || value.isBlank()) {
+      throw new IllegalStateException(
+          "Missing benchmark system property "
+              + DatabaseTelemetryCollectors.OUTPUT_PROPERTY);
+    }
+    return Path.of(value);
+  }
+
+  private Map<String, String> telemetryCoordinate(String phase, int iteration) {
+    return Map.of(
+        "backend", backend,
+        "benchmarkMethod", benchmarkMethod,
+        "cacheState", cacheState,
+        "databaseBackend", databaseBackend(),
+        "deployment", deployment,
+        "maintenanceMode", maintenanceMode,
+        "measurementIteration", Integer.toString(iteration),
+        "phase", phase,
+        "pushes", Integer.toString(pushes));
+  }
+
+  private static String benchmarkMethod(BenchmarkParams benchmarkParams) {
+    String benchmark = benchmarkParams.getBenchmark();
+    return benchmark.substring(benchmark.lastIndexOf('.') + 1);
   }
 
   private void buildDeterministicHistory() throws Exception {
@@ -528,10 +655,43 @@ public class RepositoryAgingBenchmark {
 
   private static String requiredProperty(String name) {
     String value = System.getProperty(name);
+    if (value != null && !value.isBlank()) {
+      return value;
+    }
+
+    String connectionPropertiesFile =
+        System.getProperty(
+            PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY);
+    if (connectionPropertiesFile != null && !connectionPropertiesFile.isBlank()) {
+      Properties connectionProperties = new Properties();
+      try (InputStream input =
+          Files.newInputStream(Path.of(connectionPropertiesFile))) {
+        connectionProperties.load(input);
+      } catch (IOException failure) {
+        throw new IllegalStateException(
+            "Cannot read temporary benchmark connection properties", failure);
+      }
+      value = connectionProperties.getProperty(name);
+    }
     if (value == null || value.isBlank()) {
       throw new IllegalStateException("Missing benchmark system property " + name);
     }
     return value;
+  }
+
+  private static void suppressConnectionMetadataLogging() {
+    java.util.logging.Level warning = java.util.logging.Level.WARNING;
+    Logger.getLogger("").setLevel(warning);
+    Logger.getLogger("org.hibernate").setLevel(warning);
+    Logger.getLogger("org.hibernate.orm.connections.pooling").setLevel(warning);
+    Logger.getLogger(
+            "org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
+        .setLevel(warning);
+  }
+
+  @FunctionalInterface
+  private interface CheckedAction {
+    void run() throws Exception;
   }
 
   private static boolean jgitDfsExposesMultiPackIndexExtension() {

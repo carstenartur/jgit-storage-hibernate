@@ -30,9 +30,10 @@ The integrated runners retain companion files beside raw JMH evidence:
 ```text
 pack-storage-layout-database-telemetry.json
 write-queue-database-telemetry.json
+repository-aging-database-telemetry.json
 ```
 
-The write-queue coordinate includes the benchmark method, shared versus isolated repository scope, backend/pool variant, execution mode, stripe count, pool size, payload, thread count and measurement-iteration number.
+The write-queue coordinate includes the benchmark method, shared versus isolated repository scope, backend/pool variant, execution mode, stripe count, pool size, payload, thread count and measurement-iteration number. Repository-aging coordinates add pushes, maintenance mode, cache state and one of three explicit phases: deterministic fixture build, maintenance, or measured read operation.
 
 Counter resets and a counter missing from either snapshot are never converted to an invented value. They appear under `unsupported` as `counter-reset`, `missing-before-snapshot` or `missing-after-snapshot`. JSON serialization accepts only integral values and never emits `NaN` or Infinity.
 
@@ -105,11 +106,21 @@ The second integration brackets complete measurement iterations of `DurableWrite
 
 This is evidence for the durable scheduling/publication path, not completion of Git-aware combined receiver-record batching. A queued command still performs its full object insertion and ref update. The narrower atomic multi-record processor and its batch-size distribution remain work in #162 and #187.
 
+## Repository-aging and maintenance interpretation
+
+The focused PostgreSQL aging sub-run separates three boundaries for every selected JMH coordinate:
+
+1. deterministic incremental fixture publication;
+2. the selected maintenance action (`none`, compact-only or read-optimized);
+3. the later measured lookup/traversal/reopen iteration.
+
+This prevents repack WAL and I/O from being misattributed to the read that benefits from it. The initial bounded profile uses ten pushes and representative oldest-object, clone-style and reopen lookups. It proves attribution and artifact contracts; the 32/100/300/1,000-push production matrix and SQL Server aging telemetry remain open.
+
 ## Remaining issue #187 work
 
 This foundation does not close #187. Follow-up integrations must apply the same contract to:
 
-1. repository aging, MIDX and repack;
+1. full-scale repository aging/MIDX/repack and SQL Server;
 2. atomic durable receiver-record batches beyond queue scheduling;
 3. Hibernate Search incremental indexing and rebuild;
 4. representative history queries;
