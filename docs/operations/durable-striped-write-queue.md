@@ -110,6 +110,8 @@ Telemetry exposes submitted, completed, failed, cancelled and rejected commands;
 
 The queue can batch ordinary receiver records immediately. It must not transparently merge arbitrary complete JGit push/ref operations into one transaction without a storage-specific processor. Git ref compare-and-set, pack visibility, replacement and rollback semantics require explicit validation of the whole combined operation.
 
+The first such storage-specific processor is deliberately narrower than a push: [`DurableReflogWriter`](git-aware-reflog-batching.md) batches idempotent append-only **queryable reflog projection records**. It validates immutable delivery IDs and contiguous per-ref history before one repository-locked JDBC batch, then completes callers only after commit. That proven contract does not authorize batching authoritative Reftable/ref changes, pack generations or unrelated complete pushes.
+
 The earlier benchmark-only scheduling queue grouped commands for worker scheduling but deliberately executed their transactions separately. The production queue described here is different: its processor receives the full record list once, uses one transaction and can emit one JDBC batch per compatible SQL shape.
 
 ## Verification
@@ -125,3 +127,5 @@ Core integration tests verify:
 - an invalid result count rolls back data before any future can report success;
 - the Hibernate adapter commits before queue acknowledgement;
 - property overrides independently control record count, byte bounds and collection time.
+
+The Git-aware reflog contract additionally verifies exact replay, semantic rejection before mutation, full rollback after a later JDBC-batch failure, and PostgreSQL/SQL Server WAL or transaction-log evidence for batch sizes 1, 10 and 50.

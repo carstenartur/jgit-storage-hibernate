@@ -61,7 +61,8 @@ class CoreSchemaMigrationIntegrationTest {
           "0.1.14.2",
           "0.1.17",
           "0.1.18",
-          "0.9.1");
+          "0.9.1",
+          "0.9.2");
 
   @Test
   void migratesEmptyH2DatabaseAndRestartsWithValidation() throws Exception {
