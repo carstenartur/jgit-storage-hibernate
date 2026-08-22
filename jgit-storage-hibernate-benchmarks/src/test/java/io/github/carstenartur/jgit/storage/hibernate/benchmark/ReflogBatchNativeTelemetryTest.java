@@ -255,7 +255,8 @@ class ReflogBatchNativeTelemetryTest {
     try (Session session = provider.getSessionFactory().openSession()) {
       return session
           .createQuery(
-              "SELECT COUNT(r) FROM GitReflogEntity r WHERE r.repositoryName = :repo",
+              "SELECT COUNT(r) FROM GitReflogEntity r WHERE r.repositoryName = :repo "
+                  + "AND r.deliveryId IS NOT NULL",
               Long.class)
           .setParameter("repo", repositoryName)
           .getSingleResult();

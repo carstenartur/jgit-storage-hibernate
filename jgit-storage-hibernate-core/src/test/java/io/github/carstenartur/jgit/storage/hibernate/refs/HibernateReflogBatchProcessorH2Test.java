@@ -256,7 +256,8 @@ class HibernateReflogBatchProcessorH2Test {
       try (Session session = provider.getSessionFactory().openSession()) {
         return session
             .createQuery(
-                "FROM GitReflogEntity r WHERE r.repositoryName = :repo ORDER BY r.id",
+                "FROM GitReflogEntity r WHERE r.repositoryName = :repo "
+                    + "AND r.deliveryId IS NOT NULL ORDER BY r.id",
                 GitReflogEntity.class)
             .setParameter("repo", repositoryName)
             .getResultList();
