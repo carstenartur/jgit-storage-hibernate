@@ -50,10 +50,12 @@ jobs:
           test "$(find jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core -name 'V0_9_2__add_reflog_delivery_id.sql' | wc -l)" -eq 4
           git diff --check
 
-      - name: Remove one-shot tooling
+      - name: Prepare source-only validated commit
+        shell: bash
         run: |
-          rm .github/scripts/apply-issue162-reflog-migration-contract.py
-          rm .github/workflows/apply-issue162-reflog-migration-contract.yml
+          set -euo pipefail
+          git checkout -- .github/workflows/git-aware-reflog-batch.yml
+          git diff --check
 
       - name: Commit validated migration contract
         shell: bash
@@ -61,7 +63,10 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add -- \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/CoreSchemaMigrationIntegrationTest.java \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateReflogBatchProcessorH2Test.java \
+            jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ReflogBatchNativeTelemetryTest.java
           if git diff --cached --quiet; then
             echo 'Expected validated migration-contract changes' >&2
             exit 1
