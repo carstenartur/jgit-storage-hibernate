@@ -1,0 +1,73 @@
+name: Apply issue 162 SQL Server adoption fixes
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-issue162-sqlserver-adoption-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/162-git-aware-reflog-batching
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Apply exact SQL Server adoption fixes
+        run: python3 .github/scripts/apply-issue162-sqlserver-adoption-fixes.py
+
+      - name: Run clean, post-adoption and downgrade/upgrade contracts
+        run: |
+          mvn -B -pl jgit-storage-hibernate-core -am test \
+            -Dtest=CoreSqlServerSchemaMigrationIntegrationTest,LegacyCoreSqlServerPostAdoptionWriteIntegrationTest,LegacyCoreSqlServerSchemaAdoptionIntegrationTest \
+            -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Verify exact repair shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -RFl 'assertEquals("0.9.2", flyway.info().current().getVersion().getVersion())' \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/*SqlServer*IntegrationTest.java | wc -l)" -ge 3
+          grep -F 'drop index if exists idx_reflog_repo_delivery on git_reflog' \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/LegacyCoreSqlServerSchemaAdoptionIntegrationTest.java
+          grep -F "alter table git_reflog drop column delivery_id" \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/LegacyCoreSqlServerSchemaAdoptionIntegrationTest.java
+          git diff --check
+
+      - name: Commit validated test-contract fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/LegacyCoreSqlServerPostAdoptionWriteIntegrationTest.java \
+            jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/LegacyCoreSqlServerSchemaAdoptionIntegrationTest.java
+          if git diff --cached --quiet; then
+            echo 'Expected SQL Server adoption-contract changes' >&2
+            exit 1
+          fi
+          git commit -m 'Align SQL Server adoption with core schema 0.9.2'
+          git push origin HEAD:feat/162-git-aware-reflog-batching
