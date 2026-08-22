@@ -1,1 +1,0 @@
-Temporary same-repository maintainer trigger for the exact PR #295 source state.
