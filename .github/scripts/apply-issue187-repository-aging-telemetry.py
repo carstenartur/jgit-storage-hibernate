@@ -104,8 +104,16 @@ benchmark = replace_once(
 
   @Setup(Level.Trial)
   public void setupTrial(BenchmarkParams benchmarkParams) throws Exception {
+    setupTrial(benchmarkMethod(benchmarkParams));
+  }
+
+  public void setupTrial() throws Exception {
+    setupTrial("unit-test");
+  }
+
+  private void setupTrial(String benchmarkMethod) throws Exception {
     suppressConnectionMetadataLogging();
-    benchmarkMethod = benchmarkMethod(benchmarkParams);
+    this.benchmarkMethod = benchmarkMethod;
     repositoryName =
         "jmh-aging-"
             + backend
