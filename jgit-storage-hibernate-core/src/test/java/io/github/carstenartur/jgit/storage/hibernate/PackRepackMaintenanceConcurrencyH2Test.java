@@ -26,4 +26,11 @@ class PackRepackMaintenanceConcurrencyH2Test {
     PackRepackMaintenanceConcurrencyContract.verifyIndependentRepositoryMaintenance(
         PackRepackMaintenanceConcurrencyContract.DatabaseFixture.h2());
   }
+
+  @Test
+  @Timeout(value = 180, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+  void providerRestartRetainsThePublishedMaintenanceGeneration() throws Exception {
+    PackRepackMaintenanceConcurrencyContract.verifyProviderRestartAfterMaintenance(
+        PackRepackMaintenanceConcurrencyContract.DatabaseFixture.h2());
+  }
 }
