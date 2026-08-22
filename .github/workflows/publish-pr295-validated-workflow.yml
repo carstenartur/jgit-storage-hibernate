@@ -1,0 +1,78 @@
+name: Publish PR 295 validated workflow
+
+on:
+  push:
+    branches:
+      - feat/187-repository-aging-telemetry
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-pr295-validated-workflow
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HEAD_REF: feat/187-repository-aging-telemetry
+      EVIDENCE_RUN_ID: '32552607133'
+      EXPECTED_SHA256: e5100884b946ec2caafb45fbfc38be638fb84ca9eba520dfb6126365c8f7a9d5
+
+    steps:
+      - name: Checkout current PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          fetch-depth: 0
+
+      - name: Download validated durable workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf target/pr295-validated-workflow
+          mkdir -p target/pr295-validated-workflow
+          gh run download "$EVIDENCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name issue187-generated-aging-workflow \
+            --dir target/pr295-validated-workflow
+          test -s target/pr295-validated-workflow/performance-investigations.yml
+          actual="$(sha256sum target/pr295-validated-workflow/performance-investigations.yml | cut -d' ' -f1)"
+          test "$actual" = "$EXPECTED_SHA256"
+          grep -F 'Run exact PostgreSQL repository-aging native telemetry smoke' \
+            target/pr295-validated-workflow/performance-investigations.yml
+          grep -F 'Validate repository-aging native telemetry' \
+            target/pr295-validated-workflow/performance-investigations.yml
+
+      - name: Install durable workflow and remove one-shot tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp target/pr295-validated-workflow/performance-investigations.yml \
+            .github/workflows/performance-investigations.yml
+          rm .github/workflows/validate-issue187-repository-aging-telemetry.yml
+          rm .github/workflows/publish-pr295-validated-workflow.yml
+          git diff --check
+          test "$(sha256sum .github/workflows/performance-investigations.yml | cut -d' ' -f1)" = "$EXPECTED_SHA256"
+
+      - name: Commit user-authorized durable workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            .github/workflows/performance-investigations.yml \
+            .github/workflows/validate-issue187-repository-aging-telemetry.yml \
+            .github/workflows/publish-pr295-validated-workflow.yml
+          if git diff --cached --quiet; then
+            echo 'Expected validated workflow publication produced no staged changes' >&2
+            exit 1
+          fi
+          git commit -m 'Retain repository-aging native telemetry workflow'
+          git push origin "HEAD:${HEAD_REF}"
