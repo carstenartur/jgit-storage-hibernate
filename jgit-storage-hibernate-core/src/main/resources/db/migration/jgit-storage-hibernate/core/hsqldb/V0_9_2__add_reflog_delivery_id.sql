@@ -1,4 +1,9 @@
-ALTER TABLE git_reflog ADD COLUMN delivery_id VARCHAR(128);
+-- Delivery IDs make durable queryable reflog batches replay-safe.
+-- IF NOT EXISTS also supports copied/current schemas adopted without Flyway history.
 
-CREATE INDEX idx_reflog_repo_delivery
-    ON git_reflog (repository_name, delivery_id);
+alter table git_reflog
+    add column if not exists delivery_id varchar(128);
+
+drop index if exists idx_reflog_repo_delivery;
+create index idx_reflog_repo_delivery
+    on git_reflog (repository_name, delivery_id);
