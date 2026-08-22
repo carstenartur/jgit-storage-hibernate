@@ -17,6 +17,7 @@ import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFact
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TimeZone;
@@ -192,6 +193,37 @@ final class PackRepackMaintenanceConcurrencyContract {
     }
   }
 
+  static void verifyProviderRestartAfterMaintenance(DatabaseFixture database)
+      throws Exception {
+    String repositoryName =
+        database.backend() + "-maintenance-restart-" + UUID.randomUUID();
+    HistoryFixture fixture;
+    PackRepackResult result;
+
+    try (HibernateSessionFactoryProvider provider = database.provider("create")) {
+      fixture = createFixture(provider, repositoryName, 0x16530000L);
+      result =
+          new PackStorageMaintenance(provider.getSessionFactory())
+              .repackForReads(new RepositoryName(repositoryName));
+      assertTrue(result.successful());
+      assertTrue(result.packsAfter() < result.packsBefore());
+
+      try (HibernateRepository beforeRestart =
+          HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+        assertSnapshot(beforeRestart, fixture);
+        assertEquals(
+            result.packsAfter(), beforeRestart.getObjectDatabase().getPacks().length);
+      }
+    }
+
+    try (HibernateSessionFactoryProvider restarted = database.provider("validate");
+        HibernateRepository afterRestart =
+            HibernateRepository.create(restarted.getSessionFactory(), repositoryName)) {
+      assertSnapshot(afterRestart, fixture);
+      assertEquals(result.packsAfter(), afterRestart.getObjectDatabase().getPacks().length);
+    }
+  }
+
   private static HistoryFixture createFixture(
       HibernateSessionFactoryProvider provider, String repositoryName, long seed)
       throws Exception {
@@ -280,24 +312,30 @@ final class PackRepackMaintenanceConcurrencyContract {
   record DatabaseFixture(String backend, Supplier<Properties> propertiesFactory) {
 
     DatabaseFixture {
-      assertNotNull(backend);
-      assertNotNull(propertiesFactory);
+      Objects.requireNonNull(backend, "backend");
+      Objects.requireNonNull(propertiesFactory, "propertiesFactory");
     }
 
     HibernateSessionFactoryProvider provider() {
-      return new HibernateSessionFactoryProvider(propertiesFactory.get());
+      return provider("create-drop");
+    }
+
+    HibernateSessionFactoryProvider provider(String schemaAction) {
+      Properties properties = propertiesFactory.get();
+      properties.put("hibernate.hbm2ddl.auto", schemaAction);
+      return new HibernateSessionFactoryProvider(properties);
     }
 
     static DatabaseFixture h2() {
+      String url =
+          "jdbc:h2:mem:repack-concurrency-"
+              + UUID.randomUUID()
+              + ";DB_CLOSE_DELAY=-1";
       return new DatabaseFixture(
           "h2",
           () -> {
             Properties properties = baseProperties();
-            properties.put(
-                "hibernate.connection.url",
-                "jdbc:h2:mem:repack-concurrency-"
-                    + UUID.randomUUID()
-                    + ";DB_CLOSE_DELAY=-1");
+            properties.put("hibernate.connection.url", url);
             properties.put("hibernate.connection.driver_class", "org.h2.Driver");
             properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
             return properties;
@@ -326,7 +364,6 @@ final class PackRepackMaintenanceConcurrencyContract {
 
     private static Properties baseProperties() {
       Properties properties = new Properties();
-      properties.put("hibernate.hbm2ddl.auto", "create-drop");
       properties.put("hibernate.show_sql", "false");
       properties.put("hibernate.format_sql", "false");
       properties.put("hibernate.search.enabled", "false");
