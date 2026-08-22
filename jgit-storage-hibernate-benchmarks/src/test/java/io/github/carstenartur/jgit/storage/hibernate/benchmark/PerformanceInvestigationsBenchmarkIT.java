@@ -31,6 +31,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.mssqlserver.MSSQLServerContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -44,6 +45,8 @@ class PerformanceInvestigationsBenchmarkIT {
       "jgit.storage.benchmark.investigation.profile";
   private static final String REPOSITORY_AGING_NATIVE_SMOKE_PROPERTY =
       "jgit.storage.benchmark.repository-aging.native-smoke";
+  private static final String REPOSITORY_AGING_DATABASE_BACKEND_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.database-backend";
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -77,6 +80,10 @@ class PerformanceInvestigationsBenchmarkIT {
     boolean repositoryAgingNativeSmoke =
         repositoryAging
             && Boolean.getBoolean(REPOSITORY_AGING_NATIVE_SMOKE_PROPERTY);
+    String repositoryAgingDatabaseBackend =
+        repositoryAgingNativeSmoke
+            ? repositoryAgingDatabaseBackend()
+            : HibernateRepositoryBenchmark.POSTGRESQL;
     boolean telemetryEnabled =
         (writeQueue || repositoryAging)
             && Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
@@ -86,55 +93,71 @@ class PerformanceInvestigationsBenchmarkIT {
     Path telemetryJson =
         resultFile.resolveSibling(telemetryPrefix + "-database-telemetry.json");
     Path connectionPropertiesFile = null;
-    List<String> jvmArguments = new ArrayList<>();
-    jvmArguments.add("-Xms1g");
-    jvmArguments.add(full ? "-Xmx3g" : "-Xmx1536m");
-    if (writeQueue || repositoryAging) {
-      connectionPropertiesFile = writeConnectionProperties();
-      jvmArguments.add(
-          RepositoryBackendBenchmarkIT.systemProperty(
-              PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY,
-              connectionPropertiesFile.toString()));
-    } else {
-      jvmArguments.add(
-          RepositoryBackendBenchmarkIT.systemProperty(
-              HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
-              POSTGRESQL.getJdbcUrl()));
-      jvmArguments.add(
-          RepositoryBackendBenchmarkIT.systemProperty(
-              HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
-              POSTGRESQL.getUsername()));
-      jvmArguments.add(
-          RepositoryBackendBenchmarkIT.systemProperty(
-              HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
-              POSTGRESQL.getPassword()));
-    }
-    if (telemetryEnabled) {
-      Files.deleteIfExists(telemetryNdjson);
-      Files.deleteIfExists(telemetryJson);
-      jvmArguments.add(
-          RepositoryBackendBenchmarkIT.systemProperty(
-              DatabaseTelemetryCollectors.ENABLED_PROPERTY, "true"));
-      jvmArguments.add(
-          RepositoryBackendBenchmarkIT.systemProperty(
-              DatabaseTelemetryCollectors.OUTPUT_PROPERTY,
-              telemetryNdjson.toString()));
-    }
-    builder.jvmArgsAppend(jvmArguments.toArray(String[]::new));
-
-    configure(
-        builder,
-        investigation,
-        full,
-        deployment,
-        threads,
-        repositoryAgingNativeSmoke);
+    MSSQLServerContainer sqlServer = null;
     Collection<RunResult> results;
     try {
+      if (repositoryAgingNativeSmoke
+          && PackStorageLayoutBenchmark.SQL_SERVER.equals(
+              repositoryAgingDatabaseBackend)) {
+        sqlServer =
+            new MSSQLServerContainer(
+                    "mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04")
+                .acceptLicense();
+        sqlServer.start();
+      }
+
+      List<String> jvmArguments = new ArrayList<>();
+      jvmArguments.add("-Xms1g");
+      jvmArguments.add(full ? "-Xmx3g" : "-Xmx1536m");
+      if (writeQueue || repositoryAging) {
+        connectionPropertiesFile =
+            writeConnectionProperties(repositoryAgingDatabaseBackend, sqlServer);
+        jvmArguments.add(
+            RepositoryBackendBenchmarkIT.systemProperty(
+                PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY,
+                connectionPropertiesFile.toString()));
+      } else {
+        jvmArguments.add(
+            RepositoryBackendBenchmarkIT.systemProperty(
+                HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
+                POSTGRESQL.getJdbcUrl()));
+        jvmArguments.add(
+            RepositoryBackendBenchmarkIT.systemProperty(
+                HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
+                POSTGRESQL.getUsername()));
+        jvmArguments.add(
+            RepositoryBackendBenchmarkIT.systemProperty(
+                HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+                POSTGRESQL.getPassword()));
+      }
+      if (telemetryEnabled) {
+        Files.deleteIfExists(telemetryNdjson);
+        Files.deleteIfExists(telemetryJson);
+        jvmArguments.add(
+            RepositoryBackendBenchmarkIT.systemProperty(
+                DatabaseTelemetryCollectors.ENABLED_PROPERTY, "true"));
+        jvmArguments.add(
+            RepositoryBackendBenchmarkIT.systemProperty(
+                DatabaseTelemetryCollectors.OUTPUT_PROPERTY,
+                telemetryNdjson.toString()));
+      }
+      builder.jvmArgsAppend(jvmArguments.toArray(String[]::new));
+
+      configure(
+          builder,
+          investigation,
+          full,
+          deployment,
+          threads,
+          repositoryAgingNativeSmoke,
+          repositoryAgingDatabaseBackend);
       results = new Runner(builder.build()).run();
     } finally {
       if (connectionPropertiesFile != null) {
         Files.deleteIfExists(connectionPropertiesFile);
+      }
+      if (sqlServer != null) {
+        sqlServer.stop();
       }
     }
 
@@ -163,7 +186,50 @@ class PerformanceInvestigationsBenchmarkIT {
     }
   }
 
-  private static Path writeConnectionProperties() throws IOException {
+  private static String repositoryAgingDatabaseBackend() {
+    String value =
+        System.getProperty(
+            REPOSITORY_AGING_DATABASE_BACKEND_PROPERTY,
+            HibernateRepositoryBenchmark.POSTGRESQL);
+    if (!HibernateRepositoryBenchmark.POSTGRESQL.equals(value)
+        && !PackStorageLayoutBenchmark.SQL_SERVER.equals(value)) {
+      throw new IllegalArgumentException(
+          REPOSITORY_AGING_DATABASE_BACKEND_PROPERTY
+              + " must be postgresql or sqlserver but was "
+              + value);
+    }
+    return value;
+  }
+
+  private static Path writeConnectionProperties(
+      String databaseBackend, MSSQLServerContainer sqlServer) throws IOException {
+    Map<String, String> connectionProperties =
+        switch (databaseBackend) {
+          case HibernateRepositoryBenchmark.POSTGRESQL ->
+              Map.of(
+                  HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
+                  POSTGRESQL.getJdbcUrl(),
+                  HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
+                  POSTGRESQL.getUsername(),
+                  HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+                  POSTGRESQL.getPassword());
+          case PackStorageLayoutBenchmark.SQL_SERVER -> {
+            if (sqlServer == null || !sqlServer.isRunning()) {
+              throw new IllegalStateException("SQL Server benchmark target is not running");
+            }
+            yield Map.of(
+                PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY,
+                sqlServer.getJdbcUrl(),
+                PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY,
+                sqlServer.getUsername(),
+                PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY,
+                sqlServer.getPassword());
+          }
+          default ->
+              throw new IllegalArgumentException(
+                  "Unsupported benchmark connection backend " + databaseBackend);
+        };
+
     Path target = null;
     try {
       target =
@@ -176,14 +242,7 @@ class PerformanceInvestigationsBenchmarkIT {
         // Supported CI performance runners use POSIX filesystems.
       }
       Properties properties = new Properties();
-      Map.of(
-              HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
-              POSTGRESQL.getJdbcUrl(),
-              HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
-              POSTGRESQL.getUsername(),
-              HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
-              POSTGRESQL.getPassword())
-          .forEach(properties::setProperty);
+      connectionProperties.forEach(properties::setProperty);
       try (OutputStream output = Files.newOutputStream(target)) {
         properties.store(output, "ephemeral benchmark connection properties");
       }
@@ -206,7 +265,11 @@ class PerformanceInvestigationsBenchmarkIT {
             HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY + "=",
             HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY + "=",
             HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY + "=",
+            PackStorageLayoutBenchmark.SQL_SERVER_URL_PROPERTY + "=",
+            PackStorageLayoutBenchmark.SQL_SERVER_USER_PROPERTY + "=",
+            PackStorageLayoutBenchmark.SQL_SERVER_PASSWORD_PROPERTY + "=",
             "jdbc:postgresql://",
+            "jdbc:sqlserver://",
             "Database JDBC URL",
             "Default catalog/schema");
     for (Path file : files) {
@@ -241,7 +304,8 @@ class PerformanceInvestigationsBenchmarkIT {
       boolean full,
       String deployment,
       int threads,
-      boolean repositoryAgingNativeSmoke) {
+      boolean repositoryAgingNativeSmoke,
+      String repositoryAgingDatabaseBackend) {
     switch (investigation) {
       case "write-queue" ->
           builder
@@ -279,7 +343,7 @@ class PerformanceInvestigationsBenchmarkIT {
               .param(
                   "backend",
                   repositoryAgingNativeSmoke
-                      ? new String[] {HibernateRepositoryBenchmark.POSTGRESQL}
+                      ? new String[] {repositoryAgingDatabaseBackend}
                       : full
                           ? new String[] {
                             HibernateRepositoryBenchmark.HSQLDB,

@@ -35,10 +35,18 @@ permissions:
   contents: read
 
 jobs:
-  postgresql-aging-phases:
-    name: PostgreSQL fixture, maintenance and measurement phases
+  native-aging-phases:
+    name: ${{ matrix.backend }} fixture, maintenance and measurement phases
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        backend:
+          - postgresql
+          - sqlserver
+    env:
+      BACKEND: ${{ matrix.backend }}
 
     steps:
       - name: Checkout
@@ -62,21 +70,24 @@ jobs:
           mvn -B -pl jgit-storage-hibernate-benchmarks test \
             -Dtest=DatabaseTelemetrySnapshotTest,RepositoryAgingBenchmarkTest
 
-      - name: Run exact PostgreSQL repository-aging telemetry smoke
+      - name: Run exact repository-aging native telemetry smoke
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf target/repository-aging-native
-          mkdir -p target/repository-aging-native
+          root="$GITHUB_WORKSPACE/target/repository-aging-native-$BACKEND"
+          rm -rf "$root"
+          mkdir -p "$root"
           mvn -B -pl jgit-storage-hibernate-benchmarks verify \
             -Pperformance-investigations \
             -Dtest=DatabaseTelemetrySnapshotTest \
             -Djgit.storage.benchmark.investigation=repository-aging \
             -Djgit.storage.benchmark.investigation.profile=smoke \
             -Djgit.storage.benchmark.repository-aging.native-smoke=true \
+            -Djgit.storage.benchmark.repository-aging.database-backend="$BACKEND" \
             -Djgit.storage.benchmark.database-telemetry.enabled=true \
-            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/repository-aging-native/jmh-result.json" 2>&1 \
-            | tee target/repository-aging-native/maven-benchmark.log
+            -Djgit.storage.benchmark.deployment="${BACKEND}-local-testcontainers" \
+            -Dbenchmark.resultFile="$root/jmh-result.json" 2>&1 \
+            | tee "$root/maven-benchmark.log"
 
       - name: Validate exact phase attribution and privacy
         shell: bash
@@ -85,31 +96,44 @@ jobs:
           import collections
           import datetime
           import json
+          import os
           from pathlib import Path
 
-          root = Path('target/repository-aging-native')
+          backend = os.environ['BACKEND']
+          metric_by_backend = {
+              'postgresql': 'postgresql.wal.insert_lsn_bytes',
+              'sqlserver': 'sqlserver.io.log.bytes_written',
+          }
+          required_metric = metric_by_backend[backend]
+          root = Path(f'target/repository-aging-native-{backend}')
           telemetry_path = root / 'repository-aging-database-telemetry.json'
           ndjson_path = root / 'repository-aging-database-telemetry.ndjson'
           jmh_path = root / 'jmh-result.json'
           output_path = root / 'repository-aging-jmh-output.txt'
           for path in (telemetry_path, ndjson_path, jmh_path, output_path):
               if not path.is_file() or path.stat().st_size < 3:
-                  raise SystemExit(f'Missing retained repository-aging evidence {path}')
+                  raise SystemExit(
+                      f'Missing retained {backend} repository-aging evidence {path}'
+                  )
 
           telemetry_text = telemetry_path.read_text(encoding='utf-8')
           if 'NaN' in telemetry_text or 'Infinity' in telemetry_text:
-              raise SystemExit('Repository-aging telemetry is not strict JSON')
+              raise SystemExit(f'{backend} repository-aging telemetry is not strict JSON')
           observations = json.loads(telemetry_text)['observations']
           jmh = json.loads(jmh_path.read_text(encoding='utf-8'))
           if len(jmh) != 9:
-              raise SystemExit(f'Expected 9 focused JMH results, found {len(jmh)}')
+              raise SystemExit(f'Expected 9 {backend} JMH results, found {len(jmh)}')
           if len(observations) != 27:
               raise SystemExit(
-                  f'Expected 27 phase observations, found {len(observations)}'
+                  f'Expected 27 {backend} phase observations, found {len(observations)}'
               )
 
           def base_from_jmh(item):
               params = item['params']
+              if params['backend'] != backend:
+                  raise SystemExit(
+                      f'Unexpected JMH backend {params["backend"]!r} in {backend} matrix'
+                  )
               return (
                   item['benchmark'].rsplit('.', 1)[-1],
                   params['backend'],
@@ -135,10 +159,11 @@ jobs:
               (base_from_observation(item), item['coordinate']['phase'])
               for item in observations
           )
-          if {base for base, _ in phase_counts} != jmh_bases:
+          telemetry_bases = {base for base, _ in phase_counts}
+          if telemetry_bases != jmh_bases:
               raise SystemExit(
-                  'JMH and telemetry base coordinates differ: '
-                  f'{jmh_bases ^ {base for base, _ in phase_counts}}'
+                  f'{backend} JMH and telemetry coordinates differ: '
+                  f'{telemetry_bases ^ jmh_bases}'
               )
           expected_phases = {'fixture-build', 'maintenance', 'measurement'}
           for base in jmh_bases:
@@ -148,37 +173,52 @@ jobs:
                   if candidate == base and count == 1
               }
               if phases != expected_phases:
-                  raise SystemExit(f'Incomplete phases for {base}: {phases}')
+                  raise SystemExit(
+                      f'Incomplete {backend} phases for {base}: {phases}'
+                  )
 
-          wal_by_phase = collections.defaultdict(list)
+          metric_by_phase = collections.defaultdict(list)
           for item in observations:
               coordinate = item['coordinate']
               phase = coordinate['phase']
-              if item['backend'] != 'postgresql':
-                  raise SystemExit(f'Unexpected telemetry backend: {item["backend"]}')
-              if coordinate['databaseBackend'] != 'postgresql':
-                  raise SystemExit(f'Unexpected database coordinate: {coordinate}')
+              if item['backend'] != backend:
+                  raise SystemExit(
+                      f'Unexpected telemetry backend {item["backend"]!r}'
+                  )
+              if coordinate['databaseBackend'] != backend:
+                  raise SystemExit(
+                      f'Unexpected database coordinate {coordinate}'
+                  )
               expected_iteration = '1' if phase == 'measurement' else '0'
               if coordinate['measurementIteration'] != expected_iteration:
-                  raise SystemExit(f'Unexpected phase iteration: {coordinate}')
-              for field in ('coordinate', 'counters', 'gauges', 'metadata', 'unsupported'):
+                  raise SystemExit(f'Unexpected phase iteration {coordinate}')
+              for field in (
+                  'coordinate', 'counters', 'gauges', 'metadata', 'unsupported'
+              ):
                   keys = list(item[field])
                   if keys != sorted(keys):
                       raise SystemExit(
-                          f'{field} keys are not deterministic for {coordinate}: {keys}'
+                          f'{backend} {field} keys are not deterministic for '
+                          f'{coordinate}: {keys}'
                       )
-              wal = item['counters'].get('postgresql.wal.insert_lsn_bytes')
-              if wal is None or wal < 0:
-                  raise SystemExit(f'Missing immediate WAL delta for {coordinate}: {wal}')
-              wal_by_phase[phase].append(wal)
-              if phase == 'fixture-build' and wal <= 0:
-                  raise SystemExit(f'Fixture build produced no WAL: {coordinate}')
+              value = item['counters'].get(required_metric)
+              if value is None or value < 0:
+                  raise SystemExit(
+                      f'Missing {required_metric} for {coordinate}: {value}'
+                  )
+              metric_by_phase[phase].append(value)
+              if phase == 'fixture-build' and value <= 0:
+                  raise SystemExit(
+                      f'{backend} fixture build produced no log delta: {coordinate}'
+                  )
               if (
                   phase == 'maintenance'
                   and coordinate['maintenanceMode'] != 'none'
-                  and wal <= 0
+                  and value <= 0
               ):
-                  raise SystemExit(f'Maintenance produced no WAL: {coordinate}')
+                  raise SystemExit(
+                      f'{backend} maintenance produced no log delta: {coordinate}'
+                  )
               start = datetime.datetime.fromisoformat(
                   item['startedAt'].replace('Z', '+00:00')
               )
@@ -186,14 +226,19 @@ jobs:
                   item['completedAt'].replace('Z', '+00:00')
               )
               if end < start:
-                  raise SystemExit(f'Negative telemetry window for {coordinate}')
+                  raise SystemExit(
+                      f'Negative {backend} telemetry window for {coordinate}'
+                  )
 
           ndjson_lines = [
-              line for line in ndjson_path.read_text(encoding='utf-8').splitlines() if line
+              line
+              for line in ndjson_path.read_text(encoding='utf-8').splitlines()
+              if line
           ]
           if len(ndjson_lines) != len(observations):
               raise SystemExit(
-                  f'NDJSON/aggregate count mismatch: {len(ndjson_lines)} != {len(observations)}'
+                  f'{backend} NDJSON and aggregate count mismatch: '
+                  f'{len(ndjson_lines)} != {len(observations)}'
               )
           for line in ndjson_lines:
               json.loads(line)
@@ -202,7 +247,11 @@ jobs:
               'jgit.storage.benchmark.postgresql.url=',
               'jgit.storage.benchmark.postgresql.user=',
               'jgit.storage.benchmark.postgresql.password=',
+              'jgit.storage.benchmark.sqlserver.url=',
+              'jgit.storage.benchmark.sqlserver.user=',
+              'jgit.storage.benchmark.sqlserver.password=',
               'jdbc:postgresql://',
+              'jdbc:sqlserver://',
               'Database JDBC URL',
               'Default catalog/schema',
           )
@@ -219,7 +268,9 @@ jobs:
                   content = path.read_bytes().decode('utf-8', errors='replace')
                   for token in forbidden:
                       if token in content:
-                          raise SystemExit(f'Sensitive token {token!r} found in {path}')
+                          raise SystemExit(
+                              f'Sensitive token {token!r} found in {path}'
+                          )
           leftovers = list(
               Path('/tmp').glob('jgit-storage-benchmark-connection-*.properties')
           )
@@ -227,10 +278,10 @@ jobs:
               raise SystemExit(f'Temporary credential files remain: {leftovers}')
 
           print(
-              'Validated 9 repository-aging coordinates and 27 exact phases; '
+              f'Validated {backend} repository-aging phases; '
               + ', '.join(
-                  f'{phase} WAL {min(values)}..{max(values)} bytes'
-                  for phase, values in sorted(wal_by_phase.items())
+                  f'{phase} {min(values)}..{max(values)} bytes'
+                  for phase, values in sorted(metric_by_phase.items())
               )
           )
           PY
@@ -239,18 +290,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: repository-aging-native-telemetry
+          name: repository-aging-native-telemetry-${{ matrix.backend }}
           path: |
-            target/repository-aging-native/**
+            target/repository-aging-native-${{ matrix.backend }}/**
             jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Report evidence contract
         if: success()
         run: |
-          echo '### Repository-aging native telemetry' >> "$GITHUB_STEP_SUMMARY"
+          echo "### ${BACKEND} repository-aging native telemetry" >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '- 9 exact JMH coordinates and 27 phase observations validated.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Fixture build, selected maintenance and measured read are attributed separately.' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Immediate PostgreSQL WAL, strict JSON and credential-free artifact contracts passed.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Native log, strict JSON and credential-free artifact contracts passed.' >> "$GITHUB_STEP_SUMMARY"
           echo '- This workflow does not change an automatic maintenance threshold.' >> "$GITHUB_STEP_SUMMARY"

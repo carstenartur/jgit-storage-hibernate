@@ -108,19 +108,19 @@ This is evidence for the durable scheduling/publication path, not completion of 
 
 ## Repository-aging and maintenance interpretation
 
-The focused PostgreSQL aging sub-run separates three boundaries for every selected JMH coordinate:
+The focused aging matrix separates three boundaries for every selected JMH coordinate on PostgreSQL and SQL Server:
 
 1. deterministic incremental fixture publication;
 2. the selected maintenance action (`none`, compact-only or read-optimized);
 3. the later measured lookup/traversal/reopen iteration.
 
-This prevents repack WAL and I/O from being misattributed to the read that benefits from it. The initial bounded profile uses ten pushes and representative oldest-object, clone-style and reopen lookups. It proves attribution and artifact contracts; the 32/100/300/1,000-push production matrix and SQL Server aging telemetry remain open.
+This prevents repack WAL/log and file-I/O work from being misattributed to the read that benefits from it. The initial bounded profile uses ten pushes and representative oldest-object, clone-style and reopen lookups. PostgreSQL requires immediate WAL insert-LSN evidence; SQL Server requires transaction-log file-write evidence and retains data/log I/O and server-scoped wait categories from its isolated Testcontainers instance. This proves cross-database phase attribution and artifact contracts; the 32/100/300/1,000-push production matrix remains open.
 
 ## Remaining issue #187 work
 
 This foundation does not close #187. Follow-up integrations must apply the same contract to:
 
-1. full-scale repository aging/MIDX/repack and SQL Server;
+1. full-scale repository aging/MIDX/repack;
 2. atomic durable receiver-record batches beyond queue scheduling;
 3. Hibernate Search incremental indexing and rebuild;
 4. representative history queries;
