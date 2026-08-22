@@ -58,7 +58,7 @@ current elapsed time
 
 This page therefore distinguishes:
 
-- **Physical ceiling:** host, network, database and storage-device throughput. The benchmark telemetry SPI captures PostgreSQL WAL/I/O and SQL Server log/file-I/O deltas outside timed pack-layout invocations and PostgreSQL WAL/I/O/wait deltas around complete concurrent write-queue measurement iterations. This is direct evidence toward that ceiling; repository aging, atomic receiver batches, Search paths and calibrated attribution remain open in #187.
+- **Physical ceiling:** host, network, database and storage-device throughput. The benchmark telemetry SPI captures PostgreSQL WAL/I/O and SQL Server log/file-I/O deltas outside timed pack-layout invocations, PostgreSQL WAL/I/O/wait deltas around complete concurrent write-queue measurement iterations, and separated PostgreSQL fixture-build, maintenance and measured-read phases for a bounded repository-aging profile. Full-scale aging/SQL Server, atomic receiver batches, Search paths and calibrated attribution remain open in #187.
 - **Semantic ceiling:** the fastest implementation preserving atomic publication, rollback, lifecycle, lease and multi-instance contracts.
 - **Practical comparison ceiling:** JGit `FileRepository` on the same benchmark workload. This is useful but not proof of a physical maximum because the durability and caching paths differ.
 

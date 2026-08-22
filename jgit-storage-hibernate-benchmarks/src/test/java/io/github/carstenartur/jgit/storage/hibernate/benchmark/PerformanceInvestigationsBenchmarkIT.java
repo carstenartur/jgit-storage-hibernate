@@ -42,6 +42,8 @@ class PerformanceInvestigationsBenchmarkIT {
       "jgit.storage.benchmark.investigation";
   private static final String PROFILE_PROPERTY =
       "jgit.storage.benchmark.investigation.profile";
+  private static final String REPOSITORY_AGING_NATIVE_SMOKE_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.native-smoke";
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -71,18 +73,23 @@ class PerformanceInvestigationsBenchmarkIT {
 
     OptionsBuilder builder = baseOptions(resultFile, outputFile, full);
     boolean writeQueue = "write-queue".equals(investigation);
+    boolean repositoryAging = "repository-aging".equals(investigation);
+    boolean repositoryAgingNativeSmoke =
+        repositoryAging
+            && Boolean.getBoolean(REPOSITORY_AGING_NATIVE_SMOKE_PROPERTY);
     boolean telemetryEnabled =
-        writeQueue
+        (writeQueue || repositoryAging)
             && Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
+    String telemetryPrefix = writeQueue ? "write-queue" : "repository-aging";
     Path telemetryNdjson =
-        resultFile.resolveSibling("write-queue-database-telemetry.ndjson");
+        resultFile.resolveSibling(telemetryPrefix + "-database-telemetry.ndjson");
     Path telemetryJson =
-        resultFile.resolveSibling("write-queue-database-telemetry.json");
+        resultFile.resolveSibling(telemetryPrefix + "-database-telemetry.json");
     Path connectionPropertiesFile = null;
     List<String> jvmArguments = new ArrayList<>();
     jvmArguments.add("-Xms1g");
     jvmArguments.add(full ? "-Xmx3g" : "-Xmx1536m");
-    if (writeQueue) {
+    if (writeQueue || repositoryAging) {
       connectionPropertiesFile = writeConnectionProperties();
       jvmArguments.add(
           RepositoryBackendBenchmarkIT.systemProperty(
@@ -115,7 +122,13 @@ class PerformanceInvestigationsBenchmarkIT {
     }
     builder.jvmArgsAppend(jvmArguments.toArray(String[]::new));
 
-    configure(builder, investigation, full, deployment, threads);
+    configure(
+        builder,
+        investigation,
+        full,
+        deployment,
+        threads,
+        repositoryAgingNativeSmoke);
     Collection<RunResult> results;
     try {
       results = new Runner(builder.build()).run();
@@ -129,16 +142,16 @@ class PerformanceInvestigationsBenchmarkIT {
       DatabaseTelemetryJson.writeAggregate(telemetryNdjson, telemetryJson);
       assertTrue(
           Files.isRegularFile(telemetryJson),
-          "Write-queue telemetry JSON was not written");
+          investigation + " telemetry JSON was not written");
       assertTrue(
           Files.size(telemetryJson) > 32,
-          "Write-queue telemetry JSON is empty");
+          investigation + " telemetry JSON is empty");
     }
     assertFalse(results.isEmpty(), "Selected investigation produced no JMH results");
     assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
     assertTrue(Files.size(resultFile) > 2, "JMH JSON result is empty");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
-    if (writeQueue) {
+    if (writeQueue || repositoryAging) {
       List<Path> retainedEvidence = new ArrayList<>();
       retainedEvidence.add(resultFile);
       retainedEvidence.add(outputFile);
@@ -151,35 +164,40 @@ class PerformanceInvestigationsBenchmarkIT {
   }
 
   private static Path writeConnectionProperties() throws IOException {
-    Path target =
-        Files.createTempFile(
-            "jgit-storage-benchmark-connection-", ".properties");
+    Path target = null;
     try {
-      Files.setPosixFilePermissions(
-          target, PosixFilePermissions.fromString("rw-------"));
-    } catch (UnsupportedOperationException ignored) {
-      // Supported CI performance runners use POSIX filesystems.
-    }
-    Properties properties = new Properties();
-    Map.of(
-            HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
-            POSTGRESQL.getJdbcUrl(),
-            HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
-            POSTGRESQL.getUsername(),
-            HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
-            POSTGRESQL.getPassword())
-        .forEach(properties::setProperty);
-    try (OutputStream output = Files.newOutputStream(target)) {
-      properties.store(output, "ephemeral benchmark connection properties");
-    } catch (IOException failure) {
+      target =
+          Files.createTempFile(
+              "jgit-storage-benchmark-connection-", ".properties");
       try {
-        Files.deleteIfExists(target);
-      } catch (IOException cleanupFailure) {
-        failure.addSuppressed(cleanupFailure);
+        Files.setPosixFilePermissions(
+            target, PosixFilePermissions.fromString("rw-------"));
+      } catch (UnsupportedOperationException ignored) {
+        // Supported CI performance runners use POSIX filesystems.
+      }
+      Properties properties = new Properties();
+      Map.of(
+              HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
+              POSTGRESQL.getJdbcUrl(),
+              HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY,
+              POSTGRESQL.getUsername(),
+              HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY,
+              POSTGRESQL.getPassword())
+          .forEach(properties::setProperty);
+      try (OutputStream output = Files.newOutputStream(target)) {
+        properties.store(output, "ephemeral benchmark connection properties");
+      }
+      return target;
+    } catch (IOException | RuntimeException failure) {
+      if (target != null) {
+        try {
+          Files.deleteIfExists(target);
+        } catch (IOException cleanupFailure) {
+          failure.addSuppressed(cleanupFailure);
+        }
       }
       throw failure;
     }
-    return target;
   }
 
   private static void assertCredentialFreeEvidence(Collection<Path> files) throws IOException {
@@ -222,7 +240,8 @@ class PerformanceInvestigationsBenchmarkIT {
       String investigation,
       boolean full,
       String deployment,
-      int threads) {
+      int threads,
+      boolean repositoryAgingNativeSmoke) {
     switch (investigation) {
       case "write-queue" ->
           builder
@@ -251,22 +270,30 @@ class PerformanceInvestigationsBenchmarkIT {
               .param("readAheadChunks", "1", "4", "16");
       case "repository-aging" ->
           builder
-              .include(RepositoryAgingBenchmark.class.getName())
+              .include(
+                  repositoryAgingNativeSmoke
+                      ? RepositoryAgingBenchmark.class.getName()
+                          + ".(lookupOldestObject|cloneStyleTraversal|reopenAndLookupOldest)"
+                      : RepositoryAgingBenchmark.class.getName())
               .threads(1)
               .param(
                   "backend",
-                  full
-                      ? new String[] {
-                        HibernateRepositoryBenchmark.HSQLDB,
-                        HibernateRepositoryBenchmark.POSTGRESQL,
-                        HibernateRepositoryBenchmark.POSTGRESQL_HIKARI
-                      }
-                      : new String[] {HibernateRepositoryBenchmark.HSQLDB})
+                  repositoryAgingNativeSmoke
+                      ? new String[] {HibernateRepositoryBenchmark.POSTGRESQL}
+                      : full
+                          ? new String[] {
+                            HibernateRepositoryBenchmark.HSQLDB,
+                            HibernateRepositoryBenchmark.POSTGRESQL,
+                            HibernateRepositoryBenchmark.POSTGRESQL_HIKARI
+                          }
+                          : new String[] {HibernateRepositoryBenchmark.HSQLDB})
               .param(
                   "pushes",
-                  full
-                      ? new String[] {"1", "10", "32", "100", "300", "1000"}
-                      : new String[] {"1", "10"})
+                  repositoryAgingNativeSmoke
+                      ? new String[] {"10"}
+                      : full
+                          ? new String[] {"1", "10", "32", "100", "300", "1000"}
+                          : new String[] {"1", "10"})
               .param(
                   "maintenanceMode",
                   RepositoryAgingBenchmark.NONE,
