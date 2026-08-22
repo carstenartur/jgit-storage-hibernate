@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.refs;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.eclipse.jgit.lib.ObjectId;
@@ -63,7 +64,10 @@ public record ReflogAppendCommand(
     newId = Objects.requireNonNull(newId, "newId");
     whoName = normalizeIdentityField(whoName, "whoName");
     whoEmail = normalizeIdentityField(whoEmail, "whoEmail");
-    when = Objects.requireNonNull(when, "when");
+    // Millisecond precision round-trips identically through every supported database timestamp
+    // mapping. Higher precision would make an exact replay appear different after PostgreSQL or
+    // SQL Server normalized the stored value.
+    when = Objects.requireNonNull(when, "when").truncatedTo(ChronoUnit.MILLIS);
     if (message != null && message.length() > GitReflogEntity.MAX_MESSAGE_LENGTH) {
       throw new IllegalArgumentException(
           "message exceeds " + GitReflogEntity.MAX_MESSAGE_LENGTH + " characters");
