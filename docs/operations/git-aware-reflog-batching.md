@@ -33,9 +33,12 @@ For each repository-homogeneous queue batch, `HibernateReflogBatchProcessor`:
 5. verifies that committed replays contain exactly the same ref, object IDs, actor, timestamp and message;
 6. loads the latest committed queryable reflog entry for every affected ref;
 7. validates all new `oldId -> newId` transitions in command order before the first insert;
-8. persists every new entry and flushes all SQL/constraint failures inside the owning transaction;
-9. commits once;
-10. completes queue futures only after commit.
+8. adds every new entry to one portable JDBC `PreparedStatement` batch and executes it inside the owning transaction;
+9. rejects any failed or missing JDBC update count and rolls the transaction back;
+10. commits once;
+11. completes queue futures only after commit.
+
+The identity primary key is omitted from the insert because the durable result is the caller's delivery ID. This avoids the usual identity-generation split into individual Hibernate inserts while preserving the mapped table and transaction.
 
 A result is returned in the same order as the submitted commands:
 
@@ -104,7 +107,7 @@ The queue remains an in-memory batching and backpressure layer, not a durable jo
 
 ## Database schema
 
-Core migration `0.1.19` adds nullable `git_reflog.delivery_id` and an index on repository plus delivery ID for H2, HSQLDB, PostgreSQL and SQL Server. The column remains nullable so existing queryable reflog data and the standalone `HibernateReflogWriter` API remain compatible.
+Core migration `0.9.2` adds nullable `git_reflog.delivery_id` and an index on repository plus delivery ID for H2, HSQLDB, PostgreSQL and SQL Server. The column remains nullable so existing queryable reflog data and the standalone `HibernateReflogWriter` API remain compatible.
 
 ## Verification and native telemetry
 
