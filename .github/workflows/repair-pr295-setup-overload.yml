@@ -32,26 +32,26 @@ jobs:
 
           path = Path('.github/scripts/apply-issue187-repository-aging-telemetry.py')
           text = path.read_text(encoding='utf-8')
-          old = '''  @Setup(Level.Trial)
-          public void setupTrial(BenchmarkParams benchmarkParams) throws Exception {
-            suppressConnectionMetadataLogging();
-            benchmarkMethod = benchmarkMethod(benchmarkParams);
-            repositoryName =
-          '''.replace('          ', '')
-          new = '''  @Setup(Level.Trial)
-          public void setupTrial(BenchmarkParams benchmarkParams) throws Exception {
-            setupTrial(benchmarkMethod(benchmarkParams));
-          }
-
-          public void setupTrial() throws Exception {
-            setupTrial("unit-test");
-          }
-
-          private void setupTrial(String benchmarkMethod) throws Exception {
-            suppressConnectionMetadataLogging();
-            this.benchmarkMethod = benchmarkMethod;
-            repositoryName =
-          '''.replace('          ', '')
+          old = (
+              "  @Setup(Level.Trial)\n"
+              "  public void setupTrial(BenchmarkParams benchmarkParams) throws Exception {\n"
+              "    suppressConnectionMetadataLogging();\n"
+              "    benchmarkMethod = benchmarkMethod(benchmarkParams);\n"
+              "    repositoryName =\n"
+          )
+          new = (
+              "  @Setup(Level.Trial)\n"
+              "  public void setupTrial(BenchmarkParams benchmarkParams) throws Exception {\n"
+              "    setupTrial(benchmarkMethod(benchmarkParams));\n"
+              "  }\n\n"
+              "  public void setupTrial() throws Exception {\n"
+              "    setupTrial(\"unit-test\");\n"
+              "  }\n\n"
+              "  private void setupTrial(String benchmarkMethod) throws Exception {\n"
+              "    suppressConnectionMetadataLogging();\n"
+              "    this.benchmarkMethod = benchmarkMethod;\n"
+              "    repositoryName =\n"
+          )
           count = text.count(old)
           if count != 1:
               raise SystemExit(f'Expected one generated setup block, found {count}')
