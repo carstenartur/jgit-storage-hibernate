@@ -28,16 +28,30 @@ public final class SecuredSmartHttpReceivePackFactory<C>
     implements ReceivePackFactory<HttpServletRequest> {
 
   private final SmartHttpReceiveAdmission<? super C> receiveAdmission;
+  private final SmartHttpPostReceiveHandler<? super C> postReceiveHandler;
 
   /** Disable receive-pack until an explicit coarse admission policy is supplied. */
   public SecuredSmartHttpReceivePackFactory() {
-    this(SmartHttpReceiveAdmission.disabled());
+    this(SmartHttpReceiveAdmission.disabled(), SmartHttpPostReceiveHandler.none());
   }
 
   /** Create a factory with an application-owned coarse receive-pack admission check. */
   public SecuredSmartHttpReceivePackFactory(
       SmartHttpReceiveAdmission<? super C> receiveAdmission) {
+    this(receiveAdmission, SmartHttpPostReceiveHandler.none());
+  }
+
+  /**
+   * Create a factory with explicit receive admission and post-receive projection scheduling.
+   *
+   * @param receiveAdmission coarse check before JGit accepts pack data
+   * @param postReceiveHandler bounded callback after command results are known
+   */
+  public SecuredSmartHttpReceivePackFactory(
+      SmartHttpReceiveAdmission<? super C> receiveAdmission,
+      SmartHttpPostReceiveHandler<? super C> postReceiveHandler) {
     this.receiveAdmission = Objects.requireNonNull(receiveAdmission, "receiveAdmission");
+    this.postReceiveHandler = Objects.requireNonNull(postReceiveHandler, "postReceiveHandler");
   }
 
   @Override
@@ -61,6 +75,14 @@ public final class SecuredSmartHttpReceivePackFactory<C>
 
     ReceivePack receivePack = new ReceivePack(repository);
     receivePack.setAtomic(true);
+    receivePack.setPostReceiveHook(
+        (completedPack, commands) ->
+            postReceiveHandler.onPostReceive(
+                request,
+                binding.session().repositoryName(),
+                binding.session().accessContext(),
+                completedPack,
+                commands));
     return receivePack;
   }
 }

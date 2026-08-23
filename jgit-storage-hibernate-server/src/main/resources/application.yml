@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: jgit-storage-hibernate-server
+  datasource:
+    url: ${JSH_JDBC_URL:jdbc:postgresql://localhost:5432/jgit}
+    username: ${JSH_JDBC_USERNAME:jgit}
+    password: ${JSH_JDBC_PASSWORD:jgit}
+    driver-class-name: org.postgresql.Driver
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
+
+jgit:
+  storage:
+    hibernate:
+      schema-action: migrate
+      search:
+        enabled: true
+        directory: ${JSH_SEARCH_DIRECTORY:/var/lib/jgit-storage/search}
+      hibernate-properties:
+        hibernate.connection.provider_disables_autocommit: "true"
+    server:
+      authentication:
+        username: ${JSH_ADMIN_USERNAME:admin}
+        password: ${JSH_ADMIN_PASSWORD:}
+        require-secure-transport: ${JSH_REQUIRE_SECURE_TRANSPORT:false}
+      indexing-threads: ${JSH_INDEXING_THREADS:2}
+      inspection-views-enabled: ${JSH_INSPECTION_VIEWS_ENABLED:true}
