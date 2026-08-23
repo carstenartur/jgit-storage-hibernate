@@ -18,7 +18,7 @@ https://doi.org/10.5281/zenodo.21210132
 
 JGit is the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. `jgit-storage-hibernate` adds a relational storage backend plus persistent query models over that history: transaction-safe pack/ref publication, structured history queries and Lucene full-text search. The Java Analysis and Architecture modules additionally provide semantic in-memory analysis APIs; their module-owned database persistence is still incubating in the `0.1.x` line.
 
-The documented release line is **0.11.0**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
+The documented release line is **0.11.1**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
 
 The important distinction is not merely that the library saves application code. It changes **when and how often** expensive work is performed:
 
@@ -122,7 +122,7 @@ Security and Smart HTTP are published artifacts in the documented `0.11.0` relea
 
 ## Five-minute production setup
 
-The documented release line is **0.11.0**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; HSQLDB 2.7 is supported for embedded persistent Core deployments; H2 2.4.x remains supported for tests, demos and lightweight development.
+The documented release line is **0.11.1**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; HSQLDB 2.7 is supported for embedded persistent Core deployments; H2 2.4.x remains supported for tests, demos and lightweight development.
 
 ### 1. Configure the anonymous release repository
 
@@ -145,7 +145,7 @@ No GitHub token or Maven Central account is required.
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.11.0</version>
+  <version>0.11.1</version>
 </dependency>
 ```
 

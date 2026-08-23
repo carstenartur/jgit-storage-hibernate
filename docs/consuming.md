@@ -10,7 +10,7 @@ io.github.carstenartur:jgit-storage-hibernate-search
 
 Core provides database-backed JGit repositories. Security is optional and adds a framework-neutral principal/group ACL schema plus deterministic repository/ref decisions. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
 
-The documented release line is **0.11.0**. It uses Java 21, JGit 7.7.1.202607240634-r, Hibernate ORM 7.4.5.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published BOM and tested deployment stack instead of overriding only one side of the stack.
+The documented release line is **0.11.1**. It uses Java 21, JGit 7.7.1.202607240634-r, Hibernate ORM 7.4.5.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published BOM and tested deployment stack instead of overriding only one side of the stack.
 
 SQL Server Search was introduced in **0.1.16**. Do not configure released Search 0.1.15 against SQL Server.
 
@@ -66,7 +66,7 @@ Core only:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.11.0</version>
+  <version>0.11.1</version>
 </dependency>
 ```
 
@@ -76,7 +76,7 @@ Optional generic history search:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.11.0</version>
+  <version>0.11.1</version>
 </dependency>
 ```
 
@@ -84,13 +84,13 @@ Use Search 0.1.16 or later for SQL Server.
 
 Optional database-backed security policy:
 
-Security is published in the documented `0.11.0` release. It remains optional: consumers add it only when they need stable principals, groups, repository/ref policy, credentials or audit.
+Security was introduced in `0.11.0` and remains available in the documented release line. It remains optional: consumers add it only when they need stable principals, groups, repository/ref policy, credentials or audit.
 
 ```xml
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-security</artifactId>
-  <version>0.11.0</version>
+  <version>0.11.1</version>
 </dependency>
 ```
 
