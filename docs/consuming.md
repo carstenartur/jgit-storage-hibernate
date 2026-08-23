@@ -84,7 +84,7 @@ Use Search 0.1.16 or later for SQL Server.
 
 Optional database-backed security policy:
 
-Security is published in the documented `0.11.0` release. It remains optional: consumers add it only when they need stable principals, groups, repository/ref policy, credentials or audit.
+Security was introduced in `0.11.0` and remains available in the documented release line. It remains optional: consumers add it only when they need stable principals, groups, repository/ref policy, credentials or audit.
 
 ```xml
 <dependency>
