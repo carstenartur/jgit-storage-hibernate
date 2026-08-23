@@ -79,9 +79,18 @@ jobs:
         run: |
           set -euo pipefail
           auth=$(printf '%s' "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" | base64 -w0)
-          curl --fail --silent --show-error \
+          create_response=$(mktemp)
+          create_status=$(curl --silent --show-error \
+            --output "$create_response" \
+            --write-out '%{http_code}' \
             -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
-            -X POST http://localhost:8080/api/repositories/smoke >/dev/null
+            -X POST http://localhost:8080/api/repositories/smoke)
+          if [[ "$create_status" -lt 200 || "$create_status" -ge 300 ]]; then
+            printf 'Repository creation failed with HTTP %s:\n' "$create_status" >&2
+            cat "$create_response" >&2
+            printf '\n' >&2
+            exit 1
+          fi
 
           work=$(mktemp -d)
           git -C "$work" init -b main
@@ -95,7 +104,7 @@ jobs:
             push http://localhost:8080/git/smoke.git main
 
           for attempt in $(seq 1 60); do
-            status=$(curl --fail --silent \
+            status=$(curl --fail-with-body --silent --show-error \
               -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
               http://localhost:8080/api/repositories/smoke/index-status)
             if grep -q '"state":"COMPLETED"' <<< "$status"; then
@@ -108,7 +117,7 @@ jobs:
             sleep 1
           done
 
-          curl --fail --silent \
+          curl --fail-with-body --silent --show-error \
             -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
             'http://localhost:8080/api/repositories/smoke/changes?path=README.md&pathMode=exact' \
             | grep -q 'Add smoke history'
