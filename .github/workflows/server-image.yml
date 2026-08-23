@@ -56,11 +56,8 @@ jobs:
 
       - name: Verify product modules
         run: |
-          mvn -B -ntp -pl \
-            jgit-storage-hibernate-spring-boot-autoconfigure,\
-            jgit-storage-hibernate-spring-boot-starter,\
-            jgit-storage-hibernate-server,\
-            jgit-storage-hibernate-testcontainers \
+          mvn -B -ntp \
+            -pl 'jgit-storage-hibernate-spring-boot-autoconfigure,jgit-storage-hibernate-spring-boot-starter,jgit-storage-hibernate-server,jgit-storage-hibernate-testcontainers' \
             -am verify
 
       - name: Build and start PostgreSQL-backed server
