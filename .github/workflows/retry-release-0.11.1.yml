@@ -44,7 +44,7 @@ jobs:
           RELEASE_ACTION: prepare
           GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
-          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           RELEASE_VERSION: '0.11.1'
           NEXT_VERSION_INPUT: '0.11.2-SNAPSHOT'
           SKIP_TESTS: 'false'
