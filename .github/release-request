@@ -1,5 +1,6 @@
 {
   "release_version": "0.11.1",
   "next_development_version": "0.11.2-SNAPSHOT",
-  "source_commit": "9468972b7b5cff282692ab2fdd0773095535b679"
+  "source_commit": "9468972b7b5cff282692ab2fdd0773095535b679",
+  "trigger_nonce": "2026-08-23T13:51:00+02:00"
 }
