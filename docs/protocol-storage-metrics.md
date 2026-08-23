@@ -64,6 +64,7 @@ Every top-level repository transaction receives exactly one stable `StorageOpera
 | `REF_PUBLICATION` | locked ref/reftable publication and its nested reflog work |
 | `REFLOG_READ` | standalone reflog retrieval |
 | `REFLOG_WRITE` | standalone reflog persistence outside a ref-publication transaction |
+| `REFLOG_BATCH_WRITE` | repository-locked atomic JDBC batch of idempotent queryable reflog projection records |
 | `OTHER` | explicit uncategorized application work or an internal call site still requiring classification |
 
 For adaptive additive chunked publication, the expected category sequence is:
@@ -216,6 +217,7 @@ Use the metrics to choose and validate optimizations:
 - replacement and compaction must remain on one locked `PACK_PUBLICATION` boundary to preserve JGit's race contract;
 - high transaction duration with little lock-held time points to connection, read or database work outside serialized publication;
 - many `REF_PUBLICATION` transactions or locks suggest ref/reftable coordination is the dominant fixed cost;
+- `REFLOG_BATCH_WRITE` isolates the first Git-aware append-only projection batch; interpret it with delivery-ID replay, queue batch-size and database-native WAL/log evidence rather than treating it as authoritative ref publication;
 - many `PACK_METADATA_READ` transactions suggest pack-list reconstruction should be examined;
 - `PACK_FILE_READ` must be interpreted through extension/storage attribution before adding payload caching;
 - many statements within a small number of pack-write transactions suggest JDBC batching or lower-level chunk persistence;

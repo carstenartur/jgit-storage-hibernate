@@ -27,7 +27,10 @@ import org.hibernate.annotations.Nationalized;
     indexes = {
       @Index(
           name = "idx_reflog_repo_ref_key_id",
-          columnList = "repository_name, ref_name_key, id")
+          columnList = "repository_name, ref_name_key, id"),
+      @Index(
+          name = "idx_reflog_repo_delivery",
+          columnList = "repository_name, delivery_id")
     })
 public class GitReflogEntity {
 
@@ -38,6 +41,9 @@ public class GitReflogEntity {
    * AL16UTF16 national character set, the 4,000-byte SQL limit allows at most 2,000 characters.
    */
   public static final int MAX_MESSAGE_LENGTH = 2000;
+
+  /** Maximum persisted idempotency identifier used by durable append batches. */
+  public static final int MAX_DELIVERY_ID_LENGTH = 128;
 
   /**
    * Indexed prefix length for portable reverse-reflog lookup.
@@ -60,6 +66,10 @@ public class GitReflogEntity {
   @Nationalized
   @Column(name = "repository_name", nullable = false, length = 255)
   private String repositoryName;
+
+  @Nationalized
+  @Column(name = "delivery_id", length = MAX_DELIVERY_ID_LENGTH)
+  private String deliveryId;
 
   @Nationalized
   @Column(name = "ref_name", nullable = false, length = 1024)
@@ -125,6 +135,14 @@ public class GitReflogEntity {
 
   public void setRepositoryName(String repositoryName) {
     this.repositoryName = repositoryName;
+  }
+
+  public String getDeliveryId() {
+    return deliveryId;
+  }
+
+  public void setDeliveryId(String deliveryId) {
+    this.deliveryId = deliveryId;
   }
 
   public String getRefName() {

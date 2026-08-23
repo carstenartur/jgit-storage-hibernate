@@ -1,0 +1,200 @@
+name: Git-aware Reflog Batch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 5 11 * *'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/git-aware-reflog-batch.yml'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitReflogEntity.java'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/**'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/queue/**'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/**'
+      - 'jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/**'
+      - 'jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/refs/**'
+      - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ReflogBatchNativeTelemetryTest.java'
+      - 'docs/operations/git-aware-reflog-batching.md'
+      - 'docs/operations/durable-striped-write-queue.md'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/git-aware-reflog-batch.yml'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitReflogEntity.java'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/**'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/queue/**'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/**'
+      - 'jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/**'
+      - 'jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/refs/**'
+      - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ReflogBatchNativeTelemetryTest.java'
+      - 'docs/operations/git-aware-reflog-batching.md'
+      - 'docs/operations/durable-striped-write-queue.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  semantic-and-native-contract:
+    name: Atomic semantics and PostgreSQL/SQL Server telemetry
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Run atomic H2 semantics
+        run: |
+          mvn -B -pl jgit-storage-hibernate-core -am test \
+            -Dtest=HibernateReflogBatchProcessorH2Test \
+            -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Run PostgreSQL and SQL Server native evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf target/git-aware-reflog-batch
+          mkdir -p target/git-aware-reflog-batch
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am test \
+            -Dtest=ReflogBatchNativeTelemetryTest \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Djgit.storage.benchmark.reflog-batch.native.enabled=true \
+            -Djgit.storage.benchmark.database-telemetry.output="$GITHUB_WORKSPACE/target/git-aware-reflog-batch/reflog-batch-database-telemetry.ndjson"
+
+      - name: Validate exact matrix, physical writes and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+
+          root = Path('target/git-aware-reflog-batch')
+          aggregate = root / 'reflog-batch-database-telemetry.json'
+          ndjson = root / 'reflog-batch-database-telemetry.ndjson'
+          for path in (aggregate, ndjson):
+              if not path.is_file() or path.stat().st_size < 100:
+                  raise SystemExit(f'Missing retained evidence: {path}')
+
+          text = aggregate.read_text(encoding='utf-8')
+          if 'NaN' in text or 'Infinity' in text:
+              raise SystemExit('Native reflog-batch evidence is not strict JSON')
+          value = json.loads(text)
+          observations = value.get('observations')
+          if not isinstance(observations, list) or len(observations) != 12:
+              raise SystemExit(
+                  f'Expected 12 native observations, found {len(observations or [])}'
+              )
+
+          expected = {
+              (backend, str(batch_size), phase)
+              for backend in ('postgresql', 'sqlserver')
+              for batch_size in (1, 10, 50)
+              for phase in ('first-apply', 'idempotent-replay')
+          }
+          actual = set()
+          for item in observations:
+              coordinate = item['coordinate']
+              for field in ('coordinate', 'counters', 'gauges', 'metadata', 'unsupported'):
+                  keys = list(item[field])
+                  if keys != sorted(keys):
+                      raise SystemExit(
+                          f'{field} keys are not deterministic for {coordinate}: {keys}'
+                      )
+              key = (
+                  coordinate['backend'],
+                  coordinate['batchSize'],
+                  coordinate['phase'],
+              )
+              if key in actual:
+                  raise SystemExit(f'Duplicate native coordinate: {key}')
+              actual.add(key)
+              expected_status = (
+                  'APPENDED'
+                  if coordinate['phase'] == 'first-apply'
+                  else 'ALREADY_APPLIED'
+              )
+              if coordinate['expectedStatus'] != expected_status:
+                  raise SystemExit(f'Unexpected status contract for {coordinate}')
+              elapsed = int(coordinate['elapsedNanos'])
+              if elapsed <= 0:
+                  raise SystemExit(f'Non-positive elapsed duration for {coordinate}')
+              for metric in item['counters'].values():
+                  if isinstance(metric, bool) or not isinstance(metric, int):
+                      raise SystemExit(f'Non-integral counter for {coordinate}')
+              if coordinate['phase'] == 'first-apply':
+                  counter = (
+                      'postgresql.wal.insert_lsn_bytes'
+                      if coordinate['backend'] == 'postgresql'
+                      else 'sqlserver.io.log.bytes_written'
+                  )
+                  if item['counters'].get(counter, 0) <= 0:
+                      raise SystemExit(
+                          f'Missing positive physical-write counter {counter} for {coordinate}'
+                      )
+          if actual != expected:
+              raise SystemExit(
+                  f'Native matrix differs; missing={sorted(expected-actual)}, '
+                  f'extra={sorted(actual-expected)}'
+              )
+
+          lines = [line for line in ndjson.read_text(encoding='utf-8').splitlines() if line]
+          if len(lines) != 12:
+              raise SystemExit(f'Expected 12 NDJSON records, found {len(lines)}')
+          for line in lines:
+              json.loads(line)
+
+          forbidden = (
+              'jdbc:postgresql://',
+              'jdbc:sqlserver://',
+              'jgit.storage.benchmark.postgresql.password',
+              'jgit.storage.benchmark.sqlserver.password',
+              'Database JDBC URL',
+              'Default catalog/schema',
+          )
+          for path in root.rglob('*'):
+              if not path.is_file():
+                  continue
+              content = path.read_text(encoding='utf-8', errors='replace')
+              for token in forbidden:
+                  if token in content:
+                      raise SystemExit(f'Sensitive token {token!r} found in {path}')
+
+          print('Validated 12 exact apply/replay observations across PostgreSQL and SQL Server')
+          PY
+
+      - name: Upload native batch evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: git-aware-reflog-batch-native-telemetry
+          path: target/git-aware-reflog-batch/**
+          if-no-files-found: error
+
+      - name: Report semantic boundary
+        if: success()
+        run: |
+          echo '### Git-aware queryable reflog batches' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Atomic append and rollback semantics passed.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Exact delivery-ID replay returned ALREADY_APPLIED without duplicate rows.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PostgreSQL WAL and SQL Server transaction-log evidence passed for batch sizes 1, 10 and 50.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- This processor does not batch refs, packs or complete pushes.' >> "$GITHUB_STEP_SUMMARY"

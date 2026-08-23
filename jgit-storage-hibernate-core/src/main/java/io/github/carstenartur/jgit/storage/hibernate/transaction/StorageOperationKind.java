@@ -40,6 +40,9 @@ public enum StorageOperationKind {
   /** Standalone reflog persistence outside an owning ref-publication transaction. */
   REFLOG_WRITE,
 
+  /** Atomic repository-locked append of idempotent queryable reflog projection records. */
+  REFLOG_BATCH_WRITE,
+
   /** Explicit application work or an internal diagnostic call site not yet classified. */
   OTHER
 }

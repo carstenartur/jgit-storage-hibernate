@@ -61,7 +61,7 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
 
     flyway.migrate();
 
-    assertEquals("0.9.1", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.9.2", flyway.info().current().getVersion().getVersion());
     try (Connection connection =
         DriverManager.getConnection(
             SQL_SERVER.getJdbcUrl(), SQL_SERVER.getUsername(), SQL_SERVER.getPassword())) {
@@ -77,8 +77,11 @@ class CoreSqlServerSchemaMigrationIntegrationTest {
       assertTrue(columnExists(connection, "git_packs", "min_update_index"));
       assertTrue(columnExists(connection, "git_packs", "max_update_index"));
       assertTrue(columnExists(connection, "git_reflog", "ref_name_key"));
+      assertTrue(columnExists(connection, "git_reflog", "delivery_id"));
       assertTrue(
           indexExists(connection, "git_reflog", "idx_reflog_repo_ref_key_id"));
+      assertTrue(
+          indexExists(connection, "git_reflog", "idx_reflog_repo_delivery"));
       assertFalse(indexExists(connection, "git_reflog", "idx_reflog_repo_id"));
       assertFalse(indexExists(connection, "git_packs", "idx_pack_repo"));
       assertFalse(indexExists(connection, "git_packs", "idx_pack_repo_name"));

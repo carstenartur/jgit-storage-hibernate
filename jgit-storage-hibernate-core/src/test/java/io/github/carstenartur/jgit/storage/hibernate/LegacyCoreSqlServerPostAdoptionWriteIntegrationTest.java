@@ -73,7 +73,7 @@ class LegacyCoreSqlServerPostAdoptionWriteIntegrationTest {
             .baselineDescription("adopted pre-library core schema")
             .load();
     flyway.migrate();
-    assertEquals("0.9.1", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.9.2", flyway.info().current().getVersion().getVersion());
 
     ObjectId commitId;
     try (HibernateSessionFactoryProvider provider = provider();

@@ -114,7 +114,7 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
   private static void baselineAndMigrateCurrent() {
     Flyway flyway = currentFlyway(CoreSchemaMigrations.CURRENT_SCHEMA_VERSION);
     flyway.migrate();
-    assertEquals("0.9.1", flyway.info().current().getVersion().getVersion());
+    assertEquals("0.9.2", flyway.info().current().getVersion().getVersion());
   }
 
   private static Flyway currentFlyway(String baselineVersion) {
@@ -260,6 +260,11 @@ class LegacyCoreSqlServerSchemaAdoptionIntegrationTest {
       statement.execute(
           "create index idx_pack_repo_name on git_packs (repository_name, pack_name)");
 
+      statement.execute(
+          "drop index if exists idx_reflog_repo_delivery on git_reflog");
+      statement.execute(
+          "if col_length('git_reflog', 'delivery_id') is not null "
+              + "alter table git_reflog drop column delivery_id");
       statement.execute(
           "drop index if exists idx_reflog_repo_ref_key_id on git_reflog");
       statement.execute(

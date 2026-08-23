@@ -10,6 +10,7 @@ package io.github.carstenartur.jgit.storage.hibernate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
 import jakarta.persistence.Column;
@@ -28,5 +29,16 @@ class GitReflogEntityMappingTest {
     assertNotNull(column);
     assertEquals(2000, GitReflogEntity.MAX_MESSAGE_LENGTH);
     assertEquals(GitReflogEntity.MAX_MESSAGE_LENGTH, column.length());
+  }
+
+  @Test
+  void deliveryIdIsNullableNationalizedAndPortablyBounded() throws Exception {
+    Field deliveryId = GitReflogEntity.class.getDeclaredField("deliveryId");
+    Column column = deliveryId.getAnnotation(Column.class);
+
+    assertNotNull(deliveryId.getAnnotation(Nationalized.class));
+    assertNotNull(column);
+    assertTrue(column.nullable(), "legacy standalone reflogs require a nullable delivery ID");
+    assertEquals(GitReflogEntity.MAX_DELIVERY_ID_LENGTH, column.length());
   }
 }
