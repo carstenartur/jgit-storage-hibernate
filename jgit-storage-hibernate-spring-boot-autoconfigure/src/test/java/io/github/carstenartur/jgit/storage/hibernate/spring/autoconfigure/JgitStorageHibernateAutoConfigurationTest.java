@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.spring.autoconfigure;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -15,6 +16,8 @@ import io.github.carstenartur.jgit.storage.hibernate.spring.JgitRepositoryServic
 import javax.sql.DataSource;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -36,6 +39,11 @@ class JgitStorageHibernateAutoConfigurationTest {
           assertNotNull(
               context.getBean(JgitStorageHibernateAutoConfiguration.SESSION_FACTORY_BEAN));
           JgitRepositoryService repositories = context.getBean(JgitRepositoryService.class);
+          assertDoesNotThrow(
+              () ->
+                  context
+                      .getBean("jgitConfiguredRepositoryBootstrap", ApplicationRunner.class)
+                      .run(new DefaultApplicationArguments()));
           assertEquals(java.util.List.of("configured"), repositories.list());
           repositories.create("second");
           assertEquals(java.util.List.of("configured", "second"), repositories.list());
