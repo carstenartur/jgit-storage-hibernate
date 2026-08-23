@@ -246,23 +246,41 @@ public final class HibernateReflogBatchProcessor
 
   private static Map<String, String> loadLatestNewIds(
       Session session, String repositoryName, Set<String> refNames) {
-    Map<String, String> result = new HashMap<>();
+    if (refNames.isEmpty()) {
+      return Map.of();
+    }
+
+    Set<String> refNameKeys = new LinkedHashSet<>();
     for (String refName : refNames) {
-      List<String> latest =
-          session
-              .createQuery(
-                  "SELECT r.newId FROM GitReflogEntity r WHERE r.repositoryName = :repo "
-                      + "AND r.refNameKey = :refKey AND r.refName = :ref "
-                      + "ORDER BY r.id DESC",
-                  String.class)
-              .setParameter("repo", repositoryName)
-              .setParameter("refKey", GitReflogEntity.refNameKey(refName))
-              .setParameter("ref", refName)
-              .setMaxResults(1)
-              .getResultList();
-      if (!latest.isEmpty()) {
-        result.put(refName, latest.getFirst());
-      }
+      refNameKeys.add(GitReflogEntity.refNameKey(refName));
+    }
+
+    List<Object[]> latestRows =
+        session
+            .createQuery(
+                """
+                SELECT r.refName, r.newId
+                FROM GitReflogEntity r
+                WHERE r.repositoryName = :repo
+                  AND r.refNameKey IN :refKeys
+                  AND r.refName IN :refs
+                  AND r.id = (
+                    SELECT MAX(candidate.id)
+                    FROM GitReflogEntity candidate
+                    WHERE candidate.repositoryName = r.repositoryName
+                      AND candidate.refNameKey = r.refNameKey
+                      AND candidate.refName = r.refName
+                  )
+                """,
+                Object[].class)
+            .setParameter("repo", repositoryName)
+            .setParameterList("refKeys", refNameKeys)
+            .setParameterList("refs", refNames)
+            .getResultList();
+
+    Map<String, String> result = new HashMap<>();
+    for (Object[] row : latestRows) {
+      result.put((String) row[0], (String) row[1]);
     }
     return result;
   }
