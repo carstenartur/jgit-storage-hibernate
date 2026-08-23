@@ -1,4 +1,4 @@
-name: Retry release 0.11.1 preparation
+name: Fix release 0.11.1 review wording
 
 on:
   pull_request:
@@ -9,49 +9,56 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
-  group: jgit-storage-hibernate-release
+  group: jgit-storage-hibernate-release-review-fix
   cancel-in-progress: false
 
 jobs:
-  prepare:
+  fix-review-wording:
     if: ${{ github.head_ref == 'release-automation/prepare-0.11.1-retry' }}
-    name: Prepare protected release pull request
+    name: Clarify Security introduction version
     runs-on: ubuntu-latest
-    timeout-minutes: 90
     steps:
-      - name: Checkout authoritative main
+      - name: Checkout release candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: release/prepare-0.11.1
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          token: ${{ github.token }}
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Verify security policy
-        run: python3 .github/scripts/verify-security-policy.py
-
-      - name: Prepare release branch
-        env:
-          RELEASE_ACTION: prepare
-          GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
-          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
-          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
-          RELEASE_VERSION: '0.11.1'
-          NEXT_VERSION_INPUT: '0.11.2-SNAPSHOT'
-          SKIP_TESTS: 'false'
-          DRY_RUN: 'false'
-          REQUEST_BRANCH: 'release-request/0.11.1'
-          PUBLIC_REPOSITORY_URL: https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/
+      - name: Clarify historical version reference
+        shell: bash
         run: |
-          chmod +x .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
-          python3 .github/scripts/verify-public-repository-publishing.py
-          .github/scripts/release.sh
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/consuming.md')
+          old = (
+              'Security is published in the documented `0.11.0` release. '
+              'It remains optional: consumers add it only when they need stable '
+              'principals, groups, repository/ref policy, credentials or audit.'
+          )
+          new = (
+              'Security was introduced in `0.11.0` and remains available in the '
+              'documented release line. It remains optional: consumers add it only '
+              'when they need stable principals, groups, repository/ref policy, '
+              'credentials or audit.'
+          )
+          text = path.read_text(encoding='utf-8')
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one stale Security release sentence')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Commit reviewed documentation fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/consuming.md
+          git diff --cached --check
+          git commit -m 'Clarify Security introduction version'
+          git push origin HEAD:release/prepare-0.11.1
