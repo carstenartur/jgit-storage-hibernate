@@ -6,4 +6,5 @@ alter table git_reflog
 
 drop index if exists idx_reflog_repo_delivery;
 create index idx_reflog_repo_delivery
-    on git_reflog (repository_name, delivery_id);
+    on git_reflog (repository_name, delivery_id)
+    where delivery_id is not null;
