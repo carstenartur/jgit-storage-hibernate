@@ -1,0 +1,149 @@
+name: Server image and Git protocol smoke
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'compose.yaml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-smart-http/**'
+      - 'jgit-storage-hibernate-spring-boot-*/**'
+      - 'jgit-storage-hibernate-server/**'
+      - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/workflows/server-image.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'compose.yaml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-smart-http/**'
+      - 'jgit-storage-hibernate-spring-boot-*/**'
+      - 'jgit-storage-hibernate-server/**'
+      - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/workflows/server-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Build image, push Git history and inspect PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      JSH_ADMIN_USERNAME: admin
+      JSH_ADMIN_PASSWORD: ci-password
+      JSH_DATABASE_PASSWORD: ci-database-password
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify product modules
+        run: |
+          mvn -B -ntp -pl \
+            jgit-storage-hibernate-spring-boot-autoconfigure,\
+            jgit-storage-hibernate-spring-boot-starter,\
+            jgit-storage-hibernate-server,\
+            jgit-storage-hibernate-testcontainers \
+            -am verify
+
+      - name: Build and start PostgreSQL-backed server
+        run: |
+          docker compose build git-server
+          docker compose up -d postgres git-server
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps
+          docker compose logs git-server
+          exit 1
+
+      - name: Push with normal Git and query indexed history
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth=$(printf '%s' "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" | base64 -w0)
+          curl --fail --silent --show-error \
+            -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
+            -X POST http://localhost:8080/api/repositories/smoke >/dev/null
+
+          work=$(mktemp -d)
+          git -C "$work" init -b main
+          git -C "$work" config user.name 'Server Smoke'
+          git -C "$work" config user.email 'smoke@example.invalid'
+          printf '%s\n' 'transactional database-backed Git' > "$work/README.md"
+          git -C "$work" add README.md
+          git -C "$work" commit -m 'Add smoke history'
+          git -C "$work" \
+            -c "http.extraHeader=Authorization: Basic $auth" \
+            push http://localhost:8080/git/smoke.git main
+
+          for attempt in $(seq 1 60); do
+            status=$(curl --fail --silent \
+              -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
+              http://localhost:8080/api/repositories/smoke/index-status)
+            if grep -q '"state":"COMPLETED"' <<< "$status"; then
+              break
+            fi
+            if grep -q '"state":"FAILED"' <<< "$status"; then
+              printf '%s\n' "$status"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent \
+            -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
+            'http://localhost:8080/api/repositories/smoke/changes?path=README.md&pathMode=exact' \
+            | grep -q 'Add smoke history'
+
+          rows=$(docker compose exec -T postgres \
+            psql -U jgit -d jgit -Atc \
+            "select count(*) from jsh_inspection.commit_change where repository_name='smoke' and path='README.md'")
+          test "$rows" = 1
+
+      - name: Restart the server and clone retained history
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose restart git-server
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          auth=$(printf '%s' "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" | base64 -w0)
+          clone=$(mktemp -d)
+          git -c "http.extraHeader=Authorization: Basic $auth" \
+            clone http://localhost:8080/git/smoke.git "$clone/repository"
+          test "$(git -C "$clone/repository" log -1 --format=%s)" = 'Add smoke history'
+
+      - name: Report logs on failure
+        if: failure()
+        run: |
+          docker compose ps || true
+          docker compose logs postgres git-server || true
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v --remove-orphans
