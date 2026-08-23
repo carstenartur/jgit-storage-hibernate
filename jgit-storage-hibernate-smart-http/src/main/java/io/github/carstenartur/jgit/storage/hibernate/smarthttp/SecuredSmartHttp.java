@@ -36,7 +36,8 @@ public final class SecuredSmartHttp {
         repositoryFactory,
         accessContextProvider,
         SmartHttpRepositoryNameMapper.strict(),
-        SmartHttpReceiveAdmission.disabled());
+        SmartHttpReceiveAdmission.disabled(),
+        SmartHttpPostReceiveHandler.none());
   }
 
   /** Create a servlet with explicit name mapping and coarse receive admission. */
@@ -45,13 +46,39 @@ public final class SecuredSmartHttp {
       SmartHttpAccessContextProvider<C> accessContextProvider,
       SmartHttpRepositoryNameMapper repositoryNameMapper,
       SmartHttpReceiveAdmission<? super C> receiveAdmission) {
+    return servlet(
+        repositoryFactory,
+        accessContextProvider,
+        repositoryNameMapper,
+        receiveAdmission,
+        SmartHttpPostReceiveHandler.none());
+  }
+
+  /**
+   * Create a servlet with explicit receive admission and post-receive follow-up handling.
+   *
+   * @param repositoryFactory principal-bound repository factory
+   * @param accessContextProvider request authentication boundary
+   * @param repositoryNameMapper strict HTTP path mapper
+   * @param receiveAdmission coarse admission before pack upload
+   * @param postReceiveHandler bounded callback after receive command results are known
+   * @param <C> access-context type
+   * @return configured servlet
+   */
+  public static <C> GitServlet servlet(
+      SecuredHibernateRepositoryFactory<C> repositoryFactory,
+      SmartHttpAccessContextProvider<C> accessContextProvider,
+      SmartHttpRepositoryNameMapper repositoryNameMapper,
+      SmartHttpReceiveAdmission<? super C> receiveAdmission,
+      SmartHttpPostReceiveHandler<? super C> postReceiveHandler) {
     GitServlet servlet = new GitServlet();
     configure(
         servlet,
         repositoryFactory,
         accessContextProvider,
         repositoryNameMapper,
-        receiveAdmission);
+        receiveAdmission,
+        postReceiveHandler);
     return servlet;
   }
 
@@ -62,12 +89,30 @@ public final class SecuredSmartHttp {
       SmartHttpAccessContextProvider<C> accessContextProvider,
       SmartHttpRepositoryNameMapper repositoryNameMapper,
       SmartHttpReceiveAdmission<? super C> receiveAdmission) {
+    configure(
+        servlet,
+        repositoryFactory,
+        accessContextProvider,
+        repositoryNameMapper,
+        receiveAdmission,
+        SmartHttpPostReceiveHandler.none());
+  }
+
+  /** Configure an application-created servlet including a post-receive follow-up callback. */
+  public static <C> void configure(
+      GitServlet servlet,
+      SecuredHibernateRepositoryFactory<C> repositoryFactory,
+      SmartHttpAccessContextProvider<C> accessContextProvider,
+      SmartHttpRepositoryNameMapper repositoryNameMapper,
+      SmartHttpReceiveAdmission<? super C> receiveAdmission,
+      SmartHttpPostReceiveHandler<? super C> postReceiveHandler) {
     GitServlet target = Objects.requireNonNull(servlet, "servlet");
     target.setRepositoryResolver(
         new SecuredSmartHttpRepositoryResolver<>(
             repositoryFactory, accessContextProvider, repositoryNameMapper));
     target.setUploadPackFactory(new SecuredSmartHttpUploadPackFactory<>());
-    target.setReceivePackFactory(new SecuredSmartHttpReceivePackFactory<>(receiveAdmission));
+    target.setReceivePackFactory(
+        new SecuredSmartHttpReceivePackFactory<>(receiveAdmission, postReceiveHandler));
     target.setAsIsFileService(null);
   }
 }
