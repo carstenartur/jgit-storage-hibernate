@@ -18,7 +18,7 @@
       "id": "taxonomy",
       "displayName": "Taxonomy",
       "repository": "carstenartur/Taxonomy",
-      "ref": "72ca56b4be162582b82c14a42339475fa15a08c2",
+      "ref": "862dfc8a88672ea18f2f2e762a9dc64d410a6465",
       "defaultBranch": "main",
       "contractScript": ".github/jgit-storage-hibernate-contract.sh",
       "expectedModules": [
