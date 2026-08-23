@@ -103,19 +103,27 @@ jobs:
             -c "http.extraHeader=Authorization: Basic $auth" \
             push http://localhost:8080/git/smoke.git main
 
+          projection_ready=false
+          status=''
           for attempt in $(seq 1 60); do
             status=$(curl --fail-with-body --silent --show-error \
               -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
               http://localhost:8080/api/repositories/smoke/index-status)
-            if grep -q '"state":"COMPLETED"' <<< "$status"; then
-              break
-            fi
             if grep -q '"state":"FAILED"' <<< "$status"; then
-              printf '%s\n' "$status"
+              printf 'Projection rebuild failed: %s\n' "$status" >&2
               exit 1
+            fi
+            if grep -q '"state":"COMPLETED"' <<< "$status" \
+                && grep -Eq '"indexedCommits":[1-9][0-9]*' <<< "$status"; then
+              projection_ready=true
+              break
             fi
             sleep 1
           done
+          if [[ "$projection_ready" != true ]]; then
+            printf 'Projection did not include the pushed commit: %s\n' "$status" >&2
+            exit 1
+          fi
 
           curl --fail-with-body --silent --show-error \
             -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
