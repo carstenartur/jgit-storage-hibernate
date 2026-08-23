@@ -16,6 +16,10 @@ PRODUCTION_MODULES = {
     "jgit-storage-hibernate-security",
     "jgit-storage-hibernate-smart-http",
     "jgit-storage-hibernate-search",
+    "jgit-storage-hibernate-spring-boot-autoconfigure",
+    "jgit-storage-hibernate-spring-boot-starter",
+    "jgit-storage-hibernate-server",
+    "jgit-storage-hibernate-testcontainers",
     "jgit-storage-hibernate-java-analysis",
     "jgit-storage-hibernate-architecture",
 }
