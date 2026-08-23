@@ -52,7 +52,6 @@ public class RepositoryAdministrationController {
   @PostMapping("/{name}")
   public ResponseEntity<RepositoryDescriptor> create(@PathVariable("name") String name) {
     String repositoryName = repositories.create(name).value();
-    scheduler.schedule(repositoryName);
     return ResponseEntity.created(URI.create("/git/" + repositoryName + ".git"))
         .body(descriptor(repositoryName));
   }
