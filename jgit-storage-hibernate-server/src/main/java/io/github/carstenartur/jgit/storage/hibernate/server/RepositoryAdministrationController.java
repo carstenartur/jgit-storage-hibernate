@@ -50,7 +50,7 @@ public class RepositoryAdministrationController {
   }
 
   @PostMapping("/{name}")
-  public ResponseEntity<RepositoryDescriptor> create(@PathVariable String name) {
+  public ResponseEntity<RepositoryDescriptor> create(@PathVariable("name") String name) {
     String repositoryName = repositories.create(name).value();
     scheduler.schedule(repositoryName);
     return ResponseEntity.created(URI.create("/git/" + repositoryName + ".git"))
@@ -58,32 +58,32 @@ public class RepositoryAdministrationController {
   }
 
   @DeleteMapping("/{name}")
-  public RepositoryDeletionResult delete(@PathVariable String name) {
+  public RepositoryDeletionResult delete(@PathVariable("name") String name) {
     return repositories.delete(name);
   }
 
   @PostMapping("/{name}/reindex")
-  public RepositoryProjectionScheduler.IndexStatus reindex(@PathVariable String name) {
+  public RepositoryProjectionScheduler.IndexStatus reindex(@PathVariable("name") String name) {
     repositories.create(name);
     return scheduler.schedule(name);
   }
 
   @GetMapping("/{name}/index-status")
-  public RepositoryProjectionScheduler.IndexStatus indexStatus(@PathVariable String name) {
+  public RepositoryProjectionScheduler.IndexStatus indexStatus(@PathVariable("name") String name) {
     return scheduler.status(name);
   }
 
   @GetMapping("/{name}/changes")
   public List<HistoryEntry> changes(
-      @PathVariable String name,
-      @RequestParam(required = false) String text,
-      @RequestParam(required = false) String author,
-      @RequestParam(required = false) String committer,
-      @RequestParam(required = false) String path,
-      @RequestParam(defaultValue = "literal") String pathMode,
-      @RequestParam(required = false) Instant from,
-      @RequestParam(required = false) Instant to,
-      @RequestParam(defaultValue = "100") int limit) {
+      @PathVariable("name") String name,
+      @RequestParam(name = "text", required = false) String text,
+      @RequestParam(name = "author", required = false) String author,
+      @RequestParam(name = "committer", required = false) String committer,
+      @RequestParam(name = "path", required = false) String path,
+      @RequestParam(name = "pathMode", defaultValue = "literal") String pathMode,
+      @RequestParam(name = "from", required = false) Instant from,
+      @RequestParam(name = "to", required = false) Instant to,
+      @RequestParam(name = "limit", defaultValue = "100") int limit) {
     JgitRepositoryService.requireSafeName(name);
     Builder builder = CommitHistoryQuery.forRepository(name).limit(Math.max(1, Math.min(limit, 500)));
     if (text != null && !text.isBlank()) {
