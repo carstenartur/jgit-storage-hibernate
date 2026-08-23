@@ -31,7 +31,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.DependsOn;
 
 /**
  * Creates one dedicated, migration-backed Hibernate persistence context for JGit storage.
@@ -64,10 +63,15 @@ public class JgitStorageHibernateAutoConfiguration {
   }
 
   @Bean(name = SESSION_FACTORY_BEAN, destroyMethod = "close")
-  @DependsOn("jgitStorageSchemaManager")
   @ConditionalOnMissingBean(name = SESSION_FACTORY_BEAN)
   SessionFactory jgitStorageSessionFactory(
-      DataSource dataSource, JgitStorageHibernateProperties properties) {
+      DataSource dataSource,
+      JgitStorageHibernateProperties properties,
+      JgitStorageSchemaManager schemaManager) {
+    // The type dependency preserves ordering even when an application supplies the schema manager
+    // under a custom bean name. initialize() is idempotent for the default implementation.
+    schemaManager.initialize();
+
     Properties hibernate = new Properties();
     hibernate.put("hibernate.connection.datasource", dataSource);
     hibernate.put("hibernate.hbm2ddl.auto", "validate");
