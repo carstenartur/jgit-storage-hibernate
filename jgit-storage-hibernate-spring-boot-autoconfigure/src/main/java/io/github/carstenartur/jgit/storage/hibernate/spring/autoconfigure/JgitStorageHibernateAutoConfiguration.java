@@ -115,8 +115,10 @@ public class JgitStorageHibernateAutoConfiguration {
   @ConditionalOnMissingBean
   JgitRepositoryService jgitRepositoryService(
       DefaultHibernateRepositoryFactory repositoryFactory,
-      @Qualifier(SESSION_FACTORY_BEAN) SessionFactory sessionFactory) {
-    return new JgitRepositoryService(repositoryFactory, sessionFactory);
+      @Qualifier(SESSION_FACTORY_BEAN) SessionFactory sessionFactory,
+      JgitStorageHibernateProperties properties) {
+    return new JgitRepositoryService(
+        repositoryFactory, sessionFactory, properties.getDefaultBranch());
   }
 
   @Bean
