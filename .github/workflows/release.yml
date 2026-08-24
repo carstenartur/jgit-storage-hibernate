@@ -37,6 +37,7 @@ on:
       - '.github/release-request'
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -207,7 +208,7 @@ jobs:
           RELEASE_ACTION: prepare
           GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
-          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           RELEASE_VERSION: ${{ steps.request.outputs.release_version }}
           NEXT_VERSION_INPUT: ${{ steps.request.outputs.next_version }}
           SKIP_TESTS: ${{ steps.request.outputs.skip_tests }}
@@ -218,6 +219,16 @@ jobs:
           chmod +x .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
           python3 .github/scripts/verify-public-repository-publishing.py
           .github/scripts/release.sh
+
+      - name: Dispatch checks for generated release PR
+        if: ${{ steps.request.outputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          RELEASE_VERSION: ${{ steps.request.outputs.release_version }}
+        run: |
+          chmod +x .github/scripts/dispatch-generated-pr-checks.sh
+          .github/scripts/dispatch-generated-pr-checks.sh \
+            "release/prepare-${RELEASE_VERSION}"
 
   finalize:
     if: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/prepare-') }}
@@ -301,7 +312,7 @@ jobs:
           RELEASE_ACTION: finalize
           GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
-          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           RELEASE_VERSION: ${{ steps.candidate.outputs.release_version }}
           NEXT_VERSION_INPUT: ${{ steps.candidate.outputs.next_version }}
           REQUEST_BRANCH: ${{ steps.candidate.outputs.request_branch }}
@@ -313,3 +324,12 @@ jobs:
           chmod +x .github/scripts/release.sh .github/scripts/verify-public-repository-consumption.sh
           python3 .github/scripts/verify-public-repository-publishing.py
           .github/scripts/release.sh
+
+      - name: Dispatch checks for generated next-development PR
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          NEXT_VERSION: ${{ steps.candidate.outputs.next_version }}
+        run: |
+          chmod +x .github/scripts/dispatch-generated-pr-checks.sh
+          .github/scripts/dispatch-generated-pr-checks.sh \
+            "release/next-${NEXT_VERSION%-SNAPSHOT}"

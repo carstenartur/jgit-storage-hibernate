@@ -12,19 +12,24 @@ Packages.
 - `io.github.carstenartur:jgit-storage-hibernate-security`
 - `io.github.carstenartur:jgit-storage-hibernate-smart-http`
 - `io.github.carstenartur:jgit-storage-hibernate-search`
+- `io.github.carstenartur:jgit-storage-hibernate-spring-boot-autoconfigure`
+- `io.github.carstenartur:jgit-storage-hibernate-spring-boot-starter`
+- `io.github.carstenartur:jgit-storage-hibernate-server`
+- `io.github.carstenartur:jgit-storage-hibernate-testcontainers`
 - `io.github.carstenartur:jgit-storage-hibernate-java-analysis`
 - `io.github.carstenartur:jgit-storage-hibernate-architecture`
 - `io.github.carstenartur:jgit-storage-hibernate-benchmarks`
 
 The parent and BOM are POM-only artifacts. The benchmark artifact is for CI and release review, not
-normal runtime use. Smart HTTP is an optional runtime capability and must be released with its
-primary, source and Javadoc JARs just like the other production modules.
+normal runtime use. Smart HTTP, the Spring Boot integration, the standalone server and Testcontainers
+support are optional product paths and are versioned with the same reactor release as Core.
 
 ## Distribution channels
 
 | Channel | Role | Consumer authentication |
 |---|---|---|
 | Static `maven-repository` branch | Primary immutable public release channel | none |
+| GHCR server image | Runnable PostgreSQL-backed Git Smart HTTP server | none for public images |
 | GitHub Packages | Development snapshots | GitHub token |
 | GitHub Releases | Notes and convenience artifacts | none |
 
@@ -49,6 +54,31 @@ The root POM keeps publication behind explicit profiles:
 
 No Sonatype account, Central token, PGP key or consumer credential is part of this path.
 
+## Repository permissions and token model
+
+The standard release does **not** require a long-lived personal access token. The release workflow
+uses its short-lived repository `GITHUB_TOKEN` with explicit permissions:
+
+```yaml
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+```
+
+Repository **Settings → Actions → General** must allow GitHub Actions to create pull requests. The
+workflow never approves or merges its own protected release PR.
+
+GitHub intentionally suppresses ordinary workflow recursion for pushes made with `GITHUB_TOKEN`.
+After creating a generated release or next-development PR, the release workflow therefore invokes
+`.github/scripts/dispatch-generated-pr-checks.sh`. It uses `workflow_dispatch` on the exact remote
+branch head to start Maven, BOM, JGit compatibility, real-consumer compatibility, server-image and
+JMH checks without a PAT or manual workflow approval.
+
+An optional fine-grained `RELEASE_GITHUB_TOKEN` may still be configured as an operational override.
+When absent, every checkout, branch push, PR operation, publication step and explicit check dispatch
+uses `github.token`. No credential is written to repository files, logs or artifacts.
+
 ## CI contract
 
 The normal Maven workflow runs a `Public Maven repository contract` job. It derives the release
@@ -56,10 +86,10 @@ version from the current snapshot, invokes the real release script with `DRY_RUN
 `SKIP_TESTS=true`, stages the complete repository locally and resolves all artifacts from a new empty
 Maven cache. This validates release layout without publishing.
 
-The staged repository verifier requires the parent and BOM POMs plus primary, source and Javadoc JARs
-for Core, Security, Smart HTTP, Search, Java Analysis, Architecture and Benchmarks. Every retained
-release file receives canonical SHA-256/SHA-512 evidence and a SHA-1 compatibility sidecar. The
-anonymous consumer then imports the candidate BOM and resolves every production module.
+The staged repository verifier requires the parent and BOM POMs plus the expected primary, source and
+Javadoc artifacts for all public JAR modules. Every retained release file receives canonical
+SHA-256/SHA-512 evidence and a SHA-1 compatibility sidecar. The anonymous consumer then imports the
+candidate BOM and resolves every production module.
 
 Runtime, schema and dependency compatibility with the active downstream applications is covered
 separately by the [real-consumer compatibility gates](consumer-compatibility.md). The release review
@@ -84,19 +114,19 @@ Normal automated releases provide only `next_version_increment`; they do not con
 next-version string. The optional exact override is normalized, validated and must be numerically
 newer than the release.
 
-For example, a repository at `0.1.17-SNAPSHOT` releases `0.1.17`; without an exact override the
+For example, a repository at `0.11.2-SNAPSHOT` releases `0.11.2`; without an exact override the
 choices produce:
 
 | Choice | Next development version |
 |---|---:|
-| `patch` | `0.1.18-SNAPSHOT` |
-| `minor` | `0.2.0-SNAPSHOT` |
+| `patch` | `0.11.3-SNAPSHOT` |
+| `minor` | `0.12.0-SNAPSHOT` |
 | `major` | `1.0.0-SNAPSHOT` |
 
 For an agent-driven standard release, create branch `release-request/X.Y.Z` from current `main` and
 add `.github/release-request` containing exactly `X.Y.Z`. The workflow checks out authoritative
-`main`, verifies the marker against the branch name, runs the release and removes the request branch
-after success. A reviewed non-standard next version can be expressed as JSON:
+`main`, verifies the marker against the branch name and prepares a protected release PR. A reviewed
+non-standard next version can be expressed as JSON:
 
 ```json
 {
@@ -111,23 +141,22 @@ them, rather than in a generated dispatch payload.
 ## Real release sequence
 
 1. Derive and validate current/documented versions and static repository configuration.
-2. Prepare release Maven and documentation metadata.
-3. Run the complete Maven reactor, including Testcontainers-backed PostgreSQL coverage.
-4. Deploy all release POMs and primary/source/Javadoc JARs into a local Maven-layout directory.
-5. Verify required files, reject snapshots and generate SHA-256/SHA-512 evidence.
-6. Resolve the staged repository anonymously from an empty Maven cache.
-7. Merge it into branch `maven-repository`; an existing version is accepted only when bytes are
-   identical.
-8. Resolve the published repository over anonymous HTTPS with retry for CDN propagation.
-9. Commit/tag the release on `main` and create the GitHub Release.
-10. Advance Maven/software metadata to the exact or calculated next snapshot while public examples
-    remain on the released version.
+2. Prepare release Maven and documentation metadata and run the complete Maven reactor.
+3. Push `release/prepare-X.Y.Z`, open the protected release PR and explicitly dispatch its repository-owned checks.
+4. After the reviewed PR is merged, validate the immutable release candidate from the merge commit.
+5. Deploy all release POMs and primary/source/Javadoc artifacts into a local Maven-layout directory.
+6. Verify required files, reject snapshots, generate checksums and resolve the staged repository anonymously.
+7. Merge byte-identical artifacts into branch `maven-repository` and verify anonymous HTTPS consumption.
+8. Create the immutable `vX.Y.Z` tag, GitHub Release and release convenience artifacts.
+9. Push `release/next-A.B.C`, open the protected next-development PR and explicitly dispatch the same critical checks.
+10. Merge the reviewed next-development PR to restore `A.B.C-SNAPSHOT` on `main` while public examples remain pinned to `X.Y.Z`.
 
-A real release cannot skip tests. A dry run stops after local repository staging and anonymous
-resolution.
+A real release cannot skip tests. A dry run stops after release preparation and complete local
+verification without pushing a branch or creating a PR.
 
 ## Recovery
 
 The Maven repository may be published before a later GitHub tag/release step fails. Re-run only after
 inspecting the branch, tag and GitHub Release. The release script will continue when existing version
-bytes are identical and will fail on any attempted overwrite.
+bytes are identical and will fail on any attempted overwrite. The recovery workflow also uses the
+short-lived repository token unless the optional override secret is configured.

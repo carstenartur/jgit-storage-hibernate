@@ -10,6 +10,7 @@ import unittest
 
 WORKFLOW = Path(__file__).parents[1] / "workflows" / "release.yml"
 RELEASE_SCRIPT = Path(__file__).with_name("release.sh")
+DISPATCH_SCRIPT = Path(__file__).with_name("dispatch-generated-pr-checks.sh")
 RECOVERY_REGRESSION_TESTS = (
     Path(__file__).with_name("test_recover_partial_release.py"),
     Path(__file__).with_name("test_publish_snapshot_workflow.py"),
@@ -24,6 +25,7 @@ class ReleaseWorkflowTriggerTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.text = WORKFLOW.read_text(encoding="utf-8")
         cls.script = RELEASE_SCRIPT.read_text(encoding="utf-8")
+        cls.dispatch = DISPATCH_SCRIPT.read_text(encoding="utf-8")
         match = re.search(
             r"(?ms)^  push:\n(?P<body>.*?)(?=^\S|^permissions:)", cls.text
         )
@@ -63,13 +65,22 @@ class ReleaseWorkflowTriggerTest(unittest.TestCase):
         self.assertNotIn("HEAD:main", self.script)
         self.assertNotIn("HEAD:refs/heads/main", self.script)
 
-    def test_non_dry_run_release_requires_automation_token(self) -> None:
-        self.assertIn(
-            "RELEASE_GITHUB_TOKEN is required for non-dry-run release automation",
-            self.script,
+    def test_repository_token_replaces_missing_long_lived_pat(self) -> None:
+        fallback = (
+            "RELEASE_AUTOMATION_TOKEN: "
+            "${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}"
         )
-        self.assertNotIn("No RELEASE_GITHUB_TOKEN is configured", self.script)
+        self.assertEqual(2, self.text.count(fallback))
+        self.assertIn("actions: write", self.text)
         self.assertIn('export GH_TOKEN="$RELEASE_AUTOMATION_TOKEN"', self.script)
+
+    def test_generated_release_and_next_pr_checks_are_dispatched(self) -> None:
+        self.assertTrue(DISPATCH_SCRIPT.is_file())
+        self.assertIn("Dispatch checks for generated release PR", self.text)
+        self.assertIn("Dispatch checks for generated next-development PR", self.text)
+        self.assertIn('"release/prepare-${RELEASE_VERSION}"', self.text)
+        self.assertIn('"release/next-${NEXT_VERSION%-SNAPSHOT}"', self.text)
+        self.assertIn('gh workflow run "$workflow" --ref "$branch"', self.dispatch)
 
     def test_release_preparation_asserts_pull_request_exists(self) -> None:
         self.assertIn("Expected a protected pull request", self.script)
