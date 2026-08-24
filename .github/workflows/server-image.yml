@@ -9,12 +9,14 @@ on:
       - '.env.example'
       - 'compose.yaml'
       - 'compose.build.yaml'
+      - 'docs/current-release-version.txt'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
       - 'jgit-storage-hibernate-smart-http/**'
       - 'jgit-storage-hibernate-spring-boot-*/**'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/smoke_server_compose.sh'
       - '.github/workflows/server-image.yml'
   push:
     branches: [ main ]
@@ -24,12 +26,14 @@ on:
       - '.env.example'
       - 'compose.yaml'
       - 'compose.build.yaml'
+      - 'docs/current-release-version.txt'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
       - 'jgit-storage-hibernate-smart-http/**'
       - 'jgit-storage-hibernate-spring-boot-*/**'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/smoke_server_compose.sh'
       - '.github/workflows/server-image.yml'
   workflow_dispatch:
 
@@ -41,15 +45,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  smoke:
-    name: Build image, push Git history and inspect PostgreSQL
+  source-smoke:
+    name: Build source image and exercise Git/PostgreSQL
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
       COMPOSE_FILE: compose.yaml:compose.build.yaml
       JSH_ADMIN_USERNAME: admin
-      JSH_ADMIN_PASSWORD: ci-password
-      JSH_DATABASE_PASSWORD: ci-database-password
+      JSH_ADMIN_PASSWORD: source-smoke-${{ github.run_id }}
+      JSH_DATABASE_PASSWORD: source-database-${{ github.run_id }}
+      SMOKE_REPOSITORY: source-smoke
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,111 +72,80 @@ jobs:
             -pl 'jgit-storage-hibernate-spring-boot-autoconfigure,jgit-storage-hibernate-spring-boot-starter,jgit-storage-hibernate-server,jgit-storage-hibernate-testcontainers' \
             -am verify
 
-      - name: Build and start PostgreSQL-backed server
+      - name: Build and start current source
         run: |
           docker compose build git-server
           docker compose up -d postgres git-server
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker compose ps
-          docker compose logs git-server
-          exit 1
 
-      - name: Push with normal Git and query indexed history
+      - name: Exercise Git protocol, Search projection and restart
+        run: .github/scripts/smoke_server_compose.sh
+
+      - name: Report logs on failure
+        if: failure()
+        run: |
+          docker compose ps || true
+          docker compose logs postgres git-server || true
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v --remove-orphans
+
+  released-smoke:
+    name: Pull released image and exercise Git/PostgreSQL
+    if: ${{ github.event_name != 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE_NAME: ghcr.io/carstenartur/jgit-storage-hibernate-server
+      JSH_ADMIN_USERNAME: admin
+      JSH_ADMIN_PASSWORD: release-smoke-${{ github.run_id }}
+      JSH_DATABASE_PASSWORD: release-database-${{ github.run_id }}
+      SMOKE_REPOSITORY: release-smoke
+    steps:
+      - name: Checkout proposed Compose configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select the currently published release
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          auth=$(printf '%s' "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" | base64 -w0)
-          create_response=$(mktemp)
-          create_status=$(curl --silent --show-error \
-            --output "$create_response" \
-            --write-out '%{http_code}' \
-            -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
-            -X POST http://localhost:8080/api/repositories/smoke)
-          if [[ "$create_status" -lt 200 || "$create_status" -ge 300 ]]; then
-            printf 'Repository creation failed with HTTP %s:\n' "$create_status" >&2
-            cat "$create_response" >&2
-            printf '\n' >&2
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            release_version="$(git show "$BASE_SHA:docs/current-release-version.txt")"
+          else
+            release_version="$(cat docs/current-release-version.txt)"
+          fi
+          release_version="${release_version//$'\r'/}"
+          release_version="${release_version//$'\n'/}"
+          if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'Published release version must match X.Y.Z, received %s\n' \
+              "$release_version" >&2
             exit 1
           fi
+          printf 'JSH_SERVER_IMAGE=%s:%s\n' "$IMAGE_NAME" "$release_version" \
+            >> "$GITHUB_ENV"
+          printf 'Testing released image %s:%s with the proposed Compose file.\n' \
+            "$IMAGE_NAME" "$release_version"
 
-          work=$(mktemp -d)
-          git -C "$work" init -b main
-          git -C "$work" config user.name 'Server Smoke'
-          git -C "$work" config user.email 'smoke@example.invalid'
-          printf '%s\n' 'transactional database-backed Git' > "$work/README.md"
-          git -C "$work" add README.md
-          git -C "$work" commit -m 'Add smoke history'
-          git -C "$work" \
-            -c "http.extraHeader=Authorization: Basic $auth" \
-            push http://localhost:8080/git/smoke.git main
-
-          projection_ready=false
-          status=''
-          for attempt in $(seq 1 60); do
-            status=$(curl --fail-with-body --silent --show-error \
-              -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
-              http://localhost:8080/api/repositories/smoke/index-status)
-            if grep -q '"state":"FAILED"' <<< "$status"; then
-              printf 'Projection rebuild failed: %s\n' "$status" >&2
-              exit 1
-            fi
-            if grep -q '"state":"COMPLETED"' <<< "$status" \
-                && grep -Eq '"indexedCommits":[1-9][0-9]*' <<< "$status"; then
-              projection_ready=true
-              break
-            fi
-            sleep 1
-          done
-          if [[ "$projection_ready" != true ]]; then
-            printf 'Projection did not include the pushed commit: %s\n' "$status" >&2
-            exit 1
-          fi
-
-          curl --fail-with-body --silent --show-error \
-            -u "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" \
-            'http://localhost:8080/api/repositories/smoke/changes?path=README.md&pathMode=exact' \
-            | grep -q 'Add smoke history'
-
-          rows=$(docker compose exec -T postgres \
-            psql -U jgit -d jgit -Atc \
-            "select count(*) from jsh_inspection.commit_change where repository_name='smoke' and path='README.md'")
-          test "$rows" = 1
-
-      - name: Restart the server and clone retained history
-        shell: bash
+      - name: Pull and start released image without a source build
         run: |
-          set -euo pipefail
-          docker compose restart git-server
-          ready=false
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null; then
-              ready=true
-              break
-            fi
-            sleep 2
-          done
-          if [[ "$ready" != true ]]; then
-            printf 'Server did not become ready after restart.\n' >&2
-            docker compose logs git-server >&2
+          docker compose config --quiet
+          docker compose pull postgres git-server
+          docker compose up --no-build -d postgres git-server
+          container_id="$(docker compose ps -q git-server)"
+          actual_reference="$(docker inspect --format '{{ .Config.Image }}' "$container_id")"
+          if [[ "$actual_reference" != "$JSH_SERVER_IMAGE" ]]; then
+            printf 'Expected running image %s, found %s.\n' \
+              "$JSH_SERVER_IMAGE" "$actual_reference" >&2
             exit 1
           fi
 
-          auth=$(printf '%s' "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" | base64 -w0)
-          remote=http://localhost:8080/git/smoke.git
-          git -c "http.extraHeader=Authorization: Basic $auth" \
-            ls-remote --symref "$remote" HEAD \
-            | grep -Eq '^ref: refs/heads/main[[:space:]]+HEAD$'
-
-          clone=$(mktemp -d)
-          git -c "http.extraHeader=Authorization: Basic $auth" \
-            clone "$remote" "$clone/repository"
-          test "$(git -C "$clone/repository" symbolic-ref --short HEAD)" = 'main'
-          test "$(git -C "$clone/repository" log -1 --format=%s)" = 'Add smoke history'
+      - name: Exercise released Git protocol, Search projection and restart
+        run: .github/scripts/smoke_server_compose.sh
 
       - name: Report logs on failure
         if: failure()

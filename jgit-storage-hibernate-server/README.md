@@ -29,6 +29,11 @@ The repository Compose file defaults to the released `0.11.2` image:
 ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2
 ```
 
+CI pulls this released image without a source build and exercises repository creation, normal Git
+push/clone, the Search projection, PostgreSQL inspection views and restart persistence against the
+proposed base Compose file. The current source image is built and tested independently, so a passing
+source build cannot hide a broken or incompatible published artifact.
+
 From the repository root, create a private local configuration and set both passwords:
 
 ```bash
@@ -124,21 +129,27 @@ the build context. BuildKit also retains the Maven dependency cache between loca
 
 ### Application settings
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `JSH_JDBC_URL` | `jdbc:postgresql://localhost:5432/jgit` | PostgreSQL JDBC URL |
-| `JSH_JDBC_USERNAME` | `jgit` | Database user |
-| `JSH_JDBC_PASSWORD` | `jgit` outside Compose | Database password |
-| `JSH_ADMIN_USERNAME` | `admin` | Basic-authentication user |
-| `JSH_ADMIN_PASSWORD` | none; startup validation rejects blank values | Required password for authenticated use |
-| `JSH_DEFAULT_BRANCH` | `main` | Symbolic `HEAD` target for new repositories |
-| `JSH_SEARCH_DIRECTORY` | `/var/lib/jgit-storage/search` | Persistent Lucene directory |
-| `JSH_INDEXING_THREADS` | `2` | Bounded projection worker count, from 1 through 16 |
-| `JSH_INSPECTION_VIEWS_ENABLED` | `true` | Create read-only PostgreSQL inspection views |
-| `JSH_REQUIRE_SECURE_TRANSPORT` | `false` | Reject credentials received over requests that are not considered secure |
-| `JSH_FORWARD_HEADERS_STRATEGY` | `NONE` | Spring forwarded-header handling; use `FRAMEWORK` only behind a trusted proxy |
-| `JSH_MANAGEMENT_ENDPOINTS` | `health,info` | Publicly exposed Actuator endpoints; metrics are opt-in |
-| `PORT` | `8080` | HTTP port inside the container |
+A variable is effective only in an image version listed in the availability column. Compose may pass
+a newer variable to an older image, but that image has no corresponding Spring configuration and the
+value has no effect. In particular, released image `0.11.2` exposes `health`, `info` and `metrics` and
+does not consume `JSH_FORWARD_HEADERS_STRATEGY` or `JSH_MANAGEMENT_ENDPOINTS`. Current source builds
+and released images `0.11.3+` use the narrower defaults below.
+
+| Variable | Default | Available in released images | Purpose |
+|---|---|---|---|
+| `JSH_JDBC_URL` | `jdbc:postgresql://localhost:5432/jgit` | `0.11.2+` | PostgreSQL JDBC URL |
+| `JSH_JDBC_USERNAME` | `jgit` | `0.11.2+` | Database user |
+| `JSH_JDBC_PASSWORD` | `jgit` outside Compose | `0.11.2+` | Database password |
+| `JSH_ADMIN_USERNAME` | `admin` | `0.11.2+` | Basic-authentication user |
+| `JSH_ADMIN_PASSWORD` | none; startup validation rejects blank values | `0.11.2+` | Required password for authenticated use |
+| `JSH_DEFAULT_BRANCH` | `main` | `0.11.2+` | Symbolic `HEAD` target for new repositories |
+| `JSH_SEARCH_DIRECTORY` | `/var/lib/jgit-storage/search` | `0.11.2+` | Persistent Lucene directory |
+| `JSH_INDEXING_THREADS` | `2` | `0.11.2+` | Bounded projection worker count, from 1 through 16 |
+| `JSH_INSPECTION_VIEWS_ENABLED` | `true` | `0.11.2+` | Create read-only PostgreSQL inspection views |
+| `JSH_REQUIRE_SECURE_TRANSPORT` | `false` | `0.11.2+` | Reject credentials received over requests that are not considered secure |
+| `JSH_FORWARD_HEADERS_STRATEGY` | `NONE` | `0.11.3+` | Spring forwarded-header handling; use `FRAMEWORK` only behind a trusted proxy |
+| `JSH_MANAGEMENT_ENDPOINTS` | `health,info` | `0.11.3+` | Publicly exposed Actuator endpoints; metrics are opt-in |
+| `PORT` | `8080` | `0.11.2+` | HTTP port inside the container |
 
 ## Production deployment boundaries
 
@@ -158,8 +169,9 @@ production forge or cluster orchestrator.
 - The standalone image currently has one administrator identity. Applications needing users, groups,
   per-repository grants, protected refs or token lifecycle should integrate the Security and Smart
   HTTP modules rather than treating this image as a multi-user forge.
-- `health` and `info` are the only management endpoints exposed by default. Protect the management
-  network before opting into `metrics` or additional Actuator endpoints.
+- Images `0.11.3+` expose only `health` and `info` by default. Released image `0.11.2` also
+  exposes `metrics`, so protect its management network even when no explicit metrics setting is
+  present. Protect the management network before opting into any additional Actuator endpoints.
 
 ## Search and inspection capabilities
 

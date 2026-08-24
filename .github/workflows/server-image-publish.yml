@@ -367,3 +367,76 @@ jobs:
             fi
             printf -- '- Anonymous pull: verified\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout current smoke tooling for a manual backfill
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: publication-tooling
+          sparse-checkout: |
+            compose.yaml
+            .github/scripts/smoke_server_compose.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Select the exact published digest for runtime smoke
+        id: smoke
+        shell: bash
+        env:
+          DIGEST: ${{ steps.release.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            compose_file=publication-tooling/compose.yaml
+            smoke_script=publication-tooling/.github/scripts/smoke_server_compose.sh
+          else
+            compose_file=compose.yaml
+            smoke_script=.github/scripts/smoke_server_compose.sh
+          fi
+          test -f "$compose_file"
+          test -f "$smoke_script"
+          {
+            printf 'compose-file=%s\n' "$compose_file"
+            printf 'smoke-script=%s\n' "$smoke_script"
+            printf 'image=%s@%s\n' "$IMAGE_NAME" "$DIGEST"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Exercise the anonymously published digest
+        shell: bash
+        env:
+          COMPOSE_FILE: ${{ steps.smoke.outputs.compose-file }}
+          JSH_SERVER_IMAGE: ${{ steps.smoke.outputs.image }}
+          JSH_ADMIN_USERNAME: admin
+          JSH_ADMIN_PASSWORD: publication-smoke-${{ github.run_id }}
+          JSH_DATABASE_PASSWORD: publication-database-${{ github.run_id }}
+          SMOKE_REPOSITORY: publication-smoke
+          SMOKE_SCRIPT: ${{ steps.smoke.outputs.smoke-script }}
+        run: |
+          set -euo pipefail
+          docker compose config --quiet
+          docker compose pull postgres git-server
+          docker compose up --no-build -d postgres git-server
+          container_id="$(docker compose ps -q git-server)"
+          actual_reference="$(docker inspect --format '{{ .Config.Image }}' "$container_id")"
+          if [[ "$actual_reference" != "$JSH_SERVER_IMAGE" ]]; then
+            printf 'Expected running image %s, found %s.\n' \
+              "$JSH_SERVER_IMAGE" "$actual_reference" >&2
+            exit 1
+          fi
+          bash "$SMOKE_SCRIPT"
+          printf '- Runtime smoke: passed\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report publication smoke logs on failure
+        if: failure() && steps.smoke.outcome == 'success'
+        env:
+          COMPOSE_FILE: ${{ steps.smoke.outputs.compose-file }}
+        run: |
+          docker compose ps || true
+          docker compose logs postgres git-server || true
+
+      - name: Stop publication smoke containers
+        if: always() && steps.smoke.outcome == 'success'
+        env:
+          COMPOSE_FILE: ${{ steps.smoke.outputs.compose-file }}
+        run: docker compose down -v --remove-orphans
