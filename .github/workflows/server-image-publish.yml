@@ -19,6 +19,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: write
   packages: write
 
 jobs:
@@ -152,6 +153,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Verify anonymous multi-architecture distribution
+        id: distribution
         shell: bash
         env:
           VERSION: ${{ steps.target.outputs.version }}
@@ -190,3 +192,44 @@ jobs:
             printf -- '- Platforms: `linux/amd64`, `linux/arm64`\n'
             printf -- '- Anonymous pull: verified\n'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record backfill evidence in issue 316
+        if: ${{ always() && startsWith(github.ref_name, 'image-backfill/') }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          VERSION: ${{ steps.target.outputs.version }}
+          REVISION: ${{ steps.verify.outputs.revision }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          DISTRIBUTION_OUTCOME: ${{ steps.distribution.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [[ "$DISTRIBUTION_OUTCOME" == success ]]; then
+            result='SUCCESS'
+          else
+            result='FAILURE'
+          fi
+
+          cat > backfill-evidence.md <<EOF
+          ## OCI image backfill: $result
+
+          - release tag: \`${RELEASE_TAG:-unresolved}\`
+          - image version: \`${VERSION:-unresolved}\`
+          - source revision: \`${REVISION:-unresolved}\`
+          - manifest digest: \`${DIGEST:-unavailable}\`
+          - build outcome: \`${BUILD_OUTCOME:-not-run}\`
+          - anonymous distribution outcome: \`${DISTRIBUTION_OUTCOME:-not-run}\`
+          - expected tags: \`${VERSION:-unresolved}\`, \`latest\`, \`edge\`
+          - expected platforms: \`linux/amd64\`, \`linux/arm64\`
+          - workflow run: $RUN_URL
+
+          The issue is closed only when all three image references were readable without registry credentials and both platforms were present.
+          EOF
+
+          gh issue comment 316 --body-file backfill-evidence.md
+          if [[ "$DISTRIBUTION_OUTCOME" == success ]]; then
+            gh issue close 316 --reason completed
+          fi
