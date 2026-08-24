@@ -11,9 +11,13 @@ package io.github.carstenartur.jgit.storage.hibernate.spring.autoconfigure;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.carstenartur.jgit.storage.hibernate.HibernateGitStorage;
 import io.github.carstenartur.jgit.storage.hibernate.spring.JgitRepositoryService;
 import javax.sql.DataSource;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Ref;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.ApplicationRunner;
@@ -45,9 +49,25 @@ class JgitStorageHibernateAutoConfigurationTest {
                       .getBean("jgitConfiguredRepositoryBootstrap", ApplicationRunner.class)
                       .run(new DefaultApplicationArguments()));
           assertEquals(java.util.List.of("configured"), repositories.list());
+          assertEquals(Constants.R_HEADS + "main", assertDoesNotThrow(() -> headTarget(repositories, "configured")));
+
           repositories.create("second");
           assertEquals(java.util.List.of("configured", "second"), repositories.list());
+          assertEquals(Constants.R_HEADS + "main", assertDoesNotThrow(() -> headTarget(repositories, "second")));
+
+          assertDoesNotThrow(() -> repositories.create("configured"));
+          assertEquals(Constants.R_HEADS + "main", assertDoesNotThrow(() -> headTarget(repositories, "configured")));
         });
+  }
+
+  private static String headTarget(JgitRepositoryService repositories, String repositoryName)
+      throws Exception {
+    try (HibernateGitStorage storage = repositories.open(repositoryName)) {
+      Ref head = storage.repository().exactRef(Constants.HEAD);
+      assertNotNull(head);
+      assertTrue(head.isSymbolic());
+      return head.getTarget().getName();
+    }
   }
 
   private static DataSource dataSource() {
