@@ -214,11 +214,11 @@ def verify_aligned_test_dependencies(errors: list[str]) -> None:
         fail(errors, f"inconsistent {coordinate[0]}:{coordinate[1]} versions: {detail}")
 
 
-def verify_metadata(project_version: str, java_version: str, errors: list[str]) -> None:
+def verify_metadata(metadata_version: str, java_version: str, errors: list[str]) -> None:
     cff = required_text(Path("CITATION.cff"), errors)
     match = re.search(r'^version:\s*["\']?([^"\'\s]+)["\']?\s*$', cff, flags=re.MULTILINE)
-    if not match or match.group(1) != project_version:
-        fail(errors, f"CITATION.cff version does not match {project_version}")
+    if not match or match.group(1) != metadata_version:
+        fail(errors, f"CITATION.cff version does not match {metadata_version}")
 
     citation_md = required_text(Path("CITATION.md"), errors)
     cited_versions = set(
@@ -228,10 +228,10 @@ def verify_metadata(project_version: str, java_version: str, errors: list[str]) 
             citation_md,
         )
     )
-    if cited_versions != {project_version}:
+    if cited_versions != {metadata_version}:
         fail(
             errors,
-            f"CITATION.md versions {sorted(cited_versions)} do not equal [{project_version!r}]",
+            f"CITATION.md versions {sorted(cited_versions)} do not equal [{metadata_version!r}]",
         )
 
     for path in METADATA_JSON_FILES:
@@ -244,10 +244,10 @@ def verify_metadata(project_version: str, java_version: str, errors: list[str]) 
             fail(errors, f"cannot parse {path}: {exception}")
             continue
 
-        if data.get("version") != project_version:
+        if data.get("version") != metadata_version:
             fail(
                 errors,
-                f"{path} version {data.get('version')!r} does not match {project_version!r}",
+                f"{path} version {data.get('version')!r} does not match {metadata_version!r}",
             )
 
         if path.name == "codemeta.json":
@@ -544,11 +544,14 @@ def main() -> None:
     errors: list[str] = []
     project_version, java_version = root_project_version(errors)
     documented_version = documentation_version(errors)
+    metadata_version = (
+        documented_version if project_version.endswith("-SNAPSHOT") else project_version
+    )
 
     verify_module_poms(project_version, errors)
     verify_project_dependencies(project_version, errors)
     verify_aligned_test_dependencies(errors)
-    verify_metadata(project_version, java_version, errors)
+    verify_metadata(metadata_version, java_version, errors)
     verify_documentation_snippets(documented_version, java_version, errors)
     verify_release_status_prose(project_version, documented_version, errors)
     verify_release_workflow(errors)
@@ -562,7 +565,8 @@ def main() -> None:
 
     print(
         "Repository consistency verified: "
-        f"project={project_version}, docs={documented_version}, java={java_version}"
+        f"project={project_version}, metadata={metadata_version}, "
+        f"docs={documented_version}, java={java_version}"
     )
 
 

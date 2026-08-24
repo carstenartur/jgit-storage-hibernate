@@ -162,6 +162,41 @@ Security fixes are provided for the latest released `0.1.x` version.
             finally:
                 os.chdir(previous_directory)
 
+    def test_snapshot_transition_preserves_public_release_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(root / "docs/current-release-version.txt", "0.11.2\n")
+            expected = {
+                "CITATION.cff": 'version: "0.11.2"\ndate-released: "2026-08-24"\n',
+                "CITATION.md": "Version 0.11.2.\ndate = {2026-08-24},\n",
+                "codemeta.json": '{"version":"0.11.2","datePublished":"2026-08-24"}\n',
+                ".zenodo.json": '{"version":"0.11.2","publication_date":"2026-08-24"}\n',
+            }
+            for name, content in expected.items():
+                self.write(root / name, content)
+
+            previous_directory = Path.cwd()
+            os.chdir(root)
+            try:
+                UPDATE_RELEASE_METADATA.update_release_metadata(
+                    "0.11.3-SNAPSHOT", False, "2099-01-01"
+                )
+            finally:
+                os.chdir(previous_directory)
+
+            for name, content in expected.items():
+                self.assertEqual(
+                    content,
+                    (root / name).read_text(encoding="utf-8"),
+                    f"snapshot transition rewrote {name}",
+                )
+
+    def test_non_snapshot_development_metadata_is_rejected(self) -> None:
+        with self.assertRaises(SystemExit):
+            UPDATE_RELEASE_METADATA.update_release_metadata(
+                "0.11.3", False, "2099-01-01"
+            )
+
     def test_release_script_generates_documentation_instead_of_requiring_pre_alignment(self) -> None:
         text = RELEASE_SCRIPT.read_text(encoding="utf-8")
         normalized = re.sub(r"[ \t]*\\\n[ \t]*", " ", text)

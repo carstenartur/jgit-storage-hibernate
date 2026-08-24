@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update citation, software, security, and public documentation release metadata."""
+"""Update immutable release metadata and preserve it during snapshot development."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ PROJECT_ARTIFACT_PREFIX = "jgit-storage-hibernate-"
 DOCUMENTATION_VERSION_FILE = Path("docs/current-release-version.txt")
 SECURITY_POLICY_FILE = Path("SECURITY.md")
 RELEASE_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+SNAPSHOT_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?$")
 SUPPORTED_RELEASE_LINE = re.compile(r"`[0-9]+\.[0-9]+\.x`")
 SUPPORTED_SNAPSHOT_LINE = re.compile(r"`[0-9]+\.[0-9]+\.x-SNAPSHOT`")
@@ -213,20 +214,47 @@ def update_public_documentation(version: str) -> list[Path]:
     return changed
 
 
+def update_release_metadata(version: str, release: bool, today: str) -> None:
+    """Update public metadata only for an immutable release.
+
+    Snapshot development intentionally leaves citation, CodeMeta and Zenodo metadata pinned to
+    the most recent immutable release. This keeps public citation tooling stable while Maven reactor
+    versions continue on the next snapshot line.
+    """
+    if not release:
+        if SNAPSHOT_SEMVER.fullmatch(version) is None:
+            raise SystemExit(
+                f"Development metadata version must use X.Y.Z-SNAPSHOT, received {version!r}"
+            )
+        documented = (
+            DOCUMENTATION_VERSION_FILE.read_text(encoding="utf-8").strip()
+            if DOCUMENTATION_VERSION_FILE.is_file()
+            else "the latest immutable release"
+        )
+        print(
+            "Snapshot development does not rewrite public citation or archive metadata; "
+            f"those remain pinned to {documented}."
+        )
+        return
+
+    if RELEASE_SEMVER.fullmatch(version) is None:
+        raise SystemExit(
+            f"Release metadata requires an immutable X.Y.Z version, received {version!r}"
+        )
+    update_citation_cff(version, True, today)
+    update_citation_md(version, True, today)
+    update_json(".zenodo.json", version, True, today, "publication_date")
+    update_json("codemeta.json", version, True, today, "datePublished")
+    update_security_policy(version)
+    update_public_documentation(version)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("version")
     parser.add_argument("--release", action="store_true")
     args = parser.parse_args()
-    today = date.today().isoformat()
-
-    update_citation_cff(args.version, args.release, today)
-    update_citation_md(args.version, args.release, today)
-    update_json(".zenodo.json", args.version, args.release, today, "publication_date")
-    update_json("codemeta.json", args.version, args.release, today, "datePublished")
-    if args.release:
-        update_security_policy(args.version)
-        update_public_documentation(args.version)
+    update_release_metadata(args.version, args.release, date.today().isoformat())
 
 
 if __name__ == "__main__":
