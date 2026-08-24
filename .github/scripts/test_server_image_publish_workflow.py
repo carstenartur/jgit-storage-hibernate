@@ -10,6 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).parents[2]
 WORKFLOW = ROOT / ".github/workflows/server-image-publish.yml"
 CONTRACT_WORKFLOW = ROOT / ".github/workflows/server-image-publish-contract.yml"
+SERVER_IMAGE_WORKFLOW = ROOT / ".github/workflows/server-image.yml"
+SMOKE_SCRIPT = ROOT / ".github/scripts/smoke_server_compose.sh"
 COMPOSE = ROOT / "compose.yaml"
 COMPOSE_BUILD = ROOT / "compose.build.yaml"
 DOCKERFILE = ROOT / "jgit-storage-hibernate-server/Dockerfile"
@@ -39,6 +41,8 @@ class ServerImagePublishWorkflowTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.text = WORKFLOW.read_text(encoding="utf-8")
         cls.contract = CONTRACT_WORKFLOW.read_text(encoding="utf-8")
+        cls.server_image_workflow = SERVER_IMAGE_WORKFLOW.read_text(encoding="utf-8")
+        cls.smoke_script = SMOKE_SCRIPT.read_text(encoding="utf-8")
         cls.compose = COMPOSE.read_text(encoding="utf-8")
         cls.compose_build = COMPOSE_BUILD.read_text(encoding="utf-8")
         cls.dockerfile = DOCKERFILE.read_text(encoding="utf-8")
@@ -157,6 +161,73 @@ class ServerImagePublishWorkflowTest(unittest.TestCase):
         self.assertIn("grep -q 'linux/arm64'", self.text)
         self.assertIn("Anonymous pull: verified", self.text)
 
+    def test_published_digest_is_exercised_after_anonymous_verification(self) -> None:
+        for fragment in (
+            "Verify anonymous multi-architecture distribution",
+            "Checkout current smoke tooling for a manual backfill",
+            "Select the exact published digest for runtime smoke",
+            "Exercise the anonymously published digest",
+            "JSH_SERVER_IMAGE: ${{ steps.smoke.outputs.image }}",
+            "docker compose up --no-build -d postgres git-server",
+            'actual_reference="$(docker inspect',
+            'bash "$SMOKE_SCRIPT"',
+            "Stop publication smoke containers",
+        ):
+            self.assertIn(fragment, self.text)
+        self.assertGreater(
+            self.text.index("Checkout current smoke tooling for a manual backfill"),
+            self.text.index("Verify anonymous multi-architecture distribution"),
+        )
+        self.assertIn("ref: main", self.text)
+        self.assertIn("compose.yaml", self.text)
+        self.assertIn(".github/scripts/smoke_server_compose.sh", self.text)
+        self.assertIn("printf 'image=%s@%s", self.text)
+        self.assertIn("printf -- '- Runtime smoke: passed\\n'", self.text)
+        self.assertNotIn("printf '- Runtime smoke: passed\\n'", self.text)
+
+    def test_source_and_released_images_share_a_real_protocol_smoke(self) -> None:
+        for fragment in (
+            "source-smoke:",
+            "released-smoke:",
+            "github.event_name != 'push'",
+            "BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+            'git show "$BASE_SHA:docs/current-release-version.txt"',
+            "docker compose pull postgres git-server",
+            "docker compose up --no-build -d postgres git-server",
+            ".github/scripts/smoke_server_compose.sh",
+        ):
+            self.assertIn(fragment, self.server_image_workflow)
+        self.assertEqual(
+            2,
+            self.server_image_workflow.count(
+                "run: .github/scripts/smoke_server_compose.sh"
+            ),
+        )
+        for fragment in (
+            "/api/repositories/$repository",
+            'git -C "$work" push',
+            "/index-status",
+            "jsh_inspection.commit_change",
+            "docker compose restart git-server",
+            "git clone",
+        ):
+            self.assertIn(fragment, self.smoke_script)
+        for fragment in (
+            "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "${#repository} -gt 255",
+            '"$repository" == *.git',
+            '"$repository" == *..*',
+        ):
+            self.assertIn(fragment, self.smoke_script)
+        actions = FULL_SHA_ACTION.findall(self.server_image_workflow)
+        self.assertEqual(
+            {"actions/checkout", "actions/setup-java"},
+            {name for name, _ in actions},
+        )
+        self.assertNotRegex(
+            self.server_image_workflow, r"uses:\s+[^\s]+@v[0-9]"
+        )
+
     def test_stable_defaults_match_the_documented_release(self) -> None:
         self.assertRegex(self.release, r"^[0-9]+\.[0-9]+\.[0-9]+$")
         stable_image = f"{IMAGE}:{self.release}"
@@ -234,6 +305,10 @@ class ServerImagePublishWorkflowTest(unittest.TestCase):
         )
         self.assertIn("GitLab, Gitea, Gerrit", self.server_readme)
         self.assertIn("do not embed a password", self.server_readme)
+        self.assertIn("released image `0.11.2` exposes", self.server_readme)
+        self.assertIn("`JSH_FORWARD_HEADERS_STRATEGY`", self.server_readme)
+        self.assertIn("`0.11.3+`", self.server_readme)
+        self.assertIn("Released image 0.11.2 ignores them", self.env_example)
         self.assertNotIn(
             "http://$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD@",
             self.server_readme,
@@ -241,6 +316,9 @@ class ServerImagePublishWorkflowTest(unittest.TestCase):
 
     def test_contract_workflow_executes_tests_and_both_compose_parsers(self) -> None:
         self.assertIn("workflow_dispatch:", self.contract)
+        self.assertIn(".github/scripts/smoke_server_compose.sh", self.contract)
+        self.assertIn(".github/workflows/server-image.yml", self.contract)
+        self.assertIn("bash -n .github/scripts/smoke_server_compose.sh", self.contract)
         self.assertIn(
             "python3 .github/scripts/test_server_image_publish_workflow.py",
             self.contract,
