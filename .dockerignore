@@ -1,0 +1,19 @@
+# Never send repository metadata, local secrets or prior build output to Docker.
+.git
+.git/**
+**/.git
+**/.git/**
+
+.env
+.env.*
+!.env.example
+
+.idea
+.vscode
+*.iml
+*.log
+
+target
+target/**
+**/target
+**/target/**
