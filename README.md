@@ -29,15 +29,30 @@ Smart HTTP endpoint rather than a Java library integration:
 ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2
 ```
 
+The image does not contain its own PostgreSQL server or the host-side Compose configuration. The
+commands below therefore first obtain this repository's `compose.yaml` and `.env.example`. From any
+working directory:
+
 ```bash
+git clone --depth 1 https://github.com/carstenartur/jgit-storage-hibernate.git
+cd jgit-storage-hibernate
+
 cp .env.example .env
 chmod 600 .env
-${EDITOR:-vi} .env            # set both required passwords
+${EDITOR:-vi} .env            # set JSH_DATABASE_PASSWORD and JSH_ADMIN_PASSWORD
 
 docker compose config --quiet
-docker compose pull
-docker compose up --no-build -d
+docker compose config --images # shows PostgreSQL and the published GHCR server image
+docker compose pull postgres git-server
+docker compose up --no-build -d postgres git-server
+docker compose ps
+curl --fail http://localhost:8080/actuator/health/readiness
 ```
+
+`compose.yaml` maps the `git-server` service to the GHCR image shown above. `docker compose pull
+... git-server` downloads that image; `docker compose up --no-build ... git-server` creates and starts
+a container from it without building this repository's source. PostgreSQL is started alongside it
+because the server stores Git data there.
 
 The endpoint works with normal Git CLI, JGit and IDE Smart HTTP clone/fetch/push operations. It is
 **not** a drop-in replacement for GitLab, Gitea, Gerrit or other forge images when consumers depend on
