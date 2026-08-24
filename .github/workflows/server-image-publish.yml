@@ -158,19 +158,45 @@ jobs:
             grep -q 'linux/amd64' "$inspection"
             grep -q 'linux/arm64' "$inspection"
 
-            docker pull --quiet --platform linux/amd64 "$reference" >/dev/null
-            revision="$(docker image inspect --format \
-              '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
-              "$reference")"
-            image_version="$(docker image inspect --format \
-              '{{ index .Config.Labels "org.opencontainers.image.version" }}' \
-              "$reference")"
-            if [[ "$revision" != "$EXPECTED_REVISION" || "$image_version" != "$VERSION" ]]; then
-              printf 'Refusing to overwrite %s: existing labels are version=%s revision=%s; expected version=%s revision=%s.\n' \
-                "$reference" "$image_version" "$revision" "$VERSION" \
-                "$EXPECTED_REVISION" >&2
+            mapfile -t platform_manifests < <(
+              docker buildx imagetools inspect --raw "$reference" | python3 -c \
+                'import json, sys; index = json.load(sys.stdin); required = (("linux", "amd64"), ("linux", "arm64")); found = {(manifest.get("platform", {}).get("os"), manifest.get("platform", {}).get("architecture")): manifest.get("digest", "") for manifest in index.get("manifests", [])}; missing = ["/".join(key) for key in required if not found.get(key)]; missing and sys.exit("missing platform manifests: " + ", ".join(missing)); print("\n".join(f"{operating_system}/{architecture} {found[(operating_system, architecture)]}" for operating_system, architecture in required))'
+            )
+            if [[ "${#platform_manifests[@]}" -ne 2 ]]; then
+              printf 'Expected exactly two required platform manifests for %s.\n' \
+                "$reference" >&2
               exit 1
             fi
+
+            for entry in "${platform_manifests[@]}"; do
+              platform="${entry%% *}"
+              platform_digest="${entry##* }"
+              if [[ ! "$platform_digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                printf 'Invalid %s child-manifest digest for %s: %s\n' \
+                  "$platform" "$reference" "$platform_digest" >&2
+                exit 1
+              fi
+              platform_reference="$IMAGE_NAME@$platform_digest"
+              docker pull --quiet --platform "$platform" "$platform_reference" >/dev/null
+              architecture="$(docker image inspect --format '{{ .Architecture }}' \
+                "$platform_reference")"
+              revision="$(docker image inspect --format \
+                '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+                "$platform_reference")"
+              image_version="$(docker image inspect --format \
+                '{{ index .Config.Labels "org.opencontainers.image.version" }}' \
+                "$platform_reference")"
+              expected_architecture="${platform#linux/}"
+              if [[ "$architecture" != "$expected_architecture" \
+                  || "$revision" != "$EXPECTED_REVISION" \
+                  || "$image_version" != "$VERSION" ]]; then
+                printf 'Refusing to overwrite %s: %s child metadata is architecture=%s version=%s revision=%s; expected architecture=%s version=%s revision=%s.\n' \
+                  "$reference" "$platform" "$architecture" "$image_version" \
+                  "$revision" "$expected_architecture" "$VERSION" \
+                  "$EXPECTED_REVISION" >&2
+                exit 1
+              fi
+            done
 
             {
               printf 'exists=true\n'
