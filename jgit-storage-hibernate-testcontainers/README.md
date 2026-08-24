@@ -4,10 +4,28 @@ This module starts the same OCI server image used by Docker deployments together
 It is intentionally more than a generic Git test server: tests can use normal clone/fetch/push,
 wait for the searchable projection and inspect the relational evidence through JDBC.
 
+The no-argument environment is pinned to the documented release image:
+
+```text
+ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2
+```
+
+Add the test dependency from the public Maven repository:
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>jgit-storage-hibernate-testcontainers</artifactId>
+  <version>0.11.2</version>
+  <scope>test</scope>
+</dependency>
+```
+
+Then use the production server and PostgreSQL as one JUnit lifecycle:
+
 ```java
 @Container
-static final JgitStorageEnvironment git =
-    new JgitStorageEnvironment("ghcr.io/carstenartur/jgit-storage-hibernate-server:edge");
+static final JgitStorageEnvironment git = new JgitStorageEnvironment();
 
 @Test
 void pushedHistoryIsQueryable() throws Exception {
@@ -27,5 +45,14 @@ void pushedHistoryIsQueryable() throws Exception {
 }
 ```
 
-Pin an immutable server image tag in stable test suites. The `edge` default is intended for testing
-the current main branch and examples.
+Stable suites should use the default or another explicit numeric image tag. To test a deliberately
+selected image, pass it explicitly:
+
+```java
+new JgitStorageEnvironment(
+    "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2");
+```
+
+`latest` and `edge` are moving compatibility aliases for the newest published release and are not
+recommended for reproducible CI. The Testcontainers artifact and server image are released from one
+Maven reactor; using the same numeric version keeps helper APIs and server endpoints aligned.
