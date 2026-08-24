@@ -1,4 +1,6 @@
 {
   "release_tag": "v0.11.2",
-  "purpose": "Backfill the published standalone server image from the existing immutable release tag."
+  "purpose": "Backfill the published standalone server image from the existing immutable release tag.",
+  "requested_at": "2026-08-24T16:20:00+02:00",
+  "requested_after_main": "fef865819ba86c68c0eb43b522c2d16e756e1542"
 }
