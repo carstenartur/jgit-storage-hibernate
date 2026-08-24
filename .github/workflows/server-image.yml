@@ -5,7 +5,10 @@ on:
     branches: [ main ]
     paths:
       - 'pom.xml'
+      - '.dockerignore'
+      - '.env.example'
       - 'compose.yaml'
+      - 'compose.build.yaml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
       - 'jgit-storage-hibernate-smart-http/**'
@@ -17,7 +20,10 @@ on:
     branches: [ main ]
     paths:
       - 'pom.xml'
+      - '.dockerignore'
+      - '.env.example'
       - 'compose.yaml'
+      - 'compose.build.yaml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
       - 'jgit-storage-hibernate-smart-http/**'
@@ -40,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
+      COMPOSE_FILE: compose.yaml:compose.build.yaml
       JSH_ADMIN_USERNAME: admin
       JSH_ADMIN_PASSWORD: ci-password
       JSH_DATABASE_PASSWORD: ci-database-password

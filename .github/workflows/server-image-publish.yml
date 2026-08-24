@@ -4,14 +4,17 @@ on:
   push:
     tags:
       - 'v*.*.*'
-    branches:
-      - 'image-backfill/v*'
   workflow_dispatch:
     inputs:
       release_tag:
         description: 'Existing immutable release tag in the form vX.Y.Z'
         required: true
         type: string
+      update_aliases:
+        description: 'Move latest and edge to this release (never enabled for a routine backfill)'
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: publish-server-image-${{ github.repository }}
@@ -34,14 +37,20 @@ jobs:
         shell: bash
         env:
           REQUESTED_TAG: ${{ inputs.release_tag }}
+          REQUESTED_UPDATE_ALIASES: ${{ inputs.update_aliases }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then
             release_tag="$GITHUB_REF_NAME"
-          elif [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_NAME" == image-backfill/v* ]]; then
-            release_tag="${GITHUB_REF_NAME#image-backfill/}"
+            update_aliases=true
           elif [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+              printf 'Manual publication must run from refs/heads/main, received %s\n' \
+                "$GITHUB_REF" >&2
+              exit 1
+            fi
             release_tag="$REQUESTED_TAG"
+            update_aliases="${REQUESTED_UPDATE_ALIASES:-false}"
           else
             printf 'Unsupported publication trigger: event=%s ref=%s\n' \
               "$GITHUB_EVENT_NAME" "$GITHUB_REF" >&2
@@ -52,16 +61,17 @@ jobs:
             printf 'Release tag must match vX.Y.Z, received %s\n' "$release_tag" >&2
             exit 1
           fi
+          if [[ "$update_aliases" != true && "$update_aliases" != false ]]; then
+            printf 'update_aliases must be true or false, received %s\n' \
+              "$update_aliases" >&2
+            exit 1
+          fi
 
           version="${release_tag#v}"
           {
             printf 'tag=%s\n' "$release_tag"
             printf 'version=%s\n' "$version"
-            printf 'tags<<EOF\n'
-            printf '%s:%s\n' "$IMAGE_NAME" "$version"
-            printf '%s:latest\n' "$IMAGE_NAME"
-            printf '%s:edge\n' "$IMAGE_NAME"
-            printf 'EOF\n'
+            printf 'update_aliases=%s\n' "$update_aliases"
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout immutable release tag
@@ -115,9 +125,6 @@ jobs:
           fi
           printf 'revision=%s\n' "$head_commit" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
@@ -128,7 +135,93 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish release image
+      - name: Reuse an existing immutable version tag
+        id: existing
+        shell: bash
+        env:
+          VERSION: ${{ steps.target.outputs.version }}
+          EXPECTED_REVISION: ${{ steps.verify.outputs.revision }}
+        run: |
+          set -euo pipefail
+          reference="$IMAGE_NAME:$VERSION"
+          inspection="$(mktemp)"
+          error_output="$(mktemp)"
+
+          if docker buildx imagetools inspect "$reference" \
+              >"$inspection" 2>"$error_output"; then
+            cat "$inspection"
+            digest="$(awk '$1 == "Digest:" {print $2; exit}' "$inspection")"
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              printf 'Could not determine the manifest digest for %s.\n' "$reference" >&2
+              exit 1
+            fi
+            grep -q 'linux/amd64' "$inspection"
+            grep -q 'linux/arm64' "$inspection"
+
+            mapfile -t platform_manifests < <(
+              docker buildx imagetools inspect --raw "$reference" | python3 -c \
+                'import json, sys; index = json.load(sys.stdin); required = (("linux", "amd64"), ("linux", "arm64")); found = {(manifest.get("platform", {}).get("os"), manifest.get("platform", {}).get("architecture")): manifest.get("digest", "") for manifest in index.get("manifests", [])}; missing = ["/".join(key) for key in required if not found.get(key)]; missing and sys.exit("missing platform manifests: " + ", ".join(missing)); print("\n".join(f"{operating_system}/{architecture} {found[(operating_system, architecture)]}" for operating_system, architecture in required))'
+            )
+            if [[ "${#platform_manifests[@]}" -ne 2 ]]; then
+              printf 'Expected exactly two required platform manifests for %s.\n' \
+                "$reference" >&2
+              exit 1
+            fi
+
+            for entry in "${platform_manifests[@]}"; do
+              platform="${entry%% *}"
+              platform_digest="${entry##* }"
+              if [[ ! "$platform_digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                printf 'Invalid %s child-manifest digest for %s: %s\n' \
+                  "$platform" "$reference" "$platform_digest" >&2
+                exit 1
+              fi
+              platform_reference="$IMAGE_NAME@$platform_digest"
+              docker pull --quiet --platform "$platform" "$platform_reference" >/dev/null
+              architecture="$(docker image inspect --format '{{ .Architecture }}' \
+                "$platform_reference")"
+              revision="$(docker image inspect --format \
+                '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+                "$platform_reference")"
+              image_version="$(docker image inspect --format \
+                '{{ index .Config.Labels "org.opencontainers.image.version" }}' \
+                "$platform_reference")"
+              expected_architecture="${platform#linux/}"
+              if [[ "$architecture" != "$expected_architecture" \
+                  || "$revision" != "$EXPECTED_REVISION" \
+                  || "$image_version" != "$VERSION" ]]; then
+                printf 'Refusing to overwrite %s: %s child metadata is architecture=%s version=%s revision=%s; expected architecture=%s version=%s revision=%s.\n' \
+                  "$reference" "$platform" "$architecture" "$image_version" \
+                  "$revision" "$expected_architecture" "$VERSION" \
+                  "$EXPECTED_REVISION" >&2
+                exit 1
+              fi
+            done
+
+            {
+              printf 'exists=true\n'
+              printf 'digest=%s\n' "$digest"
+            } >> "$GITHUB_OUTPUT"
+            printf 'Reusing immutable image %s@%s\n' "$reference" "$digest"
+          else
+            cat "$error_output" >&2
+            if grep -Eqi '(manifest unknown|not found|404)' "$error_output"; then
+              printf 'exists=false\n' >> "$GITHUB_OUTPUT"
+              printf 'No existing version tag found; %s will be built once.\n' \
+                "$reference"
+            else
+              printf 'Registry inspection failed for %s; refusing to treat the error as an absent tag.\n' \
+                "$reference" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Set up QEMU
+        if: steps.existing.outputs.exists != 'true'
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Build and publish the version tag once
+        if: steps.existing.outputs.exists != 'true'
         id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
@@ -137,7 +230,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           pull: true
-          tags: ${{ steps.target.outputs.tags }}
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.target.outputs.version }}
           labels: |
             org.opencontainers.image.title=jgit-storage-hibernate-server
             org.opencontainers.image.description=PostgreSQL-backed JGit Smart HTTP server with searchable history
@@ -151,21 +244,92 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Select the immutable release digest
+        id: release
+        shell: bash
+        env:
+          EXISTING: ${{ steps.existing.outputs.exists }}
+          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ "$EXISTING" == true ]]; then
+            digest="$EXISTING_DIGEST"
+            outcome=reused
+          else
+            digest="$BUILT_DIGEST"
+            outcome=built
+          fi
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            printf 'Missing or invalid immutable image digest: %s\n' "$digest" >&2
+            exit 1
+          fi
+          {
+            printf 'digest=%s\n' "$digest"
+            printf 'outcome=%s\n' "$outcome"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Move compatibility aliases without allowing rollback
+        if: steps.target.outputs.update_aliases == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.target.outputs.version }}
+          DIGEST: ${{ steps.release.outputs.digest }}
+        run: |
+          set -euo pipefail
+          latest_inspection="$(mktemp)"
+          latest_error="$(mktemp)"
+          if docker buildx imagetools inspect "$IMAGE_NAME:latest" \
+              >"$latest_inspection" 2>"$latest_error"; then
+            docker pull --quiet --platform linux/amd64 "$IMAGE_NAME:latest" >/dev/null
+            current_version="$(docker image inspect --format \
+              '{{ index .Config.Labels "org.opencontainers.image.version" }}' \
+              "$IMAGE_NAME:latest")"
+            if [[ ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              printf 'Existing latest alias has no valid release-version label: %s\n' \
+                "$current_version" >&2
+              exit 1
+            fi
+            highest="$(printf '%s\n%s\n' "$current_version" "$VERSION" \
+              | sort -V | tail -n 1)"
+            if [[ "$highest" != "$VERSION" ]]; then
+              printf 'Refusing to move latest/edge backwards from %s to %s.\n' \
+                "$current_version" "$VERSION" >&2
+              exit 1
+            fi
+          elif ! grep -Eqi '(manifest unknown|not found|404)' "$latest_error"; then
+            cat "$latest_error" >&2
+            printf 'Could not inspect the existing latest alias.\n' >&2
+            exit 1
+          fi
+
+          docker buildx imagetools create \
+            --tag "$IMAGE_NAME:latest" \
+            --tag "$IMAGE_NAME:edge" \
+            "$IMAGE_NAME@$DIGEST"
+
       - name: Verify anonymous multi-architecture distribution
         shell: bash
         env:
           VERSION: ${{ steps.target.outputs.version }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.release.outputs.digest }}
+          OUTCOME: ${{ steps.release.outputs.outcome }}
+          UPDATE_ALIASES: ${{ steps.target.outputs.update_aliases }}
         run: |
           set -euo pipefail
           docker logout ghcr.io >/dev/null 2>&1 || true
           anonymous_config="$(mktemp -d)"
-          for tag in "$VERSION" latest edge; do
+          tags=("$VERSION")
+          if [[ "$UPDATE_ALIASES" == true ]]; then
+            tags+=(latest edge)
+          fi
+
+          for tag in "${tags[@]}"; do
             manifest=''
             published=false
             for attempt in $(seq 1 12); do
-              if manifest="$(docker --config "$anonymous_config" buildx imagetools inspect \
-                  "$IMAGE_NAME:$tag" 2>&1)"; then
+              if manifest="$(docker --config "$anonymous_config" \
+                  buildx imagetools inspect "$IMAGE_NAME:$tag" 2>&1)"; then
                 published=true
                 break
               fi
@@ -173,20 +337,33 @@ jobs:
             done
             if [[ "$published" != true ]]; then
               printf '%s\n' "$manifest" >&2
-              printf 'Image %s:%s is not anonymously readable. Ensure the GHCR package inherits the public repository visibility or set it to Public.\n' \
+              printf 'Image %s:%s is not anonymously readable. Ensure the GHCR package is Public.\n' \
                 "$IMAGE_NAME" "$tag" >&2
               exit 1
             fi
             printf '%s\n' "$manifest"
+            observed_digest="$(awk '$1 == "Digest:" {print $2; exit}' \
+              <<< "$manifest")"
+            if [[ "$observed_digest" != "$DIGEST" ]]; then
+              printf 'Image %s:%s resolved to %s instead of immutable digest %s.\n' \
+                "$IMAGE_NAME" "$tag" "$observed_digest" "$DIGEST" >&2
+              exit 1
+            fi
             grep -q 'linux/amd64' <<< "$manifest"
             grep -q 'linux/arm64' <<< "$manifest"
           done
 
           {
             printf '### Published server image\n\n'
-            printf -- '- Image: `%s:%s`\n' "$IMAGE_NAME" "$VERSION"
-            printf -- '- Aliases: `%s:latest`, `%s:edge`\n' "$IMAGE_NAME" "$IMAGE_NAME"
+            printf -- '- Version: `%s:%s`\n' "$IMAGE_NAME" "$VERSION"
             printf -- '- Digest: `%s`\n' "$DIGEST"
+            printf -- '- Version-tag outcome: `%s`\n' "$OUTCOME"
             printf -- '- Platforms: `linux/amd64`, `linux/arm64`\n'
+            if [[ "$UPDATE_ALIASES" == true ]]; then
+              printf -- '- Aliases moved: `%s:latest`, `%s:edge`\n' \
+                "$IMAGE_NAME" "$IMAGE_NAME"
+            else
+              printf -- '- Aliases moved: no\n'
+            fi
             printf -- '- Anonymous pull: verified\n'
           } >> "$GITHUB_STEP_SUMMARY"

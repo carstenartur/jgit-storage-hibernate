@@ -4,7 +4,11 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'README.md'
+      - '.dockerignore'
+      - '.env.example'
       - 'compose.yaml'
+      - 'compose.build.yaml'
       - 'docs/current-release-version.txt'
       - 'docs/release-process.md'
       - 'jgit-storage-hibernate-server/**'
@@ -20,7 +24,11 @@ on:
   pull_request:
     branches: [ main ]
     paths:
+      - 'README.md'
+      - '.dockerignore'
+      - '.env.example'
       - 'compose.yaml'
+      - 'compose.build.yaml'
       - 'docs/current-release-version.txt'
       - 'docs/release-process.md'
       - 'jgit-storage-hibernate-server/**'
@@ -62,5 +70,10 @@ jobs:
           python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/verify-release-consistency.py
 
-      - name: Validate stable Compose deployment
-        run: docker compose config --quiet
+      - name: Validate stable and source-build Compose deployments
+        env:
+          JSH_DATABASE_PASSWORD: contract-database-password
+          JSH_ADMIN_PASSWORD: contract-admin-password
+        run: |
+          docker compose -f compose.yaml config --quiet
+          docker compose -f compose.yaml -f compose.build.yaml config --quiet
