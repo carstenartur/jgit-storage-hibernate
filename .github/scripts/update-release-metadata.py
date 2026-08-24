@@ -11,8 +11,15 @@ from pathlib import Path
 
 PROJECT_GROUP_ID = "io.github.carstenartur"
 PROJECT_ARTIFACT_PREFIX = "jgit-storage-hibernate-"
+SERVER_IMAGE = "ghcr.io/carstenartur/jgit-storage-hibernate-server"
 DOCUMENTATION_VERSION_FILE = Path("docs/current-release-version.txt")
 SECURITY_POLICY_FILE = Path("SECURITY.md")
+COMPOSE_FILE = Path("compose.yaml")
+TESTCONTAINERS_CONTAINER_FILE = Path(
+    "jgit-storage-hibernate-testcontainers/src/main/java/"
+    "io/github/carstenartur/jgit/storage/hibernate/testcontainers/"
+    "JgitStorageContainer.java"
+)
 RELEASE_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 SNAPSHOT_SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?$")
@@ -22,6 +29,19 @@ DEPENDENCY_BLOCK = re.compile(r"<dependency>.*?</dependency>", re.DOTALL)
 PROJECT_COORDINATE = re.compile(
     r"(io\.github\.carstenartur:jgit-storage-hibernate-[A-Za-z0-9_.-]+:)"
     r"([0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?)"
+)
+PROJECT_IMAGE_REFERENCE = re.compile(
+    r"(ghcr\.io/carstenartur/jgit-storage-hibernate-server:)"
+    r"([0-9]+\.[0-9]+\.[0-9]+)"
+)
+COMPOSE_IMAGE_DEFAULT = re.compile(
+    r"(image:\s+\$\{JSH_SERVER_IMAGE:-"
+    r"ghcr\.io/carstenartur/jgit-storage-hibernate-server:)"
+    r"([0-9]+\.[0-9]+\.[0-9]+)(\})"
+)
+TESTCONTAINERS_IMAGE_DEFAULT = re.compile(
+    r'(DEFAULT_IMAGE_VERSION\s*=\s*")'
+    r"([0-9]+\.[0-9]+\.[0-9]+)(\")"
 )
 DOCUMENTED_RELEASE_LINE = re.compile(
     r"(The documented release line is \*\*)([0-9]+\.[0-9]+\.[0-9]+)(\*\*)"
@@ -152,12 +172,43 @@ def update_dependency_block(block: str, version: str) -> tuple[str, bool]:
     return updated, updated != block
 
 
+def update_server_image_defaults(version: str) -> list[Path]:
+    """Advance stable Compose and Testcontainers image defaults with a release."""
+    if not RELEASE_SEMVER.fullmatch(version):
+        raise SystemExit(
+            f"Server image defaults require a release X.Y.Z version, received {version!r}"
+        )
+
+    changed: list[Path] = []
+    replacements = (
+        (COMPOSE_FILE, COMPOSE_IMAGE_DEFAULT),
+        (TESTCONTAINERS_CONTAINER_FILE, TESTCONTAINERS_IMAGE_DEFAULT),
+    )
+    for path, pattern in replacements:
+        if not path.is_file():
+            raise SystemExit(f"Missing server image default file: {path}")
+        text = path.read_text(encoding="utf-8")
+        updated, count = pattern.subn(
+            lambda match: match.group(1) + version + match.group(3), text
+        )
+        if count != 1:
+            raise SystemExit(
+                f"Expected one stable server image default in {path}, found {count}"
+            )
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
+            changed.append(path)
+            print(f"Updated stable server image default in {path} to {version}")
+    return changed
+
+
 def update_public_documentation(version: str) -> list[Path]:
-    """Advance active public dependency examples to the release being created.
+    """Advance active public dependency and server-image examples for a release.
 
     Historical release notes are excluded. Other historical version references, such as the
     0.1.4 migration baseline, are preserved because only project dependency declarations,
-    project coordinates, and explicit documented-release sentences are rewritten.
+    project coordinates, numeric server-image references and explicit documented-release
+    sentences are rewritten.
     """
     if not RELEASE_SEMVER.fullmatch(version):
         raise SystemExit(
@@ -192,6 +243,10 @@ def update_public_documentation(version: str) -> list[Path]:
             lambda match: match.group(1) + version,
             updated,
         )
+        updated, image_changes = PROJECT_IMAGE_REFERENCE.subn(
+            lambda match: match.group(1) + version,
+            updated,
+        )
         updated, release_line_changes = DOCUMENTED_RELEASE_LINE.subn(
             lambda match: match.group(1) + version + match.group(3),
             updated,
@@ -201,10 +256,11 @@ def update_public_documentation(version: str) -> list[Path]:
             path.write_text(updated, encoding="utf-8")
             changed.append(path)
 
-        if dependency_changes or coordinate_changes or release_line_changes:
+        if dependency_changes or coordinate_changes or image_changes or release_line_changes:
             print(
                 f"Updated {path}: dependencies={dependency_changes}, "
-                f"coordinates={coordinate_changes}, release-lines={release_line_changes}"
+                f"coordinates={coordinate_changes}, images={image_changes}, "
+                f"release-lines={release_line_changes}"
             )
 
     DOCUMENTATION_VERSION_FILE.write_text(version + "\n", encoding="utf-8")
@@ -217,9 +273,9 @@ def update_public_documentation(version: str) -> list[Path]:
 def update_release_metadata(version: str, release: bool, today: str) -> None:
     """Update public metadata only for an immutable release.
 
-    Snapshot development intentionally leaves citation, CodeMeta and Zenodo metadata pinned to
-    the most recent immutable release. This keeps public citation tooling stable while Maven reactor
-    versions continue on the next snapshot line.
+    Snapshot development intentionally leaves citation, CodeMeta, Zenodo and stable server-image
+    metadata pinned to the most recent immutable release. This keeps public tooling and deployment
+    defaults stable while Maven reactor versions continue on the next snapshot line.
     """
     if not release:
         if SNAPSHOT_SEMVER.fullmatch(version) is None:
@@ -232,8 +288,8 @@ def update_release_metadata(version: str, release: bool, today: str) -> None:
             else "the latest immutable release"
         )
         print(
-            "Snapshot development does not rewrite public citation or archive metadata; "
-            f"those remain pinned to {documented}."
+            "Snapshot development does not rewrite public citation, archive or server-image "
+            f"metadata; those remain pinned to {documented}."
         )
         return
 
@@ -246,6 +302,7 @@ def update_release_metadata(version: str, release: bool, today: str) -> None:
     update_json(".zenodo.json", version, True, today, "publication_date")
     update_json("codemeta.json", version, True, today, "datePublished")
     update_security_policy(version)
+    update_server_image_defaults(version)
     update_public_documentation(version)
 
 

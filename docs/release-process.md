@@ -1,8 +1,9 @@
 # Release process
 
-The project publishes immutable releases to an anonymous static Maven repository in branch
-`maven-repository`, then creates a GitHub Release. Development snapshots may continue to use GitHub
-Packages.
+The project publishes immutable Maven releases to an anonymous static repository in branch
+`maven-repository`, creates a GitHub Release and publishes the standalone server as a versioned
+multi-architecture OCI image in GitHub Container Registry. Development snapshots may continue to use
+GitHub Packages for Maven artifacts.
 
 ## Public artifacts
 
@@ -28,9 +29,9 @@ support are optional product paths and are versioned with the same reactor relea
 
 | Channel | Role | Consumer authentication |
 |---|---|---|
-| Static `maven-repository` branch | Primary immutable public release channel | none |
-| GHCR server image | Runnable PostgreSQL-backed Git Smart HTTP server | none for public images |
-| GitHub Packages | Development snapshots | GitHub token |
+| Static `maven-repository` branch | Primary immutable public Maven release channel | none |
+| GHCR server image | Runnable PostgreSQL-backed Git Smart HTTP server | none after public-visibility verification |
+| GitHub Packages | Development Maven snapshots | GitHub token |
 | GitHub Releases | Notes and convenience artifacts | none |
 
 The public Maven URL is:
@@ -39,7 +40,17 @@ The public Maven URL is:
 https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/
 ```
 
-See [Public Maven repository](public-maven-repository.md).
+The released server image is:
+
+```text
+ghcr.io/carstenartur/jgit-storage-hibernate-server:X.Y.Z
+```
+
+Each release also updates `latest` and the documented compatibility alias `edge`. Deployments and
+stable tests should pin the numeric tag.
+
+See [Public Maven repository](public-maven-repository.md) and the
+[standalone server guide](../jgit-storage-hibernate-server/README.md).
 
 ## One release authority
 
@@ -47,7 +58,12 @@ See [Public Maven repository](public-maven-repository.md).
 verification, static repository staging, immutability checks, anonymous local and remote consumption,
 release commit/tag creation, GitHub Release creation and next-snapshot preparation.
 
-The root POM keeps publication behind explicit profiles:
+`.github/workflows/server-image-publish.yml` is the separate OCI publication authority. It accepts
+only an annotated `vX.Y.Z` tag, checks that the tag target and Maven reactor both represent `X.Y.Z`,
+builds `linux/amd64` and `linux/arm64`, adds OCI labels plus provenance and SBOM attestations, pushes
+the three image tags and then verifies the manifests without registry credentials.
+
+The root POM keeps Maven publication behind explicit profiles:
 
 - `public-repository-release` deploys to a local file repository for immutable public releases;
 - `github-packages` supplies authenticated snapshot distribution metadata.
@@ -72,12 +88,19 @@ workflow never approves or merges its own protected release PR.
 GitHub intentionally suppresses ordinary workflow recursion for pushes made with `GITHUB_TOKEN`.
 After creating a generated release or next-development PR, the release workflow therefore invokes
 `.github/scripts/dispatch-generated-pr-checks.sh`. It uses `workflow_dispatch` on the exact remote
-branch head to start Maven, BOM, JGit compatibility, real-consumer compatibility, server-image and
-JMH checks without a PAT or manual workflow approval.
+branch head to start Maven, BOM, JGit compatibility, real-consumer compatibility, server-image,
+server-image-publication-contract and JMH checks without a PAT or manual workflow approval.
 
-An optional fine-grained `RELEASE_GITHUB_TOKEN` may still be configured as an operational override.
-When absent, every checkout, branch push, PR operation, publication step and explicit check dispatch
-uses `github.token`. No credential is written to repository files, logs or artifacts.
+The image publication job has only `contents: read` and `packages: write`. It logs in to GHCR with the
+short-lived `GITHUB_TOKEN`; the final inspection uses a new Docker configuration with no credentials.
+If GitHub creates the first package with private visibility rather than inheriting the public
+repository visibility, that anonymous check fails explicitly and the package must be changed to
+**Public** in its package settings before publication is considered complete.
+
+An optional fine-grained `RELEASE_GITHUB_TOKEN` may still be configured as an operational override
+for the Maven/GitHub release workflow. When absent, every checkout, branch push, PR operation,
+publication step and explicit check dispatch uses `github.token`. No credential is written to
+repository files, logs or artifacts.
 
 ## CI contract
 
@@ -90,6 +113,12 @@ The staged repository verifier requires the parent and BOM POMs plus the expecte
 Javadoc artifacts for all public JAR modules. Every retained release file receives canonical
 SHA-256/SHA-512 evidence and a SHA-1 compatibility sidecar. The anonymous consumer then imports the
 candidate BOM and resolves every production module.
+
+`Server image publication contract` statically verifies immutable triggers, full-SHA action pins,
+tag/reactor validation, multi-architecture output, OCI evidence, anonymous distribution checks,
+Compose parsing and alignment of stable Compose/Testcontainers defaults with the documented release.
+The normal server-image smoke test separately builds the current source and proves create, push,
+query, PostgreSQL inspection, restart and clone behavior.
 
 Runtime, schema and dependency compatibility with the active downstream applications is covered
 separately by the [real-consumer compatibility gates](consumer-compatibility.md). The release review
@@ -147,16 +176,32 @@ them, rather than in a generated dispatch payload.
 5. Deploy all release POMs and primary/source/Javadoc artifacts into a local Maven-layout directory.
 6. Verify required files, reject snapshots, generate checksums and resolve the staged repository anonymously.
 7. Merge byte-identical artifacts into branch `maven-repository` and verify anonymous HTTPS consumption.
-8. Create the immutable `vX.Y.Z` tag, GitHub Release and release convenience artifacts.
-9. Push `release/next-A.B.C`, open the protected next-development PR and explicitly dispatch the same critical checks.
-10. Merge the reviewed next-development PR to restore `A.B.C-SNAPSHOT` on `main` while public examples remain pinned to `X.Y.Z`.
+8. Create the annotated immutable `vX.Y.Z` tag, GitHub Release and release convenience artifacts.
+9. The tag starts OCI publication; the workflow publishes `X.Y.Z`, `latest` and `edge`, then proves anonymous multi-architecture access.
+10. Push `release/next-A.B.C`, open the protected next-development PR and explicitly dispatch the same critical checks.
+11. Merge the reviewed next-development PR to restore `A.B.C-SNAPSHOT` on `main` while public examples and image defaults remain pinned to `X.Y.Z`.
 
 A real release cannot skip tests. A dry run stops after release preparation and complete local
 verification without pushing a branch or creating a PR.
 
+## OCI image backfill
+
+A release tag created before the OCI workflow existed can be published without rebuilding snapshot
+sources. After the workflow is present on `main`, either dispatch it with `release_tag=vX.Y.Z` or
+create a short-lived branch named `image-backfill/vX.Y.Z` from `main`. Both paths:
+
+1. validate the requested `vX.Y.Z` syntax;
+2. check out the existing tag rather than the branch;
+3. require an annotated tag whose target equals the checked-out commit;
+4. require the reactor version to be exactly `X.Y.Z` and reject snapshots;
+5. publish and anonymously verify the same release image contract.
+
+Delete the backfill branch after a successful run. Never move or recreate an existing release tag to
+repair image publication.
+
 ## Recovery
 
-The Maven repository may be published before a later GitHub tag/release step fails. Re-run only after
-inspecting the branch, tag and GitHub Release. The release script will continue when existing version
-bytes are identical and will fail on any attempted overwrite. The recovery workflow also uses the
-short-lived repository token unless the optional override secret is configured.
+The Maven repository may be published before a later GitHub tag/release or OCI step fails. Re-run only
+after inspecting the branch, tag, GitHub Release and package state. The Maven release script continues
+only when existing version bytes are identical and fails on any attempted overwrite. OCI backfill
+always rebuilds from the immutable tag and never from current snapshot sources.

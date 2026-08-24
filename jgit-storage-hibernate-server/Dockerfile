@@ -1,4 +1,4 @@
-FROM maven:3.9.11-eclipse-temurin-21 AS build
+FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY . .
 RUN mvn -B -ntp -pl jgit-storage-hibernate-server -am -DskipTests package \

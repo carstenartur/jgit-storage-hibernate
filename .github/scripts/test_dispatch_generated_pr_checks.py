@@ -18,6 +18,7 @@ WORKFLOWS = (
     "jgit-compatibility.yml",
     "consumer-compatibility.yml",
     "server-image.yml",
+    "server-image-publish-contract.yml",
     "performance.yml",
 )
 HEAD = "0123456789abcdef0123456789abcdef01234567"
@@ -90,7 +91,10 @@ class GeneratedPrCheckDispatchTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         calls = self.calls.read_text(encoding="utf-8").splitlines()
         self.assertEqual(
-            [f"workflow run {workflow} --ref release/prepare-0.11.2" for workflow in WORKFLOWS],
+            [
+                f"workflow run {workflow} --ref release/prepare-0.11.2"
+                for workflow in WORKFLOWS
+            ],
             calls,
         )
         self.assertNotIn("test-token-not-printed", result.stdout + result.stderr)

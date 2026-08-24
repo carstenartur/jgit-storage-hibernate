@@ -1,0 +1,192 @@
+name: Publish server OCI image
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+    branches:
+      - 'image-backfill/v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing immutable release tag in the form vX.Y.Z'
+        required: true
+        type: string
+
+concurrency:
+  group: publish-server-image-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish versioned multi-architecture image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      IMAGE_NAME: ghcr.io/carstenartur/jgit-storage-hibernate-server
+    steps:
+      - name: Resolve and validate immutable release tag
+        id: target
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then
+            release_tag="$GITHUB_REF_NAME"
+          elif [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_NAME" == image-backfill/v* ]]; then
+            release_tag="${GITHUB_REF_NAME#image-backfill/}"
+          elif [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            release_tag="$REQUESTED_TAG"
+          else
+            printf 'Unsupported publication trigger: event=%s ref=%s\n' \
+              "$GITHUB_EVENT_NAME" "$GITHUB_REF" >&2
+            exit 1
+          fi
+
+          if [[ ! "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'Release tag must match vX.Y.Z, received %s\n' "$release_tag" >&2
+            exit 1
+          fi
+
+          version="${release_tag#v}"
+          {
+            printf 'tag=%s\n' "$release_tag"
+            printf 'version=%s\n' "$version"
+            printf 'tags<<EOF\n'
+            printf '%s:%s\n' "$IMAGE_NAME" "$version"
+            printf '%s:latest\n' "$IMAGE_NAME"
+            printf '%s:edge\n' "$IMAGE_NAME"
+            printf 'EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout immutable release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.target.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify annotated tag, source commit and Maven reactor version
+        id: verify
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          EXPECTED_VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          set -euo pipefail
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || {
+            printf 'Release tag %s is not present after checkout.\n' "$RELEASE_TAG" >&2
+            exit 1
+          }
+          if [[ "$(git cat-file -t "refs/tags/$RELEASE_TAG")" != tag ]]; then
+            printf 'Release ref %s must be an annotated immutable tag.\n' "$RELEASE_TAG" >&2
+            exit 1
+          fi
+          tag_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          head_commit="$(git rev-parse HEAD)"
+          if [[ "$tag_commit" != "$head_commit" ]]; then
+            printf 'Checked out commit %s does not match tag target %s.\n' \
+              "$head_commit" "$tag_commit" >&2
+            exit 1
+          fi
+
+          actual_version="$(mvn -B -ntp -q help:evaluate \
+            -Dexpression=project.version -DforceStdout)"
+          if [[ "$actual_version" != "$EXPECTED_VERSION" ]]; then
+            printf 'Tag version %s does not match Maven reactor version %s\n' \
+              "$EXPECTED_VERSION" "$actual_version" >&2
+            exit 1
+          fi
+          if [[ "$actual_version" == *-SNAPSHOT ]]; then
+            printf 'Refusing to publish a mutable snapshot image: %s\n' "$actual_version" >&2
+            exit 1
+          fi
+          printf 'revision=%s\n' "$head_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish release image
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: jgit-storage-hibernate-server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          pull: true
+          tags: ${{ steps.target.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=jgit-storage-hibernate-server
+            org.opencontainers.image.description=PostgreSQL-backed JGit Smart HTTP server with searchable history
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.verify.outputs.revision }}
+            org.opencontainers.image.version=${{ steps.target.outputs.version }}
+            org.opencontainers.image.licenses=BSD-3-Clause
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify anonymous multi-architecture distribution
+        shell: bash
+        env:
+          VERSION: ${{ steps.target.outputs.version }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          anonymous_config="$(mktemp -d)"
+          for tag in "$VERSION" latest edge; do
+            manifest=''
+            published=false
+            for attempt in $(seq 1 12); do
+              if manifest="$(docker --config "$anonymous_config" buildx imagetools inspect \
+                  "$IMAGE_NAME:$tag" 2>&1)"; then
+                published=true
+                break
+              fi
+              sleep 5
+            done
+            if [[ "$published" != true ]]; then
+              printf '%s\n' "$manifest" >&2
+              printf 'Image %s:%s is not anonymously readable. Ensure the GHCR package inherits the public repository visibility or set it to Public.\n' \
+                "$IMAGE_NAME" "$tag" >&2
+              exit 1
+            fi
+            printf '%s\n' "$manifest"
+            grep -q 'linux/amd64' <<< "$manifest"
+            grep -q 'linux/arm64' <<< "$manifest"
+          done
+
+          {
+            printf '### Published server image\n\n'
+            printf -- '- Image: `%s:%s`\n' "$IMAGE_NAME" "$VERSION"
+            printf -- '- Aliases: `%s:latest`, `%s:edge`\n' "$IMAGE_NAME" "$IMAGE_NAME"
+            printf -- '- Digest: `%s`\n' "$DIGEST"
+            printf -- '- Platforms: `linux/amd64`, `linux/arm64`\n'
+            printf -- '- Anonymous pull: verified\n'
+          } >> "$GITHUB_STEP_SUMMARY"
