@@ -425,7 +425,7 @@ jobs:
             exit 1
           fi
           bash "$SMOKE_SCRIPT"
-          printf '- Runtime smoke: passed\n' >> "$GITHUB_STEP_SUMMARY"
+          printf -- '- Runtime smoke: passed\n' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report publication smoke logs on failure
         if: failure() && steps.smoke.outcome == 'success'
