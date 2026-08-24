@@ -42,6 +42,7 @@ else
     jgit-compatibility.yml
     consumer-compatibility.yml
     server-image.yml
+    server-image-publish-contract.yml
     performance.yml
   )
 fi
