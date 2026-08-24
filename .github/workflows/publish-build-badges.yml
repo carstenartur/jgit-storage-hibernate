@@ -1,0 +1,96 @@
+name: Publish build badges
+
+on:
+  workflow_run:
+    workflows: [ Java CI with Maven ]
+    types: [ completed ]
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Successful Java CI with Maven run ID whose badge-metrics artifact should be published'
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: repository-pages-publication-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish generated coverage and test badges
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository publication tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {fetch-depth: 0}
+
+      - name: Resolve source CI run
+        id: source
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::A positive Java CI workflow run ID is required."
+            exit 1
+          fi
+          echo "run_id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download generated badge data outside the worktree
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          name: badge-metrics
+          path: ${{ runner.temp }}/build-badge-metrics
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Publish generated badges to gh-pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="${RUNNER_TEMP}/build-badge-metrics"
+          coverage_source="$(find "$source_root" -type f -name coverage.json -print -quit)"
+          tests_source="$(find "$source_root" -type f -name tests.json -print -quit)"
+          test -s "$coverage_source"
+          test -s "$tests_source"
+
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            empty_tree="$(git mktree </dev/null)"
+            initial_commit="$(printf '%s\n' 'Initialize generated project pages' | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$empty_tree")"
+            git push origin "$initial_commit:refs/heads/gh-pages"
+          fi
+
+          pages_dir="${RUNNER_TEMP}/generated-pages-build"
+          for attempt in 1 2 3; do
+            git fetch origin gh-pages
+            git worktree remove --force "$pages_dir" >/dev/null 2>&1 || true
+            git worktree prune
+            git worktree add --detach "$pages_dir" origin/gh-pages
+
+            mkdir -p "$pages_dir/badges"
+            cp "$coverage_source" "$pages_dir/badges/coverage.json"
+            cp "$tests_source" "$pages_dir/badges/tests.json"
+            git -C "$pages_dir" add badges/coverage.json badges/tests.json
+
+            if git -C "$pages_dir" diff --cached --quiet; then
+              echo 'Build badge data unchanged'
+              exit 0
+            fi
+
+            git -C "$pages_dir" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Update build metric badges'
+            if git -C "$pages_dir" push origin HEAD:gh-pages; then
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+
+          echo 'Could not publish build badges after three attempts' >&2
+          exit 1
