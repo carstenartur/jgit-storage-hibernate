@@ -23,7 +23,8 @@ explicit feature and data migration; changing only the Docker image is not suffi
 
 ## Run the published release
 
-The repository Compose file defaults to the released `0.11.2` image:
+The repository Compose file starts PostgreSQL and defaults its `git-server` service to the released
+`0.11.2` image:
 
 ```text
 ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2
@@ -34,18 +35,29 @@ push/clone, the Search projection, PostgreSQL inspection views and restart persi
 proposed base Compose file. The current source image is built and tested independently, so a passing
 source build cannot hide a broken or incompatible published artifact.
 
-From the repository root, create a private local configuration and set both passwords:
+The Compose file and environment template are repository files; they are not embedded in the image.
+Start from any working directory by obtaining those files first, then set both passwords:
 
 ```bash
+git clone --depth 1 https://github.com/carstenartur/jgit-storage-hibernate.git
+cd jgit-storage-hibernate
+
 cp .env.example .env
 chmod 600 .env
-${EDITOR:-vi} .env
+${EDITOR:-vi} .env            # set JSH_DATABASE_PASSWORD and JSH_ADMIN_PASSWORD
 
 docker compose config --quiet
+docker compose config --images # confirms the exact images that will run
 docker compose pull postgres git-server
-docker compose up --no-build -d
+docker compose up --no-build --detach --wait postgres git-server
+docker compose ps
 curl --fail http://localhost:8080/actuator/health/readiness
 ```
+
+The `git-server` target in `docker compose pull` downloads the GHCR image shown above. The same target
+in `docker compose up --no-build` creates and starts a container from that published image; it cannot
+fall back to compiling the repository source. PostgreSQL is started alongside it because it contains
+the authoritative Git packs, refs and reflogs.
 
 Create and clone a repository without placing credentials in shell history, process arguments or the
 remote URL. Both commands prompt for the configured administrator password:
