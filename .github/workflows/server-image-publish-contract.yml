@@ -1,0 +1,66 @@
+name: Server image publication contract
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'compose.yaml'
+      - 'docs/current-release-version.txt'
+      - 'docs/release-process.md'
+      - 'jgit-storage-hibernate-server/**'
+      - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/dispatch-generated-pr-checks.sh'
+      - '.github/scripts/test_dispatch_generated_pr_checks.py'
+      - '.github/scripts/test_server_image_publish_workflow.py'
+      - '.github/scripts/update-release-metadata.py'
+      - '.github/scripts/test_update_release_metadata.py'
+      - '.github/scripts/verify-release-consistency.py'
+      - '.github/workflows/server-image-publish.yml'
+      - '.github/workflows/server-image-publish-contract.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'compose.yaml'
+      - 'docs/current-release-version.txt'
+      - 'docs/release-process.md'
+      - 'jgit-storage-hibernate-server/**'
+      - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/dispatch-generated-pr-checks.sh'
+      - '.github/scripts/test_dispatch_generated_pr_checks.py'
+      - '.github/scripts/test_server_image_publish_workflow.py'
+      - '.github/scripts/update-release-metadata.py'
+      - '.github/scripts/test_update_release_metadata.py'
+      - '.github/scripts/verify-release-consistency.py'
+      - '.github/workflows/server-image-publish.yml'
+      - '.github/workflows/server-image-publish-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify versioned GHCR publication contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Parse and test publication contract
+        run: |
+          python3 -m py_compile \
+            .github/scripts/test_server_image_publish_workflow.py \
+            .github/scripts/update-release-metadata.py \
+            .github/scripts/test_update_release_metadata.py \
+            .github/scripts/verify-release-consistency.py
+          python3 .github/scripts/test_server_image_publish_workflow.py
+          python3 .github/scripts/test_update_release_metadata.py
+          python3 .github/scripts/verify-release-consistency.py
+
+      - name: Validate stable Compose deployment
+        run: docker compose config --quiet
