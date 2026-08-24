@@ -20,6 +20,31 @@ JGit is the authoritative engine for Git objects, commits, trees, refs, revision
 
 The documented release line is **0.11.2**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
 
+## Run the published Git server image
+
+A released multi-architecture image is available for users who need a runnable PostgreSQL-backed Git
+Smart HTTP endpoint rather than a Java library integration:
+
+```text
+ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2
+```
+
+```bash
+cp .env.example .env
+chmod 600 .env
+${EDITOR:-vi} .env            # set both required passwords
+
+docker compose config --quiet
+docker compose pull
+docker compose up --no-build -d
+```
+
+The endpoint works with normal Git CLI, JGit and IDE Smart HTTP clone/fetch/push operations. It is
+**not** a drop-in replacement for GitLab, Gitea, Gerrit or other forge images when consumers depend on
+SSH, LFS, pull requests, their REST APIs, hooks, webhooks, database schemas or plug-in extension
+points. The [standalone server guide](jgit-storage-hibernate-server/README.md) contains the secure
+quick start, compatibility matrix, source-build override, digest pinning and production boundaries.
+
 The important distinction is not merely that the library saves application code. It changes **when and how often** expensive work is performed:
 
 ```text
@@ -232,6 +257,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 
 ## Documentation
 
+- [Standalone server image, compatibility and deployment](jgit-storage-hibernate-server/README.md)
 - [Performance status and distance to the ceiling](docs/performance-status.md)
 - [Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
 - [Benchmark methodology](docs/benchmarks.md)

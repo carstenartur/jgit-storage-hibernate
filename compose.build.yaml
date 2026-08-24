@@ -1,0 +1,6 @@
+services:
+  git-server:
+    image: jgit-storage-hibernate-server:local
+    build:
+      context: .
+      dockerfile: jgit-storage-hibernate-server/Dockerfile

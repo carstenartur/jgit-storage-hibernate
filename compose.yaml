@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: jgit
       POSTGRES_USER: jgit
-      POSTGRES_PASSWORD: ${JSH_DATABASE_PASSWORD:-jgit}
+      POSTGRES_PASSWORD: ${JSH_DATABASE_PASSWORD:?Set JSH_DATABASE_PASSWORD in .env or the environment}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jgit -d jgit"]
       interval: 5s
@@ -14,23 +14,31 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   git-server:
-    build:
-      context: .
-      dockerfile: jgit-storage-hibernate-server/Dockerfile
     image: ${JSH_SERVER_IMAGE:-ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2}
     environment:
       JSH_JDBC_URL: jdbc:postgresql://postgres:5432/jgit
       JSH_JDBC_USERNAME: jgit
-      JSH_JDBC_PASSWORD: ${JSH_DATABASE_PASSWORD:-jgit}
+      JSH_JDBC_PASSWORD: ${JSH_DATABASE_PASSWORD:?Set JSH_DATABASE_PASSWORD in .env or the environment}
       JSH_ADMIN_USERNAME: ${JSH_ADMIN_USERNAME:-admin}
-      JSH_ADMIN_PASSWORD: ${JSH_ADMIN_PASSWORD:-change-me}
+      JSH_ADMIN_PASSWORD: ${JSH_ADMIN_PASSWORD:?Set JSH_ADMIN_PASSWORD in .env or the environment}
       JSH_SEARCH_DIRECTORY: /var/lib/jgit-storage/search
       JSH_REQUIRE_SECURE_TRANSPORT: ${JSH_REQUIRE_SECURE_TRANSPORT:-false}
+      JSH_FORWARD_HEADERS_STRATEGY: ${JSH_FORWARD_HEADERS_STRATEGY:-NONE}
+      JSH_MANAGEMENT_ENDPOINTS: ${JSH_MANAGEMENT_ENDPOINTS:-health,info}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "${JSH_PORT:-8080}:8080"
+      - "${JSH_BIND_ADDRESS:-127.0.0.1}:${JSH_PORT:-8080}:8080"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
       interval: 5s

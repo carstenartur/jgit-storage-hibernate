@@ -12,12 +12,13 @@ spring:
 server:
   port: ${PORT:8080}
   shutdown: graceful
+  forward-headers-strategy: ${JSH_FORWARD_HEADERS_STRATEGY:NONE}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: ${JSH_MANAGEMENT_ENDPOINTS:health,info}
   endpoint:
     health:
       probes:
