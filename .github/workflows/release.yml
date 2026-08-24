@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      dry_run:
+        description: 'Prepare and verify the release without pushing a release branch'
+        required: false
+        type: boolean
+        default: false
   pull_request:
     branches: [ main ]
     types: [ closed ]
