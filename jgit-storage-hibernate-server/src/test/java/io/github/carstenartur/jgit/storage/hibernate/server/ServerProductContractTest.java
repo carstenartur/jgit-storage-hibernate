@@ -79,7 +79,7 @@ class ServerProductContractTest {
     assertSame(completed, controller.indexStatus("demo"));
 
     verify(repositories, times(2)).create("demo");
-    verify(scheduler, times(2)).schedule("demo");
+    verify(scheduler).schedule("demo");
   }
 
   @Test

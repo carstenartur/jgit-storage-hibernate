@@ -10,11 +10,17 @@ package io.github.carstenartur.jgit.storage.hibernate.spring;
 
 import io.github.carstenartur.jgit.storage.hibernate.DefaultHibernateRepositoryFactory;
 import io.github.carstenartur.jgit.storage.hibernate.HibernateGitStorage;
+import io.github.carstenartur.jgit.storage.hibernate.HibernateStorageException;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryDeletionResult;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.Repository;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
@@ -26,17 +32,27 @@ public final class JgitRepositoryService {
 
   private final DefaultHibernateRepositoryFactory repositoryFactory;
   private final SessionFactory sessionFactory;
+  private final String defaultBranchRef;
 
   public JgitRepositoryService(
       DefaultHibernateRepositoryFactory repositoryFactory, SessionFactory sessionFactory) {
+    this(repositoryFactory, sessionFactory, "main");
+  }
+
+  public JgitRepositoryService(
+      DefaultHibernateRepositoryFactory repositoryFactory,
+      SessionFactory sessionFactory,
+      String defaultBranch) {
     this.repositoryFactory = Objects.requireNonNull(repositoryFactory, "repositoryFactory");
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
+    this.defaultBranchRef = requireDefaultBranchRef(defaultBranch);
   }
 
   /** Create the logical repository if absent and return its canonical name. */
   public RepositoryName create(String repositoryName) {
     RepositoryName name = requireSafeName(repositoryName);
-    try (HibernateGitStorage ignored = repositoryFactory.open(name)) {
+    try (HibernateGitStorage storage = repositoryFactory.open(name)) {
+      initializeUnbornHead(storage.repository(), name);
       return name;
     }
   }
@@ -72,5 +88,54 @@ public final class JgitRepositoryService {
           "repository name must use 1-255 letters, digits, '.', '_' or '-', must not end in .git and must not contain '..'");
     }
     return new RepositoryName(value);
+  }
+
+  private void initializeUnbornHead(Repository repository, RepositoryName repositoryName) {
+    try {
+      List<Ref> branches = repository.getRefDatabase().getRefsByPrefix(Constants.R_HEADS);
+      if (!branches.isEmpty()) {
+        return;
+      }
+
+      Ref head = repository.exactRef(Constants.HEAD);
+      if (head != null && !head.isSymbolic() && head.getObjectId() != null) {
+        return;
+      }
+      if (head != null
+          && head.isSymbolic()
+          && defaultBranchRef.equals(head.getTarget().getName())) {
+        return;
+      }
+
+      RefUpdate.Result result = repository.updateRef(Constants.HEAD).link(defaultBranchRef);
+      if (result != RefUpdate.Result.NEW
+          && result != RefUpdate.Result.FORCED
+          && result != RefUpdate.Result.NO_CHANGE) {
+        throw new HibernateStorageException(
+            "Could not set HEAD of repository "
+                + repositoryName
+                + " to "
+                + defaultBranchRef
+                + ": "
+                + result);
+      }
+    } catch (IOException exception) {
+      throw new HibernateStorageException(
+          "Could not initialize HEAD of repository "
+              + repositoryName
+              + " to "
+              + defaultBranchRef,
+          exception);
+    }
+  }
+
+  private static String requireDefaultBranchRef(String defaultBranch) {
+    String value = Objects.requireNonNull(defaultBranch, "defaultBranch").trim();
+    String refName = Constants.R_HEADS + value;
+    if (value.startsWith(Constants.R_REFS) || !Repository.isValidRefName(refName)) {
+      throw new IllegalArgumentException(
+          "default branch must be a valid short branch name but was '" + defaultBranch + "'");
+    }
+    return refName;
   }
 }

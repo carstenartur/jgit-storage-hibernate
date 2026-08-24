@@ -31,6 +31,7 @@ public class JgitStorageHibernateProperties {
   private boolean enabled = true;
   private SchemaAction schemaAction = SchemaAction.MIGRATE;
   private boolean baselineOnMigrate;
+  private String defaultBranch = "main";
   private final Search search = new Search();
   private final Map<String, String> hibernateProperties = new LinkedHashMap<>();
   private final List<String> repositories = new ArrayList<>();
@@ -57,6 +58,14 @@ public class JgitStorageHibernateProperties {
 
   public void setBaselineOnMigrate(boolean baselineOnMigrate) {
     this.baselineOnMigrate = baselineOnMigrate;
+  }
+
+  public String getDefaultBranch() {
+    return defaultBranch;
+  }
+
+  public void setDefaultBranch(String defaultBranch) {
+    this.defaultBranch = defaultBranch;
   }
 
   public Search getSearch() {

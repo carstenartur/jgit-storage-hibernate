@@ -33,11 +33,10 @@ jgit:
   storage:
     hibernate:
       schema-action: migrate
+      default-branch: ${JSH_DEFAULT_BRANCH:main}
       search:
         enabled: true
         directory: ${JSH_SEARCH_DIRECTORY:/var/lib/jgit-storage/search}
-      hibernate-properties:
-        hibernate.connection.provider_disables_autocommit: "true"
     server:
       authentication:
         username: ${JSH_ADMIN_USERNAME:admin}
