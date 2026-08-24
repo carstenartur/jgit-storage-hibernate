@@ -15,6 +15,16 @@ FULL_SHA_ACTION = re.compile(
     r"uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([0-9a-f]{40})(?:\s+#.*)?$",
     re.MULTILINE,
 )
+WRITE_ALL_PERMISSION = re.compile(
+    r"^\s*permissions:\s*write-all\s*(?:#.*)?$", re.MULTILINE
+)
+NAMED_WRITE_PERMISSION = re.compile(
+    r"^\s*[A-Za-z][A-Za-z0-9-]*:\s*write\s*(?:#.*)?$", re.MULTILINE
+)
+INLINE_WRITE_PERMISSION = re.compile(
+    r"^\s*permissions:\s*\{[^}\n]*\bwrite\b[^}\n]*\}\s*(?:#.*)?$",
+    re.MULTILINE,
+)
 
 
 class CiBadgeWorkflowTest(unittest.TestCase):
@@ -27,11 +37,16 @@ class CiBadgeWorkflowTest(unittest.TestCase):
 
     def test_ci_workflow_contains_no_pages_publication_job(self) -> None:
         self.assertNotIn("publish-build-badges:", self.ci)
-        self.assertNotIn("contents: write", self.ci)
         self.assertNotIn("git push origin HEAD:gh-pages", self.ci)
         self.assertIn("name: Java CI with Maven", self.ci)
         self.assertIn("name: Maven verification", self.ci)
         self.assertIn("name: Public Maven repository contract", self.ci)
+
+    def test_ci_workflow_cannot_acquire_write_permissions(self) -> None:
+        self.assertIn("permissions:\n  contents: read", self.ci)
+        self.assertNotRegex(self.ci, WRITE_ALL_PERMISSION)
+        self.assertNotRegex(self.ci, NAMED_WRITE_PERMISSION)
+        self.assertNotRegex(self.ci, INLINE_WRITE_PERMISSION)
 
     def test_publication_runs_only_after_successful_main_ci(self) -> None:
         self.assertIn("name: Publish build badges", self.publish)
