@@ -182,6 +182,8 @@ class ServerImagePublishWorkflowTest(unittest.TestCase):
         self.assertIn("compose.yaml", self.text)
         self.assertIn(".github/scripts/smoke_server_compose.sh", self.text)
         self.assertIn("printf 'image=%s@%s", self.text)
+        self.assertIn("printf -- '- Runtime smoke: passed\\n'", self.text)
+        self.assertNotIn("printf '- Runtime smoke: passed\\n'", self.text)
 
     def test_source_and_released_images_share_a_real_protocol_smoke(self) -> None:
         for fragment in (
@@ -208,6 +210,13 @@ class ServerImagePublishWorkflowTest(unittest.TestCase):
             "jsh_inspection.commit_change",
             "docker compose restart git-server",
             "git clone",
+        ):
+            self.assertIn(fragment, self.smoke_script)
+        for fragment in (
+            "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "${#repository} -gt 255",
+            '"$repository" == *.git',
+            '"$repository" == *..*',
         ):
             self.assertIn(fragment, self.smoke_script)
         actions = FULL_SHA_ACTION.findall(self.server_image_workflow)
