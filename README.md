@@ -1,6 +1,7 @@
 # jgit-storage-hibernate
 
 [![Java CI with Maven](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
+[![Server image](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/server-image.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/server-image.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/gh-pages/badges/coverage.json)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
 [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/gh-pages/badges/tests.json)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/maven.yml)
 [![JMH](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/gh-pages/badges/performance.json)](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
@@ -19,6 +20,26 @@ https://doi.org/10.5281/zenodo.21210132
 JGit is the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. `jgit-storage-hibernate` adds a relational storage backend plus persistent query models over that history: transaction-safe pack/ref publication, structured history queries and Lucene full-text search. The Java Analysis and Architecture modules additionally provide semantic in-memory analysis APIs; their module-owned database persistence is still incubating in the `0.1.x` line.
 
 The documented release line is **0.11.2**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
+
+## Standalone Docker/OCI server
+
+The published server image provides a PostgreSQL-backed Git Smart HTTP remote plus repository administration and searchable history. It is compatible with normal `git clone`, `fetch` and `push`, and with integrations that only need a Git URL and Basic authentication. It is **not** a drop-in Docker/configuration or vendor-API replacement for GitLab, Gitea or Bitbucket, and it does not provide SSH, Git LFS, pull requests, issues or a plugin runtime.
+
+```bash
+export JSH_DATABASE_PASSWORD='replace-with-a-long-random-database-password'
+export JSH_ADMIN_PASSWORD='replace-with-a-long-random-admin-password'
+export JSH_IMAGE='ghcr.io/carstenartur/jgit-storage-hibernate-server:latest'
+
+docker compose pull
+docker compose up -d
+curl --fail http://localhost:8080/actuator/health/readiness
+curl --fail-with-body -u "admin:$JSH_ADMIN_PASSWORD" \
+  -X POST http://localhost:8080/api/repositories/demo
+
+git clone http://localhost:8080/git/demo.git
+```
+
+Use an immutable `X.Y.Z` tag or digest for production. See the complete [Standalone Docker/OCI Git server guide](docs/operations/server-image.md) for image tags, configuration, persistence, TLS, APIs, local builds and the compatibility matrix.
 
 The important distinction is not merely that the library saves application code. It changes **when and how often** expensive work is performed:
 
@@ -108,7 +129,7 @@ Git objects and refs remain authoritative. Search, Java Analysis and Architectur
 
 ## Module guide
 
-Security and Smart HTTP are published artifacts in the documented `0.11.0` release.
+The documented release line is **0.11.2**.
 
 | Module | Choose it when... | Persistence/runtime contract |
 |---|---|---|
@@ -116,6 +137,9 @@ Security and Smart HTTP are published artifacts in the documented `0.11.0` relea
 | `jgit-storage-hibernate-security` | You need principals/groups, repository/ref ACLs, local credentials or tokens, revocation and durable authorization/identity audit. | Own Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server; principal-bound direct-JGit enforcement |
 | `jgit-storage-hibernate-smart-http` | You expose authenticated clone, fetch and push through JGit Smart HTTP. | No schema; optional Servlet/JGit HTTP adapter over Core's final ref checks |
 | `jgit-storage-hibernate-search` | Users or services need repeated audit, reporting or content-search queries. | Versioned Flyway migrations for H2 and PostgreSQL |
+| `jgit-storage-hibernate-spring-boot-starter` | You embed the same storage and optional Search services in a Spring Boot application. | Dedicated module-owned SessionFactory and Flyway orchestration over an application DataSource |
+| `jgit-storage-hibernate-server` | You need the ready-made PostgreSQL-backed Smart HTTP and history-query service. | Executable Spring Boot server and OCI image; single-admin Basic-auth deployment |
+| `jgit-storage-hibernate-testcontainers` | Integration tests should run the same server image and inspect PostgreSQL evidence. | Typed server/PostgreSQL Testcontainers environment |
 | `jgit-storage-hibernate-java-analysis` | You need to know which logical Java declaration changed and which versions are affected. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-architecture` | You need explainable architecture drift and decision provenance. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-benchmarks` | You maintain or review backend performance. | Not a runtime dependency |
@@ -149,7 +173,7 @@ No GitHub token or Maven Central account is required.
 </dependency>
 ```
 
-Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security and Smart HTTP are independently selectable in the documented `0.11.0` release; source/reactor builds keep them aligned through `${project.version}`.
+Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security, Smart HTTP, Spring Boot integration, the standalone server and Testcontainers are independently selectable in the documented `0.11.2` release; source/reactor builds keep them aligned through `${project.version}`.
 
 ### 3. Apply the packaged migration before Hibernate starts
 
@@ -232,6 +256,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 
 ## Documentation
 
+- [Standalone Docker/OCI Git server](docs/operations/server-image.md)
 - [Performance status and distance to the ceiling](docs/performance-status.md)
 - [Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)
 - [Benchmark methodology](docs/benchmarks.md)

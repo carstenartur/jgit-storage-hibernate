@@ -52,6 +52,7 @@ class UpdateReleaseDocumentationTest(unittest.TestCase):
                     </dependency>
 
                     Coordinate: io.github.carstenartur:jgit-storage-hibernate-core:0.1.5
+                    Image: ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.5
                     Historical migration baseline: 0.1.4
                     """
                 ).lstrip(),
@@ -72,7 +73,8 @@ The legacy migration baseline remains 0.1.4.
             self.write(
                 root / "docs/releases/0.1.5.md",
                 "The documented release line is **0.1.5**.\n"
-                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n",
+                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n"
+                "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.5\n",
             )
             self.write(
                 root / "jgit-storage-hibernate-core/README.md",
@@ -108,6 +110,10 @@ The legacy migration baseline remains 0.1.4.
                 "io.github.carstenartur:jgit-storage-hibernate-core:0.1.6",
                 readme,
             )
+            self.assertIn(
+                "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.6",
+                readme,
+            )
             self.assertIn("<groupId>com.example</groupId>", readme)
             self.assertIn("<version>X.Y.Z</version>", readme)
             self.assertIn("Historical migration baseline: 0.1.4", readme)
@@ -117,7 +123,8 @@ The legacy migration baseline remains 0.1.4.
             self.assertIn("<version>0.1.6</version>", module_readme)
             self.assertEqual(
                 "The documented release line is **0.1.5**.\n"
-                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n",
+                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n"
+                "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.5\n",
                 release_note,
             )
 

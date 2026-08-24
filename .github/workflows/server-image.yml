@@ -1,51 +1,87 @@
-name: Server image and Git protocol smoke
+name: Server image, Git protocol smoke and edge publication
 
 on:
   pull_request:
     branches: [ main ]
     paths:
       - 'pom.xml'
+      - 'README.md'
       - 'compose.yaml'
+      - 'compose.build.yaml'
+      - 'docs/operations/server-image.md'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
       - 'jgit-storage-hibernate-smart-http/**'
       - 'jgit-storage-hibernate-spring-boot-*/**'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/verify-server-image-delivery.py'
       - '.github/workflows/server-image.yml'
+      - '.github/workflows/server-image-release.yml'
   push:
     branches: [ main ]
     paths:
       - 'pom.xml'
+      - 'README.md'
       - 'compose.yaml'
+      - 'compose.build.yaml'
+      - 'docs/operations/server-image.md'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
       - 'jgit-storage-hibernate-smart-http/**'
       - 'jgit-storage-hibernate-spring-boot-*/**'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/verify-server-image-delivery.py'
       - '.github/workflows/server-image.yml'
+      - '.github/workflows/server-image-release.yml'
   workflow_dispatch:
+    inputs:
+      publish_edge:
+        description: 'Publish the selected main commit as edge and sha-* after the smoke test'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: server-image-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  IMAGE_NAME: ghcr.io/carstenartur/jgit-storage-hibernate-server
+
 jobs:
-  smoke:
-    name: Build image, push Git history and inspect PostgreSQL
+  smoke-and-publish:
+    name: Build image, push Git history and publish verified edge
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       JSH_ADMIN_USERNAME: admin
       JSH_ADMIN_PASSWORD: ci-password
       JSH_DATABASE_PASSWORD: ci-database-password
+      JSH_IMAGE: jgit-storage-hibernate-server:ci
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Require main for manual edge publication
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_edge }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = 'refs/heads/main' || {
+            echo '::error::Manual edge publication must select the main branch.'
+            exit 1
+          }
+
+      - name: Verify server image delivery contract
+        run: python3 .github/scripts/verify-server-image-delivery.py
 
       - name: Set up JDK 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
@@ -61,17 +97,20 @@ jobs:
             -am verify
 
       - name: Build and start PostgreSQL-backed server
+        shell: bash
         run: |
-          docker compose build git-server
-          docker compose up -d postgres git-server
+          set -euo pipefail
+          compose=(docker compose -f compose.yaml -f compose.build.yaml)
+          "${compose[@]}" build git-server
+          "${compose[@]}" up -d postgres git-server
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null; then
               exit 0
             fi
             sleep 2
           done
-          docker compose ps
-          docker compose logs git-server
+          "${compose[@]}" ps
+          "${compose[@]}" logs git-server
           exit 1
 
       - name: Push with normal Git and query indexed history
@@ -130,7 +169,7 @@ jobs:
             'http://localhost:8080/api/repositories/smoke/changes?path=README.md&pathMode=exact' \
             | grep -q 'Add smoke history'
 
-          rows=$(docker compose exec -T postgres \
+          rows=$(docker compose -f compose.yaml -f compose.build.yaml exec -T postgres \
             psql -U jgit -d jgit -Atc \
             "select count(*) from jsh_inspection.commit_change where repository_name='smoke' and path='README.md'")
           test "$rows" = 1
@@ -139,7 +178,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker compose restart git-server
+          compose=(docker compose -f compose.yaml -f compose.build.yaml)
+          "${compose[@]}" restart git-server
           ready=false
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null; then
@@ -150,7 +190,7 @@ jobs:
           done
           if [[ "$ready" != true ]]; then
             printf 'Server did not become ready after restart.\n' >&2
-            docker compose logs git-server >&2
+            "${compose[@]}" logs git-server >&2
             exit 1
           fi
 
@@ -169,9 +209,83 @@ jobs:
       - name: Report logs on failure
         if: failure()
         run: |
-          docker compose ps || true
-          docker compose logs postgres git-server || true
+          docker compose -f compose.yaml -f compose.build.yaml ps || true
+          docker compose -f compose.yaml -f compose.build.yaml logs postgres git-server || true
 
-      - name: Stop containers
+      - name: Stop smoke containers
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: docker compose -f compose.yaml -f compose.build.yaml down -v --remove-orphans
+
+      - name: Resolve edge publication
+        id: publish
+        shell: bash
+        env:
+          MANUAL_PUBLISH: ${{ inputs.publish_edge || false }}
+        run: |
+          set -euo pipefail
+          publish=false
+          if [[ "${GITHUB_EVENT_NAME}" == push && "${GITHUB_REF}" == refs/heads/main ]]; then
+            publish=true
+          elif [[ "${GITHUB_EVENT_NAME}" == workflow_dispatch && "${MANUAL_PUBLISH}" == true ]]; then
+            publish=true
+          fi
+          source_sha=$(git rev-parse HEAD)
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${source_sha:0:12}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: steps.publish.outputs.publish == 'true'
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        if: steps.publish.outputs.publish == 'true'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GHCR
+        if: steps.publish.outputs.publish == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive edge image metadata
+        if: steps.publish.outputs.publish == 'true'
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=edge
+            type=raw,value=sha-${{ steps.publish.outputs.short_sha }}
+          labels: |
+            org.opencontainers.image.title=jgit-storage-hibernate server
+            org.opencontainers.image.description=PostgreSQL-backed Git Smart HTTP server with searchable history
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.publish.outputs.source_sha }}
+            org.opencontainers.image.licenses=BSD-3-Clause
+
+      - name: Publish edge and commit-addressable images
+        if: steps.publish.outputs.publish == 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: jgit-storage-hibernate-server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=jgit-storage-hibernate-server
+          cache-to: type=gha,mode=max,scope=jgit-storage-hibernate-server
+          provenance: mode=max
+          sbom: true
+
+      - name: Anonymous pull verifies public edge delivery
+        if: steps.publish.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io
+          docker pull "${IMAGE_NAME}:edge"

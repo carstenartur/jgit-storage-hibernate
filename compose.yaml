@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: jgit
       POSTGRES_USER: jgit
-      POSTGRES_PASSWORD: ${JSH_DATABASE_PASSWORD:-jgit}
+      POSTGRES_PASSWORD: ${JSH_DATABASE_PASSWORD:?Set JSH_DATABASE_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jgit -d jgit"]
       interval: 5s
@@ -14,18 +14,18 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   git-server:
-    build:
-      context: .
-      dockerfile: jgit-storage-hibernate-server/Dockerfile
-    image: ghcr.io/carstenartur/jgit-storage-hibernate-server:edge
+    image: ${JSH_IMAGE:-ghcr.io/carstenartur/jgit-storage-hibernate-server:latest}
     environment:
       JSH_JDBC_URL: jdbc:postgresql://postgres:5432/jgit
       JSH_JDBC_USERNAME: jgit
-      JSH_JDBC_PASSWORD: ${JSH_DATABASE_PASSWORD:-jgit}
+      JSH_JDBC_PASSWORD: ${JSH_DATABASE_PASSWORD:?Set JSH_DATABASE_PASSWORD}
       JSH_ADMIN_USERNAME: ${JSH_ADMIN_USERNAME:-admin}
-      JSH_ADMIN_PASSWORD: ${JSH_ADMIN_PASSWORD:-change-me}
+      JSH_ADMIN_PASSWORD: ${JSH_ADMIN_PASSWORD:?Set JSH_ADMIN_PASSWORD}
+      JSH_DEFAULT_BRANCH: ${JSH_DEFAULT_BRANCH:-main}
       JSH_SEARCH_DIRECTORY: /var/lib/jgit-storage/search
       JSH_REQUIRE_SECURE_TRANSPORT: ${JSH_REQUIRE_SECURE_TRANSPORT:-false}
+      JSH_INDEXING_THREADS: ${JSH_INDEXING_THREADS:-2}
+      JSH_INSPECTION_VIEWS_ENABLED: ${JSH_INSPECTION_VIEWS_ENABLED:-true}
     depends_on:
       postgres:
         condition: service_healthy

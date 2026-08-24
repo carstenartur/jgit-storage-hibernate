@@ -23,6 +23,10 @@ PROJECT_COORDINATE = re.compile(
     r"(io\.github\.carstenartur:jgit-storage-hibernate-[A-Za-z0-9_.-]+:)"
     r"([0-9]+\.[0-9]+\.[0-9]+(?:-SNAPSHOT)?)"
 )
+SERVER_IMAGE_REFERENCE = re.compile(
+    r"(ghcr\.io/carstenartur/jgit-storage-hibernate-server:)"
+    r"([0-9]+\.[0-9]+\.[0-9]+)"
+)
 DOCUMENTED_RELEASE_LINE = re.compile(
     r"(The documented release line is \*\*)([0-9]+\.[0-9]+\.[0-9]+)(\*\*)"
 )
@@ -153,11 +157,12 @@ def update_dependency_block(block: str, version: str) -> tuple[str, bool]:
 
 
 def update_public_documentation(version: str) -> list[Path]:
-    """Advance active public dependency examples to the release being created.
+    """Advance active public dependency and server-image examples to a release.
 
     Historical release notes are excluded. Other historical version references, such as the
     0.1.4 migration baseline, are preserved because only project dependency declarations,
-    project coordinates, and explicit documented-release sentences are rewritten.
+    project coordinates, explicit server-image references, and documented-release sentences
+    are rewritten.
     """
     if not RELEASE_SEMVER.fullmatch(version):
         raise SystemExit(
@@ -192,6 +197,10 @@ def update_public_documentation(version: str) -> list[Path]:
             lambda match: match.group(1) + version,
             updated,
         )
+        updated, image_changes = SERVER_IMAGE_REFERENCE.subn(
+            lambda match: match.group(1) + version,
+            updated,
+        )
         updated, release_line_changes = DOCUMENTED_RELEASE_LINE.subn(
             lambda match: match.group(1) + version + match.group(3),
             updated,
@@ -201,10 +210,11 @@ def update_public_documentation(version: str) -> list[Path]:
             path.write_text(updated, encoding="utf-8")
             changed.append(path)
 
-        if dependency_changes or coordinate_changes or release_line_changes:
+        if dependency_changes or coordinate_changes or image_changes or release_line_changes:
             print(
                 f"Updated {path}: dependencies={dependency_changes}, "
-                f"coordinates={coordinate_changes}, release-lines={release_line_changes}"
+                f"coordinates={coordinate_changes}, images={image_changes}, "
+                f"release-lines={release_line_changes}"
             )
 
     DOCUMENTATION_VERSION_FILE.write_text(version + "\n", encoding="utf-8")
