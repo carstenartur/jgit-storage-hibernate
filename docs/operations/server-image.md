@@ -25,6 +25,19 @@ It is a useful replacement for a simple HTTP Git remote when consumers only need
 
 The library modules offer lower-level security and embedding APIs for applications that need a richer identity or authorization model. The ready-made standalone image intentionally remains a bounded single-admin deployment.
 
+## One-time GHCR visibility bootstrap
+
+GitHub Container Registry creates a newly published container package as **private**, even when the source repository is public. Repository linking and inherited repository permissions do not change package visibility.
+
+The publication workflows therefore use a deliberate two-stage gate:
+
+1. build, test and push the image with the repository `GITHUB_TOKEN`;
+2. log out of GHCR and require an anonymous pull.
+
+On the first publication, the anonymous pull is expected to fail until the repository owner opens the package settings, selects **Change visibility → Public**, confirms the irreversible change, and reruns the failed workflow. The failed job prints and records the exact package-settings URL in its job summary.
+
+Once public visibility has been established, all later `edge`, commit and release publications must pass the anonymous-pull gate automatically. This manual bootstrap is intentionally not hidden: GitHub's supported visibility procedure is an account-level package setting, and making a package public cannot later be undone.
+
 ## Use a published image
 
 Create an `.env` file next to `compose.yaml` and choose non-demo secrets:

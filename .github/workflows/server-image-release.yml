@@ -204,4 +204,18 @@ jobs:
         run: |
           set -euo pipefail
           docker logout ghcr.io
-          docker pull "${IMAGE_NAME}:${{ steps.release.outputs.version }}"
+          image="${IMAGE_NAME}:${{ steps.release.outputs.version }}"
+          settings="https://github.com/users/${GITHUB_REPOSITORY_OWNER}/packages/container/jgit-storage-hibernate-server/settings"
+          if ! docker pull "$image"; then
+            echo "::error title=GHCR package is not public::The image was published, but GitHub initializes new container packages as private. Open $settings, choose Change visibility -> Public, then rerun this workflow."
+            {
+              echo '### One-time GHCR visibility bootstrap required'
+              echo
+              echo "The image push succeeded, but an anonymous pull of \`$image\` failed because the new package is not public."
+              echo
+              echo "Open: $settings"
+              echo
+              echo 'Choose **Change visibility → Public**, confirm the irreversible change, and rerun this workflow.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

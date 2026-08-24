@@ -102,6 +102,9 @@ def main() -> int:
         require(workflow, "provenance: mode=max", relative, errors)
         require(workflow, "sbom: true", relative, errors)
         require(workflow, "Anonymous pull", relative, errors)
+        require(workflow, "GHCR package is not public", relative, errors)
+        require(workflow, "Change visibility", relative, errors)
+        require(workflow, "GITHUB_STEP_SUMMARY", relative, errors)
         require(workflow, "verify-server-image-delivery.py", relative, errors)
 
     require(edge_workflow, "value=edge", ".github/workflows/server-image.yml", errors)
@@ -149,6 +152,13 @@ def main() -> int:
     require(guide, "`X.Y.Z`", "docs/operations/server-image.md", errors)
     require(guide, "`edge`", "docs/operations/server-image.md", errors)
     require(guide, "`latest`", "docs/operations/server-image.md", errors)
+    require(
+        guide,
+        "One-time GHCR visibility bootstrap",
+        "docs/operations/server-image.md",
+        errors,
+    )
+    require(guide, "Change visibility", "docs/operations/server-image.md", errors)
     require(
         testcontainers_readme,
         "Stable suites must pin an immutable full release tag or digest",
