@@ -1,0 +1,4 @@
+{
+  "release_tag": "v0.11.2",
+  "purpose": "Backfill the published standalone server image from the existing immutable release tag."
+}
