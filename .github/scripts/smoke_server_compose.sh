@@ -6,8 +6,12 @@ set -euo pipefail
 
 base_url="${JSH_BASE_URL:-http://localhost:8080}"
 repository="${SMOKE_REPOSITORY:-smoke}"
-if [[ ! "$repository" =~ ^[A-Za-z0-9._-]+$ ]]; then
-  printf 'SMOKE_REPOSITORY contains unsupported characters: %s\n' "$repository" >&2
+if [[ ! "$repository" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+    || [[ ${#repository} -gt 255 ]] \
+    || [[ "$repository" == *.git ]] \
+    || [[ "$repository" == *..* ]]; then
+  printf 'Invalid SMOKE_REPOSITORY %s: use 1-255 letters, digits, dot, underscore or hyphen; do not end in .git or contain two consecutive dots.\n' \
+    "$repository" >&2
   exit 1
 fi
 
