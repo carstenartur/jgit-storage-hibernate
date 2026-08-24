@@ -140,16 +140,30 @@ jobs:
         run: |
           set -euo pipefail
           docker compose restart git-server
+          ready=false
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null; then
+              ready=true
               break
             fi
             sleep 2
           done
+          if [[ "$ready" != true ]]; then
+            printf 'Server did not become ready after restart.\n' >&2
+            docker compose logs git-server >&2
+            exit 1
+          fi
+
           auth=$(printf '%s' "$JSH_ADMIN_USERNAME:$JSH_ADMIN_PASSWORD" | base64 -w0)
+          remote=http://localhost:8080/git/smoke.git
+          git -c "http.extraHeader=Authorization: Basic $auth" \
+            ls-remote --symref "$remote" HEAD \
+            | grep -Eq '^ref: refs/heads/main[[:space:]]+HEAD$'
+
           clone=$(mktemp -d)
           git -c "http.extraHeader=Authorization: Basic $auth" \
-            clone http://localhost:8080/git/smoke.git "$clone/repository"
+            clone "$remote" "$clone/repository"
+          test "$(git -C "$clone/repository" symbolic-ref --short HEAD)" = 'main'
           test "$(git -C "$clone/repository" log -1 --format=%s)" = 'Add smoke history'
 
       - name: Report logs on failure
