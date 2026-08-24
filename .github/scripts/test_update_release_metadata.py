@@ -52,6 +52,7 @@ class UpdateReleaseDocumentationTest(unittest.TestCase):
                     </dependency>
 
                     Coordinate: io.github.carstenartur:jgit-storage-hibernate-core:0.1.5
+                    Image: ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.5
                     Historical migration baseline: 0.1.4
                     """
                 ).lstrip(),
@@ -72,7 +73,8 @@ The legacy migration baseline remains 0.1.4.
             self.write(
                 root / "docs/releases/0.1.5.md",
                 "The documented release line is **0.1.5**.\n"
-                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n",
+                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n"
+                "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.5\n",
             )
             self.write(
                 root / "jgit-storage-hibernate-core/README.md",
@@ -108,6 +110,10 @@ The legacy migration baseline remains 0.1.4.
                 "io.github.carstenartur:jgit-storage-hibernate-core:0.1.6",
                 readme,
             )
+            self.assertIn(
+                "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.6",
+                readme,
+            )
             self.assertIn("<groupId>com.example</groupId>", readme)
             self.assertIn("<version>X.Y.Z</version>", readme)
             self.assertIn("Historical migration baseline: 0.1.4", readme)
@@ -117,7 +123,8 @@ The legacy migration baseline remains 0.1.4.
             self.assertIn("<version>0.1.6</version>", module_readme)
             self.assertEqual(
                 "The documented release line is **0.1.5**.\n"
-                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n",
+                "io.github.carstenartur:jgit-storage-hibernate-core:0.1.5\n"
+                "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.1.5\n",
                 release_note,
             )
 
@@ -150,6 +157,58 @@ Security fixes are provided for the latest released `0.1.x` version.
             self.assertEqual(4, policy.count("0.9.x"))
             self.assertIn("`0.9.x-SNAPSHOT`", policy)
 
+    def test_release_advances_stable_server_image_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write(
+                root / "compose.yaml",
+                "image: ${JSH_SERVER_IMAGE:-"
+                "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2}\n",
+            )
+            container = (
+                root
+                / "jgit-storage-hibernate-testcontainers/src/main/java/"
+                "io/github/carstenartur/jgit/storage/hibernate/testcontainers/"
+                "JgitStorageContainer.java"
+            )
+            self.write(
+                container,
+                'public static final String DEFAULT_IMAGE_VERSION = "0.11.2";\n',
+            )
+
+            previous_directory = Path.cwd()
+            os.chdir(root)
+            try:
+                changed = UPDATE_RELEASE_METADATA.update_server_image_defaults(
+                    "0.11.3"
+                )
+            finally:
+                os.chdir(previous_directory)
+
+            self.assertEqual(
+                {
+                    Path("compose.yaml"),
+                    Path(
+                        "jgit-storage-hibernate-testcontainers/src/main/java/"
+                        "io/github/carstenartur/jgit/storage/hibernate/"
+                        "testcontainers/JgitStorageContainer.java"
+                    ),
+                },
+                set(changed),
+            )
+            self.assertIn(
+                "jgit-storage-hibernate-server:0.11.3}",
+                (root / "compose.yaml").read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                'DEFAULT_IMAGE_VERSION = "0.11.3"',
+                container.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "update_server_image_defaults(version)",
+                SCRIPT.read_text(encoding="utf-8"),
+            )
+
     def test_snapshot_is_rejected_as_public_release_version(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -159,6 +218,10 @@ Security fixes are provided for the latest released `0.1.x` version.
             try:
                 with self.assertRaises(SystemExit):
                     UPDATE_RELEASE_METADATA.update_public_documentation("0.1.6-SNAPSHOT")
+                with self.assertRaises(SystemExit):
+                    UPDATE_RELEASE_METADATA.update_server_image_defaults(
+                        "0.1.6-SNAPSHOT"
+                    )
             finally:
                 os.chdir(previous_directory)
 
@@ -171,6 +234,12 @@ Security fixes are provided for the latest released `0.1.x` version.
                 "CITATION.md": "Version 0.11.2.\ndate = {2026-08-24},\n",
                 "codemeta.json": '{"version":"0.11.2","datePublished":"2026-08-24"}\n',
                 ".zenodo.json": '{"version":"0.11.2","publication_date":"2026-08-24"}\n',
+                "compose.yaml": "image: ${JSH_SERVER_IMAGE:-ghcr.io/carstenartur/"
+                "jgit-storage-hibernate-server:0.11.2}\n",
+                "jgit-storage-hibernate-testcontainers/src/main/java/"
+                "io/github/carstenartur/jgit/storage/hibernate/testcontainers/"
+                "JgitStorageContainer.java":
+                'public static final String DEFAULT_IMAGE_VERSION = "0.11.2";\n',
             }
             for name, content in expected.items():
                 self.write(root / name, content)
