@@ -42,17 +42,17 @@ chmod 600 .env
 ${EDITOR:-vi} .env            # set JSH_DATABASE_PASSWORD and JSH_ADMIN_PASSWORD
 
 docker compose config --quiet
-docker compose config --images # shows PostgreSQL and the published GHCR server image
+docker compose config --images  # shows PostgreSQL and the published GHCR server image
 docker compose pull postgres git-server
-docker compose up --no-build -d postgres git-server
+docker compose up --no-build --detach --wait postgres git-server
 docker compose ps
 curl --fail http://localhost:8080/actuator/health/readiness
 ```
 
-`compose.yaml` maps the `git-server` service to the GHCR image shown above. `docker compose pull
-... git-server` downloads that image; `docker compose up --no-build ... git-server` creates and starts
-a container from it without building this repository's source. PostgreSQL is started alongside it
-because the server stores Git data there.
+The `git-server` target in `docker compose pull` downloads the GHCR image shown above. The same target
+in `docker compose up --no-build` creates and starts a container from that published image; it cannot
+fall back to compiling the repository source. PostgreSQL is started alongside it because the server
+stores Git data there.
 
 The endpoint works with normal Git CLI, JGit and IDE Smart HTTP clone/fetch/push operations. It is
 **not** a drop-in replacement for GitLab, Gitea, Gerrit or other forge images when consumers depend on
