@@ -64,7 +64,7 @@
     <jgit.version>7.7.1.202607240634-r</jgit.version>
     <hibernate.version>7.4.5.Final</hibernate.version>
     <hibernate-search.version>8.4.0.Final</hibernate-search.version>
-    <spring-boot.version>4.1.0</spring-boot.version>
+    <spring-boot.version>4.1.1</spring-boot.version>
     <flyway.version>13.3.0</flyway.version>
     <jackson3-bom.version>3.1.5</jackson3-bom.version>
     <testcontainers.version>2.0.5</testcontainers.version>
