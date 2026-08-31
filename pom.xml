@@ -62,7 +62,7 @@
     <project.build.outputTimestamp>2026-08-24T08:20:53Z</project.build.outputTimestamp>
 
     <jgit.version>7.7.1.202607240634-r</jgit.version>
-    <hibernate.version>7.4.5.Final</hibernate.version>
+    <hibernate.version>7.4.6.Final</hibernate.version>
     <hibernate-search.version>8.4.0.Final</hibernate-search.version>
     <spring-boot.version>4.1.1</spring-boot.version>
     <flyway.version>13.4.0</flyway.version>
