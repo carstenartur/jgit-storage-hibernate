@@ -69,8 +69,11 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
         )
 
     def test_transient_maven_central_throttling_is_retried(self) -> None:
-        retry = "-Dmaven.wagon.http.retryHandler.count=5"
-        self.assertGreaterEqual(self.workflow.count(retry), 6)
+        for retry in (
+            "-Daether.transport.http.retryHandler.count=5",
+            "-Dmaven.wagon.http.retryHandler.count=5",
+        ):
+            self.assertGreaterEqual(self.workflow.count(retry), 6)
 
     def test_java_runner_supports_validated_backend_and_cache_shards(self) -> None:
         for fragment in (
