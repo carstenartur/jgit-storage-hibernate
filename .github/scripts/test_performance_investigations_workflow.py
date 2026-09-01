@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 WORKFLOW = ROOT / ".github/workflows/performance-investigations.yml"
+MAVEN_JVM_CONFIG = ROOT / ".mvn/jvm.config"
 BENCHMARK_IT = (
     ROOT
     / "jgit-storage-hibernate-benchmarks/src/test/java/"
@@ -21,6 +22,7 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.workflow = WORKFLOW.read_text(encoding="utf-8")
+        cls.maven_jvm_config = MAVEN_JVM_CONFIG.read_text(encoding="utf-8")
         cls.benchmark_it = BENCHMARK_IT.read_text(encoding="utf-8")
 
     def section(self, start: str, end: str) -> str:
@@ -73,7 +75,7 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
             "-Daether.transport.http.retryHandler.count=5",
             "-Dmaven.wagon.http.retryHandler.count=5",
         ):
-            self.assertGreaterEqual(self.workflow.count(retry), 6)
+            self.assertIn(retry, self.maven_jvm_config)
 
     def test_java_runner_supports_validated_backend_and_cache_shards(self) -> None:
         for fragment in (
