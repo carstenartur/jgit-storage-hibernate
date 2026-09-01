@@ -96,6 +96,45 @@ class PublishedServerVersionSelectorTest(unittest.TestCase):
                 "release/prepare-0.11.3",
             )
 
+    def test_release_candidate_rejects_invalid_source_commit(self) -> None:
+        (self.repository / ".github/release-candidate.json").write_text(
+            json.dumps({"source_commit": "main"}) + "\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "Release candidate source_commit must be a full lowercase commit SHA",
+        ):
+            SELECTOR.select_version(
+                self.repository,
+                "workflow_dispatch",
+                "release/prepare-0.11.3",
+            )
+
+    def test_pull_request_requires_full_base_sha(self) -> None:
+        for base_sha in (None, "main", "--help", "A" * 40):
+            with self.subTest(base_sha=base_sha):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "Pull-request base_sha must be a full lowercase commit SHA",
+                ):
+                    SELECTOR.select_version(
+                        self.repository,
+                        "pull_request",
+                        "332/merge",
+                        base_sha,
+                    )
+
+    def test_git_lookup_rejects_option_like_revision(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, "Git revision must be a full lowercase commit SHA"
+        ):
+            SELECTOR._read_git_file(
+                self.repository,
+                "--help",
+                Path("docs/current-release-version.txt"),
+            )
+
     def test_invalid_release_version_is_rejected(self) -> None:
         (self.repository / "docs/current-release-version.txt").write_text(
             "0.11.3-SNAPSHOT\n", encoding="utf-8"
