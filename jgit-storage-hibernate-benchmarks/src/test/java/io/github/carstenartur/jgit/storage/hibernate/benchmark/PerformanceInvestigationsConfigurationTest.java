@@ -22,8 +22,7 @@ class PerformanceInvestigationsConfigurationTest {
     String[] defaults = {"hsqldb", "postgresql", "postgresql-hikari"};
 
     String[] selected =
-        PerformanceInvestigationsBenchmarkIT.selectParameterValues(
-            "backend", null, defaults, defaults);
+        PerformanceInvestigationParameters.select("backend", null, defaults, defaults);
 
     assertArrayEquals(defaults, selected);
     assertNotSame(defaults, selected);
@@ -32,7 +31,7 @@ class PerformanceInvestigationsConfigurationTest {
   @Test
   void explicitShardSelectionProducesOneTrimmedParameterValue() {
     String[] selected =
-        PerformanceInvestigationsBenchmarkIT.selectParameterValues(
+        PerformanceInvestigationParameters.select(
             "cache-state", " warm ", new String[] {"cold", "warm"}, "cold", "warm");
 
     assertArrayEquals(new String[] {"warm"}, selected);
@@ -44,7 +43,7 @@ class PerformanceInvestigationsConfigurationTest {
         assertThrows(
             IllegalArgumentException.class,
             () ->
-                PerformanceInvestigationsBenchmarkIT.selectParameterValues(
+                PerformanceInvestigationParameters.select(
                     "backend",
                     "filesystem",
                     new String[] {"hsqldb", "postgresql"},
