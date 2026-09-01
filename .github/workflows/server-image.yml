@@ -118,6 +118,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
+          # For pull requests the selector performs the equivalent of
+          # git show "$BASE_SHA:docs/current-release-version.txt"
           selector_args=(
             --event-name "$GITHUB_EVENT_NAME"
             --ref-name "$GITHUB_REF_NAME"
