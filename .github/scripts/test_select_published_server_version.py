@@ -24,15 +24,15 @@ class PublishedServerVersionSelectorTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.repository = Path(self.temporary.name)
-        self.run("git", "init", "-q")
-        self.run("git", "config", "user.name", "Test")
-        self.run("git", "config", "user.email", "test@example.invalid")
+        self.run_command("git", "init", "-q")
+        self.run_command("git", "config", "user.name", "Test")
+        self.run_command("git", "config", "user.email", "test@example.invalid")
 
         current_release = self.repository / "docs/current-release-version.txt"
         current_release.parent.mkdir(parents=True)
         current_release.write_text("0.11.2\n", encoding="utf-8")
-        self.run("git", "add", ".")
-        self.run("git", "commit", "-q", "-m", "published release")
+        self.run_command("git", "add", ".")
+        self.run_command("git", "commit", "-q", "-m", "published release")
         self.source_commit = self.output("git", "rev-parse", "HEAD")
 
         current_release.write_text("0.11.3\n", encoding="utf-8")
@@ -49,8 +49,8 @@ class PublishedServerVersionSelectorTest(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        self.run("git", "add", ".")
-        self.run("git", "commit", "-q", "-m", "release candidate")
+        self.run_command("git", "add", ".")
+        self.run_command("git", "commit", "-q", "-m", "release candidate")
 
     def test_release_candidate_dispatch_uses_recorded_source_release(self) -> None:
         self.assertEqual(
@@ -107,7 +107,7 @@ class PublishedServerVersionSelectorTest(unittest.TestCase):
                 "main",
             )
 
-    def run(self, *command: str) -> None:
+    def run_command(self, *command: str) -> None:
         subprocess.run(command, cwd=self.repository, check=True)
 
     def output(self, *command: str) -> str:
