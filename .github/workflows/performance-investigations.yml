@@ -19,6 +19,7 @@ on:
       - '.github/workflows/performance-investigations.yml'
       - '.github/scripts/convert-jmh-repository-aging.py'
       - '.github/scripts/test_convert_jmh_repository_aging.py'
+      - '.github/scripts/test_performance_investigations_workflow.py'
       - 'pom.xml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -28,6 +29,7 @@ on:
       - '.github/workflows/performance-investigations.yml'
       - '.github/scripts/convert-jmh-repository-aging.py'
       - '.github/scripts/test_convert_jmh_repository_aging.py'
+      - '.github/scripts/test_performance_investigations_workflow.py'
       - 'pom.xml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
@@ -40,8 +42,22 @@ permissions:
   contents: read
 
 jobs:
+  contract:
+    name: Performance investigation workflow contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate sharding and aggregation contract
+        run: |
+          python3 -m py_compile .github/scripts/test_performance_investigations_workflow.py
+          python3 .github/scripts/test_performance_investigations_workflow.py
+
   investigate:
     name: ${{ matrix.investigation }} (${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }})
+    needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -50,7 +66,6 @@ jobs:
         investigation:
           - write-queue
           - read-ahead
-          - repository-aging
           - concurrent-large-pack
 
     steps:
@@ -64,18 +79,13 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Validate repository-aging evidence converter
-        if: matrix.investigation == 'repository-aging'
-        run: |
-          python3 -m py_compile .github/scripts/convert-jmh-repository-aging.py .github/scripts/test_convert_jmh_repository_aging.py
-          python3 .github/scripts/test_convert_jmh_repository_aging.py
-
       - name: Build benchmark module with Maven
         shell: bash
         run: |
           mkdir -p "target/investigations/${{ matrix.investigation }}"
           set -o pipefail
-          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
             | tee "target/investigations/${{ matrix.investigation }}/maven-build.log"
 
       - name: Run selected investigation through Maven
@@ -89,7 +99,8 @@ jobs:
               '-Djgit.storage.benchmark.database-telemetry.enabled=true'
             )
           fi
-          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks verify \
             -Pperformance-investigations \
             -Dtest=DatabaseTelemetrySnapshotTest,DurableStripedWriteQueueTest \
             -Djgit.storage.benchmark.investigation="${{ matrix.investigation }}" \
@@ -243,16 +254,6 @@ jobs:
           )
           PY
 
-      - name: Derive repository-aging policy evidence
-        if: matrix.investigation == 'repository-aging'
-        shell: bash
-        run: |
-          python3 .github/scripts/convert-jmh-repository-aging.py \
-            "target/investigations/repository-aging/jmh-result.json" \
-            "target/investigations/repository-aging/evidence"
-          cat target/investigations/repository-aging/evidence/repository-aging-policy-evidence.md \
-            >> "$GITHUB_STEP_SUMMARY"
-
       - name: Upload raw investigation results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -275,12 +276,243 @@ jobs:
             echo '- This existing experiment measures striped scheduling and backpressure. Native PostgreSQL WAL/I/O/wait telemetry is retained per measurement iteration because concurrent invocations overlap and cannot be attributed safely one by one.' >> "$GITHUB_STEP_SUMMARY"
             echo '- Atomic receiver record batching is implemented separately by the production `DurableStripedWriteQueue` and its Hibernate adapter.' >> "$GITHUB_STEP_SUMMARY"
           fi
-          if [ "${{ matrix.investigation }}" = 'repository-aging' ]; then
-            echo '- Generated comparison and policy-evidence JSON retain measured break-even reads; no automatic maintenance trigger is changed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+
+  repository-aging-smoke:
+    name: repository-aging (smoke)
+    needs: contract
+    if: >-
+      github.event_name != 'schedule' &&
+      (github.event_name != 'workflow_dispatch' || inputs.profile == 'smoke')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Validate repository-aging evidence converter
+        run: |
+          python3 -m py_compile .github/scripts/convert-jmh-repository-aging.py .github/scripts/test_convert_jmh_repository_aging.py
+          python3 .github/scripts/test_convert_jmh_repository_aging.py
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          mkdir -p target/investigations/repository-aging
+          set -o pipefail
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee target/investigations/repository-aging/maven-build.log
+
+      - name: Run repository-aging smoke investigation
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks verify \
+            -Pperformance-investigations \
+            -Dtest=DatabaseTelemetrySnapshotTest,DurableStripedWriteQueueTest \
+            -Djgit.storage.benchmark.investigation=repository-aging \
+            -Djgit.storage.benchmark.investigation.profile=smoke \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/investigations/repository-aging/jmh-result.json" 2>&1 \
+            | tee target/investigations/repository-aging/maven-benchmark.log
+
+      - name: Derive repository-aging smoke evidence
+        run: |
+          python3 .github/scripts/convert-jmh-repository-aging.py \
+            target/investigations/repository-aging/jmh-result.json \
+            target/investigations/repository-aging/evidence
+          cat target/investigations/repository-aging/evidence/repository-aging-policy-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload repository-aging smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-investigation-repository-aging-smoke
+          path: |
+            target/investigations/repository-aging/**
+            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
+          if-no-files-found: error
+
+  repository-aging-full-shard:
+    name: repository-aging full — ${{ matrix.backend }} / ${{ matrix.cache_state }}
+    needs: contract
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.profile == 'full')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        backend:
+          - hsqldb
+          - postgresql
+          - postgresql-hikari
+        cache_state:
+          - cold
+          - warm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build benchmark module with Maven
+        shell: bash
+        run: |
+          shard="target/investigations/repository-aging/${{ matrix.backend }}-${{ matrix.cache_state }}"
+          mkdir -p "$shard"
+          set -o pipefail
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+            | tee "$shard/maven-build.log"
+
+      - name: Run one complete repository-aging shard
+        shell: bash
+        run: |
+          set -o pipefail
+          shard="target/investigations/repository-aging/${{ matrix.backend }}-${{ matrix.cache_state }}"
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks verify \
+            -Pperformance-investigations \
+            -Dtest=DatabaseTelemetrySnapshotTest,DurableStripedWriteQueueTest \
+            -Djgit.storage.benchmark.investigation=repository-aging \
+            -Djgit.storage.benchmark.investigation.profile=full \
+            -Djgit.storage.benchmark.repository-aging.backend=${{ matrix.backend }} \
+            -Djgit.storage.benchmark.repository-aging.cache-state=${{ matrix.cache_state }} \
+            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/$shard/jmh-result.json" 2>&1 \
+            | tee "$shard/maven-benchmark.log"
+
+      - name: Collect shard Failsafe reports
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          shard="target/investigations/repository-aging/${{ matrix.backend }}-${{ matrix.cache_state }}"
+          reports=jgit-storage-hibernate-benchmarks/target/failsafe-reports
+          if [ -d "$reports" ]; then
+            mkdir -p "$shard/failsafe-reports"
+            cp -a "$reports"/. "$shard/failsafe-reports/"
           fi
+
+      - name: Upload repository-aging shard
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-investigation-repository-aging-full-${{ matrix.backend }}-${{ matrix.cache_state }}
+          path: target/investigations/repository-aging
+          if-no-files-found: error
+
+      - name: Report retained shard evidence
+        if: always()
+        run: |
+          echo '### Repository-aging shard' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Backend: `${{ matrix.backend }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Cache state: `${{ matrix.cache_state }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- The shard retains all push counts, maintenance modes and benchmark methods for this backend/cache coordinate.' >> "$GITHUB_STEP_SUMMARY"
+
+  repository-aging-full-summary:
+    name: Merge and validate repository-aging full matrix
+    needs: repository-aging-full-shard
+    if: >-
+      always() &&
+      needs['repository-aging-full-shard'].result == 'success' &&
+      (github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.profile == 'full'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download all repository-aging shards
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          pattern: performance-investigation-repository-aging-full-*
+          path: target/repository-aging-shards
+          merge-multiple: true
+
+      - name: Merge the six disjoint JMH result sets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('target/repository-aging-shards')
+          expected = {
+              f'{backend}-{cache}'
+              for backend in ('hsqldb', 'postgresql', 'postgresql-hikari')
+              for cache in ('cold', 'warm')
+          }
+          located = {}
+          for path in sorted(root.rglob('jmh-result.json')):
+              matches = expected.intersection(path.parts)
+              if len(matches) != 1:
+                  raise SystemExit(f'Cannot assign {path} to exactly one expected shard')
+              shard = matches.pop()
+              if shard in located:
+                  raise SystemExit(f'Duplicate JMH result for shard {shard}: {located[shard]} and {path}')
+              located[shard] = path
+          if set(located) != expected:
+              raise SystemExit(
+                  f'Expected six repository-aging shards; missing={sorted(expected - set(located))}, '
+                  f'unexpected={sorted(set(located) - expected)}'
+              )
+
+          merged = []
+          manifest = {}
+          for shard in sorted(expected):
+              path = located[shard]
+              payload = json.loads(path.read_text(encoding='utf-8'))
+              if not isinstance(payload, list) or not payload:
+                  raise SystemExit(f'Shard {shard} has no JMH result entries: {path}')
+              merged.extend(payload)
+              manifest[shard] = {'path': str(path), 'entries': len(payload)}
+
+          output = Path('target/investigations/repository-aging')
+          output.mkdir(parents=True, exist_ok=True)
+          (output / 'jmh-result.json').write_text(
+              json.dumps(merged, indent=2) + '\n', encoding='utf-8'
+          )
+          (output / 'shard-manifest.json').write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(f'Merged {len(merged)} JMH entries from {len(located)} shards')
+          PY
+
+      - name: Derive complete repository-aging policy evidence
+        run: |
+          python3 .github/scripts/convert-jmh-repository-aging.py \
+            target/investigations/repository-aging/jmh-result.json \
+            target/investigations/repository-aging/evidence
+          cat target/investigations/repository-aging/evidence/repository-aging-policy-evidence.md \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload merged repository-aging evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-investigation-repository-aging-full
+          path: target/investigations/repository-aging/**
+          if-no-files-found: error
 
   stateless-threshold:
     name: Stateful/stateless threshold at 16/128/512 MiB
+    needs: contract
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -301,14 +533,16 @@ jobs:
         run: |
           mkdir -p target/stateless-threshold
           set -o pipefail
-          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
             | tee target/stateless-threshold/maven-build.log
 
       - name: Compare stateful and stateless at production batch size
         shell: bash
         run: |
           set -o pipefail
-          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks verify \
             -Pstateless-writer-threshold \
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/stateless-threshold/jmh-result.json" 2>&1 \
             | tee target/stateless-threshold/maven-benchmark.log
