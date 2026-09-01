@@ -47,6 +47,10 @@ class PerformanceInvestigationsBenchmarkIT {
       "jgit.storage.benchmark.repository-aging.native-smoke";
   private static final String REPOSITORY_AGING_DATABASE_BACKEND_PROPERTY =
       "jgit.storage.benchmark.repository-aging.database-backend";
+  private static final String REPOSITORY_AGING_BACKEND_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.backend";
+  private static final String REPOSITORY_AGING_CACHE_STATE_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.cache-state";
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -201,6 +205,26 @@ class PerformanceInvestigationsBenchmarkIT {
     return value;
   }
 
+  static String[] selectParameterValues(
+      String propertyName,
+      String configuredValue,
+      String[] defaultValues,
+      String... allowedValues) {
+    if (configuredValue == null || configuredValue.isBlank()) {
+      return defaultValues.clone();
+    }
+    String value = configuredValue.trim();
+    if (!List.of(allowedValues).contains(value)) {
+      throw new IllegalArgumentException(
+          propertyName
+              + " must be one of "
+              + String.join(", ", allowedValues)
+              + " but was "
+              + value);
+    }
+    return new String[] {value};
+  }
+
   private static Path writeConnectionProperties(
       String databaseBackend, MSSQLServerContainer sqlServer) throws IOException {
     Map<String, String> connectionProperties =
@@ -332,43 +356,56 @@ class PerformanceInvestigationsBenchmarkIT {
                       ? new String[] {"hsqldb", "postgresql", "postgresql-hikari"}
                       : new String[] {"hsqldb"})
               .param("readAheadChunks", "1", "4", "16");
-      case "repository-aging" ->
-          builder
-              .include(
-                  repositoryAgingNativeSmoke
-                      ? RepositoryAgingBenchmark.class.getName()
-                          + ".(lookupOldestObject|cloneStyleTraversal|reopenAndLookupOldest)"
-                      : RepositoryAgingBenchmark.class.getName())
-              .threads(1)
-              .param(
-                  "backend",
-                  repositoryAgingNativeSmoke
-                      ? new String[] {repositoryAgingDatabaseBackend}
-                      : full
-                          ? new String[] {
-                            HibernateRepositoryBenchmark.HSQLDB,
-                            HibernateRepositoryBenchmark.POSTGRESQL,
-                            HibernateRepositoryBenchmark.POSTGRESQL_HIKARI
-                          }
-                          : new String[] {HibernateRepositoryBenchmark.HSQLDB})
-              .param(
-                  "pushes",
-                  repositoryAgingNativeSmoke
-                      ? new String[] {"10"}
-                      : full
-                          ? new String[] {"1", "10", "32", "100", "300", "1000"}
-                          : new String[] {"1", "10"})
-              .param(
-                  "maintenanceMode",
-                  RepositoryAgingBenchmark.NONE,
-                  RepositoryAgingBenchmark.COMPACT_ONLY,
-                  RepositoryAgingBenchmark.READ_OPTIMIZED)
-              .param(
-                  "cacheState",
-                  full
-                      ? new String[] {RepositoryAgingBenchmark.COLD, RepositoryAgingBenchmark.WARM}
-                      : new String[] {RepositoryAgingBenchmark.COLD})
-              .param("deployment", deployment);
+      case "repository-aging" -> {
+        String[] fullBackends = {
+          HibernateRepositoryBenchmark.HSQLDB,
+          HibernateRepositoryBenchmark.POSTGRESQL,
+          HibernateRepositoryBenchmark.POSTGRESQL_HIKARI
+        };
+        String[] fullCacheStates = {
+          RepositoryAgingBenchmark.COLD, RepositoryAgingBenchmark.WARM
+        };
+        String[] backends =
+            repositoryAgingNativeSmoke
+                ? new String[] {repositoryAgingDatabaseBackend}
+                : full
+                    ? selectParameterValues(
+                        REPOSITORY_AGING_BACKEND_PROPERTY,
+                        System.getProperty(REPOSITORY_AGING_BACKEND_PROPERTY),
+                        fullBackends,
+                        fullBackends)
+                    : new String[] {HibernateRepositoryBenchmark.HSQLDB};
+        String[] cacheStates =
+            full
+                ? selectParameterValues(
+                    REPOSITORY_AGING_CACHE_STATE_PROPERTY,
+                    System.getProperty(REPOSITORY_AGING_CACHE_STATE_PROPERTY),
+                    fullCacheStates,
+                    fullCacheStates)
+                : new String[] {RepositoryAgingBenchmark.COLD};
+        builder
+            .include(
+                repositoryAgingNativeSmoke
+                    ? RepositoryAgingBenchmark.class.getName()
+                        + ".(lookupOldestObject|cloneStyleTraversal|reopenAndLookupOldest)"
+                    : RepositoryAgingBenchmark.class.getName())
+            .threads(1)
+            .param("backend", backends)
+            .param(
+                "pushes",
+                repositoryAgingNativeSmoke
+                    ? new String[] {"10"}
+                    : full
+                        ? new String[] {"1", "10", "32", "100", "300", "1000"}
+                        : new String[] {"1", "10"})
+            .param(
+                "maintenanceMode",
+                RepositoryAgingBenchmark.NONE,
+                RepositoryAgingBenchmark.COMPACT_ONLY,
+                RepositoryAgingBenchmark.READ_OPTIMIZED)
+            .param("cacheState", cacheStates)
+            .param("deployment", deployment);
+      }
       case "concurrent-large-pack" ->
           builder
               .include(ConcurrentPublicationBenchmark.class.getName())
