@@ -7,7 +7,7 @@ wait for the searchable projection and inspect the relational evidence through J
 The no-argument environment is pinned to the documented release image:
 
 ```text
-ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2
+ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.3
 ```
 
 Add the test dependency from the public Maven repository:
@@ -16,7 +16,7 @@ Add the test dependency from the public Maven repository:
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-testcontainers</artifactId>
-  <version>0.11.2</version>
+  <version>0.11.3</version>
   <scope>test</scope>
 </dependency>
 ```
@@ -50,7 +50,7 @@ selected image, pass it explicitly:
 
 ```java
 new JgitStorageEnvironment(
-    "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2");
+    "ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.3");
 ```
 
 `latest` and `edge` are moving compatibility aliases for the newest published release and are not

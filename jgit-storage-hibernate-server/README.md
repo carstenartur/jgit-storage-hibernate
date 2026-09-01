@@ -27,7 +27,7 @@ The repository Compose file starts PostgreSQL and defaults its `git-server` serv
 `0.11.2` image:
 
 ```text
-ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2
+ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.3
 ```
 
 CI pulls this released image without a source build and exercises repository creation, normal Git
@@ -97,7 +97,7 @@ convenient for evaluation, but not suitable for reproducible deployments or test
 For the strongest supply-chain pin, use the manifest digest recorded by the release workflow or GHCR:
 
 ```bash
-JSH_SERVER_IMAGE='ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2@sha256:<manifest-digest>' \
+JSH_SERVER_IMAGE='ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.3@sha256:<manifest-digest>' \
   docker compose pull git-server
 ```
 
