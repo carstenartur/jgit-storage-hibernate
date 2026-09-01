@@ -16,6 +16,8 @@ on:
       - 'jgit-storage-hibernate-spring-boot-*/**'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/select_published_server_version.py'
+      - '.github/scripts/test_select_published_server_version.py'
       - '.github/scripts/smoke_server_compose.sh'
       - '.github/workflows/server-image.yml'
   push:
@@ -33,6 +35,8 @@ on:
       - 'jgit-storage-hibernate-spring-boot-*/**'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/scripts/select_published_server_version.py'
+      - '.github/scripts/test_select_published_server_version.py'
       - '.github/scripts/smoke_server_compose.sh'
       - '.github/workflows/server-image.yml'
   workflow_dispatch:
@@ -114,18 +118,17 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-            release_version="$(git show "$BASE_SHA:docs/current-release-version.txt")"
-          else
-            release_version="$(cat docs/current-release-version.txt)"
+          selector_args=(
+            --event-name "$GITHUB_EVENT_NAME"
+            --ref-name "$GITHUB_REF_NAME"
+          )
+          if [[ -n "${BASE_SHA:-}" ]]; then
+            selector_args+=(--base-sha "$BASE_SHA")
           fi
-          release_version="${release_version//$'\r'/}"
-          release_version="${release_version//$'\n'/}"
-          if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf 'Published release version must match X.Y.Z, received %s\n' \
-              "$release_version" >&2
-            exit 1
-          fi
+          release_version="$(
+            python3 .github/scripts/select_published_server_version.py \
+              "${selector_args[@]}"
+          )"
           printf 'JSH_SERVER_IMAGE=%s:%s\n' "$IMAGE_NAME" "$release_version" \
             >> "$GITHUB_ENV"
           printf 'Testing released image %s:%s with the proposed Compose file.\n' \
