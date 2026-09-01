@@ -15,6 +15,12 @@ BENCHMARK_IT = (
     "io/github/carstenartur/jgit/storage/hibernate/benchmark/"
     "PerformanceInvestigationsBenchmarkIT.java"
 )
+PARAMETER_SELECTION = (
+    ROOT
+    / "jgit-storage-hibernate-benchmarks/src/test/java/"
+    "io/github/carstenartur/jgit/storage/hibernate/benchmark/"
+    "PerformanceInvestigationParameters.java"
+)
 
 
 class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
@@ -24,9 +30,13 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
         cls.workflow = WORKFLOW.read_text(encoding="utf-8")
         cls.maven_jvm_config = MAVEN_JVM_CONFIG.read_text(encoding="utf-8")
         cls.benchmark_it = BENCHMARK_IT.read_text(encoding="utf-8")
+        cls.parameter_selection = PARAMETER_SELECTION.read_text(encoding="utf-8")
 
     def section(self, start: str, end: str) -> str:
-        return self.workflow.split(start, 1)[1].split(end, 1)[0]
+        self.assertIn(start, self.workflow, f"Missing workflow section marker {start!r}")
+        tail = self.workflow.partition(start)[2]
+        self.assertIn(end, tail, f"Missing workflow section marker {end!r} after {start!r}")
+        return tail.partition(end)[0]
 
     def test_generic_matrix_does_not_repeat_the_unbounded_aging_matrix(self) -> None:
         generic = self.section("  investigate:\n", "  repository-aging-smoke:\n")
@@ -81,13 +91,16 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
         for fragment in (
             "jgit.storage.benchmark.repository-aging.backend",
             "jgit.storage.benchmark.repository-aging.cache-state",
-            "static String[] selectParameterValues(",
-            "return defaultValues.clone();",
-            "List.of(allowedValues).contains(value)",
             '.param("backend", backends)',
             '.param("cacheState", cacheStates)',
         ):
             self.assertIn(fragment, self.benchmark_it)
+        for fragment in (
+            "static String[] select(",
+            "return defaultValues.clone();",
+            "List.of(allowedValues).contains(value)",
+        ):
+            self.assertIn(fragment, self.parameter_selection)
 
 
 if __name__ == "__main__":
