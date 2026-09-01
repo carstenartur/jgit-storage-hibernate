@@ -16,7 +16,17 @@ RELEASE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
+def _full_commit_sha(value: object, field: str) -> str:
+    if not isinstance(value, str) or not COMMIT_SHA.fullmatch(value):
+        raise ValueError(f"{field} must be a full lowercase commit SHA")
+    return value
+
+
 def _read_git_file(repository: Path, revision: str, path: Path) -> str:
+    # Only a validated full hexadecimal object ID reaches Git. A revision that
+    # starts with an option marker or contains revision/path syntax is rejected
+    # before subprocess invocation.
+    revision = _full_commit_sha(revision, "Git revision")
     result = subprocess.run(
         ["git", "-C", str(repository), "show", f"{revision}:{path.as_posix()}"],
         check=False,
@@ -44,12 +54,10 @@ def _release_candidate_source(repository: Path) -> str:
         raise ValueError(f"Could not read release candidate metadata: {exc}") from exc
     if not isinstance(candidate, dict):
         raise ValueError("Release candidate metadata must be a JSON object")
-    source_commit = candidate.get("source_commit")
-    if not isinstance(source_commit, str) or not COMMIT_SHA.fullmatch(source_commit):
-        raise ValueError(
-            "Release candidate source_commit must be a full lowercase commit SHA"
-        )
-    return source_commit
+    return _full_commit_sha(
+        candidate.get("source_commit"),
+        "Release candidate source_commit",
+    )
 
 
 def select_version(
@@ -68,9 +76,10 @@ def select_version(
 
     repository = repository.resolve()
     if event_name == "pull_request":
-        if not base_sha:
-            raise ValueError("Pull-request version selection requires base_sha")
-        raw_version = _read_git_file(repository, base_sha, CURRENT_RELEASE_PATH)
+        validated_base = _full_commit_sha(base_sha, "Pull-request base_sha")
+        raw_version = _read_git_file(
+            repository, validated_base, CURRENT_RELEASE_PATH
+        )
     elif event_name == "workflow_dispatch" and ref_name.startswith(
         "release/prepare-"
     ):
