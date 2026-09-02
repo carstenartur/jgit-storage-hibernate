@@ -13,15 +13,18 @@ on:
       - 'docs/release-process.md'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/server-image-publication-request.json'
       - '.github/scripts/dispatch-generated-pr-checks.sh'
       - '.github/scripts/test_dispatch_generated_pr_checks.py'
       - '.github/scripts/select_published_server_version.py'
       - '.github/scripts/test_select_published_server_version.py'
+      - '.github/scripts/test_release_server_image_dispatch_workflow.py'
       - '.github/scripts/smoke_server_compose.sh'
       - '.github/scripts/test_server_image_publish_workflow.py'
       - '.github/scripts/update-release-metadata.py'
       - '.github/scripts/test_update_release_metadata.py'
       - '.github/scripts/verify-release-consistency.py'
+      - '.github/workflows/release-server-image-dispatch.yml'
       - '.github/workflows/server-image.yml'
       - '.github/workflows/server-image-publish.yml'
       - '.github/workflows/server-image-publish-contract.yml'
@@ -37,15 +40,18 @@ on:
       - 'docs/release-process.md'
       - 'jgit-storage-hibernate-server/**'
       - 'jgit-storage-hibernate-testcontainers/**'
+      - '.github/server-image-publication-request.json'
       - '.github/scripts/dispatch-generated-pr-checks.sh'
       - '.github/scripts/test_dispatch_generated_pr_checks.py'
       - '.github/scripts/select_published_server_version.py'
       - '.github/scripts/test_select_published_server_version.py'
+      - '.github/scripts/test_release_server_image_dispatch_workflow.py'
       - '.github/scripts/smoke_server_compose.sh'
       - '.github/scripts/test_server_image_publish_workflow.py'
       - '.github/scripts/update-release-metadata.py'
       - '.github/scripts/test_update_release_metadata.py'
       - '.github/scripts/verify-release-consistency.py'
+      - '.github/workflows/release-server-image-dispatch.yml'
       - '.github/workflows/server-image.yml'
       - '.github/workflows/server-image-publish.yml'
       - '.github/workflows/server-image-publish-contract.yml'
@@ -72,12 +78,14 @@ jobs:
           python3 -m py_compile \
             .github/scripts/select_published_server_version.py \
             .github/scripts/test_select_published_server_version.py \
+            .github/scripts/test_release_server_image_dispatch_workflow.py \
             .github/scripts/test_server_image_publish_workflow.py \
             .github/scripts/update-release-metadata.py \
             .github/scripts/test_update_release_metadata.py \
             .github/scripts/verify-release-consistency.py
           bash -n .github/scripts/smoke_server_compose.sh
           python3 .github/scripts/test_select_published_server_version.py
+          python3 .github/scripts/test_release_server_image_dispatch_workflow.py
           python3 .github/scripts/test_server_image_publish_workflow.py
           python3 .github/scripts/test_update_release_metadata.py
           python3 .github/scripts/verify-release-consistency.py

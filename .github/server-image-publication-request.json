@@ -1,0 +1,5 @@
+{
+  "release_tag": "v0.11.3",
+  "update_aliases": true,
+  "reason": "Recover the OCI channel after the release workflow created the tag with GITHUB_TOKEN, which suppresses recursive tag workflows."
+}
