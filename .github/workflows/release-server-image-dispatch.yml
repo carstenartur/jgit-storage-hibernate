@@ -1,0 +1,209 @@
+name: Dispatch released server OCI image
+
+on:
+  workflow_run:
+    workflows: [ Release ]
+    types: [ completed ]
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/server-image-publication-request.json'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: dispatch-released-server-image-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch immutable server image publication
+    if: >-
+      ${{
+        github.event_name == 'push' ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          startsWith(github.event.workflow_run.head_branch, 'release/prepare-')
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout authoritative main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve reviewed immutable release request
+        id: target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          RELEASE_WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          RELEASE_WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RELEASE_WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
+          RELEASE_WORKFLOW_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+
+          tag_pattern = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
+          event = os.environ["EVENT_NAME"]
+
+          if event == "workflow_run":
+              if os.environ.get("RELEASE_WORKFLOW_CONCLUSION") != "success":
+                  raise SystemExit("::error::Release workflow did not complete successfully")
+              if os.environ.get("RELEASE_WORKFLOW_EVENT") != "pull_request":
+                  raise SystemExit("::error::Only the merged release-PR workflow may dispatch publication")
+              branch = os.environ.get("RELEASE_WORKFLOW_BRANCH", "")
+              match = re.fullmatch(
+                  r"release/prepare-([0-9]+\.[0-9]+\.[0-9]+)", branch
+              )
+              if match is None:
+                  raise SystemExit(
+                      f"::error::Unexpected release workflow branch {branch!r}"
+                  )
+
+              run_id = os.environ.get("RELEASE_WORKFLOW_RUN_ID", "")
+              if not run_id.isdecimal():
+                  raise SystemExit("::error::Release workflow run ID is missing")
+              result = subprocess.run(
+                  ["gh", "run", "view", run_id, "--json", "jobs"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              )
+              jobs = json.loads(result.stdout).get("jobs", [])
+              conclusions = [
+                  job.get("conclusion")
+                  for job in jobs
+                  if job.get("name") == "Publish merged immutable release"
+              ]
+              if conclusions != ["success"]:
+                  raise SystemExit(
+                      "::error::Release workflow did not successfully execute "
+                      "the immutable publication job"
+                  )
+
+              release_tag = f"v{match.group(1)}"
+              update_aliases = True
+              reason = f"Successful release workflow run {run_id}"
+          elif event == "push":
+              if os.environ.get("EVENT_REF") != "refs/heads/main":
+                  raise SystemExit("::error::Publication requests must be merged to main")
+              request_path = Path(".github/server-image-publication-request.json")
+              try:
+                  request = json.loads(request_path.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError) as exc:
+                  raise SystemExit(
+                      f"::error::Invalid publication request {request_path}: {exc}"
+                  ) from exc
+              if not isinstance(request, dict):
+                  raise SystemExit("::error::Publication request must be a JSON object")
+              unknown = set(request) - {"release_tag", "update_aliases", "reason"}
+              if unknown:
+                  raise SystemExit(
+                      "::error::Unsupported publication request fields: "
+                      + ", ".join(sorted(unknown))
+                  )
+              release_tag = request.get("release_tag")
+              update_aliases = request.get("update_aliases")
+              reason = request.get("reason")
+              if not isinstance(reason, str) or not reason.strip():
+                  raise SystemExit("::error::Publication request requires a reason")
+          else:
+              raise SystemExit(f"::error::Unsupported dispatch event {event!r}")
+
+          if not isinstance(release_tag, str) or not tag_pattern.fullmatch(release_tag):
+              raise SystemExit(
+                  f"::error::Release tag must match vX.Y.Z, received {release_tag!r}"
+              )
+          if not isinstance(update_aliases, bool):
+              raise SystemExit("::error::update_aliases must be a JSON boolean")
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              print(f"tag={release_tag}", file=handle)
+              print(f"version={release_tag.removeprefix('v')}", file=handle)
+              print(
+                  f"update_aliases={'true' if update_aliases else 'false'}",
+                  file=handle,
+              )
+              print(f"reason={reason.strip()}", file=handle)
+          PY
+
+      - name: Verify published release identity
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          EXPECTED_VERSION: ${{ steps.target.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin \
+            "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          if [[ "$(git cat-file -t "refs/tags/$RELEASE_TAG")" != tag ]]; then
+            printf 'Release ref %s must be an annotated immutable tag.\n' \
+              "$RELEASE_TAG" >&2
+            exit 1
+          fi
+          actual_version="$(
+            git show "refs/tags/$RELEASE_TAG:pom.xml" | python3 -c \
+              'import sys, xml.etree.ElementTree as ET; root = ET.parse(sys.stdin).getroot(); value = root.findtext("{http://maven.apache.org/POM/4.0.0}version"); print((value or "").strip())'
+          )"
+          if [[ "$actual_version" != "$EXPECTED_VERSION" ]]; then
+            printf 'Release tag %s contains reactor version %s, expected %s.\n' \
+              "$RELEASE_TAG" "$actual_version" "$EXPECTED_VERSION" >&2
+            exit 1
+          fi
+
+          release_state="$(
+            gh release view "$RELEASE_TAG" \
+              --json tagName,isDraft,isPrerelease \
+              --jq '[.tagName, .isDraft, .isPrerelease] | @tsv'
+          )"
+          IFS=$'\t' read -r observed_tag is_draft is_prerelease <<< "$release_state"
+          if [[ "$observed_tag" != "$RELEASE_TAG" || "$is_draft" != false || "$is_prerelease" != false ]]; then
+            printf 'GitHub release %s is not a published stable release: %s\n' \
+              "$RELEASE_TAG" "$release_state" >&2
+            exit 1
+          fi
+
+      - name: Dispatch versioned multi-architecture publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          UPDATE_ALIASES: ${{ steps.target.outputs.update_aliases }}
+        run: |
+          set -euo pipefail
+          gh workflow run server-image-publish.yml \
+            --ref main \
+            -f release_tag="$RELEASE_TAG" \
+            -f update_aliases="$UPDATE_ALIASES"
+
+      - name: Summarize dispatch
+        env:
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          UPDATE_ALIASES: ${{ steps.target.outputs.update_aliases }}
+          REQUEST_REASON: ${{ steps.target.outputs.reason }}
+        run: |
+          {
+            printf '### Server-image publication dispatched\n\n'
+            printf -- '- Release tag: `%s`\n' "$RELEASE_TAG"
+            printf -- '- Update `latest` and `edge`: `%s`\n' "$UPDATE_ALIASES"
+            printf -- '- Trigger: %s\n' "$REQUEST_REASON"
+          } >> "$GITHUB_STEP_SUMMARY"
