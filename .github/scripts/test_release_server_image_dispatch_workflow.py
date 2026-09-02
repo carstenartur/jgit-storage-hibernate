@@ -67,6 +67,13 @@ class ReleaseServerImageDispatchWorkflowTest(unittest.TestCase):
         self.assertIn("update_aliases must be a JSON boolean", self.text)
         self.assertIn(r"^v[0-9]+\.[0-9]+\.[0-9]+$", self.text)
 
+    def test_reason_is_normalized_before_single_line_github_output(self) -> None:
+        self.assertIn(
+            'reason = " ".join(reason.splitlines()).strip()', self.text
+        )
+        self.assertIn('print(f"reason={reason}", file=handle)', self.text)
+        self.assertNotIn('print(f"reason={reason.strip()}"', self.text)
+
     def test_only_a_published_annotated_matching_release_is_dispatched(self) -> None:
         for fragment in (
             'git cat-file -t "refs/tags/$RELEASE_TAG"',
