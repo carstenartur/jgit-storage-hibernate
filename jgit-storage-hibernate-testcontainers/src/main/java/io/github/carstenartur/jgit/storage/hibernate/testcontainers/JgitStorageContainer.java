@@ -18,7 +18,7 @@ import org.testcontainers.utility.DockerImageName;
 /** Typed container for the same OCI image used by standalone deployments. */
 public class JgitStorageContainer extends GenericContainer<JgitStorageContainer> {
 
-  public static final String DEFAULT_IMAGE_VERSION = "0.11.2";
+  public static final String DEFAULT_IMAGE_VERSION = "0.11.3";
   public static final String DEFAULT_IMAGE =
       "ghcr.io/carstenartur/jgit-storage-hibernate-server:" + DEFAULT_IMAGE_VERSION;
   public static final int HTTP_PORT = 8080;

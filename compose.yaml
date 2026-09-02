@@ -14,7 +14,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   git-server:
-    image: ${JSH_SERVER_IMAGE:-ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.2}
+    image: ${JSH_SERVER_IMAGE:-ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.3}
     environment:
       JSH_JDBC_URL: jdbc:postgresql://postgres:5432/jgit
       JSH_JDBC_USERNAME: jgit

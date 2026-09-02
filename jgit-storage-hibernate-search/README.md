@@ -225,7 +225,7 @@ Deleted files remain represented by path in path-enabled profiles. Large, filter
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-search</artifactId>
-  <version>0.11.2</version>
+  <version>0.11.3</version>
 </dependency>
 ```
 
