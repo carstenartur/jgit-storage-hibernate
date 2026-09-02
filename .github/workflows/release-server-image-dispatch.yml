@@ -122,8 +122,6 @@ jobs:
               release_tag = request.get("release_tag")
               update_aliases = request.get("update_aliases")
               reason = request.get("reason")
-              if not isinstance(reason, str) or not reason.strip():
-                  raise SystemExit("::error::Publication request requires a reason")
           else:
               raise SystemExit(f"::error::Unsupported dispatch event {event!r}")
 
@@ -133,6 +131,11 @@ jobs:
               )
           if not isinstance(update_aliases, bool):
               raise SystemExit("::error::update_aliases must be a JSON boolean")
+          if not isinstance(reason, str):
+              raise SystemExit("::error::Publication request requires a reason")
+          reason = " ".join(reason.splitlines()).strip()
+          if not reason:
+              raise SystemExit("::error::Publication request requires a reason")
 
           output = Path(os.environ["GITHUB_OUTPUT"])
           with output.open("a", encoding="utf-8") as handle:
@@ -142,7 +145,7 @@ jobs:
                   f"update_aliases={'true' if update_aliases else 'false'}",
                   file=handle,
               )
-              print(f"reason={reason.strip()}", file=handle)
+              print(f"reason={reason}", file=handle)
           PY
 
       - name: Verify published release identity
