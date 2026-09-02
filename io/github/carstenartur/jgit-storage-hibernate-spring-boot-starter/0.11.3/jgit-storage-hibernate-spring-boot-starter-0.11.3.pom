@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.github.carstenartur</groupId>
+    <artifactId>jgit-storage-hibernate-parent</artifactId>
+    <version>0.11.3</version>
+  </parent>
+
+  <artifactId>jgit-storage-hibernate-spring-boot-starter</artifactId>
+  <name>jgit-storage-hibernate Spring Boot Starter</name>
+  <description>
+    Starter for embedding database-backed JGit repositories in Spring Boot applications.
+  </description>
+
+  <properties>
+    <japicmp.skip>true</japicmp.skip>
+    <jacoco.minimum.line>0.00</jacoco.minimum.line>
+    <jacoco.minimum.branch>0.00</jacoco.minimum.branch>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.github.carstenartur</groupId>
+      <artifactId>jgit-storage-hibernate-spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-javadoc-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
