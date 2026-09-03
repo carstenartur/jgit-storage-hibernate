@@ -23,13 +23,11 @@ persist_publication_cleanup_environment() {
 
   local publication_root script_root variable value
   publication_root="$(
-    cd -- "$GITHUB_WORKSPACE/publication-tooling"
-    pwd -P
-  )"
+    cd -- "$GITHUB_WORKSPACE/publication-tooling" && pwd -P
+  )" || return 0
   script_root="$(
-    cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
-    pwd -P
-  )"
+    cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P
+  )" || return 0
   [[ "$script_root" == "$publication_root" ]] || return 0
 
   for variable in \
