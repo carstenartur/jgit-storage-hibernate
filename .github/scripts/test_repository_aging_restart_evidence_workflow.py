@@ -55,8 +55,26 @@ class RepositoryAgingRestartEvidenceWorkflowTest(unittest.TestCase):
             self.assertIn(fragment, self.workflow)
         self.assertLess(
             len(self.workflow.splitlines()),
-            300,
+            325,
             "Keep evidence validation in the tested Python tool, not inline YAML",
+        )
+
+    def test_manual_dispatch_can_be_bound_to_an_exact_source_commit(self) -> None:
+        for fragment in (
+            "expected_source_commit:",
+            "Optional exact main commit that this run must execute",
+            "Verify requested source commit",
+            "github.event_name == 'workflow_dispatch'",
+            "inputs.expected_source_commit != ''",
+            "EXPECTED_SOURCE_COMMIT: ${{ inputs.expected_source_commit }}",
+            '[[ ! "$EXPECTED_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]',
+            '[[ "$GITHUB_SHA" != "$EXPECTED_SOURCE_COMMIT" ]]',
+            "Dispatched source moved",
+        ):
+            self.assertIn(fragment, self.workflow)
+        self.assertLess(
+            self.workflow.index("Verify requested source commit"),
+            self.workflow.index("- name: Checkout"),
         )
 
     def test_workflow_selects_restart_without_mutating_existing_native_smoke(self) -> None:
