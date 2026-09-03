@@ -38,14 +38,19 @@ class RepositoryAgingRestartEvidenceWorkflowTest(unittest.TestCase):
         cls.benchmark = BENCHMARK.read_text(encoding="utf-8")
         cls.runner = RUNNER.read_text(encoding="utf-8")
 
-    def test_workflow_has_bounded_pr_and_repeated_scheduled_matrices(self) -> None:
+    def test_workflow_has_bounded_and_controlled_repeated_matrices(self) -> None:
         for fragment in (
             "name: Repository Aging Restart Evidence",
             "workflow_dispatch:",
             "schedule:",
             "pull_request:",
             "push:",
-            'regular = event not in {"schedule", "workflow_dispatch"}',
+            "- 'evidence/repository-aging-restart/**'",
+            'ref_name = os.environ["GITHUB_REF_NAME"]',
+            'evidence_branch = ref_name.startswith(',
+            '"evidence/repository-aging-restart/"',
+            'event not in {"schedule", "workflow_dispatch"}',
+            "and not evidence_branch",
             'backends = ("postgresql", "sqlserver")',
             'cache_states = ("cold",) if regular else ("cold", "warm")',
             'repeats = ("1",) if regular else ("1", "2", "3")',
@@ -55,9 +60,19 @@ class RepositoryAgingRestartEvidenceWorkflowTest(unittest.TestCase):
             self.assertIn(fragment, self.workflow)
         self.assertLess(
             len(self.workflow.splitlines()),
-            300,
+            315,
             "Keep evidence validation in the tested Python tool, not inline YAML",
         )
+
+    def test_only_explicit_evidence_branches_expand_push_runs(self) -> None:
+        self.assertIn("Plan bounded or repeated evidence matrix", self.workflow)
+        self.assertIn("Select bounded or repeated evidence coordinates", self.workflow)
+        self.assertEqual(
+            1,
+            self.workflow.count("evidence/repository-aging-restart/**"),
+        )
+        self.assertNotIn("refs/heads/evidence/", self.workflow)
+        self.assertIn("and not evidence_branch", self.workflow)
 
     def test_workflow_selects_restart_without_mutating_existing_native_smoke(self) -> None:
         for fragment in (
