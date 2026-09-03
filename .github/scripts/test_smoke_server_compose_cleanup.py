@@ -23,12 +23,28 @@ class PublicationSmokeCleanupContractTest(unittest.TestCase):
             '[[ -n "${GITHUB_WORKSPACE:-}" ]] || return 0',
             '[[ -n "${GITHUB_ENV:-}" ]] || return 0',
             '[[ "$PWD" == "$GITHUB_WORKSPACE/publication-tooling" ]] || return 0',
-            "JSH_ADMIN_USERNAME \\\n      JSH_ADMIN_PASSWORD \\\n      JSH_DATABASE_PASSWORD \\\n      JSH_SERVER_IMAGE",
             "value=${!variable-}",
             "must be one line",
             "printf '%s=%s\\n' \"$variable\" \"$value\" >> \"$GITHUB_ENV\"",
         ):
             self.assertIn(fragment, self.text)
+
+        variable_list_start = self.text.index("for variable in")
+        variable_list_end = self.text.index("; do", variable_list_start)
+        variable_list = self.text[variable_list_start:variable_list_end]
+        for variable in (
+            "JSH_ADMIN_USERNAME",
+            "JSH_ADMIN_PASSWORD",
+            "JSH_DATABASE_PASSWORD",
+            "JSH_SERVER_IMAGE",
+        ):
+            with self.subTest(variable=variable):
+                self.assertIn(variable, variable_list)
+
+    def test_publication_values_use_the_loop_validation(self) -> None:
+        self.assertNotIn("${JSH_DATABASE_PASSWORD:?", self.text)
+        self.assertNotIn("${JSH_SERVER_IMAGE:?", self.text)
+        self.assertIn("must not be empty", self.text)
 
     def test_environment_is_persisted_before_any_compose_failure_path(self) -> None:
         invocation = "\npersist_publication_cleanup_environment\n\nwork="
