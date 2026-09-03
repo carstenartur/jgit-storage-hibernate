@@ -104,8 +104,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     if arguments.github_output is not None:
         with arguments.github_output.open("a", encoding="utf-8") as output:
-            output.write(f"request-id={request['requestId']}\n")
-            output.write(f"source-commit={request['sourceCommit']}\n")
+            output.write(f"request_id={request['requestId']}\n")
+            output.write(f"source_commit={request['sourceCommit']}\n")
     print(json.dumps(request, sort_keys=True))
 
 
