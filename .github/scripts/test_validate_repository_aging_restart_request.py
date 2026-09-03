@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -44,6 +46,33 @@ class RestartEvidenceRequestTest(unittest.TestCase):
             self.assertTrue(request["enabled"])
             self.assertEqual("initial-restart-repeat-evidence", request["requestId"])
             self.assertEqual(SOURCE, request["sourceCommit"])
+
+    def test_github_outputs_use_expression_safe_names(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            path = root / "request.json"
+            github_output = root / "github-output"
+            _write_request(path)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                VALIDATOR.main(
+                    [
+                        "--request",
+                        str(path),
+                        "--expected-source-commit",
+                        SOURCE,
+                        "--github-output",
+                        str(github_output),
+                    ]
+                )
+
+            self.assertEqual(
+                [
+                    "request_id=initial-restart-repeat-evidence",
+                    f"source_commit={SOURCE}",
+                ],
+                github_output.read_text(encoding="utf-8").splitlines(),
+            )
 
     def test_stale_main_commit_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
