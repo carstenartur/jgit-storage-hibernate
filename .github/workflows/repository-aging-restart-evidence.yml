@@ -18,7 +18,9 @@ on:
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmarkTest.java'
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - 'evidence/repository-aging-restart/**'
     paths:
       - '.github/workflows/repository-aging-restart-evidence.yml'
       - '.github/scripts/repository_aging_restart_evidence.py'
@@ -67,14 +69,14 @@ jobs:
             -Dsurefire.failIfNoSpecifiedTests=false
 
   plan:
-    name: Plan bounded evidence matrix
+    name: Plan bounded or repeated evidence matrix
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-      - name: Select pull-request or repeated evidence coordinates
+      - name: Select bounded or repeated evidence coordinates
         id: matrix
         shell: bash
         run: |
@@ -84,7 +86,14 @@ jobs:
           import os
 
           event = os.environ["GITHUB_EVENT_NAME"]
-          regular = event not in {"schedule", "workflow_dispatch"}
+          ref_name = os.environ["GITHUB_REF_NAME"]
+          evidence_branch = ref_name.startswith(
+              "evidence/repository-aging-restart/"
+          )
+          regular = (
+              event not in {"schedule", "workflow_dispatch"}
+              and not evidence_branch
+          )
           backends = ("postgresql", "sqlserver")
           cache_states = ("cold",) if regular else ("cold", "warm")
           repeats = ("1",) if regular else ("1", "2", "3")
