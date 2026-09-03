@@ -125,7 +125,7 @@ jobs:
             --request "$request_path" \
             --expected-source-commit "$BEFORE_SHA" \
             --github-output "$GITHUB_OUTPUT"
-          printf 'target-commit=%s\n' "$AFTER_SHA" >> "$GITHUB_OUTPUT"
+          printf 'target_commit=%s\n' "$AFTER_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Confirm main still resolves to the reviewed request commit
         shell: bash
@@ -143,7 +143,7 @@ jobs:
       - name: Dispatch full restart evidence on exact current main
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          TARGET_COMMIT: ${{ steps.request.outputs.target-commit }}
+          TARGET_COMMIT: ${{ steps.request.outputs.target_commit }}
         shell: bash
         run: |
           set -euo pipefail
@@ -171,6 +171,6 @@ jobs:
         run: |
           echo '### Full repository-aging restart evidence dispatched' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Request: `${{ steps.request.outputs.request-id }}`' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Unchanged benchmark source: `${{ steps.request.outputs.source-commit }}`' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Exact dispatched main commit: `${{ steps.request.outputs.target-commit }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Request: `${{ steps.request.outputs.request_id }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Unchanged benchmark source: `${{ steps.request.outputs.source_commit }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Exact dispatched main commit: `${{ steps.request.outputs.target_commit }}`' >> "$GITHUB_STEP_SUMMARY"
