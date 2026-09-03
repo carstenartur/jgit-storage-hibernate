@@ -110,6 +110,15 @@ class PublicationSmokeCleanupContractTest(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertFalse(github_env.exists())
 
+    def test_root_resolution_stops_when_directory_change_fails(self) -> None:
+        for variable in ("publication_root", "script_root"):
+            with self.subTest(variable=variable):
+                start = self.text.index(f'{variable}="$(')
+                end = self.text.index(')" || return 0', start)
+                resolution = self.text[start:end]
+                self.assertIn("cd --", resolution)
+                self.assertIn("&& pwd -P", resolution)
+
     def test_publication_values_use_the_loop_validation(self) -> None:
         self.assertNotIn("${JSH_DATABASE_PASSWORD:?", self.text)
         self.assertNotIn("${JSH_SERVER_IMAGE:?", self.text)
