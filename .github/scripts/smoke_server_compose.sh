@@ -15,6 +15,40 @@ if [[ ! "$repository" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
   exit 1
 fi
 
+persist_publication_cleanup_environment() {
+  [[ "${GITHUB_ACTIONS:-}" == true ]] || return 0
+  [[ -n "${GITHUB_WORKSPACE:-}" ]] || return 0
+  [[ -n "${GITHUB_ENV:-}" ]] || return 0
+  [[ "$PWD" == "$GITHUB_WORKSPACE/publication-tooling" ]] || return 0
+
+  local variable value
+  for variable in \
+      JSH_ADMIN_USERNAME \
+      JSH_ADMIN_PASSWORD \
+      JSH_DATABASE_PASSWORD \
+      JSH_SERVER_IMAGE; do
+    value=${!variable-}
+    if [[ -z "$value" ]]; then
+      printf 'Publication cleanup environment %s must not be empty.\n' \
+        "$variable" >&2
+      return 1
+    fi
+    if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+      printf 'Publication cleanup environment %s must be one line.\n' \
+        "$variable" >&2
+      return 1
+    fi
+    printf '%s=%s\n' "$variable" "$value" >> "$GITHUB_ENV"
+  done
+}
+
+# The publication workflow executes the protocol smoke in a nested checkout,
+# then performs log collection and `docker compose down` from the outer
+# workspace. Persist its synthetic Compose inputs for those later steps. Other
+# callers, including local use and the normal source/released-image jobs, do not
+# match this narrowly scoped GitHub Actions directory and remain unchanged.
+persist_publication_cleanup_environment
+
 work="$(mktemp -d)"
 clone_root="$(mktemp -d)"
 auth_header_file="$(mktemp)"
