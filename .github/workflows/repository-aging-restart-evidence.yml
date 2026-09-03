@@ -8,6 +8,8 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/repository-aging-restart-evidence.yml'
+      - '.github/scripts/repository_aging_restart_evidence.py'
+      - '.github/scripts/test_repository_aging_restart_evidence.py'
       - '.github/scripts/test_repository_aging_restart_evidence_workflow.py'
       - 'jgit-storage-hibernate-benchmarks/pom.xml'
       - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
@@ -19,6 +21,8 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/repository-aging-restart-evidence.yml'
+      - '.github/scripts/repository_aging_restart_evidence.py'
+      - '.github/scripts/test_repository_aging_restart_evidence.py'
       - '.github/scripts/test_repository_aging_restart_evidence_workflow.py'
       - 'jgit-storage-hibernate-benchmarks/pom.xml'
       - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
@@ -50,10 +54,13 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Validate workflow and restart contracts
+      - name: Validate workflow, evidence and restart contracts
         run: |
           python3 -m py_compile \
+            .github/scripts/repository_aging_restart_evidence.py \
+            .github/scripts/test_repository_aging_restart_evidence.py \
             .github/scripts/test_repository_aging_restart_evidence_workflow.py
+          python3 .github/scripts/test_repository_aging_restart_evidence.py
           python3 .github/scripts/test_repository_aging_restart_evidence_workflow.py
           mvn -B -pl jgit-storage-hibernate-benchmarks -am test \
             -Dtest=RepositoryAgingBenchmarkTest \
@@ -155,256 +162,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import collections
-          import datetime
-          import json
-          import math
-          import os
-          from pathlib import Path
-
-          backend = os.environ['BACKEND']
-          cache_state = os.environ['CACHE_STATE']
-          evidence_repeat = os.environ['EVIDENCE_REPEAT']
-          deployment = (
-              f'{backend}-restart-{cache_state}-repeat-{evidence_repeat}'
-          )
-          metric_by_backend = {
-              'postgresql': 'postgresql.wal.insert_lsn_bytes',
-              'sqlserver': 'sqlserver.io.log.bytes_written',
-          }
-          required_metric = metric_by_backend[backend]
-          root = Path(
-              f'target/repository-aging-restart-{backend}-{cache_state}'
-              f'-repeat-{evidence_repeat}'
-          )
-          telemetry_path = root / 'repository-aging-database-telemetry.json'
-          ndjson_path = root / 'repository-aging-database-telemetry.ndjson'
-          jmh_path = root / 'jmh-result.json'
-          output_path = root / 'repository-aging-jmh-output.txt'
-          for path in (telemetry_path, ndjson_path, jmh_path, output_path):
-              if not path.is_file() or path.stat().st_size < 3:
-                  raise SystemExit(
-                      f'Missing retained {backend} restart evidence {path}'
-                  )
-
-          telemetry_text = telemetry_path.read_text(encoding='utf-8')
-          jmh_text = jmh_path.read_text(encoding='utf-8')
-          for label, text in (
-              ('telemetry', telemetry_text),
-              ('JMH', jmh_text),
-          ):
-              if 'NaN' in text or 'Infinity' in text:
-                  raise SystemExit(f'{backend} {label} evidence is not strict JSON')
-          observations = json.loads(telemetry_text)['observations']
-          jmh = json.loads(jmh_text)
-          if len(jmh) != 9:
-              raise SystemExit(f'Expected 9 {backend} JMH results, found {len(jmh)}')
-          if len(observations) != 36:
-              raise SystemExit(
-                  f'Expected 36 {backend} phase observations, found '
-                  f'{len(observations)}'
-              )
-
-          def base_from_jmh(item):
-              params = item['params']
-              expected = {
-                  'backend': backend,
-                  'cacheState': cache_state,
-                  'deployment': deployment,
-                  'evidenceRepeat': evidence_repeat,
-                  'providerLifecycle': 'restarted-provider',
-                  'pushes': '10',
-              }
-              for key, value in expected.items():
-                  if params.get(key) != value:
-                      raise SystemExit(
-                          f'Unexpected JMH {key}={params.get(key)!r}; '
-                          f'expected {value!r}'
-                      )
-              restart_metrics = [
-                  metric
-                  for name, metric in item.get('secondaryMetrics', {}).items()
-                  if name == 'providerRestarts'
-                  or name.endswith('.providerRestarts')
-              ]
-              if len(restart_metrics) != 1:
-                  raise SystemExit(
-                      f'Missing exact providerRestarts metric for {item["benchmark"]}'
-                  )
-              restart_score = float(restart_metrics[0]['score'])
-              if not math.isclose(restart_score, 1.0, rel_tol=1e-9, abs_tol=1e-9):
-                  raise SystemExit(
-                      f'Expected one provider restart for {item["benchmark"]}, '
-                      f'found {restart_score}'
-                  )
-              return (
-                  item['benchmark'].rsplit('.', 1)[-1],
-                  params['backend'],
-                  params['pushes'],
-                  params['maintenanceMode'],
-                  params['cacheState'],
-                  params['deployment'],
-                  params['providerLifecycle'],
-                  params['evidenceRepeat'],
-              )
-
-          def base_from_observation(item):
-              coordinate = item['coordinate']
-              return (
-                  coordinate['benchmarkMethod'],
-                  coordinate['backend'],
-                  coordinate['pushes'],
-                  coordinate['maintenanceMode'],
-                  coordinate['cacheState'],
-                  coordinate['deployment'],
-                  coordinate['providerLifecycle'],
-                  coordinate['evidenceRepeat'],
-              )
-
-          jmh_bases = {base_from_jmh(item) for item in jmh}
-          if len(jmh_bases) != 9:
-              raise SystemExit(f'Duplicate {backend} JMH restart coordinates')
-          phase_counts = collections.Counter(
-              (base_from_observation(item), item['coordinate']['phase'])
-              for item in observations
-          )
-          telemetry_bases = {base for base, _ in phase_counts}
-          if telemetry_bases != jmh_bases:
-              raise SystemExit(
-                  f'{backend} JMH and restart telemetry coordinates differ: '
-                  f'{telemetry_bases ^ jmh_bases}'
-              )
-          expected_phases = {
-              'fixture-build',
-              'maintenance',
-              'provider-restart',
-              'measurement',
-          }
-          for base in jmh_bases:
-              counts = {
-                  phase: phase_counts[(base, phase)]
-                  for phase in expected_phases
-              }
-              if counts != {phase: 1 for phase in expected_phases}:
-                  raise SystemExit(
-                      f'Incomplete or duplicate {backend} restart phases '
-                      f'for {base}: {counts}'
-                  )
-
-          metric_by_phase = collections.defaultdict(list)
-          for item in observations:
-              coordinate = item['coordinate']
-              phase = coordinate['phase']
-              if item['backend'] != backend:
-                  raise SystemExit(
-                      f'Unexpected telemetry backend {item["backend"]!r}'
-                  )
-              if coordinate['databaseBackend'] != backend:
-                  raise SystemExit(f'Unexpected database coordinate {coordinate}')
-              if coordinate['cacheState'] != cache_state:
-                  raise SystemExit(f'Unexpected cache coordinate {coordinate}')
-              if coordinate['providerLifecycle'] != 'restarted-provider':
-                  raise SystemExit(f'Missing restarted-provider coordinate {coordinate}')
-              if coordinate['evidenceRepeat'] != evidence_repeat:
-                  raise SystemExit(f'Unexpected repeat coordinate {coordinate}')
-              expected_iteration = '1' if phase == 'measurement' else '0'
-              if coordinate['measurementIteration'] != expected_iteration:
-                  raise SystemExit(f'Unexpected phase iteration {coordinate}')
-              for field in (
-                  'coordinate', 'counters', 'gauges', 'metadata', 'unsupported'
-              ):
-                  keys = list(item[field])
-                  if keys != sorted(keys):
-                      raise SystemExit(
-                          f'{backend} {field} keys are not deterministic for '
-                          f'{coordinate}: {keys}'
-                      )
-              value = item['counters'].get(required_metric)
-              if value is None or value < 0:
-                  raise SystemExit(
-                      f'Missing {required_metric} for {coordinate}: {value}'
-                  )
-              metric_by_phase[phase].append(value)
-              if phase == 'fixture-build' and value <= 0:
-                  raise SystemExit(
-                      f'{backend} fixture build produced no log delta: {coordinate}'
-                  )
-              if (
-                  phase == 'maintenance'
-                  and coordinate['maintenanceMode'] != 'none'
-                  and value <= 0
-              ):
-                  raise SystemExit(
-                      f'{backend} maintenance produced no log delta: {coordinate}'
-                  )
-              start = datetime.datetime.fromisoformat(
-                  item['startedAt'].replace('Z', '+00:00')
-              )
-              end = datetime.datetime.fromisoformat(
-                  item['completedAt'].replace('Z', '+00:00')
-              )
-              if end < start:
-                  raise SystemExit(
-                      f'Negative {backend} telemetry window for {coordinate}'
-                  )
-
-          ndjson_lines = [
-              line
-              for line in ndjson_path.read_text(encoding='utf-8').splitlines()
-              if line
-          ]
-          if len(ndjson_lines) != len(observations):
-              raise SystemExit(
-                  f'{backend} NDJSON and aggregate count mismatch: '
-                  f'{len(ndjson_lines)} != {len(observations)}'
-              )
-          for line in ndjson_lines:
-              json.loads(line)
-
-          forbidden = (
-              'jgit.storage.benchmark.postgresql.url=',
-              'jgit.storage.benchmark.postgresql.user=',
-              'jgit.storage.benchmark.postgresql.password=',
-              'jgit.storage.benchmark.sqlserver.url=',
-              'jgit.storage.benchmark.sqlserver.user=',
-              'jgit.storage.benchmark.sqlserver.password=',
-              'jdbc:postgresql://',
-              'jdbc:sqlserver://',
-              'Database JDBC URL',
-              'Default catalog/schema',
-          )
-          scan_roots = [
-              root,
-              Path('jgit-storage-hibernate-benchmarks/target/failsafe-reports'),
-          ]
-          for scan_root in scan_roots:
-              if not scan_root.exists():
-                  continue
-              for path in scan_root.rglob('*'):
-                  if not path.is_file():
-                      continue
-                  content = path.read_bytes().decode('utf-8', errors='replace')
-                  for token in forbidden:
-                      if token in content:
-                          raise SystemExit(
-                              f'Sensitive token {token!r} found in {path}'
-                          )
-          leftovers = list(
-              Path('/tmp').glob('jgit-storage-benchmark-connection-*.properties')
-          )
-          if leftovers:
-              raise SystemExit(f'Temporary credential files remain: {leftovers}')
-
-          print(
-              f'Validated {backend} {cache_state} restarted-provider repeat '
-              f'{evidence_repeat}; '
-              + ', '.join(
-                  f'{phase} {min(values)}..{max(values)} bytes'
-                  for phase, values in sorted(metric_by_phase.items())
-              )
-          )
-          PY
+          root="$GITHUB_WORKSPACE/target/repository-aging-restart-$BACKEND-$CACHE_STATE-repeat-$EVIDENCE_REPEAT"
+          python3 .github/scripts/repository_aging_restart_evidence.py validate \
+            --root "$root" \
+            --backend "$BACKEND" \
+            --cache-state "$CACHE_STATE" \
+            --evidence-repeat "$EVIDENCE_REPEAT" \
+            --failsafe-root jgit-storage-hibernate-benchmarks/target/failsafe-reports
 
       - name: Upload exact restart evidence
         if: always()
@@ -435,6 +199,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Checkout aggregation tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Download all restart evidence
         uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
         with:
@@ -446,140 +213,10 @@ jobs:
           EVIDENCE_ROOT: ${{ runner.temp }}/repository-aging-restart-evidence
           SUMMARY_ROOT: ${{ runner.temp }}/repository-aging-restart-summary
         run: |
-          python3 - <<'PY'
-          import json
-          import math
-          import os
-          import statistics
-          from collections import defaultdict
-          from pathlib import Path
-
-          evidence_root = Path(os.environ['EVIDENCE_ROOT'])
-          summary_root = Path(os.environ['SUMMARY_ROOT'])
-          event = os.environ['GITHUB_EVENT_NAME']
-          regular = event not in {'schedule', 'workflow_dispatch'}
-          expected_files = 2 if regular else 12
-          expected_repeats = {'1'} if regular else {'1', '2', '3'}
-          files = sorted(evidence_root.rglob('jmh-result.json'))
-          if len(files) != expected_files:
-              raise SystemExit(
-                  f'Expected {expected_files} restart result files, found {len(files)}'
-              )
-
-          conversions = {
-              'ns/op': 1e-6,
-              'us/op': 1e-3,
-              'µs/op': 1e-3,
-              'ms/op': 1.0,
-              's/op': 1000.0,
-          }
-          observations = {}
-          groups = defaultdict(list)
-          for path in files:
-              raw = path.read_text(encoding='utf-8')
-              if 'NaN' in raw or 'Infinity' in raw:
-                  raise SystemExit(f'Non-finite JMH value in {path}')
-              for item in json.loads(raw):
-                  params = item['params']
-                  metric = item['primaryMetric']
-                  unit = metric['scoreUnit']
-                  if unit not in conversions:
-                      raise SystemExit(f'Unsupported score unit {unit!r} in {path}')
-                  coordinate = (
-                      params['backend'],
-                      params['cacheState'],
-                      params['evidenceRepeat'],
-                      item['benchmark'].rsplit('.', 1)[-1],
-                      params['maintenanceMode'],
-                  )
-                  if coordinate in observations:
-                      raise SystemExit(f'Duplicate restart coordinate {coordinate}')
-                  score = float(metric['score']) * conversions[unit]
-                  if not math.isfinite(score) or score < 0:
-                      raise SystemExit(f'Invalid restart score {score} for {coordinate}')
-                  observations[coordinate] = score
-                  groups[
-                      (
-                          params['backend'],
-                          params['cacheState'],
-                          coordinate[3],
-                          params['maintenanceMode'],
-                      )
-                  ].append((params['evidenceRepeat'], score))
-
-          expected_observations = expected_files * 9
-          if len(observations) != expected_observations:
-              raise SystemExit(
-                  f'Expected {expected_observations} JMH observations, '
-                  f'found {len(observations)}'
-              )
-
-          summary = []
-          for key, values in sorted(groups.items()):
-              repeats = {repeat for repeat, _ in values}
-              if repeats != expected_repeats:
-                  raise SystemExit(
-                      f'Incomplete repeat set for {key}: {sorted(repeats)}'
-                  )
-              scores = [score for _, score in sorted(values)]
-              mean = statistics.fmean(scores)
-              standard_deviation = (
-                  statistics.pstdev(scores) if len(scores) > 1 else 0.0
-              )
-              summary.append(
-                  {
-                      'backend': key[0],
-                      'cacheState': key[1],
-                      'operation': key[2],
-                      'maintenanceMode': key[3],
-                      'repeatCount': len(scores),
-                      'repeats': sorted(repeats),
-                      'scoresMillis': scores,
-                      'meanMillis': mean,
-                      'minimumMillis': min(scores),
-                      'maximumMillis': max(scores),
-                      'populationStddevMillis': standard_deviation,
-                      'coefficientOfVariationPercent': (
-                          0.0 if mean == 0.0 else standard_deviation * 100.0 / mean
-                      ),
-                  }
-              )
-
-          report = {
-              'schemaVersion': 1,
-              'event': event,
-              'automaticMaintenanceChanged': False,
-              'groups': summary,
-          }
-          summary_root.mkdir(parents=True, exist_ok=True)
-          (summary_root / 'repository-aging-restart-reproducibility.json').write_text(
-              json.dumps(report, indent=2, ensure_ascii=False) + '\n',
-              encoding='utf-8',
-          )
-          lines = [
-              '# Repository-aging restart reproducibility',
-              '',
-              'Provider restart is measured before every retained read coordinate. '
-              'This report is evidence only and does not change an automatic maintenance policy.',
-              '',
-              '| Backend | Cache | Operation | Maintenance | Repeats | Mean ms | CV % | Min–max ms |',
-              '|---|---|---|---|---:|---:|---:|---:|',
-          ]
-          for item in summary:
-              lines.append(
-                  '| {backend} | {cacheState} | {operation} | {maintenanceMode} | '
-                  '{repeatCount} | {meanMillis:.6f} | '
-                  '{coefficientOfVariationPercent:.2f} | '
-                  '{minimumMillis:.6f}–{maximumMillis:.6f} |'.format(**item)
-              )
-          (summary_root / 'repository-aging-restart-reproducibility.md').write_text(
-              '\n'.join(lines) + '\n', encoding='utf-8'
-          )
-          print(
-              f'Aggregated {len(observations)} restart observations into '
-              f'{len(summary)} reproducibility groups'
-          )
-          PY
+          python3 .github/scripts/repository_aging_restart_evidence.py aggregate \
+            --evidence-root "$EVIDENCE_ROOT" \
+            --output-root "$SUMMARY_ROOT" \
+            --event-name "$GITHUB_EVENT_NAME"
           cat "$SUMMARY_ROOT/repository-aging-restart-reproducibility.md" \
             >> "$GITHUB_STEP_SUMMARY"
 
