@@ -1,0 +1,228 @@
+name: Repository Aging Restart Evidence
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 14 * *'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/repository-aging-restart-evidence.yml'
+      - '.github/scripts/repository_aging_restart_evidence.py'
+      - '.github/scripts/test_repository_aging_restart_evidence.py'
+      - '.github/scripts/test_repository_aging_restart_evidence_workflow.py'
+      - 'jgit-storage-hibernate-benchmarks/pom.xml'
+      - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmark.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmarkTest.java'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/repository-aging-restart-evidence.yml'
+      - '.github/scripts/repository_aging_restart_evidence.py'
+      - '.github/scripts/test_repository_aging_restart_evidence.py'
+      - '.github/scripts/test_repository_aging_restart_evidence_workflow.py'
+      - 'jgit-storage-hibernate-benchmarks/pom.xml'
+      - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmark.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmarkTest.java'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Restart evidence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Validate workflow, evidence and restart contracts
+        run: |
+          python3 -m py_compile \
+            .github/scripts/repository_aging_restart_evidence.py \
+            .github/scripts/test_repository_aging_restart_evidence.py \
+            .github/scripts/test_repository_aging_restart_evidence_workflow.py
+          python3 .github/scripts/test_repository_aging_restart_evidence.py
+          python3 .github/scripts/test_repository_aging_restart_evidence_workflow.py
+          mvn -B -pl jgit-storage-hibernate-benchmarks -am test \
+            -Dtest=RepositoryAgingBenchmarkTest \
+            -Dsurefire.failIfNoSpecifiedTests=false
+
+  plan:
+    name: Plan bounded evidence matrix
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Select pull-request or repeated evidence coordinates
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > matrix.json
+          import json
+          import os
+
+          event = os.environ["GITHUB_EVENT_NAME"]
+          regular = event not in {"schedule", "workflow_dispatch"}
+          backends = ("postgresql", "sqlserver")
+          cache_states = ("cold",) if regular else ("cold", "warm")
+          repeats = ("1",) if regular else ("1", "2", "3")
+          include = [
+              {
+                  "backend": backend,
+                  "cache_state": cache_state,
+                  "evidence_repeat": repeat,
+              }
+              for backend in backends
+              for cache_state in cache_states
+              for repeat in repeats
+          ]
+          print(json.dumps({"include": include}, separators=(",", ":")))
+          PY
+          matrix="$(cat matrix.json)"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          printf 'Selected restart evidence matrix: %s\n' "$matrix"
+
+  evidence:
+    name: ${{ matrix.backend }} / ${{ matrix.cache_state }} / repeat ${{ matrix.evidence_repeat }}
+    needs:
+      - contract
+      - plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BACKEND: ${{ matrix.backend }}
+      CACHE_STATE: ${{ matrix.cache_state }}
+      EVIDENCE_REPEAT: ${{ matrix.evidence_repeat }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Build benchmark dependencies
+        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run exact restarted-provider aging evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/target/repository-aging-restart-$BACKEND-$CACHE_STATE-repeat-$EVIDENCE_REPEAT"
+          rm -rf "$root"
+          mkdir -p "$root"
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pperformance-investigations \
+            -Dtest=DatabaseTelemetrySnapshotTest \
+            -Djgit.storage.benchmark.investigation=repository-aging \
+            -Djgit.storage.benchmark.investigation.profile=smoke \
+            -Djgit.storage.benchmark.repository-aging.native-smoke=true \
+            -Djgit.storage.benchmark.repository-aging.database-backend="$BACKEND" \
+            -Djgit.storage.benchmark.repository-aging.cache-state="$CACHE_STATE" \
+            -Djgit.storage.benchmark.repository-aging.provider-lifecycle=restarted-provider \
+            -Djgit.storage.benchmark.repository-aging.evidence-repeat="$EVIDENCE_REPEAT" \
+            -Djgit.storage.benchmark.database-telemetry.enabled=true \
+            -Djgit.storage.benchmark.deployment="${BACKEND}-restart-${CACHE_STATE}-repeat-${EVIDENCE_REPEAT}" \
+            -Dbenchmark.resultFile="$root/jmh-result.json" 2>&1 \
+            | tee "$root/maven-benchmark.log"
+
+      - name: Validate restart phase, coordinates and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/target/repository-aging-restart-$BACKEND-$CACHE_STATE-repeat-$EVIDENCE_REPEAT"
+          python3 .github/scripts/repository_aging_restart_evidence.py validate \
+            --root "$root" \
+            --backend "$BACKEND" \
+            --cache-state "$CACHE_STATE" \
+            --evidence-repeat "$EVIDENCE_REPEAT" \
+            --failsafe-root jgit-storage-hibernate-benchmarks/target/failsafe-reports
+
+      - name: Upload exact restart evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repository-aging-restart-${{ matrix.backend }}-${{ matrix.cache_state }}-repeat-${{ matrix.evidence_repeat }}
+          path: |
+            target/repository-aging-restart-${{ matrix.backend }}-${{ matrix.cache_state }}-repeat-${{ matrix.evidence_repeat }}/**
+            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
+          if-no-files-found: warn
+
+      - name: Report exact restart evidence
+        if: success()
+        run: |
+          echo "### ${BACKEND} ${CACHE_STATE} restarted-provider evidence" >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Repeat: `${{ matrix.evidence_repeat }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- 9 exact JMH coordinates and 36 phase observations validated.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Fixture, maintenance, provider restart and measured read are attributed separately.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- This evidence does not enable automatic maintenance.' >> "$GITHUB_STEP_SUMMARY"
+
+  aggregate:
+    name: Aggregate restart reproducibility evidence
+    needs:
+      - plan
+      - evidence
+    if: ${{ always() && needs.evidence.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout aggregation tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download all restart evidence
+        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        with:
+          pattern: repository-aging-restart-*
+          path: ${{ runner.temp }}/repository-aging-restart-evidence
+
+      - name: Derive repeat dispersion summary
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/repository-aging-restart-evidence
+          SUMMARY_ROOT: ${{ runner.temp }}/repository-aging-restart-summary
+        run: |
+          python3 .github/scripts/repository_aging_restart_evidence.py aggregate \
+            --evidence-root "$EVIDENCE_ROOT" \
+            --output-root "$SUMMARY_ROOT" \
+            --event-name "$GITHUB_EVENT_NAME"
+          cat "$SUMMARY_ROOT/repository-aging-restart-reproducibility.md" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload restart reproducibility summary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repository-aging-restart-reproducibility-summary
+          path: ${{ runner.temp }}/repository-aging-restart-summary/**
+          if-no-files-found: error

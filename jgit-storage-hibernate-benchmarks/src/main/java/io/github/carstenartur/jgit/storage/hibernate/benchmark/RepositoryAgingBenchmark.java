@@ -77,7 +77,8 @@ import org.openjdk.jmh.runner.IterationType;
  * before and after optional maintenance. JMH sample-time output provides p50/p95/p99 while secondary
  * counters retain the structural condition needed to derive a policy instead of hard-coding a pack
  * count. The full scheduled profile covers 1, 10, 32, 100, 300 and 1,000 pushes with explicit cold
- * and warm JGit-cache states.
+ * and warm JGit-cache states. A separate evidence profile can close the complete Hibernate provider,
+ * reopen the existing schema with validation and then measure cold or deliberately warmed reads.
  */
 @BenchmarkMode(Mode.SampleTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -93,6 +94,8 @@ public class RepositoryAgingBenchmark {
   static final String READ_OPTIMIZED = "read-optimized";
   static final String COLD = "cold";
   static final String WARM = "warm";
+  static final String SAME_PROVIDER = "same-provider";
+  static final String RESTARTED_PROVIDER = "restarted-provider";
   static final String LOCAL_TESTCONTAINERS = "local-testcontainers";
   private static final int PAYLOAD_BYTES = 8 * 1024 + 257;
   private static final int SMALL_PACK_LIMIT_BYTES = 1024 * 1024;
@@ -115,6 +118,12 @@ public class RepositoryAgingBenchmark {
   @Param({LOCAL_TESTCONTAINERS})
   public String deployment;
 
+  @Param({SAME_PROVIDER})
+  public String providerLifecycle;
+
+  @Param({"1"})
+  public int evidenceRepeat;
+
   private HibernateSessionFactoryProvider provider;
   private HibernateRepository repository;
   private Statistics statistics;
@@ -128,6 +137,7 @@ public class RepositoryAgingBenchmark {
   private Inventory inventory;
   private PackRepackResult repackResult;
   private long unreachableLogicalBytes;
+  private int providerRestartCount;
   private final AtomicInteger measurementIteration = new AtomicInteger();
   private DatabaseTelemetryCollector telemetryCollector;
   private DatabaseTelemetrySnapshot iterationTelemetryBefore;
@@ -144,7 +154,9 @@ public class RepositoryAgingBenchmark {
 
   private void setupTrial(String benchmarkMethod) throws Exception {
     suppressConnectionMetadataLogging();
+    validateParameters();
     this.benchmarkMethod = benchmarkMethod;
+    providerRestartCount = 0;
     repositoryName =
         "jmh-aging-"
             + backend
@@ -155,8 +167,14 @@ public class RepositoryAgingBenchmark {
             + "-"
             + cacheState
             + "-"
+            + providerLifecycle
+            + "-repeat-"
+            + evidenceRepeat
+            + "-"
             + Long.toHexString(System.nanoTime());
-    provider = new HibernateSessionFactoryProvider(properties());
+    provider =
+        new HibernateSessionFactoryProvider(
+            properties(RESTARTED_PROVIDER.equals(providerLifecycle) ? "create" : "create-drop"));
     statistics = provider.getSessionFactory().getStatistics();
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     repository.create(true);
@@ -167,6 +185,10 @@ public class RepositoryAgingBenchmark {
     captureSetupPhase("maintenance", this::applyMaintenance);
     closeAndReopen();
     verifyPersistedPackOrdering();
+    if (RESTARTED_PROVIDER.equals(providerLifecycle)) {
+      captureSetupPhase("provider-restart", this::restartProvider);
+      verifyPersistedPackOrdering();
+    }
     verifyReachableFixture();
     inventory = inventory();
     if (WARM.equals(cacheState)) {
@@ -400,21 +422,34 @@ public class RepositoryAgingBenchmark {
   }
 
   private Map<String, String> telemetryCoordinate(String phase, int iteration) {
-    return Map.of(
-        "backend", backend,
-        "benchmarkMethod", benchmarkMethod,
-        "cacheState", cacheState,
-        "databaseBackend", databaseBackend(),
-        "deployment", deployment,
-        "maintenanceMode", maintenanceMode,
-        "measurementIteration", Integer.toString(iteration),
-        "phase", phase,
-        "pushes", Integer.toString(pushes));
+    return Map.ofEntries(
+        Map.entry("backend", backend),
+        Map.entry("benchmarkMethod", benchmarkMethod),
+        Map.entry("cacheState", cacheState),
+        Map.entry("databaseBackend", databaseBackend()),
+        Map.entry("deployment", deployment),
+        Map.entry("evidenceRepeat", Integer.toString(evidenceRepeat)),
+        Map.entry("maintenanceMode", maintenanceMode),
+        Map.entry("measurementIteration", Integer.toString(iteration)),
+        Map.entry("phase", phase),
+        Map.entry("providerLifecycle", providerLifecycle),
+        Map.entry("pushes", Integer.toString(pushes)));
   }
 
   private static String benchmarkMethod(BenchmarkParams benchmarkParams) {
     String benchmark = benchmarkParams.getBenchmark();
     return benchmark.substring(benchmark.lastIndexOf('.') + 1);
+  }
+
+  private void validateParameters() {
+    if (!SAME_PROVIDER.equals(providerLifecycle)
+        && !RESTARTED_PROVIDER.equals(providerLifecycle)) {
+      throw new IllegalArgumentException(
+          "Unsupported provider lifecycle " + providerLifecycle);
+    }
+    if (evidenceRepeat < 1) {
+      throw new IllegalArgumentException("Evidence repeat must be positive");
+    }
   }
 
   private void buildDeterministicHistory() throws Exception {
@@ -498,6 +533,24 @@ public class RepositoryAgingBenchmark {
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     statistics.clear();
     bytesBeforeInvocation = repository.getStorageByteMetrics();
+  }
+
+  private void restartProvider() throws Exception {
+    if (repository != null) {
+      repository.close();
+      repository = null;
+    }
+    if (provider != null) {
+      provider.close();
+      provider = null;
+    }
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    provider = new HibernateSessionFactoryProvider(properties("validate"));
+    statistics = provider.getSessionFactory().getStatistics();
+    repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+    statistics.clear();
+    bytesBeforeInvocation = repository.getStorageByteMetrics();
+    providerRestartCount++;
   }
 
   private void warmRepositoryCache() throws Exception {
@@ -618,9 +671,9 @@ public class RepositoryAgingBenchmark {
         .getSingleResult();
   }
 
-  private Properties properties() {
+  private Properties properties(String schemaAction) {
     Properties properties = new Properties();
-    properties.put("hibernate.hbm2ddl.auto", "create-drop");
+    properties.put("hibernate.hbm2ddl.auto", schemaAction);
     properties.put("hibernate.show_sql", "false");
     properties.put("hibernate.format_sql", "false");
     properties.put("hibernate.search.enabled", "false");
@@ -755,6 +808,7 @@ public class RepositoryAgingBenchmark {
     public long maintenanceElapsedMillis;
     public long maintenanceStoredByteDelta;
     public long maintenancePackReduction;
+    public long providerRestarts;
     public long jgitDfsMidxExtensionAvailable;
 
     @Setup(Level.Invocation)
@@ -775,6 +829,7 @@ public class RepositoryAgingBenchmark {
       maintenanceElapsedMillis = 0;
       maintenanceStoredByteDelta = 0;
       maintenancePackReduction = 0;
+      providerRestarts = 0;
       jgitDfsMidxExtensionAvailable = 0;
     }
 
@@ -802,6 +857,7 @@ public class RepositoryAgingBenchmark {
         maintenanceStoredByteDelta = benchmark.repackResult.storedByteDelta();
         maintenancePackReduction = benchmark.repackResult.packReduction();
       }
+      providerRestarts = benchmark.providerRestartCount;
       jgitDfsMidxExtensionAvailable = jgitDfsExposesMultiPackIndexExtension() ? 1 : 0;
     }
   }

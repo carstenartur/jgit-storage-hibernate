@@ -51,6 +51,10 @@ class PerformanceInvestigationsBenchmarkIT {
       "jgit.storage.benchmark.repository-aging.backend";
   private static final String REPOSITORY_AGING_CACHE_STATE_PROPERTY =
       "jgit.storage.benchmark.repository-aging.cache-state";
+  private static final String REPOSITORY_AGING_PROVIDER_LIFECYCLE_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.provider-lifecycle";
+  private static final String REPOSITORY_AGING_EVIDENCE_REPEAT_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.evidence-repeat";
 
   @Container
   static final PostgreSQLContainer<?> POSTGRESQL =
@@ -376,13 +380,30 @@ class PerformanceInvestigationsBenchmarkIT {
                         fullBackends)
                     : new String[] {HibernateRepositoryBenchmark.HSQLDB};
         String[] cacheStates =
-            full
+            repositoryAgingNativeSmoke || full
                 ? selectParameterValues(
                     REPOSITORY_AGING_CACHE_STATE_PROPERTY,
                     System.getProperty(REPOSITORY_AGING_CACHE_STATE_PROPERTY),
-                    fullCacheStates,
+                    repositoryAgingNativeSmoke
+                        ? new String[] {RepositoryAgingBenchmark.COLD}
+                        : fullCacheStates,
                     fullCacheStates)
                 : new String[] {RepositoryAgingBenchmark.COLD};
+        String[] providerLifecycles =
+            selectParameterValues(
+                REPOSITORY_AGING_PROVIDER_LIFECYCLE_PROPERTY,
+                System.getProperty(REPOSITORY_AGING_PROVIDER_LIFECYCLE_PROPERTY),
+                new String[] {RepositoryAgingBenchmark.SAME_PROVIDER},
+                RepositoryAgingBenchmark.SAME_PROVIDER,
+                RepositoryAgingBenchmark.RESTARTED_PROVIDER);
+        String[] evidenceRepeats =
+            selectParameterValues(
+                REPOSITORY_AGING_EVIDENCE_REPEAT_PROPERTY,
+                System.getProperty(REPOSITORY_AGING_EVIDENCE_REPEAT_PROPERTY),
+                new String[] {"1"},
+                "1",
+                "2",
+                "3");
         builder
             .include(
                 repositoryAgingNativeSmoke
@@ -404,7 +425,9 @@ class PerformanceInvestigationsBenchmarkIT {
                 RepositoryAgingBenchmark.COMPACT_ONLY,
                 RepositoryAgingBenchmark.READ_OPTIMIZED)
             .param("cacheState", cacheStates)
-            .param("deployment", deployment);
+            .param("deployment", deployment)
+            .param("providerLifecycle", providerLifecycles)
+            .param("evidenceRepeat", evidenceRepeats);
       }
       case "concurrent-large-pack" ->
           builder
