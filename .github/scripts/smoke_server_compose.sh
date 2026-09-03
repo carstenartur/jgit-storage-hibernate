@@ -19,9 +19,19 @@ persist_publication_cleanup_environment() {
   [[ "${GITHUB_ACTIONS:-}" == true ]] || return 0
   [[ -n "${GITHUB_WORKSPACE:-}" ]] || return 0
   [[ -n "${GITHUB_ENV:-}" ]] || return 0
-  [[ "$PWD" == "$GITHUB_WORKSPACE/publication-tooling" ]] || return 0
+  [[ -d "$GITHUB_WORKSPACE/publication-tooling" ]] || return 0
 
-  local variable value
+  local publication_root script_root variable value
+  publication_root="$(
+    cd -- "$GITHUB_WORKSPACE/publication-tooling"
+    pwd -P
+  )"
+  script_root="$(
+    cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
+    pwd -P
+  )"
+  [[ "$script_root" == "$publication_root" ]] || return 0
+
   for variable in \
       JSH_ADMIN_USERNAME \
       JSH_ADMIN_PASSWORD \
@@ -42,11 +52,11 @@ persist_publication_cleanup_environment() {
   done
 }
 
-# The publication workflow executes the protocol smoke in a nested checkout,
-# then performs log collection and `docker compose down` from the outer
-# workspace. Persist its synthetic Compose inputs for those later steps. Other
-# callers, including local use and the normal source/released-image jobs, do not
-# match this narrowly scoped GitHub Actions directory and remain unchanged.
+# The publication workflow executes the protocol smoke from the outer workspace
+# while the script itself lives in a nested checkout. Identify that checkout by
+# the script's canonical repository root, then persist its synthetic Compose
+# inputs for later log collection and `docker compose down`. Local callers and
+# the normal source/released-image jobs resolve to a different script root.
 persist_publication_cleanup_environment
 
 work="$(mktemp -d)"
