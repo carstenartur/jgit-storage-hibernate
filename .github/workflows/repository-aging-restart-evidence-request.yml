@@ -4,13 +4,15 @@ on:
   pull_request:
     branches: [ main ]
     paths:
+      - '.github/repository-aging-restart-evidence-request.json'
       - '.github/workflows/repository-aging-restart-evidence-request.yml'
+      - '.github/workflows/repository-aging-restart-evidence.yml'
       - '.github/scripts/validate_repository_aging_restart_request.py'
       - '.github/scripts/test_validate_repository_aging_restart_request.py'
       - '.github/scripts/test_repository_aging_restart_evidence_request_workflow.py'
+      - '.github/scripts/test_repository_aging_restart_evidence_workflow.py'
   push:
-    branches:
-      - 'evidence/repository-aging-restart/**'
+    branches: [ main ]
     paths:
       - '.github/repository-aging-restart-evidence-request.json'
 
@@ -29,8 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
+      - name: Checkout proposed contract or request
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Test request validation and workflow scope
         run: |
@@ -41,8 +47,37 @@ jobs:
           python3 .github/scripts/test_validate_repository_aging_restart_request.py
           python3 .github/scripts/test_repository_aging_restart_evidence_request_workflow.py
 
+      - name: Validate a dedicated request change
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          request_path=.github/repository-aging-restart-evidence-request.json
+          git fetch --no-tags origin "$BASE_SHA"
+          mapfile -t changed_paths < <(git diff --name-only "$BASE_SHA"...HEAD)
+          request_changed=false
+          for path in "${changed_paths[@]}"; do
+            if [[ "$path" == "$request_path" ]]; then
+              request_changed=true
+              break
+            fi
+          done
+          if [[ "$request_changed" == true ]]; then
+            if [[ "${#changed_paths[@]}" -ne 1 \
+                || "${changed_paths[0]}" != "$request_path" ]]; then
+              printf 'A restart-evidence request PR may change only %s; found:\n' \
+                "$request_path" >&2
+              printf '  %s\n' "${changed_paths[@]}" >&2
+              exit 1
+            fi
+            python3 .github/scripts/validate_repository_aging_restart_request.py \
+              --request "$request_path" \
+              --expected-source-commit "$BASE_SHA"
+          fi
+
   dispatch:
-    name: Dispatch full evidence from current main
+    name: Dispatch full evidence from protected main request
     if: github.event_name == 'push'
     permissions:
       actions: write
@@ -50,41 +85,82 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout reviewed request
+      - name: Checkout exact protected request commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate request against current main
+      - name: Validate dedicated request commit
         id: request
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          request_path=.github/repository-aging-restart-evidence-request.json
+          if [[ ! "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ \
+              || "$BEFORE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+            printf 'Request push has no valid protected-main predecessor: %s\n' \
+              "$BEFORE_SHA" >&2
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "$AFTER_SHA" ]]; then
+            printf 'Checked out request commit does not match push SHA %s.\n' \
+              "$AFTER_SHA" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin "$BEFORE_SHA"
+          mapfile -t changed_paths < <(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA")
+          if [[ "${#changed_paths[@]}" -ne 1 \
+              || "${changed_paths[0]}" != "$request_path" ]]; then
+            printf 'Protected request commit may change only %s; found:\n' \
+              "$request_path" >&2
+            printf '  %s\n' "${changed_paths[@]}" >&2
+            exit 1
+          fi
+          python3 .github/scripts/validate_repository_aging_restart_request.py \
+            --request "$request_path" \
+            --expected-source-commit "$BEFORE_SHA" \
+            --github-output "$GITHUB_OUTPUT"
+          printf 'target-commit=%s\n' "$AFTER_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Confirm main still resolves to the reviewed request commit
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags origin \
             refs/heads/main:refs/remotes/origin/main
-          source_commit="$(git rev-parse refs/remotes/origin/main)"
-          python3 .github/scripts/validate_repository_aging_restart_request.py \
-            --request .github/repository-aging-restart-evidence-request.json \
-            --expected-source-commit "$source_commit" \
-            --github-output "$GITHUB_OUTPUT"
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          if [[ "$current_main" != "$GITHUB_SHA" ]]; then
+            printf 'Main advanced from reviewed request %s to %s; refusing a stale dispatch.\n' \
+              "$GITHUB_SHA" "$current_main" >&2
+            exit 1
+          fi
 
-      - name: Dispatch full restart evidence on main
+      - name: Dispatch full restart evidence on exact current main
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          TARGET_COMMIT: ${{ steps.request.outputs.target-commit }}
         shell: bash
         run: |
           set -euo pipefail
           response="$(mktemp)"
+          payload="$(printf \
+            '{"ref":"main","inputs":{"expected_source_commit":"%s"}}' \
+            "$TARGET_COMMIT")"
           status="$(curl --silent --show-error \
             --output "$response" \
             --write-out '%{http_code}' \
             --request POST \
             --header 'Accept: application/vnd.github+json' \
+            --header 'Content-Type: application/json' \
             --header "Authorization: Bearer $GITHUB_TOKEN" \
             --header 'X-GitHub-Api-Version: 2022-11-28' \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/repository-aging-restart-evidence.yml/dispatches" \
-            --data '{"ref":"main"}')"
+            --data "$payload")"
           if [[ "$status" != 204 ]]; then
             printf 'Workflow dispatch failed with HTTP %s:\n' "$status" >&2
             cat "$response" >&2
@@ -96,5 +172,5 @@ jobs:
           echo '### Full repository-aging restart evidence dispatched' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '- Request: `${{ steps.request.outputs.request-id }}`' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Source: `${{ steps.request.outputs.source-commit }}`' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Target workflow ref: `main`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Unchanged benchmark source: `${{ steps.request.outputs.source-commit }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Exact dispatched main commit: `${{ steps.request.outputs.target-commit }}`' >> "$GITHUB_STEP_SUMMARY"
