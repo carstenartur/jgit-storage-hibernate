@@ -93,7 +93,7 @@ class RestartEvidenceRequestWorkflowTest(unittest.TestCase):
     def test_request_is_bound_to_the_exact_current_main_predecessor(self) -> None:
         for fragment in (
             "validate_repository_aging_restart_request.py",
-            "--request .github/repository-aging-restart-evidence-request.json",
+            '--request "$request_path"',
             '--github-output "$GITHUB_OUTPUT"',
         ):
             self.assertIn(fragment, self.workflow)
