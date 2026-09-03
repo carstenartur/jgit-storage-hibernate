@@ -21,9 +21,6 @@ persist_publication_cleanup_environment() {
   [[ -n "${GITHUB_ENV:-}" ]] || return 0
   [[ "$PWD" == "$GITHUB_WORKSPACE/publication-tooling" ]] || return 0
 
-  : "${JSH_DATABASE_PASSWORD:?JSH_DATABASE_PASSWORD is required for publication cleanup}"
-  : "${JSH_SERVER_IMAGE:?JSH_SERVER_IMAGE is required for publication cleanup}"
-
   local variable value
   for variable in \
       JSH_ADMIN_USERNAME \
