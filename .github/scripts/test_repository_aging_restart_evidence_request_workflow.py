@@ -86,7 +86,7 @@ class RestartEvidenceRequestWorkflowTest(unittest.TestCase):
             'git diff --name-only "$BEFORE_SHA" "$AFTER_SHA"',
             "Protected request commit may change only",
             '--expected-source-commit "$BEFORE_SHA"',
-            "target-commit=%s",
+            "target_commit=%s",
         ):
             self.assertIn(fragment, self.dispatch_block)
 
@@ -103,15 +103,24 @@ class RestartEvidenceRequestWorkflowTest(unittest.TestCase):
             'source_commit != expected_source_commit',
             "Restart-evidence request is stale",
             "reason must be one line",
+            "request_id=",
+            "source_commit=",
         ):
             self.assertIn(fragment, self.validator)
         for test_name in (
             "test_exact_current_main_request_is_normalized",
+            "test_github_outputs_use_expression_safe_names",
             "test_stale_main_commit_is_rejected",
             "test_disabled_and_extra_key_requests_are_rejected",
             "test_request_id_and_reason_are_single_line_and_bounded",
         ):
             self.assertIn(test_name, self.validator_test)
+
+    def test_expression_outputs_use_unambiguous_names(self) -> None:
+        for output in ("request_id", "source_commit", "target_commit"):
+            self.assertIn(f"steps.request.outputs.{output}", self.dispatch_block)
+        for output in ("request-id", "source-commit", "target-commit"):
+            self.assertNotIn(f"steps.request.outputs.{output}", self.workflow)
 
     def test_dispatch_refuses_when_main_advanced_after_request_merge(self) -> None:
         for fragment in (
@@ -126,7 +135,7 @@ class RestartEvidenceRequestWorkflowTest(unittest.TestCase):
     def test_dispatch_targets_exact_current_main_in_existing_workflow(self) -> None:
         for fragment in (
             "Dispatch full restart evidence on exact current main",
-            "TARGET_COMMIT: ${{ steps.request.outputs.target-commit }}",
+            "TARGET_COMMIT: ${{ steps.request.outputs.target_commit }}",
             "--request POST",
             "Accept: application/vnd.github+json",
             "Content-Type: application/json",
