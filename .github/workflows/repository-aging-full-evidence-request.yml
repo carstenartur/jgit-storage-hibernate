@@ -164,9 +164,10 @@ jobs:
           python3 - "$runs_response" "$TARGET_COMMIT" > "$existing_ids" <<'PY'
           import json
           import sys
+          from pathlib import Path
 
           path, target_commit = sys.argv[1:]
-          payload = json.loads(open(path, encoding="utf-8").read())
+          payload = json.loads(Path(path).read_text(encoding="utf-8"))
           for run in payload.get("workflow_runs", []):
               if (
                   run.get("event") == "workflow_dispatch"
@@ -203,12 +204,13 @@ jobs:
                 "$existing_ids" <<'PY'
           import json
           import sys
+          from pathlib import Path
 
           path, target_commit, existing_path = sys.argv[1:]
-          payload = json.loads(open(path, encoding="utf-8").read())
+          payload = json.loads(Path(path).read_text(encoding="utf-8"))
           existing = {
               int(value)
-              for value in open(existing_path, encoding="utf-8").read().splitlines()
+              for value in Path(existing_path).read_text(encoding="utf-8").splitlines()
               if value
           }
           matching = [
