@@ -59,7 +59,7 @@ class FullAgingEvidenceRequestWorkflowTest(unittest.TestCase):
         ):
             self.assertIn(fragment, self.request)
 
-    def test_dispatch_requests_full_profile_and_verifies_resolved_sha(self) -> None:
+    def test_dispatch_requests_full_profile_and_correlates_new_exact_sha_run(self) -> None:
         for fragment in (
             "Dispatch and verify complete matrix on exact current main",
             "payload='{\"ref\":\"main\",\"inputs\":{\"profile\":\"full\"}}'",
@@ -68,13 +68,20 @@ class FullAgingEvidenceRequestWorkflowTest(unittest.TestCase):
             'run.get("event") == "workflow_dispatch"',
             'run.get("head_branch") == "main"',
             'run.get("head_sha") == target_commit',
-            'run.get("created_at", "") >= started_at',
+            'run.get("id") not in existing',
+            'existing_ids="$(mktemp)"',
+            '"$runs_response" "$TARGET_COMMIT" > "$existing_ids"',
             "for attempt in $(seq 1 12)",
             'printf \'run_id=%s\\n\' "$run_id"',
-            "No full Performance Investigations run resolved to reviewed commit",
+            "No new full Performance Investigations run resolved to reviewed commit",
         ):
             self.assertIn(fragment, self.request)
+        self.assertLess(
+            self.request.index('> "$existing_ids" <<\'PY\''),
+            self.request.index("--request POST"),
+        )
         self.assertNotIn("expected_source_commit", self.request)
+        self.assertNotIn("dispatch_started_at", self.request)
 
     def test_target_retains_complete_sharded_age_matrix(self) -> None:
         for fragment in (
