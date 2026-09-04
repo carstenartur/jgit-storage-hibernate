@@ -1,0 +1,140 @@
+name: Record protected restart evidence launch
+
+on:
+  push:
+    branches:
+      - automation/record-restart-evidence-launch-20260904
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+  pull-requests: read
+
+jobs:
+  record:
+    name: Record merged request and launched evidence run
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_HEAD: request/repository-aging-restart-evidence-20260904-v2
+    steps:
+      - name: Await the protected request merge
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          merged=false
+          for attempt in $(seq 1 100); do
+            pulls="$(gh api \
+              "repos/$GITHUB_REPOSITORY/pulls?state=closed&base=main&head=$owner:$TARGET_HEAD&per_page=10")"
+            if [[ "$(jq 'length' <<< "$pulls")" -eq 1 \
+                && "$(jq -r '.[0].merged_at // empty' <<< "$pulls")" != '' ]]; then
+              number="$(jq -r '.[0].number' <<< "$pulls")"
+              merge_sha="$(jq -r '.[0].merge_commit_sha' <<< "$pulls")"
+              merged_at="$(jq -r '.[0].merged_at' <<< "$pulls")"
+              merged=true
+              break
+            fi
+            sleep 10
+          done
+          if [[ "$merged" != true || ! "$merge_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            printf 'The audited restart evidence request did not merge.\n' >&2
+            exit 1
+          fi
+          {
+            printf 'number=%s\n' "$number"
+            printf 'merge-sha=%s\n' "$merge_sha"
+            printf 'merged-at=%s\n' "$merged_at"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Await a main-bound restart evidence run
+        id: run
+        shell: bash
+        env:
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+          MERGED_AT: ${{ steps.request.outputs.merged-at }}
+        run: |
+          set -euo pipefail
+          found=false
+          for attempt in $(seq 1 100); do
+            runs="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs?branch=main&per_page=100")"
+            candidate="$(jq -c \
+              --arg sha "$MERGE_SHA" \
+              --arg merged "$MERGED_AT" '
+                [.workflow_runs[]
+                  | select(.head_sha == $sha)
+                  | select(.created_at >= $merged)
+                  | select(
+                      ((.name // "") + " " + (.display_title // ""))
+                      | ascii_downcase
+                      | test("restart|repository-aging|repository aging")
+                    )]
+                | sort_by(.event == "workflow_dispatch")
+                | reverse
+                | .[0] // empty
+              ' <<< "$runs")"
+            if [[ -n "$candidate" ]]; then
+              run_id="$(jq -r '.id' <<< "$candidate")"
+              run_name="$(jq -r '.name' <<< "$candidate")"
+              run_url="$(jq -r '.html_url' <<< "$candidate")"
+              run_event="$(jq -r '.event' <<< "$candidate")"
+              run_status="$(jq -r '.status' <<< "$candidate")"
+              found=true
+              break
+            fi
+            sleep 10
+          done
+          if [[ "$found" != true ]]; then
+            printf 'No restart evidence workflow run appeared for %s.\n' "$MERGE_SHA" >&2
+            exit 1
+          fi
+          {
+            printf 'id=%s\n' "$run_id"
+            printf 'name=%s\n' "$run_name"
+            printf 'url=%s\n' "$run_url"
+            printf 'event=%s\n' "$run_event"
+            printf 'status=%s\n' "$run_status"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Add one durable progress record to issue 165
+        env:
+          NUMBER: ${{ steps.request.outputs.number }}
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+          RUN_ID: ${{ steps.run.outputs.id }}
+          RUN_NAME: ${{ steps.run.outputs.name }}
+          RUN_URL: ${{ steps.run.outputs.url }}
+          RUN_EVENT: ${{ steps.run.outputs.event }}
+          RUN_STATUS: ${{ steps.run.outputs.status }}
+        run: |
+          set -euo pipefail
+          marker="<!-- restart-evidence-request:$MERGE_SHA -->"
+          comments="$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/issues/165/comments?per_page=100")"
+          if jq -e --arg marker "$marker" \
+              'any(.[]; (.body // "") | contains($marker))' \
+              <<< "$comments" >/dev/null; then
+            printf 'Issue 165 already contains the launch record.\n'
+            exit 0
+          fi
+          body="$(cat <<EOF
+          $marker
+          Protected request PR #$NUMBER merged as \`$MERGE_SHA\`.
+
+          The repository-owned restart-evidence path launched **$RUN_NAME** (run $RUN_ID, event \`$RUN_EVENT\`, current status \`$RUN_STATUS\`): $RUN_URL
+
+          This starts evidence collection only. Automatic maintenance remains disabled; policy work stays open until the repeated cold/warm results and remaining concurrency evidence support measured breakpoints.
+          EOF
+          )"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/issues/165/comments" \
+            -f body="$body" >/dev/null
+
+      - name: Remove this one-shot helper branch
+        if: success()
+        run: |
+          gh api -X DELETE \
+            "repos/$GITHUB_REPOSITORY/git/refs/heads/automation/record-restart-evidence-launch-20260904" \
+            >/dev/null 2>&1 || true
