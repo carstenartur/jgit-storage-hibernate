@@ -152,8 +152,30 @@ jobs:
           set -euo pipefail
           response="$(mktemp)"
           runs_response="$(mktemp)"
-          dispatch_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          existing_ids="$(mktemp)"
           payload='{"ref":"main","inputs":{"profile":"full"}}'
+          runs_url="https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/performance-investigations.yml/runs?event=workflow_dispatch&branch=main&head_sha=$TARGET_COMMIT&per_page=20"
+
+          curl --fail --silent --show-error \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "$runs_url" > "$runs_response"
+          python3 - "$runs_response" "$TARGET_COMMIT" > "$existing_ids" <<'PY'
+          import json
+          import sys
+
+          path, target_commit = sys.argv[1:]
+          payload = json.loads(open(path, encoding="utf-8").read())
+          for run in payload.get("workflow_runs", []):
+              if (
+                  run.get("event") == "workflow_dispatch"
+                  and run.get("head_branch") == "main"
+                  and run.get("head_sha") == target_commit
+              ):
+                  print(run["id"])
+          PY
+
           status="$(curl --silent --show-error \
             --output "$response" \
             --write-out '%{http_code}' \
@@ -170,7 +192,6 @@ jobs:
             exit 1
           fi
 
-          runs_url="https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/performance-investigations.yml/runs?event=workflow_dispatch&branch=main&head_sha=$TARGET_COMMIT&per_page=20"
           run_id=''
           for attempt in $(seq 1 12); do
             if curl --fail --silent --show-error \
@@ -179,22 +200,27 @@ jobs:
                 --header 'X-GitHub-Api-Version: 2022-11-28' \
                 "$runs_url" > "$runs_response"; then
               run_id="$(python3 - "$runs_response" "$TARGET_COMMIT" \
-                "$dispatch_started_at" <<'PY'
+                "$existing_ids" <<'PY'
           import json
           import sys
 
-          path, target_commit, started_at = sys.argv[1:]
+          path, target_commit, existing_path = sys.argv[1:]
           payload = json.loads(open(path, encoding="utf-8").read())
+          existing = {
+              int(value)
+              for value in open(existing_path, encoding="utf-8").read().splitlines()
+              if value
+          }
           matching = [
               run
               for run in payload.get("workflow_runs", [])
               if run.get("event") == "workflow_dispatch"
               and run.get("head_branch") == "main"
               and run.get("head_sha") == target_commit
-              and run.get("created_at", "") >= started_at
+              and run.get("id") not in existing
           ]
           if matching:
-              print(max(matching, key=lambda run: run["created_at"])["id"])
+              print(max(matching, key=lambda run: run["id"])["id"])
           PY
               )"
               if [[ -n "$run_id" ]]; then
@@ -204,7 +230,7 @@ jobs:
             sleep 5
           done
           if [[ -z "$run_id" ]]; then
-            printf 'No full Performance Investigations run resolved to reviewed commit %s.\n' \
+            printf 'No new full Performance Investigations run resolved to reviewed commit %s.\n' \
               "$TARGET_COMMIT" >&2
             exit 1
           fi
