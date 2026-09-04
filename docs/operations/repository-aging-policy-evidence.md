@@ -47,11 +47,16 @@ The comparison JSON is suitable for the benchmark dashboard. The policy JSON ret
 
 The converter rejects duplicate conditions and any condition that lacks `none`, `compact-only` or `read-optimized` evidence. A mode is marked beneficial only when it both removes active packs and improves the measured operation. It does not change runtime configuration.
 
-The complete protected-main provider-restart aggregate from 2026-09-04 is retained in the repository
-as both a [human-readable table](../evidence/repository-aging-restart-reproducibility-2026-09-04.md)
-and [machine-readable CSV](../evidence/repository-aging-restart-reproducibility-2026-09-04.csv).
-Those files preserve all three repeat scores, mean, range, population standard deviation and
-coefficient of variation, together with the exact workflow run and artifact digest.
+The complete protected-main provider-restart result from 2026-09-04 is retained as:
+
+- a [human-readable reproducibility table](../evidence/repository-aging-restart-reproducibility-2026-09-04.md);
+- its [machine-readable repeat and dispersion CSV](../evidence/repository-aging-restart-reproducibility-2026-09-04.csv);
+- a [paired maintenance-payback calculation](../evidence/repository-aging-restart-payback-2026-09-04.md); and
+- the [machine-readable payback inputs](../evidence/repository-aging-restart-payback-2026-09-04.csv).
+
+Together these files preserve all three repeat scores, mean, range, population standard deviation,
+coefficient of variation, matching maintenance duration and the exact workflow run and artifact
+digest.
 
 ## Interpreting break-even evidence
 
@@ -89,6 +94,25 @@ Server ranges do not overlap between the ten-pack baseline and either maintenanc
 result points in the opposite direction: at this small age, an already warmed read path is faster
 without maintenance.
 
+### Maintenance payback for the retained reopen path
+
+Each maintenance result is paired with the no-maintenance result from the same backend, cache state
+and repeat. Break-even is maintenance duration divided by the paired per-read saving.
+
+| Backend / cache | Maintenance | Mean maintenance | Mean saving per read | Break-even reads | Paired repeat range |
+|---|---|---:|---:|---:|---:|
+| PostgreSQL cold | compact-only | 71.7 ms | 12.510 ms | 5.73 | 5.31–6.23 |
+| PostgreSQL cold | read-optimized | 98.7 ms | 12.615 ms | 7.82 | 7.49–8.10 |
+| SQL Server cold | compact-only | 124.3 ms | 20.386 ms | 6.10 | 3.29–13.89 |
+| SQL Server cold | read-optimized | 147.7 ms | 20.427 ms | 7.23 | 4.46–15.72 |
+| PostgreSQL warm | both modes | 65.3–98.0 ms | negative | none | none |
+| SQL Server warm | both modes | 84.0–111.0 ms | negative | none | none |
+
+For the cold ten-pack fixture, compact-only maintenance pays back after approximately six equivalent
+reopen-plus-oldest-object reads; the read-optimized preset needs roughly seven to eight. For the warm
+fixture there is no finite payback because every paired repeat regresses. The SQL Server cold
+direction is stable, but its exact break-even range remains wider than PostgreSQL's.
+
 ### Other retained reads
 
 For PostgreSQL cold clone-style traversal, compact-only maintenance lowers the mean from 0.279 ms to
@@ -113,11 +137,11 @@ The maintenance API must not expose a MIDX setting unless the selected supported
 
 ## Remaining evidence before an automatic policy
 
-Issue #165 remains open. The completed restart and cross-database correctness slices narrow the
-remaining work to quantitative policy evidence:
+Issue #165 remains open. The completed restart, payback and cross-database correctness slices narrow
+the remaining work to broader quantitative policy evidence:
 
 - retain the full 32/100/300/1,000-push age matrix on PostgreSQL, PostgreSQL+HikariCP and SQL Server;
-- combine maintenance duration with cold/warm read frequency to calculate lifecycle-specific payback;
+- extend lifecycle-specific maintenance payback beyond the retained ten-push condition;
 - measure read latency while maintenance is actively consuming database, WAL/log, I/O and storage resources;
 - repeat SQL Server cold measurements or use a controlled production-like runner before relying on exact percentages;
 - derive a stable condition from pack count, small-pack ratio, index bytes, unreachable bytes, measured degradation and time since maintenance;
