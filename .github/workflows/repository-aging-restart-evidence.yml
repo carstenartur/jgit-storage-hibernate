@@ -2,6 +2,11 @@ name: Repository Aging Restart Evidence
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_source_commit:
+        description: 'Optional exact main commit that this run must execute'
+        required: false
+        type: string
   schedule:
     - cron: '17 4 14 * *'
   pull_request:
@@ -44,6 +49,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Verify requested source commit
+        if: github.event_name == 'workflow_dispatch' && inputs.expected_source_commit != ''
+        env:
+          EXPECTED_SOURCE_COMMIT: ${{ inputs.expected_source_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            printf 'Expected source commit must be a lowercase 40-character SHA: %s\n' \
+              "$EXPECTED_SOURCE_COMMIT" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_SHA" != "$EXPECTED_SOURCE_COMMIT" ]]; then
+            printf 'Dispatched source moved: expected %s, workflow resolved %s.\n' \
+              "$EXPECTED_SOURCE_COMMIT" "$GITHUB_SHA" >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
