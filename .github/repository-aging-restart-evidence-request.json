@@ -1,7 +1,6 @@
 {
-  "schemaVersion": 1,
   "enabled": true,
-  "requestId": "initial-protected-main-restart-evidence-20260904",
-  "sourceCommit": "02ecc1a2b2f2483ddf24a4b053b8b2e6c2894c8f",
-  "reason": "Run the complete PostgreSQL and SQL Server cold/warm provider-restart matrix with three reproducibility repeats from the reviewed protected-main source."
+  "requestId": "initial-provider-restart-evidence-2026-09-04",
+  "reason": "Capture the initial full repeated PostgreSQL and SQL Server cold/warm provider-restart evidence matrix.",
+  "sourceCommit": "842398fde103937b5320cdf79657c3d9905affec"
 }
