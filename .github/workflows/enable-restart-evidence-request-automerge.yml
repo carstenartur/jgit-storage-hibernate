@@ -1,0 +1,97 @@
+name: Enable audited restart evidence request auto-merge
+
+on:
+  push:
+    branches:
+      - automation/merge-restart-evidence-request-20260904
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-and-enable:
+    name: Validate exact request and enable protected auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_HEAD: request/repository-aging-restart-evidence-20260904-v2
+    steps:
+      - name: Find the unique open request pull request
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          pulls="$(gh api \
+            "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&head=$owner:$TARGET_HEAD&per_page=10")"
+          count="$(jq 'length' <<< "$pulls")"
+          if [[ "$count" -ne 1 ]]; then
+            printf 'Expected exactly one open request PR, found %s.\n' "$count" >&2
+            exit 1
+          fi
+          number="$(jq -r '.[0].number' <<< "$pulls")"
+          head_sha="$(jq -r '.[0].head.sha' <<< "$pulls")"
+          base_sha="$(jq -r '.[0].base.sha' <<< "$pulls")"
+          current_main="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          if [[ "$base_sha" != "$current_main" ]]; then
+            printf 'Request base %s is stale; protected main is %s.\n' \
+              "$base_sha" "$current_main" >&2
+            exit 1
+          fi
+          {
+            printf 'number=%s\n' "$number"
+            printf 'head-sha=%s\n' "$head_sha"
+            printf 'base-sha=%s\n' "$base_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Require the exact audited one-file diff
+        shell: bash
+        env:
+          NUMBER: ${{ steps.target.outputs.number }}
+          HEAD_SHA: ${{ steps.target.outputs.head-sha }}
+          BASE_SHA: ${{ steps.target.outputs.base-sha }}
+        run: |
+          set -euo pipefail
+          files="$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files?per_page=100")"
+          count="$(jq 'length' <<< "$files")"
+          path="$(jq -r '.[0].filename // empty' <<< "$files")"
+          if [[ "$count" -ne 1 \
+              || "$path" != .github/repository-aging-restart-evidence-request.json ]]; then
+            printf 'Expected only the restart evidence request file; received:\n' >&2
+            jq -r '.[].filename' <<< "$files" >&2
+            exit 1
+          fi
+          gh api \
+            -H 'Accept: application/vnd.github.raw+json' \
+            "repos/$GITHUB_REPOSITORY/contents/$path?ref=$HEAD_SHA" \
+            > request.json
+          BASE_SHA="$BASE_SHA" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          request = json.loads(Path("request.json").read_text(encoding="utf-8"))
+          expected = {"enabled", "requestId", "reason", "sourceCommit"}
+          if set(request) != expected:
+              raise SystemExit(f"Unexpected request keys: {sorted(request)}")
+          if request["enabled"] is not True:
+              raise SystemExit("enabled must be true")
+          if request["sourceCommit"] != os.environ["BASE_SHA"]:
+              raise SystemExit("sourceCommit does not equal the reviewed PR base")
+          for key, maximum in (("requestId", 96), ("reason", 240)):
+              value = request[key]
+              if not isinstance(value, str) or not value or len(value) > maximum:
+                  raise SystemExit(f"{key} must contain 1-{maximum} characters")
+              if "\n" in value or "\r" in value:
+                  raise SystemExit(f"{key} must be one line")
+          PY
+
+      - name: Enable squash auto-merge under the repository rules
+        env:
+          NUMBER: ${{ steps.target.outputs.number }}
+        run: gh pr merge "$NUMBER" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch
