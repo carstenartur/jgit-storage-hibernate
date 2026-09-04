@@ -31,12 +31,64 @@ OPERATION_LABELS = {
 }
 
 
+def _metric_number(name: str, value: Any) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"Repository-aging metric {name!r} contains a boolean")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as failure:
+        raise ValueError(
+            f"Repository-aging metric {name!r} is not numeric: {value!r}"
+        ) from failure
+    if not math.isfinite(number):
+        raise ValueError(
+            f"Repository-aging metric {name!r} is not finite: {value!r}"
+        )
+    return number
+
+
 def _metric_score(result: dict[str, Any], name: str, default: float = 0.0) -> float:
+    """Return one representative per-iteration auxiliary-counter value.
+
+    JMH reports ``AuxCounters.Type.EVENTS`` aggregate ``score`` as the sum of
+    the retained measurement iterations. Repository-aging counters describe a
+    trial condition or one maintenance action and are repeated unchanged in
+    every iteration, so using that aggregate multiplies pack counts, bytes and
+    maintenance cost by the number of iterations. Prefer the retained raw
+    iteration values, then the secondary p50, while keeping score-only fixtures
+    and older evidence readable as a final fallback.
+    """
+
     metrics = result.get("secondaryMetrics", {})
+    if not isinstance(metrics, dict):
+        raise ValueError("Repository-aging secondaryMetrics must be an object")
     for key, metric in metrics.items():
-        if key == name or key.endswith("." + name):
-            return float(metric.get("score", default))
-    return default
+        if key != name and not key.endswith("." + name):
+            continue
+        if not isinstance(metric, dict):
+            raise ValueError(f"Repository-aging metric {name!r} must be an object")
+
+        raw_data = metric.get("rawData")
+        if raw_data is not None:
+            if not isinstance(raw_data, list):
+                raise ValueError(
+                    f"Repository-aging metric {name!r} rawData must be an array"
+                )
+            values: list[float] = []
+            for fork in raw_data:
+                if not isinstance(fork, list):
+                    raise ValueError(
+                        f"Repository-aging metric {name!r} rawData fork must be an array"
+                    )
+                values.extend(_metric_number(name, value) for value in fork)
+            if values:
+                return math.fsum(values) / len(values)
+
+        percentiles = metric.get("scorePercentiles")
+        if isinstance(percentiles, dict) and "50.0" in percentiles:
+            return _metric_number(name, percentiles["50.0"])
+        return _metric_number(name, metric.get("score", default))
+    return _metric_number(name, default)
 
 
 def _milliseconds(score: float, unit: str) -> float:
