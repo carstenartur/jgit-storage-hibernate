@@ -28,6 +28,15 @@ def _reject_non_finite(value: str) -> None:
     raise RequestError(f"Non-finite JSON constant {value!r}")
 
 
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise RequestError(f"Duplicate JSON key {key!r}")
+        result[key] = value
+    return result
+
+
 def validate_request(path: Path, expected_source_commit: str) -> dict[str, Any]:
     """Return a normalized request only when it targets exact current main."""
     if not COMMIT.fullmatch(expected_source_commit):
@@ -39,6 +48,7 @@ def validate_request(path: Path, expected_source_commit: str) -> dict[str, Any]:
         request = json.loads(
             path.read_text(encoding="utf-8"),
             parse_constant=_reject_non_finite,
+            object_pairs_hook=_strict_object,
         )
     except OSError as failure:
         raise RequestError(f"Cannot read full-aging request {path}") from failure
@@ -52,8 +62,9 @@ def validate_request(path: Path, expected_source_commit: str) -> dict[str, Any]:
             "Full-aging request keys must be exactly "
             f"{sorted(ALLOWED_KEYS)}, found {sorted(keys)}"
         )
-    if request["schemaVersion"] != 1:
-        raise RequestError("Full-aging request schemaVersion must be 1")
+    schema_version = request["schemaVersion"]
+    if type(schema_version) is not int or schema_version != 1:
+        raise RequestError("Full-aging request schemaVersion must be integer 1")
     if request["enabled"] is not True:
         raise RequestError("Full-aging request must set enabled to true")
 
@@ -76,8 +87,10 @@ def validate_request(path: Path, expected_source_commit: str) -> dict[str, Any]:
     reason = request["reason"]
     if not isinstance(reason, str) or not 10 <= len(reason) <= 300:
         raise RequestError("Full-aging reason must contain 10-300 characters")
-    if "\n" in reason or "\r" in reason:
-        raise RequestError("Full-aging reason must be one line")
+    if any(ord(character) < 32 for character in reason):
+        raise RequestError(
+            "Full-aging reason must be one line without control characters"
+        )
 
     return {
         "schemaVersion": 1,
