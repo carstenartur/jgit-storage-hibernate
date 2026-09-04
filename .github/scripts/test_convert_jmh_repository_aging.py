@@ -47,6 +47,48 @@ class RepositoryAgingConverterTest(unittest.TestCase):
         )
         self.assertIn("p50/p95/p99:", comparison["extra"])
 
+    def test_event_counters_use_raw_iteration_values_instead_of_sum(self) -> None:
+        results = [
+            self.result("reopenAndLookupOldest", "none", 15.0, 0, 0),
+            self.result("reopenAndLookupOldest", "compact-only", 5.0, 70, 8),
+            self.result("reopenAndLookupOldest", "read-optimized", 6.0, 100, 8),
+        ]
+        for result in results:
+            self.as_three_iteration_events(result)
+
+        report = CONVERTER.convert(results)
+        compact = next(
+            row
+            for row in report["policyEvidence"]
+            if row["maintenanceMode"] == "compact-only"
+        )
+
+        self.assertEqual(2, compact["activePacks"])
+        self.assertEqual(100000, compact["storedExtensionBytes"])
+        self.assertEqual(70.0, compact["maintenanceElapsedMillis"])
+        self.assertEqual(8, compact["maintenancePackReduction"])
+        self.assertEqual(7, compact["breakEvenReads"])
+        self.assertEqual(7, report["recommendations"][0]["breakEvenReads"])
+
+    def test_secondary_p50_is_used_when_raw_data_is_not_retained(self) -> None:
+        result = self.result("reopenAndLookupOldest", "compact-only", 5.0, 70, 8)
+        metric = result["secondaryMetrics"]["AgingCounters.maintenanceElapsedMillis"]
+        metric["score"] = 210
+        metric["scorePercentiles"] = {"50.0": 70}
+
+        self.assertEqual(
+            70.0,
+            CONVERTER._metric_score(result, "maintenanceElapsedMillis"),
+        )
+
+    def test_non_finite_raw_counter_is_rejected(self) -> None:
+        result = self.result("reopenAndLookupOldest", "compact-only", 5.0, 70, 8)
+        metric = result["secondaryMetrics"]["AgingCounters.maintenanceElapsedMillis"]
+        metric["rawData"] = [[70.0, float("nan")]]
+
+        with self.assertRaisesRegex(ValueError, "not finite"):
+            CONVERTER._metric_score(result, "maintenanceElapsedMillis")
+
     def test_missing_baseline_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Missing no-maintenance baseline"):
             CONVERTER.convert(
@@ -67,6 +109,14 @@ class RepositoryAgingConverterTest(unittest.TestCase):
         result["primaryMetric"]["scorePercentiles"].pop("95.0")
         with self.assertRaisesRegex(ValueError, "missing the p95.0 JMH percentile"):
             CONVERTER.convert([result])
+
+    @staticmethod
+    def as_three_iteration_events(result: dict) -> None:
+        for metric in result["secondaryMetrics"].values():
+            value = metric["score"]
+            metric["score"] = value * 3
+            metric["scorePercentiles"] = {"50.0": value}
+            metric["rawData"] = [[value, value, value]]
 
     @staticmethod
     def result(
