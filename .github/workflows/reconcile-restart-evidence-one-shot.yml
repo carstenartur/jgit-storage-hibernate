@@ -1,0 +1,42 @@
+name: Run idempotent restart evidence reconciler
+
+on:
+  push:
+    branches:
+      - automation/reconcile-restart-evidence-20260904-v3
+
+concurrency:
+  group: reconcile-restart-evidence-20260904
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  reconcile:
+    name: Establish and verify protected restart evidence launch
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout one-shot reconciler
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reconcile protected request and full evidence launch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/reconcile-restart-evidence-one-shot.sh
+
+      - name: Remove this one-shot branch after success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X DELETE \
+            "repos/$GITHUB_REPOSITORY/git/refs/heads/automation/reconcile-restart-evidence-20260904-v3" \
+            >/dev/null 2>&1 || true
