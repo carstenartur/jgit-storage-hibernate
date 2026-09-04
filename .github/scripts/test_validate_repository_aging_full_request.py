@@ -108,12 +108,13 @@ class FullAgingEvidenceRequestTest(unittest.TestCase):
             with self.assertRaisesRegex(VALIDATOR.RequestError, "keys"):
                 VALIDATOR.validate_request(path, SOURCE)
 
-            path.write_text(
+            non_finite_request = (
                 '{"schemaVersion": NaN, "enabled": true, '
                 '"requestId": "initial-full-aging-evidence", '
-                f'"sourceCommit": "{SOURCE}", "reason": "Run full evidence."}}',
-                encoding="utf-8",
+                f'"sourceCommit": "{SOURCE}", "reason": "Run full evidence."'
+                "}"
             )
+            path.write_text(non_finite_request, encoding="utf-8")
             with self.assertRaisesRegex(VALIDATOR.RequestError, "Non-finite"):
                 VALIDATOR.validate_request(path, SOURCE)
 
