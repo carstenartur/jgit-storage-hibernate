@@ -1,0 +1,365 @@
+name: Reconcile audited repository-aging restart evidence
+
+on:
+  push:
+    branches:
+      - automation/reconcile-restart-evidence-20260904-v2
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  reconcile:
+    name: Reconcile protected request and evidence launch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INFRASTRUCTURE_PR: '342'
+      REQUEST_BRANCH: request/repository-aging-restart-evidence-20260904-v3
+      REQUEST_TITLE: Request full provider-restart evidence matrix
+      REQUEST_ID: initial-provider-restart-evidence-2026-09-04
+    steps:
+      - name: Require the protected request infrastructure
+        id: infrastructure
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          merged=false
+          for attempt in $(seq 1 90); do
+            pull="$(gh api "repos/$repository/pulls/$INFRASTRUCTURE_PR")"
+            merged_at="$(jq -r '.merged_at // empty' <<< "$pull")"
+            if [[ -n "$merged_at" ]]; then
+              merge_sha="$(jq -r '.merge_commit_sha' <<< "$pull")"
+              merged=true
+              break
+            fi
+            if [[ "$attempt" -eq 1 ]]; then
+              gh pr merge "$INFRASTRUCTURE_PR" \
+                --repo "$repository" --auto --squash >/dev/null 2>&1 || true
+            fi
+            sleep 10
+          done
+          if [[ "$merged" != true || ! "$merge_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            printf 'Infrastructure PR #%s did not merge under repository protection.\n' \
+              "$INFRASTRUCTURE_PR" >&2
+            exit 1
+          fi
+          current_main="$(gh api "repos/$repository/branches/main" --jq '.commit.sha')"
+          comparison="$(gh api "repos/$repository/compare/$merge_sha...$current_main")"
+          status="$(jq -r '.status' <<< "$comparison")"
+          if [[ "$status" != identical && "$status" != ahead ]]; then
+            printf 'Protected main %s does not contain infrastructure merge %s.\n' \
+              "$current_main" "$merge_sha" >&2
+            exit 1
+          fi
+          printf 'merge-sha=%s\n' "$merge_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile the exact SHA-bound one-file request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          owner="${repository%%/*}"
+          request_path=.github/repository-aging-restart-evidence-request.json
+
+          find_merged_request() {
+            gh api --paginate \
+              "repos/$repository/pulls?state=closed&base=main&per_page=100" \
+              | jq -s -c \
+                  --arg title "$REQUEST_TITLE" '
+                    add
+                    | map(select(.title == $title and .merged_at != null))
+                    | sort_by(.merged_at)
+                    | reverse
+                    | .[0] // empty
+                  '
+          }
+
+          create_request_commit() {
+            local base_sha="$1" base_tree payload blob_sha tree_sha commit_sha
+            base_tree="$(gh api "repos/$repository/git/commits/$base_sha" --jq '.tree.sha')"
+            payload="$(BASE_SHA="$base_sha" python3 - <<'PY'
+          import json
+          import os
+
+          request = {
+              "enabled": True,
+              "requestId": "initial-provider-restart-evidence-2026-09-04",
+              "reason": (
+                  "Capture the initial full repeated PostgreSQL and SQL Server "
+                  "cold/warm provider-restart evidence matrix."
+              ),
+              "sourceCommit": os.environ["BASE_SHA"],
+          }
+          print(json.dumps(request, indent=2))
+          PY
+            )"
+            blob_sha="$(gh api -X POST "repos/$repository/git/blobs" \
+              -f content="$payload" -f encoding=utf-8 --jq '.sha')"
+            tree_sha="$(jq -n \
+                --arg base "$base_tree" \
+                --arg path "$request_path" \
+                --arg blob "$blob_sha" \
+                '{base_tree:$base,tree:[{path:$path,mode:"100644",type:"blob",sha:$blob}]}' \
+              | gh api -X POST "repos/$repository/git/trees" --input - --jq '.sha')"
+            commit_sha="$(jq -n \
+                --arg message 'Request full provider-restart evidence matrix' \
+                --arg tree "$tree_sha" \
+                --arg parent "$base_sha" \
+                '{message:$message,tree:$tree,parents:[$parent]}' \
+              | gh api -X POST "repos/$repository/git/commits" --input - --jq '.sha')"
+            if gh api "repos/$repository/git/ref/heads/$REQUEST_BRANCH" \
+                >/dev/null 2>&1; then
+              gh api -X PATCH "repos/$repository/git/refs/heads/$REQUEST_BRANCH" \
+                -f sha="$commit_sha" -F force=true >/dev/null
+            else
+              gh api -X POST "repos/$repository/git/refs" \
+                -f ref="refs/heads/$REQUEST_BRANCH" -f sha="$commit_sha" >/dev/null
+            fi
+            printf '%s\n' "$commit_sha"
+          }
+
+          validate_request() {
+            local number="$1" head_sha="$2" base_sha="$3" files count path
+            files="$(gh api --paginate \
+              "repos/$repository/pulls/$number/files?per_page=100")"
+            count="$(jq -s 'add | length' <<< "$files")"
+            path="$(jq -s -r 'add | .[0].filename // empty' <<< "$files")"
+            if [[ "$count" -ne 1 || "$path" != "$request_path" ]]; then
+              printf 'Request PR #%s must change exactly %s.\n' \
+                "$number" "$request_path" >&2
+              return 1
+            fi
+            gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$repository/contents/$request_path?ref=$head_sha" > request.json
+            BASE_SHA="$base_sha" REQUEST_ID="$REQUEST_ID" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          request = json.loads(Path("request.json").read_text(encoding="utf-8"))
+          expected = {"enabled", "requestId", "reason", "sourceCommit"}
+          if set(request) != expected:
+              raise SystemExit(f"Unexpected request keys: {sorted(request)}")
+          if request["enabled"] is not True:
+              raise SystemExit("enabled must be true")
+          if request["sourceCommit"] != os.environ["BASE_SHA"]:
+              raise SystemExit("sourceCommit does not equal the reviewed base SHA")
+          if request["requestId"] != os.environ["REQUEST_ID"]:
+              raise SystemExit("requestId does not match the audited request")
+          for key, maximum in (("requestId", 96), ("reason", 240)):
+              value = request[key]
+              if not isinstance(value, str) or not value or len(value) > maximum:
+                  raise SystemExit(f"{key} must contain 1-{maximum} characters")
+              if "\n" in value or "\r" in value:
+                  raise SystemExit(f"{key} must be one line")
+          PY
+          }
+
+          merged_request="$(find_merged_request)"
+          if [[ -n "$merged_request" ]]; then
+            number="$(jq -r '.number' <<< "$merged_request")"
+            merge_sha="$(jq -r '.merge_commit_sha' <<< "$merged_request")"
+            merged_at="$(jq -r '.merged_at' <<< "$merged_request")"
+          else
+            number=''
+            merge_sha=''
+            merged_at=''
+            for generation in 1 2 3; do
+              base_sha="$(gh api "repos/$repository/branches/main" --jq '.commit.sha')"
+              head_sha="$(create_request_commit "$base_sha")"
+              pulls="$(gh api \
+                "repos/$repository/pulls?state=open&base=main&head=$owner:$REQUEST_BRANCH&per_page=10")"
+              count="$(jq 'length' <<< "$pulls")"
+              if [[ "$count" -eq 0 ]]; then
+                pull="$(gh api -X POST "repos/$repository/pulls" \
+                  -f title="$REQUEST_TITLE" \
+                  -f head="$REQUEST_BRANCH" \
+                  -f base=main \
+                  -f body='Run the protected repeated PostgreSQL and SQL Server cold/warm provider-restart evidence matrix. This pull request changes only the audited request JSON and does not enable automatic maintenance.')"
+                number="$(jq -r '.number' <<< "$pull")"
+              elif [[ "$count" -eq 1 ]]; then
+                number="$(jq -r '.[0].number' <<< "$pulls")"
+              else
+                printf 'Expected at most one open request PR, found %s.\n' "$count" >&2
+                exit 1
+              fi
+              validate_request "$number" "$head_sha" "$base_sha"
+              gh pr merge "$number" --repo "$repository" \
+                --auto --squash --delete-branch >/dev/null 2>&1 || true
+
+              rebased=false
+              for attempt in $(seq 1 70); do
+                pull="$(gh api "repos/$repository/pulls/$number")"
+                if [[ -n "$(jq -r '.merged_at // empty' <<< "$pull")" ]]; then
+                  merge_sha="$(jq -r '.merge_commit_sha' <<< "$pull")"
+                  merged_at="$(jq -r '.merged_at' <<< "$pull")"
+                  break 2
+                fi
+                current_main="$(gh api "repos/$repository/branches/main" --jq '.commit.sha')"
+                if [[ "$current_main" != "$base_sha" ]]; then
+                  rebased=true
+                  break
+                fi
+                sleep 10
+              done
+              if [[ "$rebased" != true ]]; then
+                printf 'Request PR #%s did not merge under repository protection.\n' \
+                  "$number" >&2
+                exit 1
+              fi
+            done
+          fi
+
+          if [[ ! "$merge_sha" =~ ^[0-9a-f]{40}$ || -z "$merged_at" ]]; then
+            printf 'No merged audited restart evidence request was established.\n' >&2
+            exit 1
+          fi
+          {
+            printf 'number=%s\n' "$number"
+            printf 'merge-sha=%s\n' "$merge_sha"
+            printf 'merged-at=%s\n' "$merged_at"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Require the dispatched full restart evidence workflow
+        id: evidence
+        shell: bash
+        env:
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+          MERGED_AT: ${{ steps.request.outputs.merged-at }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          run=''
+          for attempt in $(seq 1 90); do
+            runs="$(gh api \
+              "repos/$repository/actions/runs?head_sha=$MERGE_SHA&per_page=100")"
+            run="$(jq -c \
+              --arg merged "$MERGED_AT" '
+                [.workflow_runs[]
+                  | select(.created_at >= $merged)
+                  | select(.event == "workflow_dispatch")
+                  | select(
+                      ((.name // "") + " " + (.display_title // ""))
+                      | ascii_downcase
+                      | test("restart|repository-aging|repository aging")
+                    )]
+                | sort_by(.created_at)
+                | reverse
+                | .[0] // empty
+              ' <<< "$runs")"
+            if [[ -n "$run" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          if [[ -z "$run" ]]; then
+            printf 'No full restart evidence workflow was dispatched for %s.\n' \
+              "$MERGE_SHA" >&2
+            exit 1
+          fi
+          run_id="$(jq -r '.id' <<< "$run")"
+          run_url="$(jq -r '.html_url' <<< "$run")"
+          run_name="$(jq -r '.name' <<< "$run")"
+          run_status="$(jq -r '.status' <<< "$run")"
+
+          matrix_visible=false
+          matrix_jobs=0
+          for attempt in $(seq 1 60); do
+            jobs="$(gh api --paginate \
+              "repos/$repository/actions/runs/$run_id/jobs?per_page=100")"
+            matrix_jobs="$(jq -s '
+              add.jobs
+              | map(select(
+                  ((.name // "") | ascii_downcase)
+                  | test("postgres|sql server|sqlserver")
+                ))
+              | length
+            ' <<< "$jobs")"
+            if [[ "$matrix_jobs" -ge 12 ]]; then
+              matrix_visible=true
+              break
+            fi
+            sleep 10
+          done
+          if [[ "$matrix_visible" != true ]]; then
+            printf 'Run %s appeared, but fewer than 12 database matrix jobs were visible.\n' \
+              "$run_id" >&2
+            exit 1
+          fi
+          {
+            printf 'id=%s\n' "$run_id"
+            printf 'url=%s\n' "$run_url"
+            printf 'name=%s\n' "$run_name"
+            printf 'status=%s\n' "$run_status"
+            printf 'matrix-jobs=%s\n' "$matrix_jobs"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record the protected launch once in issue 165
+        shell: bash
+        env:
+          REQUEST_NUMBER: ${{ steps.request.outputs.number }}
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+          RUN_ID: ${{ steps.evidence.outputs.id }}
+          RUN_URL: ${{ steps.evidence.outputs.url }}
+          RUN_NAME: ${{ steps.evidence.outputs.name }}
+          RUN_STATUS: ${{ steps.evidence.outputs.status }}
+          MATRIX_JOBS: ${{ steps.evidence.outputs.matrix-jobs }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          marker="<!-- restart-evidence-request:$MERGE_SHA -->"
+          comments="$(gh api --paginate \
+            "repos/$repository/issues/165/comments?per_page=100")"
+          if jq -s -e --arg marker "$marker" \
+              'add | any(.[]; (.body // "") | contains($marker))' \
+              <<< "$comments" >/dev/null; then
+            printf 'Issue 165 already contains the launch record.\n'
+            exit 0
+          fi
+          body="$(cat <<EOF
+          $marker
+          Protected request PR #$REQUEST_NUMBER merged as \`$MERGE_SHA\`.
+
+          The repository-owned request path launched **$RUN_NAME** (run $RUN_ID, current status \`$RUN_STATUS\`) and exposed $MATRIX_JOBS PostgreSQL/SQL Server matrix jobs: $RUN_URL
+
+          This starts evidence collection only. Automatic maintenance remains disabled; issue #165 stays open until repeated cold/warm results, restart evidence and concurrency measurements support measured breakpoints.
+          EOF
+          )"
+          gh api -X POST "repos/$repository/issues/165/comments" \
+            -f body="$body" >/dev/null
+
+      - name: Remove obsolete one-shot branches
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          for branch in \
+            request/repository-aging-restart-evidence-20260904-v2 \
+            automation/merge-restart-evidence-request-20260904 \
+            automation/await-restart-evidence-request-20260904 \
+            automation/record-restart-evidence-launch-20260904; do
+            encoded="${branch//\//%2F}"
+            open_count="$(gh api \
+              "repos/$repository/pulls?state=open&head=${repository%%/*}:$encoded&per_page=10" \
+              --jq 'length' 2>/dev/null || printf '0')"
+            if [[ "$open_count" == 0 ]]; then
+              gh api -X DELETE "repos/$repository/git/refs/heads/$branch" \
+                >/dev/null 2>&1 || true
+            fi
+          done
+
+      - name: Remove this reconciler branch
+        if: success()
+        run: |
+          gh api -X DELETE \
+            "repos/$GITHUB_REPOSITORY/git/refs/heads/automation/reconcile-restart-evidence-20260904-v2" \
+            >/dev/null 2>&1 || true
