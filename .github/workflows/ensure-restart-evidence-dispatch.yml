@@ -1,0 +1,193 @@
+name: Ensure protected restart evidence dispatch
+
+on:
+  push:
+    branches:
+      - automation/reconcile-restart-evidence-20260904-v3
+
+concurrency:
+  group: ensure-restart-evidence-dispatch-20260904
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  ensure:
+    name: Dispatch exact main-bound evidence only when needed
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REQUEST_TITLE: Request full provider-restart evidence matrix
+    steps:
+      - name: Await a merged audited request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          request=''
+          for attempt in $(seq 1 180); do
+            request="$(gh api --paginate -X GET "repos/$repository/pulls" \
+                -f state=closed -f base=main -F per_page=100 \
+              | jq -s -c --arg title "$REQUEST_TITLE" '
+                  add
+                  | map(select(.title == $title and .merged_at != null))
+                  | sort_by(.merged_at)
+                  | reverse
+                  | .[0] // empty
+                ')"
+            [[ -z "$request" ]] || break
+            sleep 10
+          done
+          if [[ -z "$request" ]]; then
+            printf 'No merged audited restart evidence request appeared.\n' >&2
+            exit 1
+          fi
+          merge_sha="$(jq -r '.merge_commit_sha' <<< "$request")"
+          merged_at="$(jq -r '.merged_at' <<< "$request")"
+          if [[ ! "$merge_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            printf 'Merged request has no valid merge SHA.\n' >&2
+            exit 1
+          fi
+          current_main="$(gh api "repos/$repository/branches/main" --jq '.commit.sha')"
+          if [[ "$current_main" != "$merge_sha" ]]; then
+            printf 'Refusing fallback dispatch: main advanced from request merge %s to %s.\n' \
+              "$merge_sha" "$current_main" >&2
+            exit 1
+          fi
+          {
+            printf 'merge-sha=%s\n' "$merge_sha"
+            printf 'merged-at=%s\n' "$merged_at"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Reuse an existing exact workflow dispatch
+        id: existing
+        shell: bash
+        env:
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+          MERGED_AT: ${{ steps.request.outputs.merged-at }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          existing=''
+          for attempt in $(seq 1 18); do
+            runs="$(gh api "repos/$repository/actions/runs?head_sha=$MERGE_SHA&per_page=100")"
+            existing="$(jq -c --arg merged "$MERGED_AT" '
+                [.workflow_runs[]
+                  | select(.created_at >= $merged)
+                  | select(.event == "workflow_dispatch")
+                  | select(
+                      ((.name // "") + " " + (.display_title // "") + " " + (.path // ""))
+                      | ascii_downcase
+                      | test("restart|repository-aging|repository aging")
+                    )]
+                | sort_by(.created_at)
+                | reverse
+                | .[0] // empty
+              ' <<< "$runs")"
+            [[ -z "$existing" ]] || break
+            sleep 10
+          done
+          if [[ -n "$existing" ]]; then
+            printf 'run-id=%s\n' "$(jq -r '.id' <<< "$existing")" >> "$GITHUB_OUTPUT"
+            printf 'exists=true\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'exists=false\n' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Identify the exact target workflow introduced by PR 342
+        if: steps.existing.outputs.exists != 'true'
+        id: workflow
+        shell: bash
+        env:
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          candidates=()
+          mapfile -t changed_workflows < <(
+            gh api --paginate "repos/$repository/pulls/342/files?per_page=100" \
+              | jq -s -r 'add[]
+                | select(.filename | test("^\\.github/workflows/.*\\.ya?ml$"))
+                | .filename'
+          )
+          for path in "${changed_workflows[@]}"; do
+            file="$(mktemp)"
+            if ! gh api -H 'Accept: application/vnd.github.raw+json' \
+                "repos/$repository/contents/$path?ref=$MERGE_SHA" > "$file" \
+                2>/dev/null; then
+              rm -f "$file"
+              continue
+            fi
+            if grep -q 'workflow_dispatch:' "$file" \
+                && grep -q 'expected_source_commit' "$file" \
+                && grep -Eqi 'postgresql|postgres' "$file" \
+                && grep -Eqi 'sql.?server' "$file" \
+                && grep -Eqi 'repeat|repetition' "$file"; then
+              candidates+=("$path")
+            fi
+            rm -f "$file"
+          done
+          if [[ "${#candidates[@]}" -ne 1 ]]; then
+            printf 'Expected one exact restart-evidence target from PR 342, found %s: %s\n' \
+              "${#candidates[@]}" "${candidates[*]-}" >&2
+            exit 1
+          fi
+          workflow_path="${candidates[0]}"
+          workflow_id="$(gh api -X GET "repos/$repository/actions/workflows" \
+            -F per_page=100 \
+            | jq -r --arg path "$workflow_path" \
+                '.workflows[] | select(.path == $path and .state == "active") | .id')"
+          if [[ ! "$workflow_id" =~ ^[0-9]+$ ]]; then
+            printf 'Could not resolve active workflow ID for %s.\n' "$workflow_path" >&2
+            exit 1
+          fi
+          {
+            printf 'id=%s\n' "$workflow_id"
+            printf 'path=%s\n' "$workflow_path"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch the exact source commit
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          WORKFLOW_ID: ${{ steps.workflow.outputs.id }}
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+        run: |
+          set -euo pipefail
+          jq -n --arg ref main --arg sha "$MERGE_SHA" \
+            '{ref:$ref,inputs:{expected_source_commit:$sha}}' \
+            | gh api -X POST \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW_ID/dispatches" \
+                --input -
+
+      - name: Require the dispatch to become visible
+        shell: bash
+        env:
+          MERGE_SHA: ${{ steps.request.outputs.merge-sha }}
+          EXISTING_RUN_ID: ${{ steps.existing.outputs.run-id }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${EXISTING_RUN_ID:-}" ]]; then
+            printf 'Reusing workflow run %s.\n' "$EXISTING_RUN_ID"
+            exit 0
+          fi
+          for attempt in $(seq 1 60); do
+            runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$MERGE_SHA&per_page=100")"
+            count="$(jq '[.workflow_runs[]
+              | select(.event == "workflow_dispatch")
+              | select(
+                  ((.name // "") + " " + (.display_title // "") + " " + (.path // ""))
+                  | ascii_downcase
+                  | test("restart|repository-aging|repository aging")
+                )] | length' <<< "$runs")"
+            if [[ "$count" -ge 1 ]]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          printf 'The exact restart evidence dispatch did not become visible.\n' >&2
+          exit 1
