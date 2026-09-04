@@ -65,16 +65,43 @@ One-pack maintenance is rejected: either preset creates two packs and increases 
 
 ## Provider-restart evidence
 
-The first complete protected-main provider-restart run is retained in:
+Two complete protected-main provider-restart runs now cover PostgreSQL and SQL Server, cold and warm cache states, and three independent repeats per condition.
 
-- [Reproducibility record](../evidence/repository-aging-restart-reproducibility-2026-09-04.md);
-- [Repeat and dispersion CSV](../evidence/repository-aging-restart-reproducibility-2026-09-04.csv);
-- [Paired maintenance-payback record](../evidence/repository-aging-restart-payback-2026-09-04.md);
-- [Paired payback inputs](../evidence/repository-aging-restart-payback-2026-09-04.csv).
+The first run is retained in:
 
-At ten packs, cold provider reconstruction improves by about 67–68% on PostgreSQL and about 70% on SQL Server. An already warm path regresses by about 15–29%. Compact-only cold payback is approximately six equivalent reopens; read-optimized needs roughly seven to eight.
+- [First reproducibility record](../evidence/repository-aging-restart-reproducibility-2026-09-04.md);
+- [first repeat and dispersion CSV](../evidence/repository-aging-restart-reproducibility-2026-09-04.csv);
+- [first paired maintenance-payback record](../evidence/repository-aging-restart-payback-2026-09-04.md);
+- [first paired payback inputs](../evidence/repository-aging-restart-payback-2026-09-04.csv).
 
-This lifecycle result agrees with the age-axis direction while reinforcing that cache/lifecycle state matters as much as pack count.
+The corrected rerun from workflow [`33900635892`](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/33900635892), exact commit [`cefb3cd4f9d16c77737f4681d79b3f6450cf76ae`](https://github.com/carstenartur/jgit-storage-hibernate/commit/cefb3cd4f9d16c77737f4681d79b3f6450cf76ae), is retained in:
+
+- [rerun reproducibility record](../evidence/repository-aging-restart-reproducibility-2026-09-04-rerun.md);
+- [rerun repeat and dispersion CSV](../evidence/repository-aging-restart-reproducibility-2026-09-04-rerun.csv);
+- [rerun paired maintenance-payback record](../evidence/repository-aging-restart-payback-2026-09-04-rerun.md);
+- [rerun paired payback inputs](../evidence/repository-aging-restart-payback-2026-09-04-rerun.csv);
+- [cross-run comparison](../evidence/repository-aging-restart-cross-run-2026-09-04.md).
+
+### Reproduced lifecycle split
+
+| Backend / cache | First run: none → compact | Rerun: none → compact | Stable conclusion |
+|---|---:|---:|---|
+| PostgreSQL cold | 18.556 → 6.046 ms | 18.384 → 6.042 ms | about two-thirds faster |
+| PostgreSQL warm | 3.660 → 4.555 ms | 3.819 → 4.805 ms | slower after maintenance |
+| SQL Server cold | 28.972 → 8.586 ms | 36.467 → 12.129 ms | large benefit; absolute timing varies |
+| SQL Server warm | 7.069 → 8.101 ms | 7.061 → 8.081 ms | slower after maintenance |
+
+PostgreSQL cold is highly reproducible: the no-maintenance and compact-only means differ by less than 1% between runs. SQL Server warm is nearly identical between runs. SQL Server cold has runner-sensitive absolute values, but both complete runs show a large, non-overlapping maintenance benefit.
+
+### Paired payback
+
+In the corrected rerun:
+
+- PostgreSQL cold compact-only pays back after a mean 5.78 equivalent reopens; read-optimized after 7.80;
+- SQL Server cold compact-only pays back after a mean 3.60 reopens; read-optimized after 4.83;
+- every warm repeat on both databases regresses, so the measured warm reopen path has no finite payback.
+
+The exact SQL Server break-even must not be encoded as a portable constant until a full SQL Server age axis and production-like repeated runs exist. The lifecycle direction, however, is now independently reproduced.
 
 ## Recommendation semantics
 
