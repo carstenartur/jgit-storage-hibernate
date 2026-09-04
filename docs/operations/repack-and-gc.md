@@ -109,7 +109,22 @@ The cold direction is strong: PostgreSQL repeat dispersion is low, and even the 
 
 PostgreSQL cold clone-style traversal improves by 29.8% with compact-only and 16.6% with read-optimized maintenance. Direct oldest-object lookup remains in the 0.008–0.012-ms range and has too much relative noise to support a policy decision. The complete aggregate and every repeat are retained in the [provider-restart evidence record](../evidence/repository-aging-restart-reproducibility-2026-09-04.md).
 
-The result therefore does **not** justify a universal automatic threshold. It shows that the useful decision is lifecycle- and workload-dependent: maintenance can materially help cold reconstruction while regressing a warm path at the same pack count. The remaining 32/100/300/1,000-push production-database matrix and lifecycle-specific maintenance payback are required before enabling a default automatic policy.
+### Measured maintenance payback
+
+For the retained `reopenAndLookupOldest` path, every maintenance result is paired with the no-maintenance result from the same backend, cache state and repeat. Maintenance time divided by the paired latency saving gives the following break-even:
+
+| Backend / cache | Maintenance | Mean maintenance | Break-even reads | Paired repeat range |
+|---|---|---:|---:|---:|
+| PostgreSQL cold | compact-only | 71.7 ms | 5.73 | 5.31–6.23 |
+| PostgreSQL cold | read-optimized | 98.7 ms | 7.82 | 7.49–8.10 |
+| SQL Server cold | compact-only | 124.3 ms | 6.10 | 3.29–13.89 |
+| SQL Server cold | read-optimized | 147.7 ms | 7.23 | 4.46–15.72 |
+| PostgreSQL warm | both modes | 65.3–98.0 ms | none | every repeat regresses |
+| SQL Server warm | both modes | 84.0–111.0 ms | none | every repeat regresses |
+
+Thus the cold ten-pack maintenance cost is repaid by roughly six equivalent reopens for compact-only and roughly seven to eight for read-optimized maintenance. The warm path never repays the maintenance in this fixture. The [payback decision record](../evidence/repository-aging-restart-payback-2026-09-04.md) retains the method and every paired input.
+
+The result therefore does **not** justify a universal automatic threshold. It shows that the useful decision is lifecycle- and workload-dependent: maintenance can materially help cold reconstruction while regressing a warm path at the same pack count. The remaining 32/100/300/1,000-push production-database matrix, payback across those ages and latency during active maintenance are required before enabling a default automatic policy.
 
 ## Generated policy evidence
 
@@ -127,7 +142,8 @@ A candidate is emitted only when the mode both removes packs and improves the me
 
 - Do not repack a newly created or one-pack repository.
 - Do not trigger maintenance from pack count alone. Around ten small incremental packs, first check whether cold reopen, clone/fetch or index-memory behavior has measurably degraded.
-- Treat a predominantly warm repository separately: the retained ten-pack restart matrix shows that maintenance can regress an already warmed reopen path.
+- Treat a predominantly warm repository separately: the retained ten-pack restart matrix shows that maintenance can regress an already warmed reopen path and therefore has no measured payback there.
+- For the measured cold reopen problem, expect approximately six equivalent reads to repay compact-only maintenance and roughly seven to eight to repay read-optimized maintenance; recalculate for the deployment rather than treating these fixture values as constants.
 - Prefer `compactOnly()` as the first intervention when the goal is simply fewer packs; it has lower maintenance and auxiliary-storage cost, while the cold reopen result is effectively tied with the read-optimized preset.
 - Use the read-optimized preset when clone/fetch negotiation or path-history workloads justify bitmap, commit-graph and Bloom-filter construction.
 - Trigger from a combination of lifecycle/cache state, active pack count, small-pack ratio, index bytes, unreachable bytes, measured lookup/fetch degradation and time since last maintenance—not from a single hard-coded count.
