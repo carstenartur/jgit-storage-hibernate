@@ -1,0 +1,95 @@
+name: Await audited restart evidence request
+
+on:
+  push:
+    branches:
+      - automation/await-restart-evidence-request-20260904
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  await-and-enable:
+    name: Await exact request and enable protected auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_HEAD: request/repository-aging-restart-evidence-20260904-v2
+    steps:
+      - name: Await and validate the unique one-file request
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY%%/*}"
+          ready=false
+          for attempt in $(seq 1 60); do
+            pulls="$(gh api \
+              "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&head=$owner:$TARGET_HEAD&per_page=10")"
+            if [[ "$(jq 'length' <<< "$pulls")" -eq 1 ]]; then
+              number="$(jq -r '.[0].number' <<< "$pulls")"
+              head_sha="$(jq -r '.[0].head.sha' <<< "$pulls")"
+              base_sha="$(jq -r '.[0].base.sha' <<< "$pulls")"
+              current_main="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+              files="$(gh api --paginate \
+                "repos/$GITHUB_REPOSITORY/pulls/$number/files?per_page=100")"
+              if [[ "$base_sha" == "$current_main" \
+                  && "$(jq 'length' <<< "$files")" -eq 1 \
+                  && "$(jq -r '.[0].filename' <<< "$files")" \
+                     == .github/repository-aging-restart-evidence-request.json ]]; then
+                gh api \
+                  -H 'Accept: application/vnd.github.raw+json' \
+                  "repos/$GITHUB_REPOSITORY/contents/.github/repository-aging-restart-evidence-request.json?ref=$head_sha" \
+                  > request.json
+                if BASE_SHA="$base_sha" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          request = json.loads(Path("request.json").read_text(encoding="utf-8"))
+          if set(request) != {"enabled", "requestId", "reason", "sourceCommit"}:
+              raise SystemExit(1)
+          if request["enabled"] is not True:
+              raise SystemExit(1)
+          if request["sourceCommit"] != os.environ["BASE_SHA"]:
+              raise SystemExit(1)
+          for key, maximum in (("requestId", 96), ("reason", 240)):
+              value = request[key]
+              if not isinstance(value, str) or not value or len(value) > maximum:
+                  raise SystemExit(1)
+              if "\n" in value or "\r" in value:
+                  raise SystemExit(1)
+          PY
+                then
+                  ready=true
+                  break
+                fi
+              fi
+            fi
+            sleep 10
+          done
+          if [[ "$ready" != true ]]; then
+            printf 'The exact main-bound one-file request did not become ready.\n' >&2
+            exit 1
+          fi
+          {
+            printf 'number=%s\n' "$number"
+            printf 'head-sha=%s\n' "$head_sha"
+            printf 'base-sha=%s\n' "$base_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Enable squash auto-merge under repository protection
+        env:
+          NUMBER: ${{ steps.target.outputs.number }}
+        run: gh pr merge "$NUMBER" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch
+
+      - name: Remove obsolete helper branch
+        if: success()
+        run: |
+          gh api -X DELETE \
+            "repos/$GITHUB_REPOSITORY/git/refs/heads/automation/merge-restart-evidence-request-20260904" \
+            >/dev/null 2>&1 || true
