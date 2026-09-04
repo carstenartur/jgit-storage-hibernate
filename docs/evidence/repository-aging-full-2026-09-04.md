@@ -99,9 +99,9 @@ Consequently MIDX remains disabled until the relationship metadata, migrations, 
 
 ## Retained machine-readable files
 
-- [All 864 corrected policy rows, gzip-compressed CSV](repository-aging-full-policy-2026-09-04.csv.gz) (`sha256:a98700dfbc6f88c14211a72fee0e2b54f6f6ad93bd13807c688404197a702a06`)
 - [The 36 generated backend/age/cache recommendations](repository-aging-full-recommendations-2026-09-04.csv)
-- [Focused reopen axis with all backends, ages and modes](repository-aging-full-reopen-2026-09-04.csv)
+- Corrected reopen axis for [HSQLDB](repository-aging-full-reopen-hsqldb-2026-09-04.csv), [PostgreSQL](repository-aging-full-reopen-postgresql-2026-09-04.csv) and [PostgreSQL with HikariCP](repository-aging-full-reopen-postgresql-hikari-2026-09-04.csv)
+- Complete raw JMH JSON, all six shard manifests and the generated policy JSON remain identified by workflow run `33878467696` and aggregate digest `sha256:b8c796cf1165c3996518953c013a593f06a578ef63167b3587418e5213cca1cc`.
 
 ## Remaining evidence
 
