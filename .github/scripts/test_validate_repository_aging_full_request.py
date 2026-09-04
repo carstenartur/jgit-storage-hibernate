@@ -117,6 +117,25 @@ class FullAgingEvidenceRequestTest(unittest.TestCase):
             with self.assertRaisesRegex(VALIDATOR.RequestError, "Non-finite"):
                 VALIDATOR.validate_request(path, SOURCE)
 
+    def test_boolean_schema_and_duplicate_keys_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "request.json"
+            request = _request()
+            request["schemaVersion"] = True
+            path.write_text(json.dumps(request), encoding="utf-8")
+            with self.assertRaisesRegex(VALIDATOR.RequestError, "integer 1"):
+                VALIDATOR.validate_request(path, SOURCE)
+
+            path.write_text(
+                '{"schemaVersion": 1, "enabled": true, '
+                '"requestId": "first", "requestId": "second", '
+                f'"sourceCommit": "{SOURCE}", '
+                '"reason": "Run complete full aging evidence."}',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(VALIDATOR.RequestError, "Duplicate JSON key"):
+                VALIDATOR.validate_request(path, SOURCE)
+
     def test_request_id_and_reason_are_single_line_and_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / "request.json"
@@ -126,11 +145,15 @@ class FullAgingEvidenceRequestTest(unittest.TestCase):
             with self.assertRaisesRegex(VALIDATOR.RequestError, "requestId"):
                 VALIDATOR.validate_request(path, SOURCE)
 
-            request = _request()
-            request["reason"] = "first line\nsecond line"
-            path.write_text(json.dumps(request), encoding="utf-8")
-            with self.assertRaisesRegex(VALIDATOR.RequestError, "one line"):
-                VALIDATOR.validate_request(path, SOURCE)
+            for reason in ("first line\nsecond line", "tab\tcharacter"):
+                request = _request()
+                request["reason"] = reason
+                path.write_text(json.dumps(request), encoding="utf-8")
+                with self.subTest(reason=reason):
+                    with self.assertRaisesRegex(
+                        VALIDATOR.RequestError, "control characters"
+                    ):
+                        VALIDATOR.validate_request(path, SOURCE)
 
             request = _request()
             request["reason"] = "short"
