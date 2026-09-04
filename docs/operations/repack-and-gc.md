@@ -112,16 +112,27 @@ This is why pack count alone is not a safe automatic trigger.
 
 ## Provider restart at ten packs
 
-The first retained provider-restart run rebuilds the complete Hibernate `SessionFactory` and connection pool before the measured read and repeats every PostgreSQL/SQL Server cold/warm condition three times.
+Two complete protected-main runs rebuilt the repository handle, Hibernate `SessionFactory` and connection pool before retained reads. Each run measured PostgreSQL and SQL Server, cold and warm cache state, and three independent repeats.
 
-| Backend / cache | No maintenance | Compact-only | Read-optimized | Maintenance versus none |
-|---|---:|---:|---:|---|
-| PostgreSQL cold | 18.556 ms | 6.046 ms | 5.941 ms | 67–68% faster |
-| SQL Server cold | 28.972 ms | 8.586 ms | 8.545 ms | about 70% faster |
-| PostgreSQL warm | 3.660 ms | 4.555 ms | 4.712 ms | 25–29% slower |
-| SQL Server warm | 7.069 ms | 8.101 ms | 8.493 ms | 15–20% slower |
+| Backend / cache | First run: none → compact | Corrected rerun: none → compact | Reproduced direction |
+|---|---:|---:|---|
+| PostgreSQL cold | 18.556 → 6.046 ms | 18.384 → 6.042 ms | about two-thirds faster |
+| PostgreSQL warm | 3.660 → 4.555 ms | 3.819 → 4.805 ms | slower |
+| SQL Server cold | 28.972 → 8.586 ms | 36.467 → 12.129 ms | large benefit; absolute time varies |
+| SQL Server warm | 7.069 → 8.101 ms | 7.061 → 8.081 ms | slower |
 
-Compact-only cold payback is approximately six equivalent reopens. Read-optimized needs roughly seven to eight. The [provider-restart evidence record](../evidence/repository-aging-restart-reproducibility-2026-09-04.md) preserves every repeat and dispersion metric.
+PostgreSQL cold is highly reproducible: the baseline and compact-only means differ by less than 1% between runs. SQL Server warm is also almost identical. SQL Server cold absolute time varies between runners, but the maintenance benefit remains large and non-overlapping.
+
+In the corrected rerun, compact-only pays back after a mean 5.78 equivalent PostgreSQL cold reopens and 3.60 SQL Server cold reopens. Read-optimized needs 7.80 and 4.83 respectively. Every warm repeat regresses, so the measured warm reopen path has no finite payback.
+
+Evidence is retained in:
+
+- [first provider-restart record](../evidence/repository-aging-restart-reproducibility-2026-09-04.md);
+- [corrected rerun record](../evidence/repository-aging-restart-reproducibility-2026-09-04-rerun.md);
+- [corrected rerun payback](../evidence/repository-aging-restart-payback-2026-09-04-rerun.md);
+- [cross-run comparison](../evidence/repository-aging-restart-cross-run-2026-09-04.md).
+
+The stable lesson is lifecycle-aware: a cold provider-reconstruction problem can repay compaction quickly, while the same pack count on an already warm path can become slower.
 
 ## Multi-Pack-Index status
 
