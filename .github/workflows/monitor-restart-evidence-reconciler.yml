@@ -1,0 +1,91 @@
+name: Monitor restart evidence reconciler
+
+on:
+  push:
+    branches:
+      - automation/reconcile-restart-evidence-20260904-v3
+
+permissions:
+  actions: read
+  issues: write
+
+jobs:
+  monitor:
+    name: Record reconciler failure if protection or dispatch blocks it
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Await the latest reconciler run
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          target_name='Run idempotent restart evidence reconciler'
+          target=''
+          for attempt in $(seq 1 390); do
+            runs="$(gh api -X GET "repos/$repository/actions/runs" \
+              -f branch="$GITHUB_REF_NAME" -f event=push -F per_page=100)"
+            target="$(jq -c --arg name "$target_name" --argjson current "$GITHUB_RUN_ID" '
+              [.workflow_runs[]
+                | select(.name == $name)
+                | select(.id != $current)]
+              | sort_by(.created_at)
+              | reverse
+              | .[0] // empty
+            ' <<< "$runs")"
+            if [[ -n "$target" && "$(jq -r '.status' <<< "$target")" == completed ]]; then
+              break
+            fi
+            sleep 10
+          done
+          if [[ -z "$target" || "$(jq -r '.status' <<< "$target")" != completed ]]; then
+            printf 'No completed reconciler run became visible.\n' >&2
+            exit 1
+          fi
+          {
+            printf 'id=%s\n' "$(jq -r '.id' <<< "$target")"
+            printf 'url=%s\n' "$(jq -r '.html_url' <<< "$target")"
+            printf 'conclusion=%s\n' "$(jq -r '.conclusion' <<< "$target")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record a durable failure diagnosis in issue 165
+        if: steps.run.outputs.conclusion != 'success'
+        env:
+          RUN_ID: ${{ steps.run.outputs.id }}
+          RUN_URL: ${{ steps.run.outputs.url }}
+          CONCLUSION: ${{ steps.run.outputs.conclusion }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_REPOSITORY"
+          marker="<!-- restart-evidence-reconciler-failure:$RUN_ID -->"
+          comments="$(gh api --paginate \
+            "repos/$repository/issues/165/comments?per_page=100")"
+          if jq -s -e --arg marker "$marker" \
+              'add | any(.[]; (.body // "") | contains($marker))' \
+              <<< "$comments" >/dev/null; then
+            exit 0
+          fi
+          jobs="$(gh api --paginate \
+            "repos/$repository/actions/runs/$RUN_ID/jobs?per_page=100" | jq -s 'add.jobs')"
+          failed="$(jq -r '
+            [.[]
+              | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped")
+              | .name as $job
+              | ([.steps[]? | select(.conclusion == "failure") | .name] | join(", ")) as $steps
+              | if $steps == "" then $job else ($job + " — " + $steps) end]
+            | join("; ")
+          ' <<< "$jobs")"
+          body="$(cat <<EOF
+$marker
+The one-shot protected restart-evidence reconciler finished with \`$CONCLUSION\`: $RUN_URL
+
+Failed job/step summary: ${failed:-not exposed by the Actions API}
+
+No automatic maintenance was enabled and no incomplete evidence was treated as successful. The request path remains fail-closed for diagnosis.
+EOF
+          )"
+          gh api -X POST "repos/$repository/issues/165/comments" \
+            -f body="$body" >/dev/null
