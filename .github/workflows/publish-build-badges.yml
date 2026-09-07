@@ -18,6 +18,8 @@ permissions:
 
 concurrency:
   group: repository-pages-publication-${{ github.repository }}
+  # Preserve every suite; the default pending slot replaces other publishers.
+  queue: max
   cancel-in-progress: false
 
 jobs:
