@@ -1,0 +1,799 @@
+{
+  "schemaVersion": 1,
+  "event": "workflow_dispatch",
+  "automaticMaintenanceChanged": false,
+  "groups": [
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.19172166167023552,
+        0.23627204244031827,
+        0.2313646709346992
+      ],
+      "meanMillis": 0.21978612501508432,
+      "minimumMillis": 0.19172166167023552,
+      "maximumMillis": 0.23627204244031827,
+      "populationStddevMillis": 0.0199454447748404,
+      "coefficientOfVariationPercent": 9.074933539808988
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.22791217193426053,
+        0.23870305882352932,
+        0.26805668842729946
+      ],
+      "meanMillis": 0.2448906397283631,
+      "minimumMillis": 0.22791217193426053,
+      "maximumMillis": 0.26805668842729946,
+      "populationStddevMillis": 0.016962904020349157,
+      "coefficientOfVariationPercent": 6.926726166081603
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.200836582338902,
+        0.23396233333333305,
+        0.17746170187561702
+      ],
+      "meanMillis": 0.2040868725159507,
+      "minimumMillis": 0.17746170187561702,
+      "maximumMillis": 0.23396233333333305,
+      "populationStddevMillis": 0.023180503711185498,
+      "coefficientOfVariationPercent": 11.358155194119009
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.008544253393665149,
+        0.011734431986809573,
+        0.011109250867052004
+      ],
+      "meanMillis": 0.010462645415842242,
+      "minimumMillis": 0.008544253393665149,
+      "maximumMillis": 0.011734431986809573,
+      "populationStddevMillis": 0.0013803100669028123,
+      "coefficientOfVariationPercent": 13.192744397251444
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.012376234855545206,
+        0.01226125411968775,
+        0.016883910234278668
+      ],
+      "meanMillis": 0.013840466403170541,
+      "minimumMillis": 0.01226125411968775,
+      "maximumMillis": 0.016883910234278668,
+      "populationStddevMillis": 0.0021525516497461275,
+      "coefficientOfVariationPercent": 15.552594739531509
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.010093293297587139,
+        0.012531848971286452,
+        0.011764904888888896
+      ],
+      "meanMillis": 0.011463349052587496,
+      "minimumMillis": 0.010093293297587139,
+      "maximumMillis": 0.012531848971286452,
+      "populationStddevMillis": 0.0010181160330854095,
+      "coefficientOfVariationPercent": 8.881488545928917
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        5.844510117647059,
+        6.437326451612901,
+        5.844991999999998
+      ],
+      "meanMillis": 6.042276189753319,
+      "minimumMillis": 5.844510117647059,
+      "maximumMillis": 6.437326451612901,
+      "populationStddevMillis": 0.27934278834333487,
+      "coefficientOfVariationPercent": 4.623138359961981
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        17.702911999999998,
+        18.996503272727267,
+        18.452852363636364
+      ],
+      "meanMillis": 18.38408921212121,
+      "minimumMillis": 17.702911999999998,
+      "maximumMillis": 18.996503272727267,
+      "populationStddevMillis": 0.5303400628991183,
+      "coefficientOfVariationPercent": 2.884777465883098
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "cold",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        6.507883354838709,
+        6.2999040000000015,
+        6.073747393939394
+      ],
+      "meanMillis": 6.293844916259368,
+      "minimumMillis": 6.073747393939394,
+      "maximumMillis": 6.507883354838709,
+      "populationStddevMillis": 0.1772870412792485,
+      "coefficientOfVariationPercent": 2.8168320579563284
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.1733315697777777,
+        0.22868927699530497,
+        0.19800419672131137
+      ],
+      "meanMillis": 0.20000834783146468,
+      "minimumMillis": 0.1733315697777777,
+      "maximumMillis": 0.22868927699530497,
+      "populationStddevMillis": 0.02264407800948723,
+      "coefficientOfVariationPercent": 11.321566452100322
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.2519684987012986,
+        0.1927462179732313,
+        0.2359136193939394
+      ],
+      "meanMillis": 0.2268761120228231,
+      "minimumMillis": 0.1927462179732313,
+      "maximumMillis": 0.2519684987012986,
+      "populationStddevMillis": 0.02500769266006948,
+      "coefficientOfVariationPercent": 11.022620423587732
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.21660807095343698,
+        0.22137716363636356,
+        0.1745081821493626
+      ],
+      "meanMillis": 0.2041644722463877,
+      "minimumMillis": 0.1745081821493626,
+      "maximumMillis": 0.22137716363636356,
+      "populationStddevMillis": 0.021060353241636583,
+      "coefficientOfVariationPercent": 10.315385928762739
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.00982813680085501,
+        0.008137578901608464,
+        0.010280557319224004
+      ],
+      "meanMillis": 0.009415424340562493,
+      "minimumMillis": 0.008137578901608464,
+      "maximumMillis": 0.010280557319224004,
+      "populationStddevMillis": 0.0009222573052939285,
+      "coefficientOfVariationPercent": 9.795175150213478
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.00836123187753264,
+        0.01181981397072448,
+        0.009400742613029542
+      ],
+      "meanMillis": 0.009860596153762221,
+      "minimumMillis": 0.00836123187753264,
+      "maximumMillis": 0.01181981397072448,
+      "populationStddevMillis": 0.001448918328278052,
+      "coefficientOfVariationPercent": 14.694023623766707
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.009769050519788441,
+        0.00760117444648146,
+        0.008573468934397794
+      ],
+      "meanMillis": 0.008647897966889232,
+      "minimumMillis": 0.00760117444648146,
+      "maximumMillis": 0.009769050519788441,
+      "populationStddevMillis": 0.0008865951454722471,
+      "coefficientOfVariationPercent": 10.252146230989442
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        4.638767627906976,
+        4.684966697674418,
+        5.092044799999999
+      ],
+      "meanMillis": 4.805259708527131,
+      "minimumMillis": 4.638767627906976,
+      "maximumMillis": 5.092044799999999,
+      "populationStddevMillis": 0.20366288326573773,
+      "coefficientOfVariationPercent": 4.238332486053347
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        3.4938161403508774,
+        3.6425576296296276,
+        4.321190956521741
+      ],
+      "meanMillis": 3.819188242167415,
+      "minimumMillis": 3.4938161403508774,
+      "maximumMillis": 4.321190956521741,
+      "populationStddevMillis": 0.36012595164520605,
+      "coefficientOfVariationPercent": 9.429384696702778
+    },
+    {
+      "backend": "postgresql",
+      "cacheState": "warm",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        4.943672195121951,
+        4.522449454545454,
+        4.5237527272727265
+      ],
+      "meanMillis": 4.663291458980043,
+      "minimumMillis": 4.522449454545454,
+      "maximumMillis": 4.943672195121951,
+      "populationStddevMillis": 0.1982598337696582,
+      "coefficientOfVariationPercent": 4.251499944055001
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.20114452502780847,
+        0.23477230689206774,
+        0.1838845476451259
+      ],
+      "meanMillis": 0.20660045985500072,
+      "minimumMillis": 0.1838845476451259,
+      "maximumMillis": 0.23477230689206774,
+      "populationStddevMillis": 0.02113001702038446,
+      "coefficientOfVariationPercent": 10.22747821336614
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.3214970629370628,
+        0.2918152258064517,
+        0.3357233040421793
+      ],
+      "meanMillis": 0.3163451975952313,
+      "minimumMillis": 0.2918152258064517,
+      "maximumMillis": 0.3357233040421793,
+      "populationStddevMillis": 0.018291821869603698,
+      "coefficientOfVariationPercent": 5.782234726069202
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.23980800000000005,
+        0.2373799735799206,
+        0.25700503703703703
+      ],
+      "meanMillis": 0.2447310035389859,
+      "minimumMillis": 0.2373799735799206,
+      "maximumMillis": 0.25700503703703703,
+      "populationStddevMillis": 0.008735473725280997,
+      "coefficientOfVariationPercent": 3.5694185039736612
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.0141704395229983,
+        0.00921883235294117,
+        0.012922046801872072
+      ],
+      "meanMillis": 0.012103772892603845,
+      "minimumMillis": 0.00921883235294117,
+      "maximumMillis": 0.0141704395229983,
+      "populationStddevMillis": 0.002102662206914862,
+      "coefficientOfVariationPercent": 17.371956873048394
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.017389269060501717,
+        0.009918407158836693,
+        0.013932453566958694
+      ],
+      "meanMillis": 0.0137467099287657,
+      "minimumMillis": 0.009918407158836693,
+      "maximumMillis": 0.017389269060501717,
+      "populationStddevMillis": 0.0030527932469335208,
+      "coefficientOfVariationPercent": 22.207446456300012
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.013861424703891715,
+        0.012610564966740567,
+        0.012149161290322565
+      ],
+      "meanMillis": 0.01287371698698495,
+      "minimumMillis": 0.012149161290322565,
+      "maximumMillis": 0.013861424703891715,
+      "populationStddevMillis": 0.0007233709231465758,
+      "coefficientOfVariationPercent": 5.618974876314961
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        11.434211555555555,
+        11.445134222222224,
+        13.50915413333333
+      ],
+      "meanMillis": 12.12949997037037,
+      "minimumMillis": 11.434211555555555,
+      "maximumMillis": 13.50915413333333,
+      "populationStddevMillis": 0.9755730053657522,
+      "coefficientOfVariationPercent": 8.042977927769957
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        34.745002666666664,
+        37.595818666666666,
+        37.060607999999995
+      ],
+      "meanMillis": 36.467143111111106,
+      "minimumMillis": 34.745002666666664,
+      "maximumMillis": 37.595818666666666,
+      "populationStddevMillis": 1.2371845449034475,
+      "coefficientOfVariationPercent": 3.392600679285162
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "cold",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        10.889323789473684,
+        11.754074352941174,
+        12.230174117647058
+      ],
+      "meanMillis": 11.624524086687307,
+      "minimumMillis": 10.889323789473684,
+      "maximumMillis": 12.230174117647058,
+      "populationStddevMillis": 0.5550119243496772,
+      "coefficientOfVariationPercent": 4.774491585296731
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.2130929715536105,
+        0.22688209345794383,
+        0.2101554432548179
+      ],
+      "meanMillis": 0.21671016942212407,
+      "minimumMillis": 0.2101554432548179,
+      "maximumMillis": 0.22688209345794383,
+      "populationStddevMillis": 0.007291926909005492,
+      "coefficientOfVariationPercent": 3.3648291302849467
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.260425728,
+        0.2282778472385426,
+        0.23092295838287763
+      ],
+      "meanMillis": 0.2398755112071401,
+      "minimumMillis": 0.2282778472385426,
+      "maximumMillis": 0.260425728,
+      "populationStddevMillis": 0.014571266495324012,
+      "coefficientOfVariationPercent": 6.074511909113249
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "cloneStyleTraversal",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.20655544798301506,
+        0.19952229979466116,
+        0.1591638659035159
+      ],
+      "meanMillis": 0.18841387122706402,
+      "minimumMillis": 0.1591638659035159,
+      "maximumMillis": 0.20655544798301506,
+      "populationStddevMillis": 0.020881226048463288,
+      "coefficientOfVariationPercent": 11.082637341121561
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.00825869912296403,
+        0.009809619928825623,
+        0.008806889658945828
+      ],
+      "meanMillis": 0.008958402903578494,
+      "minimumMillis": 0.00825869912296403,
+      "maximumMillis": 0.009809619928825623,
+      "populationStddevMillis": 0.0006421609528189081,
+      "coefficientOfVariationPercent": 7.168252642023867
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.008884134505158585,
+        0.009991245883021017,
+        0.01082281221374046
+      ],
+      "meanMillis": 0.009899397533973354,
+      "minimumMillis": 0.008884134505158585,
+      "maximumMillis": 0.01082281221374046,
+      "populationStddevMillis": 0.0007941221164930717,
+      "coefficientOfVariationPercent": 8.021923695535564
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "lookupOldestObject",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        0.008934137251255348,
+        0.008408339141368766,
+        0.00982662861434473
+      ],
+      "meanMillis": 0.009056368335656281,
+      "minimumMillis": 0.008408339141368766,
+      "maximumMillis": 0.00982662861434473,
+      "populationStddevMillis": 0.0005854295208272186,
+      "coefficientOfVariationPercent": 6.464285673124566
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "compact-only",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        7.644711384615385,
+        8.02390016,
+        8.574634666666666
+      ],
+      "meanMillis": 8.081082070427351,
+      "minimumMillis": 7.644711384615385,
+      "maximumMillis": 8.574634666666666,
+      "populationStddevMillis": 0.3817867256164083,
+      "coefficientOfVariationPercent": 4.724450541265426
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "none",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        7.1492754285714275,
+        7.015176827586208,
+        7.018566620689655
+      ],
+      "meanMillis": 7.061006292282431,
+      "minimumMillis": 7.015176827586208,
+      "maximumMillis": 7.1492754285714275,
+      "populationStddevMillis": 0.0624310445757303,
+      "coefficientOfVariationPercent": 0.8841663920334761
+    },
+    {
+      "backend": "sqlserver",
+      "cacheState": "warm",
+      "operation": "reopenAndLookupOldest",
+      "maintenanceMode": "read-optimized",
+      "repeatCount": 3,
+      "repeats": [
+        "1",
+        "2",
+        "3"
+      ],
+      "scoresMillis": [
+        8.0265216,
+        8.825277217391305,
+        8.880840347826085
+      ],
+      "meanMillis": 8.577546388405798,
+      "minimumMillis": 8.0265216,
+      "maximumMillis": 8.880840347826085,
+      "populationStddevMillis": 0.3902930979355281,
+      "coefficientOfVariationPercent": 4.550171812105664
+    }
+  ]
+}
