@@ -58,6 +58,22 @@ Together these files preserve all three repeat scores, mean, range, population s
 coefficient of variation, matching maintenance duration and the exact workflow run and artifact
 digest.
 
+## Completed full age matrix
+
+The [full 2026-09-04 matrix and corrected CSV](../evidence/repository-aging-full-2026-09-04.md)
+now retain all 864 coordinates for HSQLDB, PostgreSQL and PostgreSQL/HikariCP, including
+32/100/300/1,000 pushes. The same evidence page also retains the later corrected-provider
+restart aggregate from run `33900635892` with all three repeats.
+
+For reopen plus oldest lookup, cold PostgreSQL paths benefit from maintenance at ten or more
+packs; warm paths regress at 10–100 and improve at 300–1,000 in both pool configurations.
+The original full-run derived counters predated PR #347 and summed three iterations. The new CSV
+uses the fixed converter; for example, two resulting packs and 80 ms maintenance replace the old
+six-pack/240-ms aggregate for one ten-push coordinate. Primary latency samples are unchanged.
+
+The original provider-restart records below keep their own provenance. They must not be pooled
+with the same-provider age matrix or treated as independent repeats of the large-age conditions.
+
 ## Interpreting break-even evidence
 
 A low break-even value is not by itself a production trigger. A useful recommendation also requires:
@@ -140,7 +156,7 @@ The maintenance API must not expose a MIDX setting unless the selected supported
 Issue #165 remains open. The completed restart, payback and cross-database correctness slices narrow
 the remaining work to broader quantitative policy evidence:
 
-- retain the full 32/100/300/1,000-push age matrix on PostgreSQL, PostgreSQL+HikariCP and SQL Server;
+- add the full 32/100/300/1,000-push SQL Server age matrix and independent repeats of the now-retained PostgreSQL/PostgreSQL+HikariCP matrix;
 - extend lifecycle-specific maintenance payback beyond the retained ten-push condition;
 - measure read latency while maintenance is actively consuming database, WAL/log, I/O and storage resources;
 - repeat SQL Server cold measurements or use a controlled production-like runner before relying on exact percentages;
