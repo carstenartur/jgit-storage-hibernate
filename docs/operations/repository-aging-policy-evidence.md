@@ -62,8 +62,8 @@ digest.
 
 The [full 2026-09-04 matrix and corrected CSV](../evidence/repository-aging-full-2026-09-04.md)
 now retain all 864 coordinates for HSQLDB, PostgreSQL and PostgreSQL/HikariCP, including
-32/100/300/1,000 pushes. The same evidence page also retains the later corrected-provider
-restart aggregate from run `33900635892` with all three repeats.
+32/100/300/1,000 pushes. The same evidence page also retains the provider-restart aggregate from rerun
+`33900635892`, after the counter correction, with all three repeats.
 
 For reopen plus oldest lookup, cold PostgreSQL paths benefit from maintenance at ten or more
 packs; warm paths regress at 10–100 and improve at 300–1,000 in both pool configurations.
