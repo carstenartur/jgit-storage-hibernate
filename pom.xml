@@ -66,7 +66,7 @@
     <hibernate-models.version>1.1.2</hibernate-models.version>
     <hibernate-search.version>8.4.0.Final</hibernate-search.version>
     <spring-boot.version>4.1.1</spring-boot.version>
-    <flyway.version>13.5.0</flyway.version>
+    <flyway.version>13.6.0</flyway.version>
     <jackson3-bom.version>3.2.2</jackson3-bom.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <postgresql.version>42.7.13</postgresql.version>
