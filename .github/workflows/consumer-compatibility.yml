@@ -89,7 +89,7 @@ jobs:
           cp -R "$candidate_repo/io/github/carstenartur" target/consumer-candidate-artifact/io/github/
 
       - name: Upload candidate Maven subtree
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jgit-storage-hibernate-consumer-candidate
           path: target/consumer-candidate-artifact/**
@@ -127,7 +127,7 @@ jobs:
           java-version: '21'
 
       - name: Download same-run candidate
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: jgit-storage-hibernate-consumer-candidate
           path: ${{ runner.temp }}/candidate-repository
@@ -217,7 +217,7 @@ jobs:
 
       - name: Upload candidate consumer evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: consumer-candidate-${{ matrix.id }}
           path: |
@@ -312,7 +312,7 @@ jobs:
 
       - name: Upload baseline consumer evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: consumer-baseline-${{ matrix.id }}
           path: |
@@ -332,7 +332,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download candidate and baseline evidence
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: consumer-*
           path: target/consumer-report/artifacts
@@ -350,7 +350,7 @@ jobs:
           cat target/consumer-report/summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload combined compatibility summary
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: consumer-compatibility-summary
           path: target/consumer-report/summary.md

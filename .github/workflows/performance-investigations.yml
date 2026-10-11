@@ -256,7 +256,7 @@ jobs:
 
       - name: Upload raw investigation results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: performance-investigation-${{ matrix.investigation }}-${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }}
           path: |
@@ -333,7 +333,7 @@ jobs:
 
       - name: Upload repository-aging smoke evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: performance-investigation-repository-aging-smoke
           path: |
@@ -410,7 +410,7 @@ jobs:
 
       - name: Upload repository-aging shard
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: performance-investigation-repository-aging-full-${{ matrix.backend }}-${{ matrix.cache_state }}
           path: target/investigations/repository-aging
@@ -440,7 +440,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download all repository-aging shards
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: performance-investigation-repository-aging-full-*
           path: target/repository-aging-shards
@@ -504,7 +504,7 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload merged repository-aging evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: performance-investigation-repository-aging-full
           path: target/investigations/repository-aging/**
@@ -549,7 +549,7 @@ jobs:
 
       - name: Upload stateless threshold evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: stateless-writer-threshold-results
           path: |

@@ -63,18 +63,18 @@ jobs:
         run: python3 .github/scripts/generate-metrics-badges.py
       - name: Upload Maven build log
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: {name: maven-build-log, path: build.log}
       - name: Upload JaCoCo reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jacoco-module-reports
           path: '**/target/site/jacoco/jacoco.*'
           if-no-files-found: error
       - name: Upload badge metrics
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: badge-metrics
           path: |
@@ -83,7 +83,7 @@ jobs:
           if-no-files-found: error
       - name: Upload benchmark consumer relevance evidence
         if: ${{ always() && hashFiles('target/benchmark-consumer-relevance/evidence.json') != '' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: benchmark-consumer-relevance-evidence
           path: target/benchmark-consumer-relevance/evidence.json
@@ -140,7 +140,7 @@ jobs:
         run: test -s target/public-repository-evidence/manifest.json
       - name: Upload public repository evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: public-maven-repository-contract
           path: |
