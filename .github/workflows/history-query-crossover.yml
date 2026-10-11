@@ -148,7 +148,7 @@ jobs:
 
       - name: Upload crossover evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: history-query-crossover-results
           path: |
@@ -190,7 +190,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download crossover evidence outside the worktree
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: history-query-crossover-results
           path: ${{ runner.temp }}/history-query-crossover-artifact
