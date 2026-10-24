@@ -10,7 +10,7 @@ io.github.carstenartur:jgit-storage-hibernate-search
 
 Core provides database-backed JGit repositories. Security is optional and adds a framework-neutral principal/group ACL schema plus deterministic repository/ref decisions. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
 
-The documented release line is **0.11.4**. It uses Java 21, JGit 7.7.1.202607240634-r, Hibernate ORM 7.4.5.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published BOM and tested deployment stack instead of overriding only one side of the stack.
+The documented release line is **0.11.4**. It uses Java 21, JGit 7.8.0.202609011348-r, Hibernate ORM 7.4.12.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published BOM and tested deployment stack instead of overriding only one side of the stack.
 
 SQL Server Search was introduced in **0.1.16**. Do not configure released Search 0.1.15 against SQL Server.
 
