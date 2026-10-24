@@ -10,7 +10,9 @@ The CI workflow `.github/workflows/jgit-compatibility.yml` verifies the full Mav
 |---|---|
 | `7.5.0.202512021534-r` | Oldest currently tested support line. |
 | `7.6.0.202603022253-r` | Intermediate compatibility line. |
-| `7.7.0.202606012155-r` | Current primary version used by the parent POM. |
+| `7.7.0.202606012155-r` | Intermediate compatibility line. |
+| `7.7.1.202607240634-r` | Tested 7.7 maintenance release. |
+| `7.8.0.202609011348-r` | Current primary version used by the parent POM. |
 
 Each version is tested on Java 21. Java 21 is the project baseline for the storage, search and optional Java/JDT analysis modules.
 
