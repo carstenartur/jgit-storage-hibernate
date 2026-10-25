@@ -7,6 +7,7 @@ import java.util.Map;
 /**
  * One historical file document. Identity is (repositoryName, documentId); callers may use blobId
  * to deduplicate identical content. The first supplied identity retains all its provenance and fields.
+ * Paths must be nonempty and retain whitespace exactly, including whitespace-only Git filenames.
  * Qualified-name facets are single whole strings, including any embedded newlines. Exact metadata
  * and normalized qualified facets must fit {@link #MAX_KEYWORD_UTF8_BYTES}; oversized input is
  * rejected before index construction, without splitting or truncating a whole-value facet.
@@ -23,7 +24,9 @@ public record JavaFileSearchDocument(
     requireText(documentId, "documentId");
     requireText(commitId, "commitId");
     requireText(blobId, "blobId");
-    requireText(path, "path");
+    if (path == null || path.isEmpty()) {
+      throw new IllegalArgumentException("path must not be empty");
+    }
     module = module == null ? "" : module;
     fileType = fileType == null ? "" : fileType;
     fields = Map.copyOf(fields);

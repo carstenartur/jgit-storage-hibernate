@@ -24,9 +24,14 @@ public final class JavaSemanticDiff {
     List<SemanticChange> changes = new ArrayList<>();
     Map<String, JavaSymbolIndex> afterByIdentity = index(after.symbols());
     Set<JavaSymbolIndex> matchedAfter = new HashSet<>();
+    Map<JavaSymbolIndex, Match> identityMatches =
+        reserveIdentityMatches(before.symbols(), afterByIdentity, matchedAfter);
 
     for (JavaSymbolIndex oldSymbol : before.symbols()) {
-      Match match = findMatch(oldSymbol, after.symbols(), afterByIdentity, matchedAfter);
+      Match match = identityMatches.get(oldSymbol);
+      if (match == null) {
+        match = findHeuristicMatch(oldSymbol, after.symbols(), matchedAfter);
+      }
       if (match.symbol() == null) {
         changes.add(new SemanticChange(
             SemanticChangeKind.REMOVED, oldSymbol, null, 1.0,
@@ -74,19 +79,35 @@ public final class JavaSemanticDiff {
     }
   }
 
-  private static Match findMatch(
-      JavaSymbolIndex oldSymbol,
-      List<JavaSymbolIndex> candidates,
+  private static Map<JavaSymbolIndex, Match> reserveIdentityMatches(
+      List<JavaSymbolIndex> before,
       Map<String, JavaSymbolIndex> indexed,
       Set<JavaSymbolIndex> matched) {
-    for (String key : identityKeys(oldSymbol)) {
-      JavaSymbolIndex candidate = indexed.get(key);
-      if (candidate != null && !matched.contains(candidate)) {
-        return new Match(candidate, key.startsWith("binding:") ? 1.0 : 0.95,
-            "Matched by " + key.substring(0, key.indexOf(':')));
+    Map<JavaSymbolIndex, Match> matches = new HashMap<>();
+    // Reserve stronger identities across all declarations before weaker names or shape heuristics.
+    // In particular, a removed overload's qualified name must not consume a surviving overload.
+    for (String prefix : List.of("binding:", "raw:", "semantic:", "qualified:")) {
+      for (JavaSymbolIndex oldSymbol : before) {
+        if (matches.containsKey(oldSymbol)) {
+          continue;
+        }
+        for (String key : identityKeys(oldSymbol)) {
+          JavaSymbolIndex candidate = key.startsWith(prefix) ? indexed.get(key) : null;
+          if (candidate != null && matched.add(candidate)) {
+            matches.put(oldSymbol, new Match(candidate, prefix.equals("binding:") ? 1.0 : 0.95,
+                "Matched by " + prefix.substring(0, prefix.length() - 1)));
+            break;
+          }
+        }
       }
     }
+    return matches;
+  }
 
+  private static Match findHeuristicMatch(
+      JavaSymbolIndex oldSymbol,
+      List<JavaSymbolIndex> candidates,
+      Set<JavaSymbolIndex> matched) {
     JavaSymbolIndex best = null;
     double bestScore = 0.0;
     for (JavaSymbolIndex candidate : candidates) {
