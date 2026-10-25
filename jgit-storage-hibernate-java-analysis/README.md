@@ -2,10 +2,11 @@
 
 ## Source text for historical search
 
-`new JavaSourceTextExtractor().extract(snapshot, configuration)` extracts declaration-attached Javadoc, decoded string
+`new JavaSourceTextExtractor().extract(snapshot, configuration)` extracts Javadoc comments, decoded string
 literals and text blocks with source offsets and line numbers. It uses the configured Java source
 level without resolving bindings or requiring a classpath. Documentation retains its original
-spelling, including delimiters and tags. Ordinary comments are excluded.
+spelling, including delimiters and tags. Module documentation and unattached Javadoc comments are
+included; ordinary comments are excluded. The snapshot path identifies module descriptors.
 
 The immutable `JavaSourceText` result includes syntax problem/error counts; recovered extraction
 must not be presented as error-free analysis. The extractor supplements `JavaJdtAnalyzer` and

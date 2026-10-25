@@ -45,6 +45,27 @@ class JavaSourceTextExtractorTest {
   }
 
   @Test
+  void recognizesDocumentedModuleDescriptorsFromTheirSnapshotPath() {
+    for (String path : List.of("src/main/java/module-info.java", "src\\main\\java\\module-info.java")) {
+      JavaSourceText result = new JavaSourceTextExtractor().extract(
+          new JavaSourceSnapshot("repo", "commit", "blob", path,
+              "/** Module documentation. */\nmodule example.application { exports example.api; }"),
+          JavaAnalysisConfiguration.java21BindingAware());
+      assertEquals(0, result.errorCount(), path);
+      assertEquals(1, result.documentation().size(), path);
+      assertEquals("/** Module documentation. */", result.documentation().getFirst().text());
+      assertEquals(1, result.documentation().getFirst().startLine());
+    }
+  }
+
+  @Test
+  void retainsUnattachedJavadocCommentsInSourceOrder() {
+    JavaSourceText result = extract("/** first */ /** second */ class Example {} /** last */");
+    assertEquals(List.of("/** first */", "/** second */", "/** last */"),
+        result.documentation().stream().map(JavaSourceText.Fragment::text).toList());
+  }
+
+  @Test
   void keepsRecoverableTextAndReportsSyntaxErrorsWithoutResolvingMissingTypes() {
     JavaSourceText result = extract("/** retained */ class Example { Missing value; String s = \"kept\"; }");
     assertEquals(0, result.errorCount(), "source text extraction must not require a classpath");

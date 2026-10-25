@@ -19,7 +19,7 @@ import org.eclipse.jdt.core.dom.Javadoc;
 import org.eclipse.jdt.core.dom.StringLiteral;
 import org.eclipse.jdt.core.dom.TextBlock;
 
-/** Extracts declaration-attached Javadoc and literal text from a source snapshot without a classpath. */
+/** Extracts Javadoc comments and literal text from a source snapshot without a classpath. */
 public final class JavaSourceTextExtractor {
 
   /** Uses the configured source level; binding and classpath settings are intentionally unnecessary. */
@@ -33,17 +33,18 @@ public final class JavaSourceTextExtractor {
     parser.setKind(ASTParser.K_COMPILATION_UNIT);
     parser.setCompilerOptions(options);
     parser.setSource(snapshot.source().toCharArray());
+    parser.setUnitName(snapshot.path().replace('\\', '/'));
     CompilationUnit unit = (CompilationUnit) parser.createAST(null);
     List<JavaSourceText.Fragment> documentation = new ArrayList<>();
     List<JavaSourceText.Fragment> literals = new ArrayList<>();
-    unit.accept(new ASTVisitor() {
-      @Override
-      public boolean visit(Javadoc node) {
+    // Module Javadoc is present in the comment table even when JDT does not attach it to the AST.
+    for (Object comment : unit.getCommentList()) {
+      if (comment instanceof Javadoc node) {
         documentation.add(fragment(node, snapshot.source().substring(
             node.getStartPosition(), node.getStartPosition() + node.getLength()), unit));
-        return false;
       }
-
+    }
+    unit.accept(new ASTVisitor() {
       @Override
       public boolean visit(StringLiteral node) {
         literals.add(fragment(node, node.getLiteralValue(), unit));

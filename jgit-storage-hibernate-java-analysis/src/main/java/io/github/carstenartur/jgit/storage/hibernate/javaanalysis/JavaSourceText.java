@@ -9,7 +9,7 @@ import java.util.Objects;
 
 /**
  * Searchable source text without a dependency on resolved Java bindings.
- * Declaration-attached documentation retains its source spelling, including delimiters and tags;
+ * Javadoc comments retain their source spelling, including delimiters and tags;
  * string literals and text blocks contain their decoded values. Lists follow source order.
  * Syntax diagnostics allow callers to distinguish complete and recovered extraction.
  */
