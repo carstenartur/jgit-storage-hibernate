@@ -13,8 +13,11 @@ import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchConten
 import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile.ContentMode;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -24,6 +27,7 @@ import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.HistogramDiff;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -152,6 +156,81 @@ public class CommitIndexer {
       }
     }
     return indexed;
+  }
+
+  /**
+   * Index the union of commit histories reachable from tips, excluding certified complete ancestry.
+   *
+   * <p>Every supplied boundary must certify that its entire reachable history is already persisted
+   * for this repository and projection generation. An existing tip row alone is never such proof.
+   * Callers must invalidate boundaries before projection purge, repository recreation, incompatible
+   * profile changes or shallow-history deepening, and serialize these operations with writers.
+   * An empty boundary set safely imports or repairs all reachable history. Only the first-parent
+   * diff uses first-parent semantics; traversal follows every parent.
+   *
+   * <p>Annotated tips are peeled; valid tree/blob tips are ignored. A missing boundary tip, such as
+   * one removed by Git GC, is discarded and causes additional traversal. Missing/corrupt new tips
+   * or other referenced objects still fail. If stale boundary ancestry was pruned, callers may
+   * retry with no boundaries. Failures/interruption can leave committed batches but return no
+   * certification. Successful persistence does not imply synchronous Lucene visibility.
+   *
+   * @return counts and deduplicated peeled input commit tips, only after every batch has succeeded
+   */
+  public ReachableIndexResult indexReachableCommits(
+      Repository repository, Collection<ObjectId> tips, Collection<ObjectId> completeBoundaries)
+      throws IOException {
+    Objects.requireNonNull(repository, "repository");
+    List<ObjectId> requestedTips = List.copyOf(tips);
+    List<ObjectId> boundaries = List.copyOf(completeBoundaries);
+    checkInterrupted();
+    int visited = 0;
+    int indexed = 0;
+    Set<String> completedTips = new LinkedHashSet<>();
+    List<RevCommit> pending = new ArrayList<>(batchSize);
+    try (RevWalk walk = new RevWalk(repository);
+        ObjectReader reader = repository.newObjectReader()) {
+      for (ObjectId tip : requestedTips) {
+        if (walk.peel(walk.parseAny(tip)) instanceof RevCommit commit
+            && completedTips.add(commit.name())) {
+          walk.markStart(commit);
+        }
+      }
+      for (ObjectId boundary : boundaries) {
+        try {
+          walk.markUninteresting(walk.parseCommit(boundary));
+        } catch (MissingObjectException prunedBoundary) {
+          // Forgetting a certificate is safe: it only expands the next traversal.
+        }
+      }
+      for (RevCommit commit : walk) {
+        checkInterrupted();
+        visited++;
+        pending.add(commit);
+        if (pending.size() == batchSize) {
+          indexed += indexParsedBatch(reader, walk, pending, false);
+          pending.clear();
+        }
+      }
+      checkInterrupted();
+      if (!pending.isEmpty()) {
+        indexed += indexParsedBatch(reader, walk, pending, false);
+      }
+      checkInterrupted();
+    }
+    return new ReachableIndexResult(visited, indexed, List.copyOf(completedTips));
+  }
+
+  /** Successful history persistence evidence; tip IDs never enumerate the full visited history. */
+  public record ReachableIndexResult(int visitedCommits, int indexedCommits, List<String> completedTipIds) {
+    public ReachableIndexResult {
+      completedTipIds = List.copyOf(completedTipIds);
+    }
+  }
+
+  private static void checkInterrupted() throws InterruptedIOException {
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedIOException("Reachable commit indexing was interrupted");
+    }
   }
 
   /**

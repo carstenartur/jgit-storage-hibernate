@@ -286,3 +286,26 @@ With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 202
 The dedicated Hibernate Search performance workflow compares all four indexing profiles on PostgreSQL plus local-filesystem Lucene and retains indexing/rebuild time, query time, GC/ORM evidence, Lucene/PostgreSQL footprint, segment count and content/path miss rates. See [Hibernate Search performance](../docs/operations/hibernate-search-performance.md).
 
 See the [change-audit and Java-usage use case](../docs/use-cases/change-audit-and-java-usage.md) for the complete architectural comparison and [SQL Server Search operations](../docs/operations/sql-server-search.md) for deployment and rollback.
+
+## Indexing reachable deltas
+
+`CommitIndexer.indexReachableCommits(repository, tips, completeBoundaries)` walks
+multiple new tips together and excludes ancestry that the caller certifies as
+fully persisted for the same repository and projection generation. Its result
+contains visited/indexed counts and only the deduplicated, peeled input commit tip
+IDs. A single existing projection row is never evidence for complete ancestry.
+
+An empty boundary set safely imports or repairs complete reachable history. Keep
+only successful completion tips in a bounded process frontier; losing a boundary
+increases work without losing coverage. Invalidate the frontier before rebuild
+purge, repository recreation, incompatible profile changes or shallow-history
+deepening, under the same writer coordination. Restart with an empty frontier.
+Failed/interrupted calls may leave committed batches and return no certificate.
+
+Valid blob/tree tips are ignored, including annotated tags. Missing boundary tips
+are discarded; missing/corrupt new tips still fail. If Git GC removed deeper stale
+boundary ancestry, retry once with no boundaries. All parents are traversed; only
+changed-file extraction retains first-parent diff semantics. Completion means
+persistence under the configured Search synchronization strategy, not an implicit
+promise of immediate Lucene visibility. This additive API leaves the existing
+single-tip/limit API unchanged.
