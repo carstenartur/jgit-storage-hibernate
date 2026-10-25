@@ -1,8 +1,0 @@
-{
-  "next_development_version": "0.11.9-SNAPSHOT",
-  "prepared_at": "2026-10-25T17:07:11+00:00",
-  "release_version": "0.11.8",
-  "request_branch": "release-request/0.11.8",
-  "schema_version": 1,
-  "source_commit": "b52ebbe461325d1424c1ee3c8aaad86d70c57352"
-}
