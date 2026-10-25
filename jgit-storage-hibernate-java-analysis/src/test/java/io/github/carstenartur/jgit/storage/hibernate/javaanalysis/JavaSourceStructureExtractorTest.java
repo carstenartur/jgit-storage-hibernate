@@ -11,6 +11,47 @@ import org.junit.jupiter.api.Test;
 class JavaSourceStructureExtractorTest {
 
   @Test
+  void preservesPackageWhenNoTypeOrSymbolIsDeclared() {
+    var configuration = JavaAnalysisConfiguration.java21SyntaxOnly();
+    var packageInfo = new JavaSourceStructureExtractor().extract(new JavaSourceSnapshot(
+        "repo", "commit", "blob", "p/package-info.java", "/** Package documentation. */ package p;"), configuration);
+    assertEquals("p", packageInfo.packageName());
+    assertTrue(packageInfo.types().isEmpty());
+    assertEquals("nested.pkg", extract("package nested.pkg;", configuration).packageName());
+    assertEquals("", extract("class A {}", configuration).packageName());
+    assertEquals("", new JavaSourceStructure(List.of(), List.of(), 0, 0).packageName());
+  }
+
+  @Test
+  void exposesOrderedDeclarationTypeUsesIncludingPrimitivesWithoutLocalReferences() {
+    String source = """
+        package p;
+        class A {
+          int first, second;
+          A(String... names) {}
+          java.util.List<String> values(int count, String names[]) {
+            Exception local;
+            try {} catch (IllegalArgumentException | IllegalStateException failure) {}
+            return null;
+          }
+          void empty() {}
+        }
+        """;
+    var result = extract(source, JavaAnalysisConfiguration.java21SyntaxOnly());
+    assertEquals(List.of("FIELD", "METHOD_PARAMETER", "METHOD_PARAMETER", "METHOD_PARAMETER",
+        "METHOD_RETURN", "CATCH", "METHOD_RETURN"), result.typeUses().stream().map(use -> use.role().name()).toList());
+    assertEquals(List.of("int", "String", "int", "String", "java.util.List",
+        "IllegalArgumentException|IllegalStateException", "void"), result.typeUses().stream().map(JavaSourceStructure.TypeUse::rawTypeName).toList());
+    var parameter = result.typeUses().get(2);
+    var returned = result.typeUses().get(4);
+    assertEquals(parameter.ownerStartPosition(), returned.ownerStartPosition());
+    assertTrue(parameter.startPosition() > returned.startPosition());
+    assertEquals("java.util.List<String>", returned.sourceName());
+    assertEquals("java.util.List<String>", source.substring(returned.startPosition(), returned.startPosition() + returned.sourceLength()));
+    assertThrows(UnsupportedOperationException.class, () -> result.typeUses().clear());
+  }
+
+  @Test
   void exposesTypeKindsAndGenericParentSyntaxWithoutBindings() {
     String source = """
         package p;
