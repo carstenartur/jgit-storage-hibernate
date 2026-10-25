@@ -38,6 +38,7 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.TreeFormatter;
+import org.eclipse.jgit.lib.TagBuilder;
 import org.hibernate.Session;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +71,76 @@ class CommitProjectionRebuilderH2Test {
     }
     if (provider != null) {
       provider.close();
+    }
+  }
+
+  @Test
+  void rebuildsCommitHistoryWhileIgnoringLightweightAndAnnotatedNonCommitTags() throws Exception {
+    ObjectId commit = createCommit("Keep reachable history", "file.txt", "content", null);
+    updateRef("refs/heads/main", commit);
+    new CommitIndexer(provider.getSessionFactory(), repositoryName).indexCommit(repository, commit);
+    var expectedRefs = new java.util.TreeMap<String, ObjectId>();
+    expectedRefs.put("refs/heads/main", commit);
+    try (ObjectInserter inserter = repository.newObjectInserter()) {
+      ObjectId blob = inserter.insert(Constants.OBJ_BLOB, "tagged data".getBytes(StandardCharsets.UTF_8));
+      ObjectId tree = inserter.insert(new TreeFormatter());
+      inserter.flush();
+      for (ObjectId target : List.of(blob, tree, commit)) {
+        int type = target.equals(blob) ? Constants.OBJ_BLOB : target.equals(tree) ? Constants.OBJ_TREE : Constants.OBJ_COMMIT;
+        for (boolean annotated : List.of(false, true)) {
+          String name = "refs/tags/" + type + "-" + annotated;
+          ObjectId tip = target;
+          if (annotated) {
+            TagBuilder tag = new TagBuilder();
+            tag.setTag(name.substring("refs/tags/".length()));
+            tag.setObjectId(target, type);
+            tag.setTagger(new PersonIdent("Tag author", "tag@example.invalid"));
+            tag.setMessage("Tagged object");
+            tip = inserter.insert(tag);
+            inserter.flush();
+          }
+          updateRef(name, tip);
+          expectedRefs.put(name, tip);
+        }
+      }
+    }
+    var result = new CommitProjectionRebuilder(provider.getSessionFactory())
+        .rebuild(repository, new RepositoryName(repositoryName));
+    assertEquals(RebuildState.COMPLETED, result.state());
+    assertEquals(1, result.refTips());
+    assertEquals(1, result.removedProjections());
+    assertEquals(1, result.indexedCommits());
+    assertEquals(List.of(commit.name()), projectedObjectIds());
+    var actualRefs = new java.util.TreeMap<String, ObjectId>();
+    repository.getRefDatabase().getRefsByPrefix(Constants.R_REFS)
+        .forEach(ref -> actualRefs.put(ref.getName(), ref.getObjectId()));
+    assertEquals(expectedRefs, actualRefs);
+  }
+
+  @Test
+  void stillFailsWhenAnAnnotatedTagReferencesAMissingObject(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+    try (var git = org.eclipse.jgit.api.Git.init().setBare(true).setDirectory(directory.toFile()).call()) {
+      ObjectId brokenTag;
+      try (ObjectInserter inserter = git.getRepository().newObjectInserter()) {
+        TagBuilder tag = new TagBuilder();
+        tag.setTag("broken");
+        tag.setObjectId(ObjectId.fromString("2".repeat(40)), Constants.OBJ_COMMIT);
+        tag.setTagger(new PersonIdent("Tag author", "tag@example.invalid"));
+        tag.setMessage("Missing target");
+        brokenTag = inserter.insert(tag);
+        inserter.flush();
+      }
+      // Simulate an already-corrupt source: normal Core ref publication rejects this tag.
+      java.nio.file.Path ref = directory.resolve("refs/tags/broken");
+      java.nio.file.Files.createDirectories(ref.getParent());
+      java.nio.file.Files.writeString(ref, brokenTag.name() + "\n", StandardCharsets.US_ASCII);
+      List<RebuildProgress> events = new ArrayList<>();
+      assertThrows(org.eclipse.jgit.errors.MissingObjectException.class,
+          () -> new CommitProjectionRebuilder(provider.getSessionFactory())
+              .rebuild(git.getRepository(), new RepositoryName(repositoryName), events::add));
+      assertEquals(RebuildState.FAILED, events.getLast().state());
+      assertEquals(brokenTag, git.getRepository().exactRef("refs/tags/broken").getObjectId());
     }
   }
 

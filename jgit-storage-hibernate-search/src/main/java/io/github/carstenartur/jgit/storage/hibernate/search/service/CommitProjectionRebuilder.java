@@ -33,7 +33,9 @@ import org.hibernate.Transaction;
  * Rebuilds the generic commit projection from authoritative Git history.
  *
  * <p>The service first removes every existing projection for the logical repository, including its
- * Hibernate Search/Lucene document, then indexes every commit reachable from a ref. A failed or
+ * Hibernate Search/Lucene document, then indexes every commit reachable from a ref. Valid refs to
+ * blobs or trees (including annotated tags) have no commit history and are ignored. Missing or
+ * corrupt referenced objects still fail the rebuild. A failed or
  * interrupted run may leave a partial derived projection; invoking the service again removes that
  * partial state and starts a deterministic rebuild. Git objects and refs are never modified.
  *
@@ -344,10 +346,12 @@ public final class CommitProjectionRebuilder {
 
   private static Set<ObjectId> resolveCommitTips(Repository repository) throws IOException {
     Set<ObjectId> tips = new LinkedHashSet<>();
-    for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_REFS)) {
-      ObjectId commitId = repository.resolve(ref.getName() + "^{commit}");
-      if (commitId != null) {
-        tips.add(commitId);
+    try (RevWalk walk = new RevWalk(repository)) {
+      for (Ref ref : repository.getRefDatabase().getRefsByPrefix(Constants.R_REFS)) {
+        ObjectId objectId = ref.getObjectId();
+        if (objectId != null && walk.peel(walk.parseAny(objectId)) instanceof RevCommit commit) {
+          tips.add(commit.copy());
+        }
       }
     }
     return tips;
