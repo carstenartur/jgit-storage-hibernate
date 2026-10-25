@@ -35,7 +35,8 @@
       "expectedModules": [
         "jgit-storage-hibernate-core",
         "jgit-storage-hibernate-search"
-      ]
+      ],
+      "javaVersion": "25"
     }
   ]
 }

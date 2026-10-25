@@ -46,6 +46,9 @@ def matrix() -> dict[str, object]:
         ref = text(raw.get("ref"), f"{consumer_id}.ref")
         if SHA.fullmatch(ref) is None:
             fail(f"{consumer_id}.ref must be an immutable 40-character SHA")
+        java_version = text(raw.get("javaVersion", "21"), f"{consumer_id}.javaVersion")
+        if re.fullmatch(r"[1-9][0-9]*", java_version) is None or int(java_version) < 21:
+            fail(f"{consumer_id}.javaVersion must be a Java feature version of at least 21")
         branch = text(raw.get("defaultBranch"), f"{consumer_id}.defaultBranch")
         script = text(raw.get("contractScript"), f"{consumer_id}.contractScript")
         modules = raw.get("expectedModules")
@@ -71,6 +74,7 @@ def matrix() -> dict[str, object]:
                 "repository": repository,
                 "ref": ref,
                 "defaultBranch": branch,
+                "javaVersion": java_version,
                 "contractScript": script,
                 "expectedModules": sorted(normalized_modules),
             }
