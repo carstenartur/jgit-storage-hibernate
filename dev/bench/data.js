@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792961339564,
+  "lastUpdate": 1792961487352,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -857897,6 +857897,5935 @@ window.BENCHMARK_DATA = {
             "defaultBranch": "main",
             "modules": [
               "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          }
+        }
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "bfd0383235062624a700c6d6551f52aab886e436",
+          "message": "Merge pull request #404 from carstenartur/dependabot/maven/com.h2database-h2-2.5.252",
+          "timestamp": "2026-10-25T21:40:24+01:00",
+          "tree_id": "a8b81a76d38db5b52cf8ba4c5b65dab9ea9fe809",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/bfd0383235062624a700c6d6551f52aab886e436"
+        },
+        "date": 1792961487352,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Hibernate Search concurrent query p50 — batch-250",
+            "unit": "ms/op",
+            "value": 0.9035,
+            "range": 0.1619274528917194,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP50Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p50 — reference",
+            "unit": "ms/op",
+            "value": 4.2585,
+            "range": 0.9340880579474293,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP50Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p50 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 2.6365,
+            "range": 1.1292495295549163,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP50Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p50 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 2.805,
+            "range": 0.5260874452027914,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP50Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p50 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 3.1845,
+            "range": 1.5704841610153222,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP50Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p50 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 1.8975,
+            "range": 1.198545994111198,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP50Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p50 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 3.0445,
+            "range": 1.4898739879600558,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP50Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p95 — batch-250",
+            "unit": "ms/op",
+            "value": 6.993,
+            "range": 4.772970773009196,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP95Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p95 — reference",
+            "unit": "ms/op",
+            "value": 45.798500000000004,
+            "range": 21.949301594811622,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP95Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p95 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 4.716,
+            "range": 0.035355339059327376,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP95Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p95 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 21.054000000000002,
+            "range": 9.297039959040728,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP95Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p95 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 44.862500000000004,
+            "range": 22.26325700565845,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP95Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p95 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 4.074,
+            "range": 0.7594326829943521,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP95Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p95 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 19.728,
+            "range": 20.40568749148139,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP95Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p99 — batch-250",
+            "unit": "ms/op",
+            "value": 102.376,
+            "range": 127.35983078663382,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP99Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p99 — reference",
+            "unit": "ms/op",
+            "value": 50.4525,
+            "range": 15.367551675527237,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP99Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p99 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 4.7705,
+            "range": 0.11242997820866106,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP99Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p99 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 22.6035,
+            "range": 7.105716044143616,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP99Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p99 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 59.886,
+            "range": 1.0168195513462555,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP99Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p99 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 7.4135,
+            "range": 1.5365430355183678,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP99Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search concurrent query p99 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 30.597,
+            "range": 5.034600282048218,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: queryP99Micros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst prepared statements — batch-250",
+            "unit": "count/op",
+            "value": 2.0,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: preparedStatements; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst prepared statements — reference",
+            "unit": "count/op",
+            "value": 2.0,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: preparedStatements; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst prepared statements — sync-async-r500",
+            "unit": "count/op",
+            "value": 2.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: preparedStatements; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst prepared statements — sync-read-sync-r0",
+            "unit": "count/op",
+            "value": 2.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: preparedStatements; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst prepared statements — sync-sync-r0",
+            "unit": "count/op",
+            "value": 2.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: preparedStatements; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst prepared statements — sync-write-sync-r500",
+            "unit": "count/op",
+            "value": 2.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: preparedStatements; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst prepared statements — writer-ram64-t4",
+            "unit": "count/op",
+            "value": 2.0,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: preparedStatements; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p50 — batch-250",
+            "unit": "ms/op",
+            "value": 95.576556,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p50 — reference",
+            "unit": "ms/op",
+            "value": 83.641187,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p50 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 484.588658,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p50 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 76.748064,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p50 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 79.216433,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p50 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 481.224692,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p50 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 87.204611,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p95 — batch-250",
+            "unit": "ms/op",
+            "value": 112.40198,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p95 — reference",
+            "unit": "ms/op",
+            "value": 101.311879,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p95 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 508.422012,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p95 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 107.999259,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p95 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 111.608624,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p95 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 506.023308,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p95 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 111.115534,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p99 — batch-250",
+            "unit": "ms/op",
+            "value": 112.40198,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p99 — reference",
+            "unit": "ms/op",
+            "value": 101.311879,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p99 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 508.422012,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p99 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 107.999259,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p99 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 111.608624,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p99 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 506.023308,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst ready p99 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 111.115534,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p50 — batch-250",
+            "unit": "ms/op",
+            "value": 73.276903,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p50 — reference",
+            "unit": "ms/op",
+            "value": 70.614886,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p50 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 28.621804,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p50 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 39.501198,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p50 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 69.149258,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p50 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 65.760181,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p50 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 71.574035,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p95 — batch-250",
+            "unit": "ms/op",
+            "value": 117.296185,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p95 — reference",
+            "unit": "ms/op",
+            "value": 191.964796,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p95 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 30.930879,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p95 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 42.318513,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p95 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 93.655768,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p95 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 90.299066,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p95 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 100.078473,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p99 — batch-250",
+            "unit": "ms/op",
+            "value": 117.296185,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p99 — reference",
+            "unit": "ms/op",
+            "value": 191.964796,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p99 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 30.930879,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p99 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 42.318513,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p99 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 93.655768,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p99 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 90.299066,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst submission p99 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 100.078473,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst transactions — batch-250",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: transactions; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst transactions — reference",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: transactions; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst transactions — sync-async-r500",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: transactions; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst transactions — sync-read-sync-r0",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: transactions; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst transactions — sync-sync-r0",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: transactions; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst transactions — sync-write-sync-r500",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: transactions; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst transactions — writer-ram64-t4",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: transactions; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility observation wait — batch-250",
+            "unit": "ms/op",
+            "value": 12.6865,
+            "range": 2.7697372619077067,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility observation wait — reference",
+            "unit": "ms/op",
+            "value": 12.0935,
+            "range": 3.5390694398386704,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility observation wait — sync-async-r500",
+            "unit": "ms/op",
+            "value": 464.58050000000003,
+            "range": 20.1263803129127,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility observation wait — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 47.2045,
+            "range": 15.336438977155028,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility observation wait — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 11.896,
+            "range": 2.5851823920180177,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility observation wait — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 411.046,
+            "range": 41.712229022194435,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility observation wait — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 14.0025,
+            "range": 0.6498311319104372,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility polls — batch-250",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility polls — reference",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility polls — sync-async-r500",
+            "unit": "count/op",
+            "value": 81.0,
+            "range": 7.0710678118654755,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility polls — sync-read-sync-r0",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility polls — sync-sync-r0",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility polls — sync-write-sync-r500",
+            "unit": "count/op",
+            "value": 72.0,
+            "range": 9.899494936611665,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime burst visibility polls — writer-ram64-t4",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p50 — batch-250",
+            "unit": "ms/op",
+            "value": 239.129764,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p50 — reference",
+            "unit": "ms/op",
+            "value": 118.894583,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p50 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 480.434324,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p50 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 97.027582,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p50 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 139.940693,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p50 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 487.80289,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p50 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 123.16049,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p95 — batch-250",
+            "unit": "ms/op",
+            "value": 414.767571,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p95 — reference",
+            "unit": "ms/op",
+            "value": 187.675044,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p95 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 503.95491,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p95 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 194.2964,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p95 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 257.347904,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p95 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 505.851063,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p95 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 236.880334,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p99 — batch-250",
+            "unit": "ms/op",
+            "value": 414.767571,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p99 — reference",
+            "unit": "ms/op",
+            "value": 187.675044,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p99 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 503.95491,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p99 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 194.2964,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p99 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 257.347904,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p99 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 505.851063,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime concurrent burst window p99 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 236.880334,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p50 — batch-250",
+            "unit": "ms/op",
+            "value": 148.306172,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p50 — reference",
+            "unit": "ms/op",
+            "value": 324.921237,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p50 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 568.848051,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p50 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 150.530976,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p50 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 177.54993,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p50 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 525.437493,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p50 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 345.611202,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p95 — batch-250",
+            "unit": "ms/op",
+            "value": 413.783604,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p95 — reference",
+            "unit": "ms/op",
+            "value": 450.523846,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p95 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 744.234478,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p95 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 407.003832,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p95 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 441.965586,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p95 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 611.53674,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p95 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 514.149166,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p99 — batch-250",
+            "unit": "ms/op",
+            "value": 413.783604,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p99 — reference",
+            "unit": "ms/op",
+            "value": 450.523846,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p99 — sync-async-r500",
+            "unit": "ms/op",
+            "value": 744.234478,
+            "range": 0.0,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p99 — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 407.003832,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p99 — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 441.965586,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p99 — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 611.53674,
+            "range": 0.0,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild ready p99 — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 514.149166,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility observation wait — batch-250",
+            "unit": "ms/op",
+            "value": 37.8435,
+            "range": 34.61782668654981,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility observation wait — reference",
+            "unit": "ms/op",
+            "value": 45.1215,
+            "range": 41.71152191541325,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility observation wait — sync-async-r500",
+            "unit": "ms/op",
+            "value": 550.0015,
+            "range": 67.8589164701294,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility observation wait — sync-read-sync-r0",
+            "unit": "ms/op",
+            "value": 132.2755,
+            "range": 90.63624010571047,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility observation wait — sync-sync-r0",
+            "unit": "ms/op",
+            "value": 43.4405,
+            "range": 39.13906744545659,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility observation wait — sync-write-sync-r500",
+            "unit": "ms/op",
+            "value": 297.974,
+            "range": 106.02924762536043,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility observation wait — writer-ram64-t4",
+            "unit": "ms/op",
+            "value": 38.835,
+            "range": 36.960471452620844,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityWaitMicros; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility polls — batch-250",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: batch-250\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=250\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility polls — reference",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: reference\nsync=write-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility polls — sync-async-r500",
+            "unit": "count/op",
+            "value": 77.0,
+            "range": 7.0710678118654755,
+            "extra": "Scenario: sync-async-r500\nsync=async; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility polls — sync-read-sync-r0",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-read-sync-r0\nsync=read-sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility polls — sync-sync-r0",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: sync-sync-r0\nsync=sync; refresh=0ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility polls — sync-write-sync-r500",
+            "unit": "count/op",
+            "value": 47.5,
+            "range": 26.16295090390226,
+            "extra": "Scenario: sync-write-sync-r500\nsync=write-sync; refresh=500ms; writerRAM=Lucene-default; backendThreads=CPU-default; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Hibernate Search runtime rebuild visibility polls — writer-ram64-t4",
+            "unit": "count/op",
+            "value": 1.0,
+            "range": 0.0,
+            "extra": "Scenario: writer-ram64-t4\nsync=write-sync; refresh=0ms; writerRAM=64MiB; backendThreads=4; batch=50\nCommits: 100\nBurst commits: 50\nJDK: 21.0.12.1\nMode: ss\nForks: 1\nChart direction: lower is better; higher is slower or more expensive.\nAuxCounter: visibilityPolls; per-invocation mean from rawData",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-runtime",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          }
+        ],
+        "consumerEvidence": {
+          "audio-analyzer": {
+            "displayName": "audio-analyzer",
+            "repository": "carstenartur/audio-analyzer",
+            "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
+            "defaultBranch": "master",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          },
+          "sandbox": {
+            "displayName": "sandbox",
+            "repository": "carstenartur/sandbox",
+            "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+            "defaultBranch": "main",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-java-analysis",
               "jgit-storage-hibernate-search"
             ],
             "contractScript": ".github/jgit-storage-hibernate-contract.sh"
