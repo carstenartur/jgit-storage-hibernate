@@ -6,7 +6,7 @@
 
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-parent</artifactId>
-  <version>0.11.8-SNAPSHOT</version>
+  <version>0.11.8</version>
   <packaging>pom</packaging>
 
   <name>jgit-storage-hibernate Parent</name>
@@ -59,7 +59,7 @@
     <maven.compiler.release>${java.version}</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <project.build.outputTimestamp>2026-10-25T14:36:20Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2026-10-25T17:07:11Z</project.build.outputTimestamp>
 
     <jgit.version>7.8.0.202609011348-r</jgit.version>
     <hibernate.version>7.4.12.Final</hibernate.version>
