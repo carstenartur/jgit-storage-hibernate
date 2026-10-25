@@ -26,6 +26,7 @@ import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySe
 import io.github.carstenartur.jgit.storage.hibernate.search.service.SearchIndexProfileMismatchException;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
+import java.util.List;
 import java.util.UUID;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -35,6 +36,7 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.TreeFormatter;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.junit.jupiter.api.Test;
@@ -163,6 +165,54 @@ class SearchIndexingProfilesH2Test {
     }
   }
 
+  @Test
+  void gitlinksKeepChangedPathsWithoutOpeningExternalCommits() throws Exception {
+    for (var profile : List.of(SearchIndexingProfile.CONTENT, SearchIndexingProfile.DIFF_HUNKS)) {
+      try (Fixture fixture = fixture(profile)) {
+        ObjectId external = ObjectId.fromString("1".repeat(40));
+        ObjectId added = fixture.commitEntry(FileMode.GITLINK, external, null);
+        GitCommitIndex projection = fixture.index(added);
+        assertEquals("module", projection.getChangedPaths());
+        assertNull(projection.getChangedText());
+
+        ObjectId changed = fixture.commitEntry(FileMode.GITLINK, ObjectId.fromString("2".repeat(40)), added);
+        assertNull(fixture.index(changed).getChangedText());
+        ObjectId regular = fixture.commit("Replace submodule", "module", "replacement-text", changed);
+        GitCommitIndex replacement = fixture.index(regular);
+        assertEquals("module", replacement.getChangedPaths());
+        if (profile == SearchIndexingProfile.CONTENT) {
+          assertTrue(replacement.getChangedText().contains("replacement-text"));
+        } else {
+          // Diff-hunks keeps its existing non-text predecessor exclusion.
+          assertNull(replacement.getChangedText());
+        }
+        ObjectId restored = fixture.commitEntry(FileMode.GITLINK, external, regular);
+        assertNull(fixture.index(restored).getChangedText());
+        ObjectId removed = fixture.commitEntry(FileMode.MISSING, ObjectId.zeroId(), restored);
+        GitCommitIndex deletion = fixture.index(removed);
+        assertEquals("module", deletion.getChangedPaths());
+        assertNull(deletion.getChangedText());
+      }
+    }
+  }
+
+  @Test
+  void blobModesStillLoadContentAndMissingBlobsStillFail() throws Exception {
+    try (Fixture fixture = fixture(SearchIndexingProfile.CONTENT)) {
+      ObjectId blob;
+      try (var inserter = fixture.repository().newObjectInserter()) {
+        blob = inserter.insert(Constants.OBJ_BLOB, "blob-marker".getBytes(StandardCharsets.UTF_8));
+        inserter.flush();
+      }
+      for (var mode : List.of(FileMode.REGULAR_FILE, FileMode.EXECUTABLE_FILE, FileMode.SYMLINK)) {
+        ObjectId commit = fixture.commitEntry(mode, blob, null);
+        assertTrue(fixture.index(commit).getChangedText().contains("blob-marker"));
+        ObjectId missing = fixture.commitEntry(mode, ObjectId.fromString("3".repeat(40)), null);
+        assertThrows(MissingObjectException.class, () -> fixture.index(missing));
+      }
+    }
+  }
+
   private static Fixture fixture(SearchIndexingProfile profile) throws Exception {
     String name = "profile-h2-" + UUID.randomUUID();
     Properties properties = new Properties();
@@ -202,6 +252,23 @@ class SearchIndexingProfilesH2Test {
         builder.setAuthor(actor);
         builder.setCommitter(actor);
         builder.setMessage(message);
+        ObjectId id = inserter.insert(builder);
+        inserter.flush();
+        return id;
+      }
+    }
+
+    ObjectId commitEntry(FileMode mode, ObjectId target, ObjectId parent) throws Exception {
+      try (var inserter = repository.newObjectInserter()) {
+        var tree = new TreeFormatter();
+        if (!FileMode.MISSING.equals(mode)) tree.append("module", mode, target);
+        var builder = new CommitBuilder();
+        builder.setTreeId(inserter.insert(tree));
+        if (parent != null) builder.setParentId(parent);
+        var actor = new PersonIdent("Profile Test", "profile@example.invalid");
+        builder.setAuthor(actor);
+        builder.setCommitter(actor);
+        builder.setMessage("Change tree entry");
         ObjectId id = inserter.insert(builder);
         inserter.flush();
         return id;
