@@ -15,9 +15,11 @@ public enum JavaFileSearchField {
   REFERENCED_TYPES(Analysis.QUALIFIED),
   DOCUMENTATION(Analysis.TEXT),
   STRING_LITERALS(Analysis.TEXT),
-  METHOD_SIGNATURES(Analysis.IDENTIFIER);
+  METHOD_SIGNATURES(Analysis.IDENTIFIER),
+  SOURCE(Analysis.SOURCE),
+  PATH(Analysis.PATH);
 
-  enum Analysis { QUALIFIED, IDENTIFIER, TEXT }
+  enum Analysis { QUALIFIED, IDENTIFIER, TEXT, SOURCE, PATH }
 
   final Analysis analysis;
 
