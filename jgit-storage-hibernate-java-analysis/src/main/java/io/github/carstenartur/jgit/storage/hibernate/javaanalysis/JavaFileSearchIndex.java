@@ -44,7 +44,7 @@ import org.apache.lucene.util.QueryBuilder;
  * arrays. Returned lists contain only one page and do not claim an exact total hit count.
  */
 public final class JavaFileSearchIndex implements AutoCloseable {
-  public static final String ANALYSIS_PROFILE = "java-file-facets-v1";
+  public static final String ANALYSIS_PROFILE = "java-file-facets-v2";
   private static final String REPOSITORY = "repository";
   private static final String ID = "identity";
   private static final String MODULE = "module";

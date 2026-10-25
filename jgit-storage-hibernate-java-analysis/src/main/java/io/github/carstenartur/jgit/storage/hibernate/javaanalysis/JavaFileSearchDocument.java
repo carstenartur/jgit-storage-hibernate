@@ -41,7 +41,7 @@ public record JavaFileSearchDocument(
     });
   }
 
-  private static void requireKeywordSize(String value, String name) {
+  static void requireKeywordSize(String value, String name) {
     if (!StandardCharsets.UTF_8.newEncoder().canEncode(value)) {
       throw new IllegalArgumentException(name + " must contain valid Unicode");
     }

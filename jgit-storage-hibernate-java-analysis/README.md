@@ -23,7 +23,7 @@ content deduplication, or supply a distinct identity for every commit/path. This
 policy does not reconstruct the original ingestion order from Git. Snapshots and
 public semantic/source-text facets can be mapped directly into document fields.
 
-The versioned `java-file-facets-v1` profile uses these exact field semantics:
+The versioned `java-file-facets-v2` profile uses these exact field semantics:
 
 - Qualified names, declared/extended/implemented/referenced types, imports and
   annotations: one keyword for the entire field, dots replaced with spaces, lowercase.
@@ -55,8 +55,25 @@ index is memory-resident and grows with the corpus; it never silently truncates
 history. Reuse a generation for queries and replace it only after a complete rebuild.
 Concurrent reads are supported; close waits for active reads. There are no background
 threads, SQL mappings, persistence migrations or automatic dependency downloads.
-Full Java-source tokenization and path facets are separate capabilities; this first
-facade covers the named fields above only.
+`SOURCE` uses the public JDT scanner with Java 25 source/compliance and preview disabled,
+for indexing and queries alike. It keeps keywords, identifiers, numeric and raw literal
+contents, while skipping comments, operators and the `@` punctuation. Identifiers retain
+the original spelling plus synonyms split only at lowercase-to-uppercase code-point boundaries,
+including supplementary Unicode letters (a correction to the legacy UTF-16 character check);
+`XMLParser` and `value2Factory` remain whole. All emitted terms are lowercased. Escapes
+inside literals and identifiers remain written escapes. String/character delimiters are
+removed, including Unicode-escaped delimiters; text blocks remove all three quotes
+(a correction to the former single-quote stripping). Text-block whitespace remains raw.
+The explicit token allowlist also retains `_` and restricted identifiers such as `record`,
+`sealed` and `yield`. Malformed source uses best-effort recovery with guaranteed scanner
+progress; this field is lexical evidence, not a compilation or binding-quality claim.
+Oversized emitted terms fail explicitly with `IllegalArgumentException` in both build
+and query analysis.
+
+`PATH` uses standard tokenization, CamelCase word parts without the original compound,
+then lowercase. Like the existing identifier/text profiles and the legacy path profile,
+standard tokenization splits long tokens into chunks of at most 255 characters. Supply PATH explicitly
+in the document field map: the provenance `path` string is not automatically searched.
 
 ## Declaration structure
 
@@ -65,7 +82,14 @@ syntax facets for named classes, interfaces, enums, records and annotation types
 declaration retains source coordinates and explicitly written parent types, including
 generic spelling and the parent name without type arguments. Imports retain their static
 and on-demand flags. Extraction uses the configured source level without a classpath;
-problem/error counts must accompany recovered results.
+problem/error counts must accompany recovered results. `packageName()` preserves package
+declarations even when package-info or a type-free source has no symbols. `typeUses()`
+provides field, method/constructor parameter, method return and catch types, including
+primitive/void and whole array/union syntax. Uses preserve duplicates and AST encounter
+order, with method parameters before the return type and body. Coordinates associate
+uses with their owning declaration; raw names remove outer generic arguments only,
+without binding/import resolution. Local variables, throws clauses and casts are excluded.
+The original four-argument structure constructor remains available with empty package/uses.
 
 Use source positions to associate facets with semantic symbols. Existing
 `JavaSymbolKind.TYPE` and analysis-result constructors remain unchanged. Enum constants

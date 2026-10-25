@@ -16,6 +16,11 @@ import org.eclipse.jdt.core.dom.RecordDeclaration;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.CatchClause;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.ASTNode;
 
 /** Extracts declaration kinds and parent syntax using the configured source level, without a classpath. */
 public final class JavaSourceStructureExtractor {
@@ -23,7 +28,39 @@ public final class JavaSourceStructureExtractor {
   public JavaSourceStructure extract(JavaSourceSnapshot snapshot, JavaAnalysisConfiguration configuration) {
     var unit = JavaSyntaxParser.parse(snapshot, configuration);
     List<JavaSourceStructure.TypeDeclaration> declarations = new ArrayList<>();
+    List<JavaSourceStructure.TypeUse> typeUses = new ArrayList<>();
     unit.accept(new ASTVisitor() {
+      @Override
+      public boolean visit(MethodDeclaration node) {
+        for (Object item : node.parameters()) {
+          use(((SingleVariableDeclaration) item).getType(), node, JavaSourceStructure.TypeUseRole.METHOD_PARAMETER);
+        }
+        if (node.getReturnType2() != null) {
+          use(node.getReturnType2(), node, JavaSourceStructure.TypeUseRole.METHOD_RETURN);
+        }
+        return true;
+      }
+
+      @Override
+      public boolean visit(FieldDeclaration node) {
+        use(node.getType(), node, JavaSourceStructure.TypeUseRole.FIELD);
+        return true;
+      }
+
+      @Override
+      public boolean visit(CatchClause node) {
+        use(node.getException().getType(), node, JavaSourceStructure.TypeUseRole.CATCH);
+        return true;
+      }
+
+      private void use(Type type, ASTNode owner, JavaSourceStructure.TypeUseRole role) {
+        Type raw = type;
+        while (raw instanceof ParameterizedType parameterized) raw = parameterized.getType();
+        String rawName = raw instanceof SimpleType simple ? simple.getName().getFullyQualifiedName() : raw.toString().trim();
+        typeUses.add(new JavaSourceStructure.TypeUse(role, type.toString().trim(), rawName,
+            owner.getStartPosition(), type.getStartPosition(), type.getLength()));
+      }
+
       @Override
       public boolean visit(TypeDeclaration node) {
         List<JavaSourceStructure.ParentType> extended = new ArrayList<>();
@@ -77,7 +114,8 @@ public final class JavaSourceStructureExtractor {
       imports.add(new JavaSourceStructure.ImportDeclaration(declaration.getName().getFullyQualifiedName(),
           declaration.isStatic(), declaration.isOnDemand()));
     }
-    return new JavaSourceStructure(declarations, imports, unit.getProblems().length, errors);
+    return new JavaSourceStructure(declarations, imports, unit.getProblems().length, errors,
+        unit.getPackage() == null ? "" : unit.getPackage().getName().getFullyQualifiedName(), typeUses);
   }
 
   private static List<JavaSourceStructure.ParentType> parents(List<?> types) {
