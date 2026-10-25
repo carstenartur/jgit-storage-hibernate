@@ -381,6 +381,10 @@ public class CommitIndexer {
 
   private String readTextCandidate(
       ObjectReader reader, TreeWalk treeWalk, int treeIndex, String path) throws IOException {
+    // Gitlinks name commits in another repository and need not exist in this object database.
+    if (treeWalk.getFileMode(treeIndex).getObjectType() != Constants.OBJ_BLOB) {
+      return null;
+    }
     ObjectId objectId = treeWalk.getObjectId(treeIndex);
     ObjectLoader loader = reader.open(objectId);
     if (loader.getType() != Constants.OBJ_BLOB || loader.getSize() > contentPolicy.maxFileBytes()) {
