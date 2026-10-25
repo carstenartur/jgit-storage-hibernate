@@ -172,7 +172,7 @@ JDT supplies the parsing and binding primitives needed to build this manually. T
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
-  <version>0.11.6</version>
+  <version>0.11.7</version>
 </dependency>
 ```
 
