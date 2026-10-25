@@ -32,8 +32,17 @@ The versioned `java-file-facets-v1` profile uses these exact field semantics:
 - Simple class names, methods, fields and method signatures: standard tokenization,
   CamelCase word parts plus original identifiers, then lowercase.
 - Documentation and decoded string literals: the identifier pipeline plus English
-  stop words. Queries use the same analysis and OR across analyzed terms/fields;
-  operator-looking input is literal text, not a query language.
+  stop words. Queries use the same analysis, with disjunction across fields and
+  ordinary query terms. Compound identifier graphs retain complete paths:
+  `createValue` means `createvalue OR (create AND value)`, while `create value`
+  matches either plain term. This follows Hibernate Search's graph-aware match
+  behavior. Operator-looking input remains literal text, not a query language.
+
+Exact metadata and whole qualified-name facets must fit 32,766 UTF-8 bytes after
+analysis. Documents validate this limit before construction of a generation,
+including Unicode lowercase expansion. Oversized values are rejected explicitly;
+whole facets are never silently split or truncated. Source path and provenance
+strings stored only for returned hits are not subject to this keyword limit.
 
 Metadata filtering precedes ranking and paging. Ties are ordered by document ID.
 Pages are bounded to 1,000 hits; search-after skips deep offsets in bounded chunks.

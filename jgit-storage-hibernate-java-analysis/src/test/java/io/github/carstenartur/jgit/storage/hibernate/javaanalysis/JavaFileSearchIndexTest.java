@@ -83,6 +83,35 @@ class JavaFileSearchIndexTest {
   }
 
   @Test
+  void preservesCompleteCompoundPathsWhilePlainTermsRemainDisjunctive() throws Exception {
+    try (var index = JavaFileSearchIndex.build(List.of(
+        document("repo", "compound", "c", "Compound.java", "m", Map.of(METHODS, "createValue")),
+        document("repo", "part", "c", "Part.java", "m", Map.of(METHODS, "value"))))) {
+      assertEquals(List.of("compound"), ids(index.search(query("repo", null, "createValue", Map.of(METHODS, 1f), 0, 10))));
+      assertEquals(java.util.Set.of("compound", "part"), java.util.Set.copyOf(ids(index.search(
+          query("repo", null, "create value", Map.of(METHODS, 1f), 0, 10)))));
+    }
+  }
+
+  @Test
+  void validatesWholeKeywordByteLimitsWithoutSplittingOrTruncatingFacets() throws Exception {
+    String maximum = "é".repeat(16_383);
+    var accepted = document("repo", "id", "c", "Type.java", "m", Map.of(QUALIFIED_NAMES, maximum));
+    try (var index = JavaFileSearchIndex.build(List.of(accepted))) {
+      assertEquals(List.of("id"), ids(index.search(query("repo", null, maximum, Map.of(QUALIFIED_NAMES, 1f), 0, 10))));
+    }
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", "id", "c", "Type.java", "m", Map.of(QUALIFIED_NAMES, maximum + "x")));
+    // U+023A lowercases to U+2C65: two UTF-8 input bytes become three indexed bytes.
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", "id", "c", "Type.java", "m", Map.of(QUALIFIED_NAMES, "\u023A".repeat(10_923))));
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", "x".repeat(32_767), "c", "Type.java", "m", Map.of()));
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", "broken\uD800", "c", "Type.java", "m", Map.of()));
+  }
+
+  @Test
   void acceptsPublicAnalysisFacetsWithoutPersistenceOrBackendTypes() throws Exception {
     var snapshot = new JavaSourceSnapshot("repo", "commit", "blob", "p/Type.java", """
         package p;
