@@ -29,12 +29,13 @@
       "id": "sandbox",
       "displayName": "sandbox",
       "repository": "carstenartur/sandbox",
-      "ref": "611b0caf16af9724bb5aa45a8d4c7e11fda64371",
+      "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
       "defaultBranch": "main",
       "contractScript": ".github/jgit-storage-hibernate-contract.sh",
       "expectedModules": [
         "jgit-storage-hibernate-core",
-        "jgit-storage-hibernate-search"
+        "jgit-storage-hibernate-search",
+        "jgit-storage-hibernate-java-analysis"
       ],
       "javaVersion": "25"
     }

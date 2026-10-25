@@ -41,8 +41,8 @@ At the current pinned commits:
 | Capability | Consumers proven by the compatibility contract |
 |---|---|
 | Core storage and repository operations | `audio-analyzer`, `taxonomy`, `sandbox` |
-| Hibernate Search indexing, query and runtime behavior | `audio-analyzer` |
-| Java Analysis | none in the current real-consumer contract |
+| Hibernate Search indexing, query and runtime behavior | `audio-analyzer`, `sandbox` |
+| Java Analysis | `sandbox` |
 | Architecture knowledge | none in the current real-consumer contract |
 
 This table is derived from selected modules, not maintained as an independent promise. When a consumer changes its actual dependencies, the compatibility descriptor must first be advanced and verified; subsequent benchmark publications then derive the new tags automatically.

@@ -104,6 +104,18 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare-candidate.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 70
+    services:
+      elasticsearch:
+        image: ${{ matrix.id == 'sandbox' && 'docker.elastic.co/elasticsearch/elasticsearch:8.19.12' || '' }}
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health"
+          --health-interval 10s --health-timeout 5s --health-retries 20
     steps:
       - name: Record contract start
         run: echo "CONTRACT_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
@@ -120,7 +132,7 @@ jobs:
           ref: ${{ matrix.ref }}
           path: consumer
 
-      - name: Set up JDK 21
+      - name: Set up JDK ${{ matrix.javaVersion }}
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -174,6 +186,7 @@ jobs:
         shell: bash
         env:
           JGIT_STORAGE_HIBERNATE_CONTRACT_MODE: candidate
+          JGIT_TEST_ELASTICSEARCH_HOSTS: ${{ matrix.id == 'sandbox' && 'localhost:9200' || '' }}
           JGIT_STORAGE_HIBERNATE_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.candidate_version }}
         run: |
           set -euo pipefail
@@ -251,6 +264,18 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare-baseline.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 70
+    services:
+      elasticsearch:
+        image: ${{ matrix.id == 'sandbox' && 'docker.elastic.co/elasticsearch/elasticsearch:8.19.12' || '' }}
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health"
+          --health-interval 10s --health-timeout 5s --health-retries 20
     steps:
       - name: Record contract start
         run: echo "CONTRACT_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
@@ -261,7 +286,7 @@ jobs:
           repository: ${{ matrix.repository }}
           ref: ${{ github.event_name == 'schedule' && matrix.defaultBranch || matrix.ref }}
 
-      - name: Set up JDK 21
+      - name: Set up JDK ${{ matrix.javaVersion }}
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -272,6 +297,7 @@ jobs:
         shell: bash
         env:
           JGIT_STORAGE_HIBERNATE_CONTRACT_MODE: baseline
+          JGIT_TEST_ELASTICSEARCH_HOSTS: ${{ matrix.id == 'sandbox' && 'localhost:9200' || '' }}
         run: |
           set -euo pipefail
           test -s '${{ matrix.contractScript }}'

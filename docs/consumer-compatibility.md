@@ -28,7 +28,9 @@ The exact commits live in `.github/consumer-compatibility.json` and are intentio
 |---|---|---|
 | audio-analyzer | Core + Search | `audio-app` reactor verification, workflow-history/runtime linkage and packaged-JAR leakage checks |
 | Taxonomy | Core | Taxonomy's catalogue-driven schema/migration/Hibernate Search/PostgreSQL contract |
-| sandbox | Core | sandbox storage lifecycle/adoption/OSGi/packaging contract |
+| sandbox | Core + Search + Java Analysis | Core-only OSGi bridge, released server REST/search/analysis, legacy adoption and executable-JAR contracts |
+
+Sandbox runs its consumer-owned contract on Java 25. Both central matrix legs provide Elasticsearch 8.19.12, matching the consumer's own CI, so its real Elasticsearch test runs alongside the Surefire and Failsafe contracts. The baseline resolves the published 0.11.8 dependencies; the candidate substitutes the isolated library build into the same pinned checkout.
 
 The table describes what the **current pinned consumer POMs actually consume**. It must not be used to speculate that a consumer uses another optional module. If a consumer adds Search, Java Analysis or Architecture later, the version-substitution report changes and the descriptor must be updated explicitly.
 
@@ -81,4 +83,4 @@ For pull requests and `main` pushes, the baseline uses immutable refs from `.git
 
 ## Relationship to performance evidence
 
-A consumer being compatible does not imply every benchmark is relevant to it. Performance-dashboard consumer relevance is a separate metadata layer: it is derived from the modules and contract capabilities proven here, not guessed from repository names. For example, Hibernate Search history-query charts must not be labelled as sandbox evidence while the pinned sandbox contract consumes Core only.
+A consumer being compatible does not imply every benchmark is relevant to it. Performance-dashboard consumer relevance is a separate metadata layer: it is derived from the modules and contract capabilities proven here, not guessed from repository names. The pinned Sandbox contract selects Core, Search and Java Analysis; benchmark relevance follows those selected modules without claiming that library microbenchmarks were measured inside Sandbox.
