@@ -6,19 +6,26 @@ import java.util.List;
 /** Immutable syntax-level declaration facets; no binding or persistence contract is implied. */
 public record JavaSourceStructure(
     List<TypeDeclaration> types, List<ImportDeclaration> imports, int problemCount, int errorCount,
-    String packageName, List<TypeUse> typeUses) {
+    String packageName, List<TypeUse> typeUses, List<FieldDeclaration> fields) {
 
   public JavaSourceStructure {
     types = List.copyOf(types);
     imports = List.copyOf(imports);
     packageName = java.util.Objects.requireNonNull(packageName, "packageName");
     typeUses = List.copyOf(typeUses);
+    fields = List.copyOf(fields);
+  }
+
+  /** Retains the constructor descriptor for callers without field-declaration metadata. */
+  public JavaSourceStructure(List<TypeDeclaration> types, List<ImportDeclaration> imports,
+      int problemCount, int errorCount, String packageName, List<TypeUse> typeUses) {
+    this(types, imports, problemCount, errorCount, packageName, typeUses, List.of());
   }
 
   /** Compatibility constructor for callers without package metadata; empty means unnamed/unknown. */
   public JavaSourceStructure(List<TypeDeclaration> types, List<ImportDeclaration> imports,
       int problemCount, int errorCount) {
-    this(types, imports, problemCount, errorCount, "", List.of());
+    this(types, imports, problemCount, errorCount, "", List.of(), List.of());
   }
 
   /** Distinguishes declaration forms without changing the existing JavaSymbolKind.TYPE contract. */
@@ -47,8 +54,25 @@ public record JavaSourceStructure(
     }
   }
 
-  /** Parent syntax, its name without generic arguments/type annotations, and source position. */
-  public record ParentType(String sourceName, String typeName, int startPosition) {}
+  /**
+   * Parent syntax, its fully normalized name, outer-generics-only raw name, and source position.
+   * The raw name follows {@link TypeUse#rawTypeName()}, retaining generic qualifiers and their annotations.
+   */
+  public record ParentType(String sourceName, String typeName, String rawTypeName, int startPosition) {
+    /** Retains the old constructor descriptor; manually constructed parents default raw to normalized. */
+    public ParentType(String sourceName, String typeName, int startPosition) {
+      this(sourceName, typeName, typeName, startPosition);
+    }
+  }
+
+  /**
+   * Explicit field fragment or enum constant; record components and local variables are excluded.
+   * All fragments/constants in a declaration group precede traversal of their initializer bodies.
+   * For enum constants declarationStartPosition is the enclosing enum declaration's start;
+   * otherwise it is the field declaration's start. The other coordinates describe the named fragment/constant.
+   */
+  public record FieldDeclaration(String name, int declarationStartPosition, int startPosition,
+      int sourceLength, boolean enumConstant) {}
 
   /** Import name as written, without a trailing wildcard; flags preserve its meaning. */
   public record ImportDeclaration(String name, boolean isStatic, boolean onDemand) {}
