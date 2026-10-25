@@ -1,5 +1,63 @@
 # jgit-storage-hibernate-java-analysis
 
+## Historical file-text search
+
+`JavaFileSearchIndex.build(documents)` builds one immutable, closeable generation of
+historical file documents. `JavaFileSearchQuery` combines literal text, field boosts,
+exact repository/module/file-type filters and an offset/limit. `JavaFileSearchHit`
+returns ranked identity and provenance without copying source text into each hit.
+The API exposes no Lucene, Hibernate or JDT implementation types.
+
+```java
+try (var index = JavaFileSearchIndex.build(documents)) {
+  var query = new JavaFileSearchQuery("repo", "module-a", "java", "createValue",
+      Map.of(JavaFileSearchField.METHODS, 1.5f, JavaFileSearchField.FIELDS, 1f), 0, 20);
+  List<JavaFileSearchHit> page = index.search(query);
+}
+```
+
+The caller supplies all historical documents and controls their order. Identity is
+`(repositoryName, documentId)`; repeated identities retain the first complete input,
+including commit/blob/path/module provenance. Use the blob ID as document ID for
+content deduplication, or supply a distinct identity for every commit/path. This
+policy does not reconstruct the original ingestion order from Git. Snapshots and
+public semantic/source-text facets can be mapped directly into document fields.
+
+The versioned `java-file-facets-v1` profile uses these exact field semantics:
+
+- Qualified names, declared/extended/implemented/referenced types, imports and
+  annotations: one keyword for the entire field, dots replaced with spaces, lowercase.
+  Newline-joined names remain one term; the caller must not silently split this facet
+  into independent field values when preserving existing whole-field semantics.
+- Simple class names, methods, fields and method signatures: standard tokenization,
+  CamelCase word parts plus original identifiers, then lowercase.
+- Documentation and decoded string literals: the identifier pipeline plus English
+  stop words. Queries use the same analysis, with disjunction across fields and
+  ordinary query terms. Compound identifier graphs retain complete paths:
+  `createValue` means `createvalue OR (create AND value)`, while `create value`
+  matches either plain term. This follows Hibernate Search's graph-aware match
+  behavior. Operator-looking input remains literal text, not a query language.
+
+Exact metadata and whole qualified-name facets must fit 32,766 UTF-8 bytes after
+analysis. Documents validate this limit before construction of a generation,
+including Unicode lowercase expansion. Oversized values are rejected explicitly;
+whole facets are never silently split or truncated. Source path and provenance
+strings stored only for returned hits are not subject to this keyword limit.
+
+Metadata filtering precedes ranking and paging. Ties are ordered by document ID.
+Pages are bounded to 1,000 hits; search-after skips deep offsets in bounded chunks.
+Deep traversal still takes time proportional to skipped matches. Page length is
+not an exact total count. Blank and tokenless text produce no hits.
+
+This optional Java module owns the Lucene implementation and declares its Lucene
+9.12.3 dependencies explicitly, aligned with Hibernate Search 8.4. The complete
+index is memory-resident and grows with the corpus; it never silently truncates
+history. Reuse a generation for queries and replace it only after a complete rebuild.
+Concurrent reads are supported; close waits for active reads. There are no background
+threads, SQL mappings, persistence migrations or automatic dependency downloads.
+Full Java-source tokenization and path facets are separate capabilities; this first
+facade covers the named fields above only.
+
 ## Declaration structure
 
 `new JavaSourceStructureExtractor().extract(snapshot, configuration)` returns immutable
