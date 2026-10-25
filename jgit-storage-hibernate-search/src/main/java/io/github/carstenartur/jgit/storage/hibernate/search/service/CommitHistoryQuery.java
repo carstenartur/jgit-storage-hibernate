@@ -34,6 +34,14 @@ import java.util.Objects;
  */
 public final class CommitHistoryQuery {
 
+  /** Fields searched by the optional full-text expression. */
+  public enum TextScope {
+    /** Commit messages, changed paths and changed content; the original default. */
+    ALL,
+    /** Commit subject and full message only. */
+    MESSAGES
+  }
+
   /** Timestamp dimension used for range predicates and chronological ordering. */
   public enum TimestampField {
     AUTHOR,
@@ -54,7 +62,9 @@ public final class CommitHistoryQuery {
 
   private final String repositoryName;
   private final String text;
+  private final TextScope textScope;
   private final String authorEmail;
+  private final String authorName;
   private final String committerEmail;
   private final String pathFragment;
   private final PathMatch pathMatch;
@@ -69,7 +79,9 @@ public final class CommitHistoryQuery {
   private CommitHistoryQuery(Builder builder) {
     repositoryName = requireText(builder.repositoryName, "repositoryName");
     text = normalize(builder.text);
+    textScope = builder.textScope;
     authorEmail = normalize(builder.authorEmail);
+    authorName = normalize(builder.authorName);
     committerEmail = normalize(builder.committerEmail);
     pathFragment = normalize(builder.pathFragment);
     pathMatch = Objects.requireNonNull(builder.pathMatch, "pathMatch");
@@ -103,6 +115,14 @@ public final class CommitHistoryQuery {
 
   public String text() {
     return text;
+  }
+
+  public TextScope textScope() {
+    return textScope;
+  }
+
+  public String authorName() {
+    return authorName;
   }
 
   public String authorEmail() {
@@ -159,7 +179,9 @@ public final class CommitHistoryQuery {
 
     private final String repositoryName;
     private String text;
+    private TextScope textScope = TextScope.ALL;
     private String authorEmail;
+    private String authorName;
     private String committerEmail;
     private String pathFragment;
     private PathMatch pathMatch = PathMatch.LITERAL_FRAGMENT;
@@ -174,8 +196,23 @@ public final class CommitHistoryQuery {
       this.repositoryName = requireText(repositoryName, "repositoryName");
     }
 
+    /** Search messages, changed paths and changed content. Replaces any prior text scope. */
     public Builder matchingText(String text) {
       this.text = text;
+      this.textScope = TextScope.ALL;
+      return this;
+    }
+
+    /** Search only commit subjects and full messages, before paging or scrolling. */
+    public Builder matchingMessages(String text) {
+      this.text = text;
+      this.textScope = TextScope.MESSAGES;
+      return this;
+    }
+
+    /** Match the exact author name, combined with all other supplied predicates. */
+    public Builder authoredByName(String authorName) {
+      this.authorName = authorName;
       return this;
     }
 

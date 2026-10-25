@@ -1,5 +1,19 @@
 # jgit-storage-hibernate-core
 
+## Read-only storage inventory
+
+`new RepositoryStorageStatistics(sessionFactory).packs(repositoryName)` reports distinct persisted
+pack names and declared payload bytes across all extensions, including Reftables and unpublished
+staging rows. Chunked payload bytes are counted once; database overhead is excluded. A missing
+repository returns zero totals without creating it.
+
+`objects(repositoryName)` counts unique object IDs by type across published packs, including
+unreachable objects. It does not count only objects reachable from current refs. The operation
+requires an existing repository and reads pack indexes and object headers; it uses memory
+proportional to the unique object count. Pause concurrent writes/repacking for a stable inventory.
+Both methods leave Git data and refs unchanged. Like pack maintenance, this is a trusted
+application/operator API: callers enforce access authorization before invoking it.
+
 Use the familiar JGit `Repository` API while storing packs, refs, reftables and reflogs in the relational database and persistence lifecycle your application already operates.
 
 ## Why use it

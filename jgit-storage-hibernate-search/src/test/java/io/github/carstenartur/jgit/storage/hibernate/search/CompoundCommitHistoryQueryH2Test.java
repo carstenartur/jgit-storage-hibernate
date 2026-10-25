@@ -49,6 +49,98 @@ class CompoundCommitHistoryQueryH2Test {
   private static final String REPOSITORY_NAME = "payment-platform";
 
   @Test
+  void messageOnlySearchExcludesPathAndContentHitsBeforePaging() throws Exception {
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    try (HibernateSessionFactoryProvider provider =
+            new HibernateSessionFactoryProvider(
+                h2Properties("message-history-" + TEST_COUNTER.incrementAndGet()),
+                SearchEntities.annotatedClasses());
+        HibernateGitStorage storage =
+            new DefaultHibernateRepositoryFactory(provider.getSessionFactory())
+                .open(new RepositoryName(REPOSITORY_NAME))) {
+      Repository repository = storage.repository();
+      CommitIndexer indexer = new CommitIndexer(provider.getSessionFactory(), REPOSITORY_NAME);
+      Instant when = Instant.parse("2026-01-10T10:00:00Z");
+      ObjectId message = commitSnapshot(repository, null, "Fix orchard handling\n\nFull body.",
+          "Alice", "alice@example.com", when, Map.of("config.txt", "plain"));
+      ObjectId content = commitSnapshot(repository, message, "Update configuration",
+          "Alice", "alice@example.com", when.plusSeconds(1),
+          Map.of("config.txt", "orchard orchard orchard"));
+      ObjectId path = commitSnapshot(repository, content, "Add directory",
+          "Bob", "bob@example.com", when.plusSeconds(2),
+          Map.of("orchard.txt", "plain"));
+      for (ObjectId id : List.of(message, content, path)) {
+        indexer.indexCommit(repository, id);
+      }
+      GitHistorySearchService history = new GitHistorySearchService(provider.getSessionFactory());
+      assertEquals(3, history.findChangeSummaries(
+          CommitHistoryQuery.forRepository(REPOSITORY_NAME).matchingText("orchard").build()).size());
+      CommitHistoryQuery messages = CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+          .matchingMessages("orchard").limit(1).build();
+      assertEquals(List.of(message.name()), history.findChanges(messages).stream()
+          .map(GitCommitIndex::getObjectId).toList());
+      assertEquals(List.of(message.name()), history.findChangeSummaries(messages).stream()
+          .map(hit -> hit.objectId()).toList());
+      assertEquals(List.of(), history.findChangeSummaries(
+          CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+              .matchingMessages("orchard").offset(1).limit(1).build()));
+      try (var cursor = history.scrollChangeSummaries(messages, 1)) {
+        assertEquals(List.of(message.name()), cursor.nextChunk().stream()
+            .map(hit -> hit.objectId()).toList());
+        assertEquals(List.of(), cursor.nextChunk());
+      }
+      assertEquals(List.of(message.name()), history.findChangeSummaries(
+          CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+              .matchingMessages("body").build()).stream().map(hit -> hit.objectId()).toList());
+    }
+  }
+
+  @Test
+  void authorNameFiltersStructuredIndexedAndScrollingQueriesWithRepositoryIsolation() throws Exception {
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+    try (HibernateSessionFactoryProvider provider =
+            new HibernateSessionFactoryProvider(
+                h2Properties("author-name-history-" + TEST_COUNTER.incrementAndGet()),
+                SearchEntities.annotatedClasses());
+        HibernateGitStorage storage =
+            new DefaultHibernateRepositoryFactory(provider.getSessionFactory())
+                .open(new RepositoryName(REPOSITORY_NAME))) {
+      Repository repository = storage.repository();
+      Instant when = Instant.parse("2026-01-10T10:00:00Z");
+      ObjectId alice = commitSnapshot(repository, null, "Repair orchard",
+          "Alice", "shared@example.com", when, Map.of("config.txt", "one"));
+      ObjectId bob = commitSnapshot(repository, alice, "Repair orchard",
+          "Bob", "shared@example.com", when.plusSeconds(1), Map.of("config.txt", "two"));
+      CommitIndexer indexer = new CommitIndexer(provider.getSessionFactory(), REPOSITORY_NAME);
+      indexer.indexCommit(repository, alice);
+      indexer.indexCommit(repository, bob);
+      new CommitIndexer(provider.getSessionFactory(), "another-repository")
+          .indexCommit(repository, alice);
+      GitHistorySearchService history = new GitHistorySearchService(provider.getSessionFactory());
+      for (boolean fullText : List.of(false, true)) {
+        CommitHistoryQuery.Builder builder = CommitHistoryQuery.forRepository(REPOSITORY_NAME)
+            .authoredByName(" Alice ").authoredBy("shared@example.com");
+        if (fullText) {
+          builder.matchingMessages("orchard");
+        }
+        CommitHistoryQuery query = builder.build();
+        assertEquals(List.of(alice.name()), history.findChanges(query).stream()
+            .map(GitCommitIndex::getObjectId).toList());
+        assertEquals(List.of(alice.name()), history.findChangeSummaries(query).stream()
+            .map(hit -> hit.objectId()).toList());
+        try (var cursor = history.scrollChangeSummaries(query, 1)) {
+          assertEquals(List.of(alice.name()), cursor.nextChunk().stream()
+              .map(hit -> hit.objectId()).toList());
+          assertEquals(List.of(), cursor.nextChunk());
+        }
+      }
+      assertEquals(List.of(), history.findChangeSummaries(
+          CommitHistoryQuery.forRepository(REPOSITORY_NAME).authoredByName("Alice")
+              .authoredBy("someone-else@example.com").build()));
+    }
+  }
+
+  @Test
   void findsOnlyMatchingTextByOneAuthorInOneSubsystemAtInclusiveTimeBounds() throws Exception {
     DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     String databaseName = "compound-history-" + TEST_COUNTER.incrementAndGet();

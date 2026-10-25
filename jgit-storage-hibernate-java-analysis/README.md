@@ -1,5 +1,18 @@
 # jgit-storage-hibernate-java-analysis
 
+## Source text for historical search
+
+`new JavaSourceTextExtractor().extract(snapshot, configuration)` extracts declaration-attached Javadoc, decoded string
+literals and text blocks with source offsets and line numbers. It uses the configured Java source
+level without resolving bindings or requiring a classpath. Documentation retains its original
+spelling, including delimiters and tags. Ordinary comments are excluded.
+
+The immutable `JavaSourceText` result includes syntax problem/error counts; recovered extraction
+must not be presented as error-free analysis. The extractor supplements `JavaJdtAnalyzer` and
+`JavaProjectAnalyzer` without changing their existing result types or persistence contract.
+Callers retain each snapshot's repository/commit/blob/path identity and decide how to index the
+returned fragments and combine them with semantic analysis.
+
 Go beyond line diffs with binding-aware Java symbol history, semantic change detection and transitive impact analysis across Git revisions.
 
 Choose this module when the question is not only *which lines changed?*, but *which declaration changed, where did it move, and which callers, implementations or types were affected in each version?*
