@@ -13,6 +13,38 @@ import org.junit.jupiter.api.Test;
 class JavaFileSearchIndexTest {
 
   @Test
+  void preservesWhitespaceGitPathsThroughQualifiedAndSourceSearch() throws Exception {
+    List<String> paths = List.of(" ", "\t", "\n", " padded.txt ");
+    List<JavaFileSearchDocument> documents = new ArrayList<>();
+    for (int i = 0; i < paths.size(); i++) {
+      documents.add(document("repo", "id-" + i, "commit", paths.get(i), "module",
+          Map.of(QUALIFIED_NAMES, "example.Document", SOURCE, "needle")));
+    }
+    try (var index = JavaFileSearchIndex.build(documents)) {
+      assertEquals(paths, index.search(query("repo", null, "example.Document",
+          Map.of(QUALIFIED_NAMES, 1f), 0, 10)).stream().map(JavaFileSearchHit::path).toList());
+      assertEquals(paths, index.search(query("repo", null, "needle",
+          Map.of(SOURCE, 1f), 0, 10)).stream().map(JavaFileSearchHit::path).toList());
+    }
+  }
+
+  @Test
+  void rejectsAbsentPathsWithoutWeakeningOtherIdentityValidation() {
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", "id", "commit", null, "module", Map.of()));
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", "id", "commit", "", "module", Map.of()));
+    assertThrows(IllegalArgumentException.class,
+        () -> document(" ", "id", "commit", "path", "module", Map.of()));
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", " ", "commit", "path", "module", Map.of()));
+    assertThrows(IllegalArgumentException.class,
+        () -> document("repo", "id", " ", "path", "module", Map.of()));
+    assertThrows(IllegalArgumentException.class,
+        () -> new JavaFileSearchDocument("repo", "id", "commit", " ", "path", "module", "java", Map.of()));
+  }
+
+  @Test
   void preservesFirstBlobProvenanceAndRepositoryIsolation() throws Exception {
     var first = document("repo", "blob", "old", "old/Type.java", "module", Map.of(METHODS, "buildValue"));
     var duplicate = document("repo", "blob", "new", "moved/Type.java", "other", Map.of(METHODS, "different"));
