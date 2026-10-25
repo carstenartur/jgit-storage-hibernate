@@ -32,11 +32,21 @@ Git/JGit does not normally provide a general full-text query engine over commit 
 | H2 2.4.x | Yes | Ordinary Maven tests | Tests, demos and disposable development |
 | PostgreSQL 17.10 | Yes | Testcontainers migration, restart and query tests | Persistent development, staging and production |
 | Microsoft SQL Server 2022 | Yes from 0.1.16 | Testcontainers migration, indexing, rebuild, deletion, query and persistent-Lucene restart tests | Persistent deployments and Sandbox cut-over |
-| HSQLDB 2.7.x | No | Core only | Do not enable this Search module on HSQLDB |
+| HSQLDB 2.7.4 | Yes from 0.11.6 | Ordinary Maven migration, file-database/Lucene restart, indexing, rebuild, query and deletion tests | Embedded persistent deployments |
 
 Support means the module ships dialect-specific Flyway migrations and real-container evidence for schema validation and public Search behavior. Core database support alone does not imply Search support.
 
-Apply Core migrations first, then the matching Search location with the separate Search history table. SQL Server deployment and copied-projection replacement are documented in [SQL Server Search operations](../docs/operations/sql-server-search.md).
+Apply Core migrations first, then the matching Search location with the separate Search history table.
+HSQLDB uses `SearchSchemaMigrations.HSQLDB_LOCATION` and a first-installation migration
+at version 0.11.6, with `timestamp(6)` matching Hibernate's HSQLDialect UTC mapping.
+When Core has already created tables, use the dedicated Search history table with the
+pre-migration baseline version `0`, then run migrations and Hibernate `validate`.
+The HSQLDB installation does not upgrade a copied Sandbox `git_commit_index` table.
+Back up and explicitly archive/rename that derived projection and its conflicting
+index/constraint names before installation, then rebuild Search from authoritative Git.
+An existing incompatible projection fails installation; its rows are not silently replaced.
+Include the HSQLDB JDBC driver and Flyway HSQLDB database module in the migration tool;
+these are test-only dependencies of this optional library module. SQL Server deployment and copied-projection replacement are documented in [SQL Server Search operations](../docs/operations/sql-server-search.md).
 
 ## Compound history query
 

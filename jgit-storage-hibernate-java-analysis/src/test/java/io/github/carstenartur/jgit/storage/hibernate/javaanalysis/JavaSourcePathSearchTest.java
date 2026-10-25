@@ -17,11 +17,11 @@ class JavaSourcePathSearchTest {
   void sourceKeepsLexicalValuesAndOnlyLowerToUpperIdentifierSynonyms() throws Exception {
     try (var analyzer = new JavaFileSearchAnalyzer()) {
       var tokens = tokens(analyzer, JavaFileSearchField.SOURCE,
-          "// hiddenComment\n@Deprecated public class StringBuilder { int value2Factory = 42; XMLParser äValue; }");
+          "// hiddenComment\n@Deprecated public class StringBuilder { int value2Factory = 42; XMLParser äValue; 𐐨Value; }");
       assertEquals(List.of("deprecated", "public", "class", "stringbuilder", "string", "builder",
-          "int", "value2factory", "42", "xmlparser", "ävalue", "ä", "value"),
+          "int", "value2factory", "42", "xmlparser", "ävalue", "ä", "value", "𐐨value", "𐐨", "value"),
           tokens.stream().map(Token::text).toList());
-      assertEquals(List.of(1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0),
+      assertEquals(List.of(1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0),
           tokens.stream().map(Token::increment).toList());
       assertEquals(tokens.get(3).start(), tokens.get(4).start());
       assertEquals(tokens.get(3).end(), tokens.get(5).end());

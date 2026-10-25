@@ -58,7 +58,8 @@ threads, SQL mappings, persistence migrations or automatic dependency downloads.
 `SOURCE` uses the public JDT scanner with Java 25 source/compliance and preview disabled,
 for indexing and queries alike. It keeps keywords, identifiers, numeric and raw literal
 contents, while skipping comments, operators and the `@` punctuation. Identifiers retain
-the original spelling plus synonyms split only at lowercase-to-uppercase boundaries;
+the original spelling plus synonyms split only at lowercase-to-uppercase code-point boundaries,
+including supplementary Unicode letters (a correction to the legacy UTF-16 character check);
 `XMLParser` and `value2Factory` remain whole. All emitted terms are lowercased. Escapes
 inside literals and identifiers remain written escapes. String/character delimiters are
 removed, including Unicode-escaped delimiters; text blocks remove all three quotes

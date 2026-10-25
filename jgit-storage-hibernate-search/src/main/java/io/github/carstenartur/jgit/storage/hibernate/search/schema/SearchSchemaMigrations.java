@@ -20,6 +20,10 @@ public final class SearchSchemaMigrations {
   public static final String H2_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/search/h2";
 
+  /** Flyway location for a new HSQLDB Search installation (available from 0.11.6). */
+  public static final String HSQLDB_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/search/hsqldb";
+
   /** Flyway location for PostgreSQL migrations. */
   public static final String POSTGRESQL_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/search/postgresql";

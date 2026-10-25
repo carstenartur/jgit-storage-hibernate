@@ -122,11 +122,15 @@ final class JavaSourceTokenizer extends Tokenizer {
   private static List<String> identifierParts(String text) {
     var result = new ArrayList<String>();
     int start = 0;
-    for (int i = 1; i < text.length(); i++) {
-      if (Character.isLowerCase(text.charAt(i - 1)) && Character.isUpperCase(text.charAt(i))) {
+    int previous = text.codePointAt(0);
+    for (int i = Character.charCount(previous); i < text.length();) {
+      int current = text.codePointAt(i);
+      if (Character.isLowerCase(previous) && Character.isUpperCase(current)) {
         result.add(text.substring(start, i));
         start = i;
       }
+      previous = current;
+      i += Character.charCount(current);
     }
     if (start == 0) return List.of();
     result.add(text.substring(start));
