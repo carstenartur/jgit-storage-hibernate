@@ -303,11 +303,7 @@ public class GitHistorySearchService {
     if (query.text() != null) {
       predicate.must(
           f.simpleQueryString()
-              .fields(
-                  "shortMessage",
-                  "fullMessage",
-                  GitCommitIndex.CHANGED_PATH_TERMS_FIELD,
-                  "changedText")
+              .fields(textFields(query))
               .matching(query.text()));
     }
     if (query.hasObjectIdRestriction()) {
@@ -315,6 +311,9 @@ public class GitHistorySearchService {
     }
     if (query.authorEmail() != null) {
       predicate.filter(f.match().field("authorEmail").matching(query.authorEmail()));
+    }
+    if (query.authorName() != null) {
+      predicate.filter(f.match().field("authorName").matching(query.authorName()));
     }
     if (query.committerEmail() != null) {
       predicate.filter(f.match().field("committerEmail").matching(query.committerEmail()));
@@ -342,6 +341,15 @@ public class GitHistorySearchService {
       predicate.filter(f.range().field(timeField).atMost(query.to()));
     }
     return predicate.toPredicate();
+  }
+
+  private static String[] textFields(CommitHistoryQuery query) {
+    return switch (query.textScope()) {
+      case MESSAGES -> new String[] {"shortMessage", "fullMessage"};
+      case ALL -> new String[] {
+        "shortMessage", "fullMessage", GitCommitIndex.CHANGED_PATH_TERMS_FIELD, "changedText"
+      };
+    };
   }
 
   private static SearchSort chronologicalSort(
@@ -415,6 +423,9 @@ public class GitHistorySearchService {
     if (query.authorEmail() != null) {
       hql.append(" AND c.authorEmail = :authorEmail");
     }
+    if (query.authorName() != null) {
+      hql.append(" AND c.authorName = :authorName");
+    }
     if (query.committerEmail() != null) {
       hql.append(" AND c.committerEmail = :committerEmail");
     }
@@ -441,6 +452,9 @@ public class GitHistorySearchService {
     }
     if (query.authorEmail() != null) {
       selection.setParameter("authorEmail", query.authorEmail());
+    }
+    if (query.authorName() != null) {
+      selection.setParameter("authorName", query.authorName());
     }
     if (query.committerEmail() != null) {
       selection.setParameter("committerEmail", query.committerEmail());
