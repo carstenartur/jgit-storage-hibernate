@@ -35,6 +35,7 @@ import org.eclipse.jdt.core.dom.BodyDeclaration;
 import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.EnumDeclaration;
+import org.eclipse.jdt.core.dom.EnumConstantDeclaration;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.IBinding;
@@ -306,6 +307,31 @@ public class JavaJdtAnalyzer {
       symbol.setDeclaringTypeBindingKey(JavaBindingKeys.declaringTypeKey(binding));
       symbol.setTypeBindingKey(JavaBindingKeys.typeKey(binding));
       symbol.setStableSemanticKey(JavaBindingKeys.stableMethodKey(binding, qualifiedName));
+      symbols.add(symbol);
+      return true;
+    }
+
+    @Override
+    public boolean visit(EnumConstantDeclaration node) {
+      IVariableBinding binding = node.resolveVariable();
+      JavaSymbolIndex symbol = baseSymbol(node);
+      String simpleName = node.getName().getIdentifier();
+      String declaringType = declaringTypes.peek();
+      String qualifiedName = declaringType + "#" + simpleName;
+      symbol.setSymbolKind(JavaSymbolKind.FIELD);
+      symbol.setBindingStatus(JavaBindingKeys.status(binding, configuration.resolveBindings()));
+      symbol.setPackageName(packageName);
+      symbol.setSimpleName(simpleName);
+      symbol.setQualifiedName(qualifiedName);
+      symbol.setDeclaringType(declaringType);
+      symbol.setSignature(declaringType + " " + simpleName);
+      symbol.setModifiers("public static final");
+      symbol.setAnnotations(annotations(node));
+      symbol.setRawBindingKey(JavaBindingKeys.rawKey(binding));
+      symbol.setDeclarationBindingKey(JavaBindingKeys.declarationKey(binding));
+      symbol.setDeclaringTypeBindingKey(JavaBindingKeys.declaringTypeKey(binding));
+      symbol.setTypeBindingKey(JavaBindingKeys.typeKey(binding));
+      symbol.setStableSemanticKey(JavaBindingKeys.stableVariableKey(binding, qualifiedName));
       symbols.add(symbol);
       return true;
     }

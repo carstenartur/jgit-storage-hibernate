@@ -7,32 +7,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /** Adds inheritance, implementation and override relations to a project graph. */
 final class JavaHierarchyGraph {
-
-  private static final Pattern TYPE_DECLARATION = Pattern.compile(
-      "\\b(class|interface|record|enum)\\s+([A-Za-z_$][A-Za-z0-9_$]*)"
-          + "(?:\\s+extends\\s+([^\\{]+?))?"
-          + "(?:\\s+implements\\s+([^\\{]+?))?\\s*\\{");
 
   private JavaHierarchyGraph() {}
 
   static List<JavaGraphEdge> extract(JavaProjectAnalysisResult analysis) {
     Map<String, JavaSymbolIndex> typesByName = new HashMap<>();
-    Map<String, JavaSymbolIndex> typesByPathAndSimpleName = new HashMap<>();
+    Map<String, JavaSymbolIndex> typesByKey = new HashMap<>();
+    Map<String, JavaSymbolIndex> typesByPosition = new HashMap<>();
     Map<String, List<JavaSymbolIndex>> methodsByDeclaringType = new HashMap<>();
     for (JavaSymbolIndex symbol : analysis.symbols()) {
       if (isType(symbol)) {
-        typesByName.put(symbol.getSimpleName(), symbol);
-        if (symbol.getQualifiedName() != null) {
-          typesByName.put(symbol.getQualifiedName(), symbol);
-        }
-        if (symbol.getPath() != null) {
-          typesByPathAndSimpleName.put(symbol.getPath() + ":" + symbol.getSimpleName(), symbol);
-        }
+        typesByName.put(symbol.getQualifiedName(), symbol);
+        typesByKey.put(symbol.getStableSemanticKey(), symbol);
+        typesByPosition.put(symbol.getPath() + ":" + symbol.getStartPosition(), symbol);
       } else if (symbol.getSymbolKind() == JavaSymbolKind.METHOD) {
         methodsByDeclaringType.computeIfAbsent(symbol.getDeclaringType(), ignored -> new ArrayList<>()).add(symbol);
       }
@@ -40,17 +30,20 @@ final class JavaHierarchyGraph {
 
     List<JavaGraphEdge> edges = new ArrayList<>();
     for (JavaSourceSnapshot source : analysis.project().sources().values()) {
-      Matcher matcher = TYPE_DECLARATION.matcher(source.source());
-      while (matcher.find()) {
-        JavaSymbolIndex child = typesByPathAndSimpleName.get(source.path() + ":" + matcher.group(2));
-        if (child == null) {
-          child = typesByName.get(matcher.group(2));
-        }
+      JavaAnalysisResult file = analysis.files().get(source.path());
+      String level = file == null ? "21" : file.analysisRun().getSourceLevel();
+      var configuration = new JavaAnalysisConfiguration(level, BindingMode.DISABLED,
+          List.of(), List.of(), List.of(), List.of(), false, null);
+      var structure = new JavaSourceStructureExtractor().extract(source, configuration);
+      for (var declaration : structure.types()) {
+        JavaSymbolIndex child = typesByPosition.get(source.path() + ":" + declaration.startPosition());
         if (child == null) {
           continue;
         }
-        addParents(edges, analysis, child, matcher.group(3), JavaGraphEdgeKind.EXTENDS, typesByName);
-        addParents(edges, analysis, child, matcher.group(4), JavaGraphEdgeKind.IMPLEMENTS, typesByName);
+        addParents(edges, analysis, child, declaration.extendedTypes(), JavaGraphEdgeKind.EXTENDS,
+            typesByName, typesByKey, structure.imports());
+        addParents(edges, analysis, child, declaration.implementedTypes(), JavaGraphEdgeKind.IMPLEMENTS,
+            typesByName, typesByKey, structure.imports());
       }
     }
 
@@ -76,50 +69,59 @@ final class JavaHierarchyGraph {
   }
 
   private static void addParents(
-      List<JavaGraphEdge> edges,
-      JavaProjectAnalysisResult analysis,
-      JavaSymbolIndex child,
-      String rawParents,
-      JavaGraphEdgeKind kind,
-      Map<String, JavaSymbolIndex> typesByName) {
-    if (rawParents == null || rawParents.isBlank()) {
-      return;
-    }
-    for (String rawParent : splitTopLevel(rawParents)) {
-      String name = rawParent.contains("<")
-          ? rawParent.substring(0, rawParent.indexOf('<')).trim()
-          : rawParent.trim();
-      if (name.isBlank()) {
-        continue;
-      }
-      JavaSymbolIndex parent = typesByName.get(name);
-      String target = parent == null
-          ? "TYPE:" + name + ":"
-          : parent.getStableSemanticKey();
+      List<JavaGraphEdge> edges, JavaProjectAnalysisResult analysis, JavaSymbolIndex child,
+      List<JavaSourceStructure.ParentType> parents, JavaGraphEdgeKind kind,
+      Map<String, JavaSymbolIndex> typesByName, Map<String, JavaSymbolIndex> typesByKey,
+      List<JavaSourceStructure.ImportDeclaration> imports) {
+    for (var syntax : parents) {
+      var reference = analysis.references().stream()
+          .filter(ref -> ref.getReferenceKind() == JavaReferenceKind.TYPE_REFERENCE)
+          .filter(ref -> Objects.equals(ref.getPath(), child.getPath()))
+          .filter(ref -> ref.getStartPosition() == syntax.startPosition())
+          .findFirst().orElse(null);
+      String resolvedKey = reference == null ? null : reference.getTargetStableSemanticKey();
+      boolean resolved = reference != null && reference.getBindingStatus() == BindingStatus.FULL
+          && resolvedKey != null;
+      String syntaxName = resolveSyntaxName(child, syntax.typeName(), typesByName, imports);
+      JavaSymbolIndex parent = resolved ? typesByKey.get(resolvedKey) : typesByName.get(syntaxName);
+      String target = parent != null ? parent.getStableSemanticKey()
+          : resolved ? resolvedKey : "TYPE:" + syntaxName + ":";
       edges.add(new JavaGraphEdge(
           child.getRepositoryName(), analysis.project().commitId(), kind,
           child.getStableSemanticKey(), target, child.getPath(), child.getStartLine(),
-          parent == null ? BindingStatus.PARTIAL : BindingStatus.FULL));
+          resolved ? BindingStatus.FULL : BindingStatus.PARTIAL));
     }
   }
 
-  private static List<String> splitTopLevel(String rawParents) {
-    List<String> result = new ArrayList<>();
-    int depth = 0;
-    int start = 0;
-    for (int i = 0; i < rawParents.length(); i++) {
-      char c = rawParents.charAt(i);
-      if (c == '<') {
-        depth++;
-      } else if (c == '>' && depth > 0) {
-        depth--;
-      } else if (c == ',' && depth == 0) {
-        result.add(rawParents.substring(start, i).trim());
-        start = i + 1;
+  private static String resolveSyntaxName(JavaSymbolIndex child,
+      String name, Map<String, JavaSymbolIndex> typesByName, List<JavaSourceStructure.ImportDeclaration> imports) {
+    // Search every enclosing declaration before considering package members.
+    String scope = child.getDeclaringType();
+    while (scope != null) {
+      String scopedName = scope + "." + name;
+      if (typesByName.containsKey(scopedName)) {
+        return scopedName;
+      }
+      JavaSymbolIndex enclosing = typesByName.get(scope);
+      scope = enclosing == null ? null : enclosing.getDeclaringType();
+    }
+    String firstName = name.contains(".") ? name.substring(0, name.indexOf('.')) : name;
+    for (var declaration : imports) {
+      if (!declaration.onDemand() && declaration.name().endsWith("." + firstName)) {
+        if (declaration.isStatic() && !typesByName.containsKey(declaration.name())) {
+          // A static field/method import does not introduce a type name.
+          continue;
+        }
+        // Preserve an explicit imported name even if its dependency is missing.
+        return declaration.name() + name.substring(firstName.length());
       }
     }
-    result.add(rawParents.substring(start).trim());
-    return result;
+    if (typesByName.containsKey(name)) {
+      return name;
+    }
+    String packageName = child.getPackageName();
+    String qualified = packageName == null || packageName.isBlank() ? name : packageName + "." + name;
+    return typesByName.containsKey(qualified) ? qualified : name;
   }
 
   private static boolean sameMethodShape(JavaSymbolIndex left, JavaSymbolIndex right) {

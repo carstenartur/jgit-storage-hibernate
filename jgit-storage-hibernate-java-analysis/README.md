@@ -1,5 +1,21 @@
 # jgit-storage-hibernate-java-analysis
 
+## Declaration structure
+
+`new JavaSourceStructureExtractor().extract(snapshot, configuration)` returns immutable
+syntax facets for named classes, interfaces, enums, records and annotation types. Each
+declaration retains source coordinates and explicitly written parent types, including
+generic spelling and the parent name without type arguments. Imports retain their static
+and on-demand flags. Extraction uses the configured source level without a classpath;
+problem/error counts must accompany recovered results.
+
+Use source positions to associate facets with semantic symbols. Existing
+`JavaSymbolKind.TYPE` and analysis-result constructors remain unchanged. Enum constants
+are now returned as `FIELD` symbols with the same binding/identity conventions as other
+fields. The software graph uses declaration structure rather than regular expressions,
+resolves bound parent identities first, and keeps unresolved syntax relations partial.
+These in-memory facets add no persistence mappings or schema lifecycle requirements.
+
 ## Source text for historical search
 
 `new JavaSourceTextExtractor().extract(snapshot, configuration)` extracts Javadoc comments, decoded string
