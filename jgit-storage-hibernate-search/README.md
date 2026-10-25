@@ -62,6 +62,12 @@ List<GitCommitIndex> hits =
 
 All supplied predicates are applied in one bounded server-side query. Full-text results retain relevance ordering; repository, author, committer, path and time restrictions are filters. When no full-text expression is present, the relational query path remains newest-first and keeps literal, case-insensitive path-fragment matching.
 
+Use `matchingMessages("threshold")` when only commit subjects and full messages should match;
+`matchingText(...)` continues to include changed paths and content. Each text method replaces
+the preceding text expression and scope. `authoredByName("Alice")` matches the exact author name
+and combines with `authoredBy("alice@example.com")` when both are supplied. These predicates
+apply before paging and scrolling, to entity results and immutable summary results alike.
+
 Structured query ordering is deterministic: selected timestamp descending, then object ID. `offset(...)` and `limit(...)` therefore provide stable bounded pages. Full-text pages are relevance-ranked.
 
 ### Author time versus committer time
