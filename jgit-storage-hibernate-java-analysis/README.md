@@ -89,7 +89,16 @@ primitive/void and whole array/union syntax. Uses preserve duplicates and AST en
 order, with method parameters before the return type and body. Coordinates associate
 uses with their owning declaration; raw names remove outer generic arguments only,
 without binding/import resolution. Local variables, throws clauses and casts are excluded.
-The original four-argument structure constructor remains available with empty package/uses.
+`fields()` exposes explicit field fragments and enum constants in declaration-group order:
+all fragments/constants are listed before their initializer bodies. Coordinates distinguish
+the containing declaration from each named fragment; record components and local variables
+are excluded. `ParentType.rawTypeName()` applies the same outer-generics-only rule as type
+uses, while `typeName()` retains its existing fully normalized form.
+
+The original four- and six-argument structure constructors and three-argument parent
+constructor remain available, preserving their binary constructor descriptors. Added
+record components change record-pattern arity and value equality/hash/string output;
+source clients using record deconstruction must update their patterns.
 
 Use source positions to associate facets with semantic symbols. Existing
 `JavaSymbolKind.TYPE` and analysis-result constructors remain unchanged. Enum constants
@@ -97,6 +106,9 @@ are now returned as `FIELD` symbols with the same binding/identity conventions a
 fields. The software graph uses declaration structure rather than regular expressions,
 resolves bound parent identities first, and keeps unresolved syntax relations partial.
 These in-memory facets add no persistence mappings or schema lifecycle requirements.
+Annotation-use references include annotations inside qualified/generic types, type
+arguments and nested annotation values. Each use is reported once, while the existing
+whole-type reference cardinality is retained.
 
 ## Source text for historical search
 

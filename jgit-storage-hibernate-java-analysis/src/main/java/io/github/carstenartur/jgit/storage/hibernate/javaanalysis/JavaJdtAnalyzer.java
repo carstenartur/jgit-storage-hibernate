@@ -390,18 +390,21 @@ public class JavaJdtAnalyzer {
     @Override
     public boolean visit(SimpleType node) {
       addTypeReference(node, node.resolveBinding(), node.toString());
+      addContainedAnnotations(node);
       return false;
     }
 
     @Override
     public boolean visit(QualifiedType node) {
       addTypeReference(node, node.resolveBinding(), node.toString());
+      addContainedAnnotations(node);
       return false;
     }
 
     @Override
     public boolean visit(NameQualifiedType node) {
       addTypeReference(node, node.resolveBinding(), node.toString());
+      addContainedAnnotations(node);
       return false;
     }
 
@@ -479,6 +482,16 @@ public class JavaJdtAnalyzer {
           ? null
           : node.resolveAnnotationBinding().getAnnotationType();
       addReference(node, JavaReferenceKind.ANNOTATION_USE, node.getTypeName().getFullyQualifiedName(), annotationType);
+    }
+
+    private void addContainedAnnotations(Type type) {
+      // The main visitor suppresses these type subtrees to avoid duplicate qualifier references.
+      // Traverse only annotation uses, including nested annotation values, without changing that contract.
+      type.accept(new ASTVisitor() {
+        @Override public void preVisit(ASTNode node) {
+          if (node instanceof Annotation annotation) addAnnotationReference(annotation);
+        }
+      });
     }
 
     private void addReference(ASTNode node, JavaReferenceKind kind, String name, IBinding binding) {
