@@ -134,6 +134,52 @@ class JavaDeclarationCompatibilityTest {
     }
   }
 
+  @Test
+  void namedPackagesNeverResolveDefaultPackageParents() {
+    for (boolean samePackageType : List.of(false, true)) {
+      Map<String, String> sources = new LinkedHashMap<>();
+      sources.put("Base.java", "public class Base {}");
+      sources.put("p/Child.java", "package p; class Child extends Base {}");
+      if (samePackageType) {
+        sources.put("p/Base.java", "package p; public class Base {}");
+      }
+      var graph = JavaSoftwareGraph.from(analyze(sources, JavaAnalysisConfiguration.java21SyntaxOnly()));
+      var edge = graph.edges().stream().filter(e -> e.kind() == JavaGraphEdgeKind.EXTENDS).findFirst().orElseThrow();
+      assertFalse(edge.targetSemanticKey().equals(key(graph, "Base")), "Default-package type is inaccessible");
+      assertEquals(BindingStatus.PARTIAL, edge.bindingStatus());
+      if (samePackageType) {
+        assertEdge(graph, "p.Child", "p.Base", JavaGraphEdgeKind.EXTENDS);
+      }
+    }
+  }
+
+  @Test
+  void syntaxOnlyResolvesUniqueOrdinaryAndStaticWildcardImports() {
+    for (boolean staticImport : List.of(false, true)) {
+      var graph = JavaSoftwareGraph.from(analyze(Map.of(
+          "q/Base.java", "package q; public class Base {}",
+          "q/Types.java", "package q; public class Types { public static class Base {} }",
+          "p/Child.java", "package p; import " + (staticImport ? "static q.Types.*;" : "q.*;")
+              + " class Child extends Base {}"), JavaAnalysisConfiguration.java21SyntaxOnly()));
+      assertEdge(graph, "p.Child", staticImport ? "q.Types.Base" : "q.Base", JavaGraphEdgeKind.EXTENDS);
+      assertEquals(BindingStatus.PARTIAL, graph.edges().stream()
+          .filter(e -> e.kind() == JavaGraphEdgeKind.EXTENDS).findFirst().orElseThrow().bindingStatus());
+    }
+  }
+
+  @Test
+  void ambiguousWildcardImportsRemainUnresolved() {
+    var graph = JavaSoftwareGraph.from(analyze(Map.of(
+        "q/Base.java", "package q; public class Base {}",
+        "r/Base.java", "package r; public class Base {}",
+        "p/Child.java", "package p; import q.*; import r.*; class Child extends Base {}"),
+        JavaAnalysisConfiguration.java21SyntaxOnly()));
+    var edge = graph.edges().stream().filter(e -> e.kind() == JavaGraphEdgeKind.EXTENDS).findFirst().orElseThrow();
+    assertEquals(BindingStatus.PARTIAL, edge.bindingStatus());
+    assertFalse(edge.targetSemanticKey().equals(key(graph, "q.Base")));
+    assertFalse(edge.targetSemanticKey().equals(key(graph, "r.Base")));
+  }
+
   private static JavaProjectAnalysisResult analyze(Map<String, String> sources) {
     return analyze(sources, JavaAnalysisConfiguration.java21BindingAware());
   }

@@ -2,8 +2,10 @@
 package io.github.carstenartur.jgit.storage.hibernate.javaanalysis;
 
 import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaSymbolIndex;
+import io.github.carstenartur.jgit.storage.hibernate.javaanalysis.entity.JavaReferenceIndex;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +20,12 @@ final class JavaHierarchyGraph {
     Map<String, JavaSymbolIndex> typesByKey = new HashMap<>();
     Map<String, JavaSymbolIndex> typesByPosition = new HashMap<>();
     Map<String, List<JavaSymbolIndex>> methodsByDeclaringType = new HashMap<>();
+    Map<SourcePosition, JavaReferenceIndex> typeReferences = new HashMap<>();
+    for (JavaReferenceIndex reference : analysis.references()) {
+      if (reference.getReferenceKind() == JavaReferenceKind.TYPE_REFERENCE) {
+        typeReferences.putIfAbsent(new SourcePosition(reference.getPath(), reference.getStartPosition()), reference);
+      }
+    }
     for (JavaSymbolIndex symbol : analysis.symbols()) {
       if (isType(symbol)) {
         typesByName.put(symbol.getQualifiedName(), symbol);
@@ -41,15 +49,15 @@ final class JavaHierarchyGraph {
           continue;
         }
         addParents(edges, analysis, child, declaration.extendedTypes(), JavaGraphEdgeKind.EXTENDS,
-            typesByName, typesByKey, structure.imports());
+            typesByName, typesByKey, typeReferences, structure.imports());
         addParents(edges, analysis, child, declaration.implementedTypes(), JavaGraphEdgeKind.IMPLEMENTS,
-            typesByName, typesByKey, structure.imports());
+            typesByName, typesByKey, typeReferences, structure.imports());
       }
     }
 
     for (JavaGraphEdge hierarchy : List.copyOf(edges)) {
-      JavaSymbolIndex childType = analysisSymbol(analysis, hierarchy.sourceSemanticKey());
-      JavaSymbolIndex parentType = analysisSymbol(analysis, hierarchy.targetSemanticKey());
+      JavaSymbolIndex childType = typesByKey.get(hierarchy.sourceSemanticKey());
+      JavaSymbolIndex parentType = typesByKey.get(hierarchy.targetSemanticKey());
       if (childType == null || parentType == null) {
         continue;
       }
@@ -72,13 +80,10 @@ final class JavaHierarchyGraph {
       List<JavaGraphEdge> edges, JavaProjectAnalysisResult analysis, JavaSymbolIndex child,
       List<JavaSourceStructure.ParentType> parents, JavaGraphEdgeKind kind,
       Map<String, JavaSymbolIndex> typesByName, Map<String, JavaSymbolIndex> typesByKey,
+      Map<SourcePosition, JavaReferenceIndex> typeReferences,
       List<JavaSourceStructure.ImportDeclaration> imports) {
     for (var syntax : parents) {
-      var reference = analysis.references().stream()
-          .filter(ref -> ref.getReferenceKind() == JavaReferenceKind.TYPE_REFERENCE)
-          .filter(ref -> Objects.equals(ref.getPath(), child.getPath()))
-          .filter(ref -> ref.getStartPosition() == syntax.startPosition())
-          .findFirst().orElse(null);
+      var reference = typeReferences.get(new SourcePosition(child.getPath(), syntax.startPosition()));
       String resolvedKey = reference == null ? null : reference.getTargetStableSemanticKey();
       boolean resolved = reference != null && reference.getBindingStatus() == BindingStatus.FULL
           && resolvedKey != null;
@@ -116,12 +121,33 @@ final class JavaHierarchyGraph {
         return declaration.name() + name.substring(firstName.length());
       }
     }
-    if (typesByName.containsKey(name)) {
-      return name;
-    }
     String packageName = child.getPackageName();
     String qualified = packageName == null || packageName.isBlank() ? name : packageName + "." + name;
-    return typesByName.containsKey(qualified) ? qualified : name;
+    if (typesByName.containsKey(qualified)) {
+      return qualified;
+    }
+    // A simple name in a named package can never refer to a default-package type.
+    if (name.contains(".") && typesByName.containsKey(name)) {
+      return name;
+    }
+    var candidates = new HashSet<String>();
+    for (var declaration : imports) {
+      if (declaration.onDemand()) {
+        String imported = declaration.name() + "." + name;
+        if (typesByName.containsKey(imported)) {
+          candidates.add(imported);
+        }
+      }
+    }
+    if (typesByName.containsKey("java.lang." + name)) {
+      candidates.add("java.lang." + name);
+    }
+    if (candidates.size() == 1) {
+      return candidates.iterator().next();
+    }
+    // Keep complete qualified syntax, but qualify unknown simple names so a
+    // later lookup cannot accidentally connect them to a default-package type.
+    return name.contains(".") ? name : qualified;
   }
 
   private static boolean sameMethodShape(JavaSymbolIndex left, JavaSymbolIndex right) {
@@ -149,9 +175,5 @@ final class JavaHierarchyGraph {
     };
   }
 
-  private static JavaSymbolIndex analysisSymbol(JavaProjectAnalysisResult analysis, String key) {
-    return analysis.symbols().stream()
-        .filter(symbol -> Objects.equals(symbol.getStableSemanticKey(), key))
-        .findFirst().orElse(null);
-  }
+  private record SourcePosition(String path, int startPosition) {}
 }
