@@ -8,82 +8,41 @@
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)](pom.xml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 
-📈 **[Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)** · 📊 **[Performance status and distance to the ceiling](docs/performance-status.md)** · ⚙️ **[Benchmark workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)**
-
-Performance-chart reading rule: **lower is always better/faster; higher is worse/slower or more expensive.** Timing and throughput evidence is normalized to `ms/op`; non-time chart units are published only when they preserve the same smaller-is-better direction.
-
-https://doi.org/10.5281/zenodo.21210132
-
 ## Git history as indexed application knowledge
 
-JGit is the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. `jgit-storage-hibernate` adds a relational storage backend plus persistent query models over that history: transaction-safe pack/ref publication, structured history queries and Lucene full-text search. The Java Analysis and Architecture modules additionally provide semantic in-memory analysis APIs; their module-owned database persistence is still incubating in the `0.1.x` line.
+`jgit-storage-hibernate` gives Java applications database-backed Git repositories and queryable history. Keep workflow definitions under Git version control, answer repeated audit questions, or analyze Java and architecture changes across revisions.
+
+JGit remains the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. Core adds Hibernate-backed storage and transaction-safe pack/ref publication. Search adds persistent structured history queries and Lucene full-text search. Java Analysis and Architecture provide semantic in-memory APIs; their module-owned database persistence is still incubating.
 
 The documented release line is **0.11.8**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
 
-## Run the published Git server image
+## Choose your starting point
 
-A released multi-architecture image is available for users who need a runnable PostgreSQL-backed Git
-Smart HTTP endpoint rather than a Java library integration:
+| You want to... | Start here |
+|---|---|
+| Embed Git in a Java application | Use Core's public facade and normal JGit APIs. Follow the [library setup](#five-minute-production-setup) and [consumer guide](docs/consuming.md). |
+| Run a Git Smart HTTP endpoint | Use the published PostgreSQL-backed server image. Follow the [server quick start](#run-the-published-git-server-image) and [standalone server guide](jgit-storage-hibernate-server/README.md). |
+| Analyze repository history, source or architecture | Use [Search](jgit-storage-hibernate-search/README.md) for persistent history queries, [Java Analysis](jgit-storage-hibernate-java-analysis/README.md) for source and symbol history, or [Architecture](jgit-storage-hibernate-architecture/README.md) for versioned rules and drift reports. |
 
-```text
-ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.8
+## Version application data with Git
+
+Consider a purchasing service that publishes approval workflows:
+
+```yaml
+id: purchase-approval
+approvalLimit: 10000
+approvalMode: dualcontrol
 ```
 
-The image does not contain its own PostgreSQL server or the host-side Compose configuration. The
-commands below therefore first obtain this repository's `compose.yaml` and `.env.example`. From any
-working directory:
+Each published definition can be addressed by its Git commit ID. Competing changes can live on branches and be merged through normal JGit APIs, while the repository stays inside the application's database operational boundary. A support screen can then ask when dual control was introduced or which versions changed `purchase-approval.yaml`.
 
-```bash
-git clone --depth 1 https://github.com/carstenartur/jgit-storage-hibernate.git
-cd jgit-storage-hibernate
+The [versioned approval workflow use case](docs/use-cases/versioned-approval-workflows.md) shows the complete application flow. Its executable [publication and history-query test](jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/VersionedApprovalWorkflowUseCaseTest.java) verifies the final `main` ref and the indexed workflow-history matches.
 
-cp .env.example .env
-chmod 600 .env
-${EDITOR:-vi} .env            # set JSH_DATABASE_PASSWORD and JSH_ADMIN_PASSWORD
+The application owns the workflow API and coordination with its domain rows. Git publication and Search indexing are separate operations; sharing a database does not create [one transaction across application data, Git and indexes](#transaction-safe-database-publication).
 
-docker compose config --quiet
-docker compose config --images  # shows PostgreSQL and the published GHCR server image
-docker compose pull postgres git-server
-docker compose up --no-build --detach --wait postgres git-server
-docker compose ps
-curl --fail http://localhost:8080/actuator/health/readiness
-```
+<a id="two-questions-that-show-the-difference"></a>
 
-The `git-server` target in `docker compose pull` downloads the GHCR image shown above. The same target
-in `docker compose up --no-build` creates and starts a container from that published image; it cannot
-fall back to compiling the repository source. PostgreSQL is started alongside it because the server
-stores Git data there.
-
-The endpoint works with normal Git CLI, JGit and IDE Smart HTTP clone/fetch/push operations. It is
-**not** a drop-in replacement for GitLab, Gitea, Gerrit or other forge images when consumers depend on
-SSH, LFS, pull requests, their REST APIs, hooks, webhooks, database schemas or plug-in extension
-points. The [standalone server guide](jgit-storage-hibernate-server/README.md) contains the secure
-quick start, compatibility matrix, source-build override, digest pinning and production boundaries.
-
-The important distinction is not merely that the library saves application code. It changes **when and how often** expensive work is performed:
-
-```text
-Without a projection
-query -> walk commits -> diff trees -> parse/filter content -> return result
-query -> walk commits -> diff trees -> parse/filter content -> return result
-
-With jgit-storage-hibernate Search
-commit/reindex -> walk/diff/parse once -> persist relational + Lucene indexes
-query          -> execute indexed predicates/full-text search
-query          -> execute indexed predicates/full-text search
-```
-
-Git and JGit do not normally provide a general full-text search engine over commit messages, actual changed paths and changed-file contents. The Search module adds that capability as a rebuildable read model while Git remains authoritative.
-
-### Measured crossover for repeated history queries
-
-A retained PostgreSQL/JMH fixture now answers the same practical questions through three paths: a normal JGit `FileRepository` with optimized on-demand traversal, the identical JGit traversal over `HibernateRepository`, and the materialized Search projection. The fixture uses canonical nested Git trees and verifies that indexed and on-demand implementations return the same commit set before timing begins.
-
-At 1,000 deterministic commits, the strongest smoke result is the exact-path + changed-content query: **96.20 ms/op** through `FileRepository`/JGit, **22.02 ms/op** through `HibernateRepository`/JGit and **3.47 ms/op** through the indexed projection. The complete `content-v1` rebuild cost was about **840 ms**, which corresponds to a conservative break-even of roughly **nine** such queries versus rebuilding once and then querying the projection. Exact path + time measured 66.86/17.29/3.10 ms/op and the compound author/path/time/content audit query 36.31/10.22/2.62 ms/op.
-
-These are workload point estimates from a bounded smoke fixture, not universal production speedup claims. Their architectural value is that the indexed path is also materially faster than on-demand JGit over the **same database-backed repository**, separating the benefit of materialization from filesystem-versus-database storage effects. See the complete [JGit versus indexed history-query crossover methodology](docs/operations/history-query-crossover.md) and the [public performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/).
-
-## Two questions that show the difference
+## Three questions that show the difference
 
 ### Which changes did one person make in one subsystem during one interval?
 
@@ -128,9 +87,24 @@ for (JavaTypeUsageHistory.Version version : usageHistory.versions()) {
 }
 ```
 
-Git does not contain Java declaration identities, JDT binding keys, type-usage relations or symbol continuity across package moves. Java Analysis derives that semantic model from each version and combines it with symbol timelines, allowing an old qualified name to lead to usages after a move or rename. In `0.1.x`, these analysis results are supported as module-owned DTOs and in-memory graphs; persistence of the Java-analysis entity model is incubating and application-owned.
+Git does not contain Java declaration identities, JDT binding keys, type-usage relations or symbol continuity across package moves. Java Analysis derives that semantic model from each version and combines it with symbol timelines, allowing an old qualified name to lead to usages after a move or rename. These analysis results are supported as module-owned DTOs and in-memory graphs; persistence of the Java-analysis entity model is incubating and application-owned.
 
 See the complete [change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md), the executable [compound history test](jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/CompoundCommitHistoryQueryH2Test.java) and the executable [Java usage test](jgit-storage-hibernate-java-analysis/src/test/java/io/github/carstenartur/jgit/storage/hibernate/javaanalysis/JavaTypeUsageHistoryQueryTest.java).
+
+### Does this version violate an architecture decision?
+
+Keep an explicit rule beside the code, map Java packages to architecture elements, and evaluate the observed software graph for a selected version. For example, a UI layer must not reference the database layer:
+
+```text
+element ui layer "UI" packagePrefix=demo.ui
+element database layer "Database" packagePrefix=demo.db
+rule no-ui-db forbid REFERENCES_TYPE from ui to database evidence=adr-7 reason="UI must not access database"
+evidence adr-7 for no-ui-db kind=ADR path=docs/adr/0007.md rationale="Layering decision" confidence=1.0
+```
+
+`ArchitectureDriftEngine` evaluates this versioned intent against a `JavaSoftwareGraph`. For an observed forbidden dependency, the finding retains the rule, affected code location and referenced ADR evidence. Missing evidence and unmapped or ambiguous code mappings are explicit findings. The evaluation API works in memory; module-owned persistence remains incubating.
+
+See the [Architecture guide](jgit-storage-hibernate-architecture/README.md) for the parser and evaluation flow, and [`VersionedArchitectureDriftTest`](jgit-storage-hibernate-architecture/src/test/java/io/github/carstenartur/jgit/storage/hibernate/architecture/VersionedArchitectureDriftTest.java) for an executable forbidden-dependency example that retains `adr-7` in its findings.
 
 ## What it adds on top of JGit
 
@@ -146,9 +120,38 @@ See the complete [change-audit and Java-usage use case](docs/use-cases/change-au
 
 Git objects and refs remain authoritative. Search, Java Analysis and Architecture outputs are derived projections or analyses: they can be rebuilt and must not be treated as the source of truth.
 
+## Why repeated queries use a projection
+
+Search changes **when and how often** expensive history-query work is performed:
+
+```text
+Without a projection
+query -> walk commits -> diff trees -> parse/filter content -> return result
+query -> walk commits -> diff trees -> parse/filter content -> return result
+
+With jgit-storage-hibernate Search
+commit/reindex -> walk/diff/parse once -> persist relational + Lucene indexes
+query          -> execute indexed predicates/full-text search
+query          -> execute indexed predicates/full-text search
+```
+
+Git and JGit do not normally provide a general full-text search engine over commit messages, actual changed paths and changed-file contents. The Search module adds that capability as a rebuildable read model while Git remains authoritative.
+
+### Measured crossover for repeated history queries
+
+A retained PostgreSQL/JMH fixture now answers the same practical questions through three paths: a normal JGit `FileRepository` with optimized on-demand traversal, the identical JGit traversal over `HibernateRepository`, and the materialized Search projection. The fixture uses canonical nested Git trees and verifies that indexed and on-demand implementations return the same commit set before timing begins.
+
+At 1,000 deterministic commits, the strongest smoke result is the exact-path + changed-content query: **96.20 ms/op** through `FileRepository`/JGit, **22.02 ms/op** through `HibernateRepository`/JGit and **3.47 ms/op** through the indexed projection. The complete `content-v1` rebuild cost was about **840 ms**, which corresponds to a conservative break-even of roughly **nine** such queries versus rebuilding once and then querying the projection. Exact path + time measured 66.86/17.29/3.10 ms/op and the compound author/path/time/content audit query 36.31/10.22/2.62 ms/op.
+
+These are workload point estimates from a bounded smoke fixture, not universal production speedup claims. Their architectural value is that the indexed path is also materially faster than on-demand JGit over the **same database-backed repository**, separating the benefit of materialization from filesystem-versus-database storage effects. See the complete [JGit versus indexed history-query crossover methodology](docs/operations/history-query-crossover.md) and the [public performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/).
+
+📈 **[Performance history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/)** · 📊 **[Performance status and distance to the ceiling](docs/performance-status.md)** · ⚙️ **[Benchmark workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)**
+
+Performance-chart reading rule: **lower is always better/faster; higher is worse/slower or more expensive.** Timing and throughput evidence is normalized to `ms/op`; non-time chart units are published only when they preserve the same smaller-is-better direction.
+
 ## Module guide
 
-Security and Smart HTTP are published artifacts in the documented `0.11.0` release.
+Security and Smart HTTP have been published artifacts since `0.11.0`.
 
 | Module | Choose it when... | Persistence/runtime contract |
 |---|---|---|
@@ -159,6 +162,46 @@ Security and Smart HTTP are published artifacts in the documented `0.11.0` relea
 | `jgit-storage-hibernate-java-analysis` | You need to know which logical Java declaration changed and which versions are affected. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-architecture` | You need explainable architecture drift and decision provenance. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-benchmarks` | You maintain or review backend performance. | Not a runtime dependency |
+
+## Run the published Git server image
+
+A released multi-architecture image is available for users who need a runnable PostgreSQL-backed Git
+Smart HTTP endpoint rather than a Java library integration:
+
+```text
+ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.8
+```
+
+The image does not contain its own PostgreSQL server or the host-side Compose configuration. The
+commands below therefore first obtain this repository's `compose.yaml` and `.env.example`. From any
+working directory:
+
+```bash
+git clone --depth 1 https://github.com/carstenartur/jgit-storage-hibernate.git
+cd jgit-storage-hibernate
+
+cp .env.example .env
+chmod 600 .env
+${EDITOR:-vi} .env            # set JSH_DATABASE_PASSWORD and JSH_ADMIN_PASSWORD
+
+docker compose config --quiet
+docker compose config --images  # shows PostgreSQL and the published GHCR server image
+docker compose pull postgres git-server
+docker compose up --no-build --detach --wait postgres git-server
+docker compose ps
+curl --fail http://localhost:8080/actuator/health/readiness
+```
+
+The `git-server` target in `docker compose pull` downloads the GHCR image shown above. The same target
+in `docker compose up --no-build` creates and starts a container from that published image; it cannot
+fall back to compiling the repository source. PostgreSQL is started alongside it because the server
+stores Git data there.
+
+The endpoint works with normal Git CLI, JGit and IDE Smart HTTP clone/fetch/push operations. It is
+**not** a drop-in replacement for GitLab, Gitea, Gerrit or other forge images when consumers depend on
+SSH, LFS, pull requests, their REST APIs, hooks, webhooks, database schemas or plug-in extension
+points. The [standalone server guide](jgit-storage-hibernate-server/README.md) contains the secure
+quick start, compatibility matrix, source-build override, digest pinning and production boundaries.
 
 ## Five-minute production setup
 
@@ -189,7 +232,7 @@ No GitHub token or Maven Central account is required.
 </dependency>
 ```
 
-Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security and Smart HTTP are independently selectable in the documented `0.11.0` release; source/reactor builds keep them aligned through `${project.version}`.
+Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security and Smart HTTP have been independently selectable since `0.11.0`; source/reactor builds keep them aligned through `${project.version}`.
 
 ### 3. Apply the packaged migration before Hibernate starts
 
@@ -286,6 +329,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 - [Capacity and recovery](docs/operations/capacity-and-recovery.md)
 - [Taxonomy/Spring adoption runbook](docs/taxonomy-adoption.md)
 - [Release process](docs/release-process.md)
+- [Cite this project](https://doi.org/10.5281/zenodo.21210132)
 
 ## Design boundaries
 

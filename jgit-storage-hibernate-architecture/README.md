@@ -5,7 +5,7 @@ Version architecture intent beside the code and produce explainable drift findin
 Choose this module when architecture decisions must be reviewable, versioned and enforceable without reducing the result to an unexplained pass/fail gate.
 
 > [!IMPORTANT]
-> The parser, snapshot, semantic-diff, mapping and drift-evaluation APIs are usable. The Hibernate/Hibernate Search entity layer is **incubating** in the `0.1.x` line: the artifact does not yet ship module-owned Flyway migrations, transactional projection writers/rebuilders or repository-deletion integration. Production applications should keep architecture sources in Git and use the in-memory reports, or explicitly own and test any experimental persistence schema.
+> The parser, snapshot, semantic-diff, mapping and drift-evaluation APIs are usable. The Hibernate/Hibernate Search entity layer is **incubating**: the artifact does not yet ship module-owned Flyway migrations, transactional projection writers/rebuilders or repository-deletion integration. Production applications should keep architecture sources in Git and use the in-memory reports, or explicitly own and test any experimental persistence schema.
 
 ## Dependency
 
@@ -36,17 +36,14 @@ element database layer "Database" packagePrefix=com.example.persistence
 
 relation ui-app depends ui -> application
 
-rule no-ui-db forbid REFERENCES_TYPE from ui to database \
-  evidence=adr-7 reason="UI must not access persistence directly"
+rule no-ui-db forbid REFERENCES_TYPE from ui to database evidence=adr-7 reason="UI must not access persistence directly"
 
-rule app-db require CALLS from application to database \
-  evidence=adr-12 reason="Persistence access is owned by the application layer"
+rule app-db require CALLS from application to database evidence=adr-12 reason="Persistence access is owned by the application layer"
 
-evidence adr-7 for no-ui-db kind=ADR path=docs/adr/0007.md \
-  rationale="Layering decision" confidence=1.0
+evidence adr-7 for no-ui-db kind=ADR path=docs/adr/0007.md rationale="Layering decision" confidence=1.0
 ```
 
-The reference parser supports `.architecture` and `.archdsl` files. Other DSLs can implement `ArchitectureDslParser` and produce the same neutral snapshot model.
+The reference parser supports `.architecture` and `.archdsl` files. Each statement and its attributes must stay on one line. Other DSLs can implement `ArchitectureDslParser` and produce the same neutral snapshot model.
 
 ## Evaluate drift
 
@@ -89,4 +86,4 @@ Elements, relations, rules and evidence are compared by stable IDs, so text move
 
 The authoritative state is the Git history containing the architecture sources. Drift reports and any database rows derived from them are rebuildable projections.
 
-`ArchitectureEntities.annotatedClasses()` exposes incubating entity mappings for controlled experiments. In `0.1.x`, a consuming application that registers them must also provide its own versioned migrations, persistence/upsert logic, reindex procedure and repository cleanup. The helper is not yet part of the production schema contract documented for Core and Search.
+`ArchitectureEntities.annotatedClasses()` exposes incubating entity mappings for controlled experiments. A consuming application that registers them must also provide its own versioned migrations, persistence/upsert logic, reindex procedure and repository cleanup. The helper is not yet part of the production schema contract documented for Core and Search.
