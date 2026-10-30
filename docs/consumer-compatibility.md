@@ -27,10 +27,14 @@ The exact commits live in `.github/consumer-compatibility.json` and are intentio
 | Consumer | Library modules expected by the central gate | Consumer-owned authority |
 |---|---|---|
 | audio-analyzer | Core + Search | `audio-app` reactor verification, workflow-history/runtime linkage and packaged-JAR leakage checks |
-| Taxonomy | Core | Taxonomy's catalogue-driven schema/migration/Hibernate Search/PostgreSQL contract |
+| Taxonomy | Core + Smart HTTP | Taxonomy's catalogue-driven schema/migration/Hibernate Search/PostgreSQL contract |
 | sandbox | Core + Search + Java Analysis | Core-only OSGi bridge, released server REST/search/analysis, legacy adoption and executable-JAR contracts |
 
-Sandbox runs its consumer-owned contract on Java 25. Both central matrix legs provide Elasticsearch 8.19.12, matching the consumer's own CI, so its real Elasticsearch test runs alongside the Surefire and Failsafe contracts. The baseline resolves the published 0.11.8 dependencies; the candidate substitutes the isolated library build into the same pinned checkout.
+Taxonomy and Sandbox run their consumer-owned contracts on Java 25; audio-analyzer uses Java 21. The pinned audio-analyzer and Taxonomy POMs select the published 0.11.8 runtime dependencies. Their baseline runs keep those version selectors, while candidate runs substitute the isolated library build into the same pinned checkouts.
+
+Both central Sandbox matrix legs provide Elasticsearch 8.19.12, matching the consumer's own CI, so its real Elasticsearch test runs alongside the Surefire and Failsafe contracts. The Sandbox baseline also resolves the published 0.11.8 dependencies; its candidate substitutes the isolated library build into the same pinned checkout.
+
+Taxonomy's Hibernate Search projection belongs to the application and does not select the library's Search module. Its declared Smart HTTP dependency is part of the module compatibility check; the storage contract does not establish coverage of every Smart HTTP behavior or other optional library capability.
 
 The table describes what the **current pinned consumer POMs actually consume**. It must not be used to speculate that a consumer uses another optional module. If a consumer adds Search, Java Analysis or Architecture later, the version-substitution report changes and the descriptor must be updated explicitly.
 
