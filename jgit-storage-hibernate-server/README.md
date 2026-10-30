@@ -24,7 +24,7 @@ explicit feature and data migration; changing only the Docker image is not suffi
 ## Run the published release
 
 The repository Compose file starts PostgreSQL and defaults its `git-server` service to the released
-`0.11.2` image:
+image shown below:
 
 ```text
 ghcr.io/carstenartur/jgit-storage-hibernate-server:0.11.8
