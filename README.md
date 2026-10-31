@@ -24,6 +24,16 @@ The documented release line is **0.11.8**. It publishes optional principal-bound
 | Run a Git Smart HTTP endpoint | Use the published PostgreSQL-backed server image. Follow the [server quick start](#run-the-published-git-server-image) and [standalone server guide](jgit-storage-hibernate-server/README.md). |
 | Analyze repository history, source or architecture | Use [Search](jgit-storage-hibernate-search/README.md) for persistent history queries, [Java Analysis](jgit-storage-hibernate-java-analysis/README.md) for source and symbol history, or [Architecture](jgit-storage-hibernate-architecture/README.md) for versioned rules and drift reports. |
 
+## Existing application integrations
+
+Three applications maintained by the same author use the library in their own workflows:
+
+- [Audio Analyzer](https://github.com/carstenartur/audio-analyzer) keeps Git-backed checkpoints for collaborative DSP workflows.
+- [Taxonomy](https://github.com/carstenartur/Taxonomy) versions architecture DSL checkpoints in database-backed repositories for personal and shared workspaces.
+- [Sandbox](https://github.com/carstenartur/sandbox) embeds storage through an OSGi bridge and exposes history search and Java analysis in its server.
+
+Each application owns an executable compatibility contract. The [consumer matrix and validation guide](docs/consumer-compatibility.md#pinned-consumers) records the selected modules and scope; the [pinned descriptor](.github/consumer-compatibility.json) identifies the exact consumer revisions and contract scripts. [Compatibility workflow results](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/consumer-compatibility.yml) retain baseline/candidate results, dependency evidence and test reports for the exercised application paths and module combinations.
+
 ## Version application data with Git
 
 Consider a purchasing service that publishes approval workflows:
@@ -322,6 +332,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`
 - [JGit versus indexed history-query crossover](docs/operations/history-query-crossover.md)
 - [Secured JGit Smart HTTP](docs/operations/secured-smart-http.md)
 - [Consumer, migration and database matrix](docs/consuming.md)
+- [Real-consumer integrations and compatibility evidence](docs/consumer-compatibility.md)
 - [Change-audit and Java-usage use case](docs/use-cases/change-audit-and-java-usage.md)
 - [Approval-workflow use case and transaction contract](docs/use-cases/versioned-approval-workflows.md)
 - [History query cookbook](docs/query-cookbook.md)
