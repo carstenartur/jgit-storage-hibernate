@@ -8,22 +8,32 @@ io.github.carstenartur:jgit-storage-hibernate-security
 io.github.carstenartur:jgit-storage-hibernate-search
 ```
 
-Core provides database-backed JGit repositories. Security is optional and adds a framework-neutral principal/group ACL schema plus deterministic repository/ref decisions. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their Hibernate entity layers remain incubating in the `0.1.x` line; consult their module guides before registering those entities.
+Core provides database-backed JGit repositories. Security is optional and adds a framework-neutral principal/group ACL schema plus deterministic repository/ref decisions. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their module-owned persistence remains incubating; consult their module guides before registering those entities.
 
 The documented release line is **0.11.8**. It uses Java 21, JGit 7.8.0.202609011348-r, Hibernate ORM 7.4.12.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published BOM and tested deployment stack instead of overriding only one side of the stack.
 
-SQL Server Search was introduced in **0.1.16**. Do not configure released Search 0.1.15 against SQL Server.
-
 ## Supported databases and operating model
 
-| Database | Core | Search | Tested version and intended use |
-|---|---|---|---|
-| PostgreSQL | Supported | Supported | PostgreSQL 17.10 through Testcontainers; persistent development, staging and production |
-| Microsoft SQL Server | Supported | Supported from 0.1.16 | SQL Server 2022 through Testcontainers; persistent deployments, copied-Sandbox Core adoption and Search rebuild cut-over |
-| HSQLDB | Supported | Not shipped | HSQLDB 2.7.4; embedded persistent Core deployments and restart tests |
-| H2 | Supported | Supported | H2 2.4.x; tests, demos and lightweight/disposable development |
+This is the canonical support matrix for the library artifacts in the documented release line. The versions below describe the tested release stack; development-branch dependency updates can exercise newer versions.
 
-Support means that the artifact ships dialect-specific Flyway migrations and automated integration coverage for the listed module. Core support does not imply Search support unless both columns explicitly say so. Java Analysis and Architecture do not yet ship module-owned migrations for any database.
+| Database | Core | Search | Security | Tested release version and intended use |
+|---|---|---|---|---|
+| PostgreSQL | Supported | Supported | Supported | PostgreSQL 17.10 through Testcontainers; persistent development, staging and production |
+| Microsoft SQL Server (MSSQL) | Supported | Supported from 0.1.16 | Supported | SQL Server 2022 through Testcontainers; persistent deployments, copied-Sandbox Core adoption and Search rebuild cut-over |
+| HSQLDB | Supported | Supported from 0.11.6; new Search installation | Supported | HSQLDB 2.7.4; embedded persistent deployments, file-database and Lucene restart tests; see the Spring Boot limitation below |
+| H2 | Supported | Supported | Supported | H2 2.4.x; tests, demos and lightweight/disposable development |
+| Oracle | Not supported | Not supported | Not supported | No module-owned migration streams or Oracle database integration tests |
+
+Support means that the artifact ships dialect-specific Flyway migrations and automated integration coverage for the listed module. H2 and HSQLDB use embedded database tests; PostgreSQL and SQL Server use real databases through Testcontainers. The public `CoreSchemaMigrations`, `SearchSchemaMigrations` and `SecuritySchemaMigrations` constants identify the [packaged migration locations](#packaged-migration-locations). A Hibernate dialect or an Oracle-related mapping portability check alone does not establish backend support.
+
+### Integration boundaries
+
+- **Spring Boot starter:** automatic Core schema management recognizes H2, HSQLDB, PostgreSQL and SQL Server. Automatic Search schema management supports H2, PostgreSQL and SQL Server, but currently rejects HSQLDB for both `migrate` and `validate`. This is a starter integration limitation even though the Search module ships HSQLDB migrations and tests. For an externally managed HSQLDB Search schema, apply and validate the matching Core and Search migrations before startup, then set `jgit.storage.hibernate.schema-action=none`; Hibernate schema validation still runs. Follow the [HSQLDB Search installation procedure](../jgit-storage-hibernate-search/README.md#hsqldb-installation), including the separate history table and baseline version `0`. Security migrations remain separately managed by the application or deployment tool.
+- **Published standalone server image:** the supplied image and Compose deployment use PostgreSQL. Other library backends are not supplied as ready-configured server-image options; see the [server guide](../jgit-storage-hibernate-server/README.md).
+- **Smart HTTP:** owns no database schema and uses the configured Core and optional Security capabilities.
+- **Java Analysis and Architecture:** their analysis/evaluation APIs are supported, but module-owned persistence remains incubating for every database.
+
+### Schema operating model
 
 Migration SQL is dialect-specific. Never run H2, HSQLDB, PostgreSQL or SQL Server resources against a different database.
 
@@ -80,7 +90,7 @@ Optional generic history search:
 </dependency>
 ```
 
-Use Search 0.1.16 or later for SQL Server.
+Check the [database support matrix](#supported-databases-and-operating-model) when selecting Search or a framework integration.
 
 Optional database-backed security policy:
 
@@ -117,6 +127,7 @@ Application workflow, session, audit, outbox and domain-projection tables are ou
 | Core | PostgreSQL | `classpath:db/migration/jgit-storage-hibernate/core/postgresql` |
 | Core | Microsoft SQL Server | `classpath:db/migration/jgit-storage-hibernate/core/sqlserver` |
 | Search | H2 | `classpath:db/migration/jgit-storage-hibernate/search/h2` |
+| Search | HSQLDB | `classpath:db/migration/jgit-storage-hibernate/search/hsqldb` |
 | Search | PostgreSQL | `classpath:db/migration/jgit-storage-hibernate/search/postgresql` |
 | Search | Microsoft SQL Server | `classpath:db/migration/jgit-storage-hibernate/search/sqlserver` |
 | Security | H2 | `classpath:db/migration/jgit-storage-hibernate/security/h2` |
@@ -220,7 +231,9 @@ Flyway.configure()
     .migrate();
 ```
 
-Select the matching Core location for HSQLDB or SQL Server. For Search, repeat the operation only on a supported Search database using `SearchSchemaMigrations` and its separate history table. Disable `baselineOnMigrate` after the one-time adoption.
+Select the matching Core location for HSQLDB or SQL Server. For Search on H2, PostgreSQL or SQL Server, repeat the operation using `SearchSchemaMigrations` and its separate history table. Disable `baselineOnMigrate` after the one-time adoption.
+
+HSQLDB Search has no 0.1.4 upgrade path. Its migration stream starts with a new installation at 0.11.6. Follow the [HSQLDB Search installation and rebuild procedure](../jgit-storage-hibernate-search/README.md#hsqldb-installation) instead; do not baseline an existing HSQLDB Search projection as 0.1.4. This limitation does not affect HSQLDB Core adoption.
 
 Do not baseline an unknown, partially created or manually modified schema. Baselining records that the existing structure is trusted; it does not verify or repair it. Existing inline BLOBs are not rewritten to chunks during migration and remain readable.
 
@@ -430,8 +443,8 @@ mvn verify
 
 The Core and Search suites exercise:
 
-- fresh installation on H2, PostgreSQL and SQL Server where supported;
-- Core installation and restart behavior on HSQLDB;
+- fresh Core and Search installation on H2, HSQLDB, PostgreSQL and SQL Server;
+- Core file-database restart and Search file-database/Lucene restart, rebuild, query and deletion behavior on HSQLDB;
 - adoption of immutable 0.1.4 fixtures;
 - copied pre-library Core adoption on HSQLDB, PostgreSQL and SQL Server;
 - Flyway history versions and Hibernate `validate`;

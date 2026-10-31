@@ -3,6 +3,8 @@
 `jgit-storage-hibernate-security` is the optional, framework-neutral security capability described by
 [ADR-0003](../docs/adrs/0003-optional-principal-bound-security.md).
 
+The [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) defines supported backends, tested release versions and integration limits for this module. Oracle is not currently supported. Security migrations are managed separately from the Spring Boot starter's Core/Search schema manager.
+
 It provides:
 
 - immutable, explicitly propagated `GitAccessContext` values;

@@ -27,16 +27,14 @@ Git/JGit does not normally provide a general full-text query engine over commit 
 
 ## Database support
 
-| Database | Search migrations | Automated evidence | Intended use |
-|---|---|---|---|
-| H2 2.4.x | Yes | Ordinary Maven tests | Tests, demos and disposable development |
-| PostgreSQL 17.10 | Yes | Testcontainers migration, restart and query tests | Persistent development, staging and production |
-| Microsoft SQL Server 2022 | Yes from 0.1.16 | Testcontainers migration, indexing, rebuild, deletion, query and persistent-Lucene restart tests | Persistent deployments and Sandbox cut-over |
-| HSQLDB 2.7.4 | Yes from 0.11.6 | Ordinary Maven migration, file-database/Lucene restart, indexing, rebuild, query and deletion tests | Embedded persistent deployments |
+The [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) defines the supported databases, introduction versions, tested release stack and integration limits. Search ships migrations and automated integration coverage for H2, HSQLDB, PostgreSQL and Microsoft SQL Server (MSSQL). Oracle is not currently supported.
 
-Support means the module ships dialect-specific Flyway migrations and real-container evidence for schema validation and public Search behavior. Core database support alone does not imply Search support.
+H2 and HSQLDB are exercised as embedded databases; PostgreSQL and SQL Server use Testcontainers. The [verification section](#verification) describes the coverage. The Spring Boot starter's automatic schema management still rejects HSQLDB Search; see the [integration boundaries and externally managed schema setup](../docs/consuming.md#integration-boundaries).
 
 Apply Core migrations first, then the matching Search location with the separate Search history table.
+
+### HSQLDB installation
+
 HSQLDB uses `SearchSchemaMigrations.HSQLDB_LOCATION` and a first-installation migration
 at version 0.11.6, with `timestamp(6)` matching Hibernate's HSQLDialect UTC mapping.
 When Core has already created tables, use the dedicated Search history table with the
@@ -245,7 +243,7 @@ Deleted files remain represented by path in path-enabled profiles. Large, filter
 </dependency>
 ```
 
-The documented released version remains 0.1.15 until the next release is published. SQL Server Search requires 0.1.16 or later. The Search artifact depends on Core. Apply Core migrations first, then Search migrations with its separate history table.
+The [consumer guide](../docs/consuming.md#dependencies) records the documented release and aligned dependencies. The Search artifact depends on Core. Apply Core migrations first, then Search migrations with its separate history table. Database availability and introduction versions are recorded in the [support matrix](../docs/consuming.md#supported-databases-and-operating-model).
 
 ## Registration
 
@@ -290,6 +288,8 @@ Search owns `git_commit_index` and `jgit_storage_hibernate_search_schema_history
 ## Verification
 
 H2 integration tests exercise compound query, analyzer, timestamp, rebuild progress, indexing-profile/content-policy semantics, fail-closed profile migration and interrupted-retry semantics on every build.
+
+HSQLDB tests also run without Docker and cover migration, Hibernate validation, indexing, rebuild, query and deletion, including file-database and persistent-Lucene restart.
 
 With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. SQL Server evidence covers Core-plus-Search migration, Hibernate `validate`, Unicode root/normal/merge indexing, first-parent added/modified/deleted path semantics, author/committer/path/time/compound queries, stable pagination, two logical repositories, interrupted rebuild retry, transactional repository deletion, projection-failure isolation and full-text search after a persistent Lucene restart.
 

@@ -161,14 +161,14 @@ Performance-chart reading rule: **lower is always better/faster; higher is worse
 
 ## Module guide
 
-Security and Smart HTTP have been published artifacts since `0.11.0`.
+Security and Smart HTTP have been published artifacts since `0.11.0`. The [database support matrix](docs/consuming.md#supported-databases-and-operating-model) defines database availability and integration limits for the library modules.
 
 | Module | Choose it when... | Persistence/runtime contract |
 |---|---|---|
-| `jgit-storage-hibernate-core` | You need database-backed Git semantics and transaction-safe repository publication. | Versioned Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server |
-| `jgit-storage-hibernate-security` | You need principals/groups, repository/ref ACLs, local credentials or tokens, revocation and durable authorization/identity audit. | Own Flyway migrations for H2, HSQLDB, PostgreSQL and SQL Server; principal-bound direct-JGit enforcement |
+| `jgit-storage-hibernate-core` | You need database-backed Git semantics and transaction-safe repository publication. | Versioned Flyway migrations for the supported databases |
+| `jgit-storage-hibernate-security` | You need principals/groups, repository/ref ACLs, local credentials or tokens, revocation and durable authorization/identity audit. | Own Flyway migrations for the supported databases; principal-bound direct-JGit enforcement |
 | `jgit-storage-hibernate-smart-http` | You expose authenticated clone, fetch and push through JGit Smart HTTP. | No schema; optional Servlet/JGit HTTP adapter over Core's final ref checks |
-| `jgit-storage-hibernate-search` | Users or services need repeated audit, reporting or content-search queries. | Versioned Flyway migrations for H2 and PostgreSQL |
+| `jgit-storage-hibernate-search` | Users or services need repeated audit, reporting or content-search queries. | Versioned Flyway migrations for the supported databases |
 | `jgit-storage-hibernate-java-analysis` | You need to know which logical Java declaration changed and which versions are affected. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-architecture` | You need explainable architecture drift and decision provenance. | In-memory API supported; entity persistence incubating |
 | `jgit-storage-hibernate-benchmarks` | You maintain or review backend performance. | Not a runtime dependency |
@@ -215,7 +215,7 @@ quick start, compatibility matrix, source-build override, digest pinning and pro
 
 ## Five-minute production setup
 
-The documented release line is **0.11.8**. Java 21 is required. PostgreSQL 17 is the production-oriented tested database; HSQLDB 2.7 is supported for embedded persistent Core deployments; H2 2.4.x remains supported for tests, demos and lightweight development.
+The documented release line is **0.11.8**. Java 21 is required. This walkthrough uses PostgreSQL. See the [database support matrix](docs/consuming.md#supported-databases-and-operating-model) for all supported backends, tested release versions and the Spring Boot and server-image boundaries.
 
 ### 1. Configure the anonymous release repository
 
@@ -255,7 +255,7 @@ Flyway.configure()
     .migrate();
 ```
 
-Use `CoreSchemaMigrations.HSQLDB_LOCATION` for HSQLDB. A shared schema, an existing 0.1.4 installation or a copied pre-library Taxonomy schema requires a deliberate one-time procedure. Do not enable `baselineOnMigrate` blindly; follow [docs/consuming.md](docs/consuming.md) and the [Taxonomy adoption runbook](docs/taxonomy-adoption.md).
+Select the matching location from the [packaged migration locations](docs/consuming.md#packaged-migration-locations) for H2, HSQLDB or Microsoft SQL Server. A shared schema, an existing 0.1.4 installation or a copied pre-library Taxonomy schema requires a deliberate one-time procedure. Do not enable `baselineOnMigrate` blindly; follow [docs/consuming.md](docs/consuming.md) and the [Taxonomy adoption runbook](docs/taxonomy-adoption.md).
 
 ### 4. Make Hibernate validate, not mutate, the production schema
 
@@ -308,20 +308,22 @@ See [Pack capacity and recovery](docs/operations/capacity-and-recovery.md) for s
 
 ## Versioned database contract
 
-| Artifact | H2 | HSQLDB | PostgreSQL | History table |
-|---|---|---|---|---|
-| Core | yes | yes | yes | `jgit_storage_hibernate_core_schema_history` |
-| Security | yes | yes | yes | `jgit_storage_hibernate_security_schema_history` |
-| Smart HTTP | no schema | no schema | no schema | — |
-| Search | yes | no | yes | `jgit_storage_hibernate_search_schema_history` |
-| Java Analysis entities | no module-owned contract | no | no | incubating |
-| Architecture entities | no module-owned contract | no | no | incubating |
+Core, Search and Security ship migrations for **H2, HSQLDB, PostgreSQL and Microsoft SQL Server (MSSQL)**. **Oracle is not currently supported.** The [canonical database support matrix](docs/consuming.md#supported-databases-and-operating-model) records module availability, introduction versions and integration limits, including HSQLDB Search in the Spring Boot starter and the PostgreSQL-only server image.
+
+| Artifact | Persistence contract | History table |
+|---|---|---|
+| Core | Versioned migrations | `jgit_storage_hibernate_core_schema_history` |
+| Security | Versioned migrations | `jgit_storage_hibernate_security_schema_history` |
+| Smart HTTP | No schema; uses Core and optional Security | — |
+| Search | Versioned migrations | `jgit_storage_hibernate_search_schema_history` |
+| Java Analysis entities | No module-owned contract; incubating | — |
+| Architecture entities | No module-owned contract; incubating | — |
 
 Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`. The chunk migration preserves existing inline BLOBs and applies chunking only to new writes.
 
 ## Verification
 
-`mvn verify` exercises H2, HSQLDB in-memory/file-backed restart paths and PostgreSQL through Testcontainers when Docker is available. CI also checks JGit 7.5, 7.6, 7.7 and 7.8 compatibility, dependency changes, release consistency and repeatable JMH workloads. The existing performance workflow additionally runs the 1/16/128 MiB pack-capacity profile manually and weekly.
+`mvn verify` exercises H2 and HSQLDB, including file-backed restart and Search migration/query paths, plus PostgreSQL and Microsoft SQL Server through Testcontainers when Docker is available. CI also checks JGit 7.5, 7.6, 7.7 and 7.8 compatibility, dependency changes, release consistency and repeatable JMH workloads. The existing performance workflow additionally runs the 1/16/128 MiB pack-capacity profile manually and weekly.
 
 ## Documentation
 

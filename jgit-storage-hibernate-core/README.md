@@ -16,6 +16,8 @@ application/operator API: callers enforce access authorization before invoking i
 
 Use the familiar JGit `Repository` API while storing packs, refs, reftables and reflogs in the relational database and persistence lifecycle your application already operates.
 
+See the [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) for supported databases, tested release versions and framework/server integration limits. Oracle is not currently supported.
+
 ## Why use it
 
 - no filesystem-backed `.git` directory is required;

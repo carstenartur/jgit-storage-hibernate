@@ -89,4 +89,4 @@ The complete gate is part of the standard build:
 mvn verify
 ```
 
-With Docker available, the same command also executes PostgreSQL/Testcontainers coverage. Without Docker, the PostgreSQL classes are disabled while H2, HSQLDB, API compatibility, Javadoc, packaged-JAR linkage and the remaining quality gates still run.
+With Docker available, the same command also executes PostgreSQL and Microsoft SQL Server coverage through Testcontainers. Without Docker, those container-backed classes are disabled while H2, HSQLDB, API compatibility, Javadoc, packaged-JAR linkage and the remaining quality gates still run. See the [database support matrix](../consuming.md#supported-databases-and-operating-model) for module availability and integration limits.
