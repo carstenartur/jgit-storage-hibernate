@@ -5,6 +5,11 @@ reflogs in PostgreSQL. Successful pushes also update the searchable history proj
 at versioned application data, auditable history and integration environments rather than at
 reproducing a complete forge such as GitLab, Gitea or GitHub.
 
+The published image and supplied Compose deployment support **PostgreSQL**. The
+[library database support matrix](../docs/consuming.md#supported-databases-and-operating-model)
+also covers H2, HSQLDB and Microsoft SQL Server, but those backends are not supplied as
+ready-configured options in this server image. Oracle is not currently supported by the library.
+
 ## Compatibility at a glance
 
 The image is **Git protocol compatible**, not **forge- or plug-in compatible**.
