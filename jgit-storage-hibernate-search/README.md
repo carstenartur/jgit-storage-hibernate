@@ -27,9 +27,9 @@ Git/JGit does not normally provide a general full-text query engine over commit 
 
 ## Database support
 
-The [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) defines the supported databases, introduction versions, tested release stack and integration limits. Search ships migrations and automated integration coverage for H2, HSQLDB, PostgreSQL and Microsoft SQL Server (MSSQL). Oracle is not currently supported.
+The [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) defines the supported databases, introduction versions, tested release stack and integration limits. Search ships migrations and automated integration coverage for H2, HSQLDB, PostgreSQL, Microsoft SQL Server (MSSQL) and Oracle. Oracle support starts with 0.12.0 for new schemas on the tested Oracle Free version; follow the [Oracle deployment guide](../docs/operations/oracle.md).
 
-H2 and HSQLDB are exercised as embedded databases; PostgreSQL and SQL Server use Testcontainers. The [verification section](#verification) describes the coverage. The Spring Boot starter's automatic schema management still rejects HSQLDB Search; see the [integration boundaries and externally managed schema setup](../docs/consuming.md#integration-boundaries).
+H2 and HSQLDB are exercised as embedded databases; PostgreSQL, SQL Server and Oracle use Testcontainers. The [verification section](#verification) describes the coverage. The Spring Boot starter's automatic schema management still rejects HSQLDB Search; see the [integration boundaries and externally managed schema setup](../docs/consuming.md#integration-boundaries).
 
 Apply Core migrations first, then the matching Search location with the separate Search history table.
 
@@ -291,7 +291,7 @@ H2 integration tests exercise compound query, analyzer, timestamp, rebuild progr
 
 HSQLDB tests also run without Docker and cover migration, Hibernate validation, indexing, rebuild, query and deletion, including file-database and persistent-Lucene restart.
 
-With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. SQL Server evidence covers Core-plus-Search migration, Hibernate `validate`, Unicode root/normal/merge indexing, first-parent added/modified/deleted path semantics, author/committer/path/time/compound queries, stable pagination, two logical repositories, interrupted rebuild retry, transactional repository deletion, projection-failure isolation and full-text search after a persistent Lucene restart.
+With Docker available, Testcontainers starts PostgreSQL 17.10, SQL Server 2022 and Oracle Free 23.26.3. Oracle uses its 0.12.0 initial schema and exercises migration/validation, relational and Lucene queries, Unicode metadata, rebuild, deletion isolation and persistent Lucene reopening. SQL Server evidence covers Core-plus-Search migration, Hibernate `validate`, Unicode root/normal/merge indexing, first-parent added/modified/deleted path semantics, author/committer/path/time/compound queries, stable pagination, two logical repositories, interrupted rebuild retry, transactional repository deletion, projection-failure isolation and full-text search after a persistent Lucene restart.
 
 The dedicated Hibernate Search performance workflow compares all four indexing profiles on PostgreSQL plus local-filesystem Lucene and retains indexing/rebuild time, query time, GC/ORM evidence, Lucene/PostgreSQL footprint, segment count and content/path miss rates. See [Hibernate Search performance](../docs/operations/hibernate-search-performance.md).
 

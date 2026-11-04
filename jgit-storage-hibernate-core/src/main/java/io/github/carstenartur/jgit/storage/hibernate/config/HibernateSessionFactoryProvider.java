@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.Properties;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
+import org.hibernate.dialect.OracleDialect;
 
 /** Provides a Hibernate {@link SessionFactory} configured for core JGit database storage. */
 public final class HibernateSessionFactoryProvider implements AutoCloseable {
@@ -31,13 +32,15 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
 
     Properties effectiveProperties = new Properties();
     effectiveProperties.putAll(properties);
+    configureOracleDialect(effectiveProperties);
     int defaultJdbcBatchSize =
         hasText(effectiveProperties, HibernateStorageSettings.PACK_CHUNK_BATCH_SIZE)
             ? HibernateStorageSettings.resolvePackChunkBatchSize(effectiveProperties)
             : HibernateStorageSettings.DEFAULT_JDBC_BATCH_SIZE;
     effectiveProperties.putIfAbsent(
         HibernateStorageSettings.JDBC_BATCH_SIZE, Integer.toString(defaultJdbcBatchSize));
-    effectiveProperties.putIfAbsent(HibernateStorageSettings.ORDER_INSERTS, Boolean.TRUE.toString());
+    effectiveProperties.putIfAbsent(
+        HibernateStorageSettings.ORDER_INSERTS, Boolean.TRUE.toString());
 
     Configuration configuration = new Configuration();
     configuration.addProperties(effectiveProperties);
@@ -63,6 +66,20 @@ public final class HibernateSessionFactoryProvider implements AutoCloseable {
     if (!sessionFactory.isClosed()) {
       sessionFactory.close();
     }
+  }
+
+  private static void configureOracleDialect(Properties properties) {
+    Object dialect = properties.get("hibernate.dialect");
+    if (OracleDialect.class.getName().equals(dialect) || dialect == OracleDialect.class) {
+      properties.put("hibernate.dialect", JgitOracleDialect.class.getName());
+    }
+    // Hibernate runs discovered resolvers first, followed by configured resolvers in order.
+    // Append our Oracle fallback so application resolvers keep their existing precedence.
+    String resolver = JgitOracleDialectResolver.class.getName();
+    String configured = properties.getProperty("hibernate.dialect_resolvers");
+    properties.setProperty(
+        "hibernate.dialect_resolvers",
+        configured == null || configured.isBlank() ? resolver : configured + "," + resolver);
   }
 
   private static boolean hasText(Properties properties, String name) {

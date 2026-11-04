@@ -16,7 +16,7 @@ application/operator API: callers enforce access authorization before invoking i
 
 Use the familiar JGit `Repository` API while storing packs, refs, reftables and reflogs in the relational database and persistence lifecycle your application already operates.
 
-See the [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) for supported databases, tested release versions and framework/server integration limits. Oracle is not currently supported.
+See the [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) for supported databases, tested release versions and framework/server integration limits. Oracle support starts with 0.12.0 for new schemas on the tested Oracle Free version; follow the [Oracle deployment guide](../docs/operations/oracle.md).
 
 ## Why use it
 
@@ -37,7 +37,7 @@ See the [canonical database support matrix](../docs/consuming.md#supported-datab
 - repository-scoped database locks coordinate independent `SessionFactory` instances;
 - writer tokens and renewable leases retain safe cleanup for legacy durable uncommitted rows;
 - public consumers do not import `org.eclipse.jgit.internal.*`;
-- versioned H2, HSQLDB, PostgreSQL and Microsoft SQL Server migrations support production `migrate + validate` operation;
+- versioned H2, HSQLDB, PostgreSQL, Microsoft SQL Server and Oracle migrations support production `migrate + validate` operation;
 - logical repositories have an explicit, idempotent and isolated deletion lifecycle.
 
 Git remains authoritative. This module changes where JGit stores repository data, not the Git semantics exposed to callers.
@@ -80,7 +80,7 @@ try (HibernateGitStorage storage =
 }
 ```
 
-Use `CoreSchemaMigrations.HSQLDB_LOCATION` for an embedded HSQLDB deployment or `CoreSchemaMigrations.SQL_SERVER_LOCATION` for Microsoft SQL Server. SQL Server applications must add Flyway's `flyway-sqlserver` database module and the Microsoft JDBC driver. Fresh databases, shared schemas, existing 0.1.4 installations and the copied pre-library Sandbox/Taxonomy schema require different procedures. See the [consumer guide](../docs/consuming.md) and [adoption runbook](../docs/taxonomy-adoption.md) before provisioning a persistent database.
+Use `CoreSchemaMigrations.HSQLDB_LOCATION` for an embedded HSQLDB deployment or `CoreSchemaMigrations.SQL_SERVER_LOCATION` for Microsoft SQL Server. Oracle installations use `CoreSchemaMigrations.ORACLE_LOCATION` from 0.12.0. SQL Server applications must add Flyway's `flyway-sqlserver` database module and the Microsoft JDBC driver. Fresh databases, shared schemas, existing 0.1.4 installations and the copied pre-library Sandbox/Taxonomy schema require different procedures. See the [consumer guide](../docs/consuming.md) and [adoption runbook](../docs/taxonomy-adoption.md) before provisioning a persistent database.
 
 ## Staged and chunked payload storage
 
@@ -221,6 +221,6 @@ Workflow, session, audit, outbox and other application-specific tables remain ow
 
 ## Verification
 
-H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10 and SQL Server 2022. The suites verify fresh installation, 0.1.4 upgrades where applicable, pre-library adoption with unchanged BLOB checksums and reflog rows, Hibernate validation, adaptive inline/chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
+H2 and HSQLDB migration tests run on every build. HSQLDB coverage includes in-memory and file-backed restart scenarios. With Docker available, Testcontainers starts PostgreSQL 17.10, SQL Server 2022 and Oracle Free 23.26.3. Oracle coverage starts with fresh 0.12.0 schemas; it does not include legacy adoption. The suites verify fresh installation, 0.1.4 upgrades where applicable, pre-library adoption with unchanged BLOB checksums and reflog rows, Hibernate validation, adaptive inline/chunked repository history, refs, normal-update reflogs and `SessionFactory` restart.
 
 Contract tests cover pre-publication invisibility, random read-back through open staging streams, atomic multi-extension publication, transaction failure, mixed legacy/staging rollback, chunked publication, replacement, deletion, legacy lease-aware cleanup, real JDBC batch execution, committed-pack catalog lifecycle, zero-query local pack-list handoff through normal `ObjectInserter.addPack()` and authoritative refresh after legacy publication. Queue integration tests verify one 50-row JDBC batch, 50-record transactions, partial batches after the configured wait, repository isolation, pre-commit result validation, rollback and post-commit acknowledgement. Automatic writer tests cover stateful below 16 MiB, stateless at the threshold, explicit overrides, shared rollback and byte-identical reopen. The JGit compatibility matrix verifies the close-before-`commitPack()` lifecycle across all supported versions. Dedicated workflows retain the local writer comparison, calibrated network RTT matrix, batch-size selection matrix, 16/128/512-MiB writer threshold and the remaining read-ahead, aging, queue-scheduling and concurrent-publication investigations.

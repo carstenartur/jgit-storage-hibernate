@@ -112,6 +112,7 @@ run_complete_build() {
   else
     docker info >/dev/null
     mvn -B verify
+    python3 .github/scripts/verify-database-test-evidence.py
   fi
 }
 

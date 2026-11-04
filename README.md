@@ -255,7 +255,7 @@ Flyway.configure()
     .migrate();
 ```
 
-Select the matching location from the [packaged migration locations](docs/consuming.md#packaged-migration-locations) for H2, HSQLDB or Microsoft SQL Server. A shared schema, an existing 0.1.4 installation or a copied pre-library Taxonomy schema requires a deliberate one-time procedure. Do not enable `baselineOnMigrate` blindly; follow [docs/consuming.md](docs/consuming.md) and the [Taxonomy adoption runbook](docs/taxonomy-adoption.md).
+Select the matching location from the [packaged migration locations](docs/consuming.md#packaged-migration-locations) for H2, HSQLDB, Microsoft SQL Server or Oracle (from 0.12.0). A shared schema, an existing 0.1.4 installation or a copied pre-library Taxonomy schema requires a deliberate one-time procedure. Do not enable `baselineOnMigrate` blindly; follow [docs/consuming.md](docs/consuming.md) and the [Taxonomy adoption runbook](docs/taxonomy-adoption.md).
 
 ### 4. Make Hibernate validate, not mutate, the production schema
 
@@ -308,7 +308,7 @@ See [Pack capacity and recovery](docs/operations/capacity-and-recovery.md) for s
 
 ## Versioned database contract
 
-Core, Search and Security ship migrations for **H2, HSQLDB, PostgreSQL and Microsoft SQL Server (MSSQL)**. **Oracle is not currently supported.** The [canonical database support matrix](docs/consuming.md#supported-databases-and-operating-model) records module availability, introduction versions and integration limits, including HSQLDB Search in the Spring Boot starter and the PostgreSQL-only server image.
+Core, Search and Security ship migrations for **H2, HSQLDB, PostgreSQL, Microsoft SQL Server (MSSQL) and Oracle**. Oracle support starts with **0.12.0** and new schemas on the tested Oracle Free version; see the [Oracle deployment guide](docs/operations/oracle.md). The [canonical database support matrix](docs/consuming.md#supported-databases-and-operating-model) records module availability, introduction versions and integration limits, including HSQLDB Search in the Spring Boot starter and the PostgreSQL-only server image.
 
 | Artifact | Persistence contract | History table |
 |---|---|---|
@@ -319,11 +319,11 @@ Core, Search and Security ship migrations for **H2, HSQLDB, PostgreSQL and Micro
 | Java Analysis entities | No module-owned contract; incubating | — |
 | Architecture entities | No module-owned contract; incubating | — |
 
-Core owns `git_packs`, `git_pack_chunks`, `git_repository_lock` and `git_reflog`. The chunk migration preserves existing inline BLOBs and applies chunking only to new writes.
+Core owns `git_packs`, `git_pack_chunks`, `git_repository_lifecycle`, `git_repository_lock` and `git_reflog`. The chunk migration preserves existing inline BLOBs and applies chunking only to new writes.
 
 ## Verification
 
-`mvn verify` exercises H2 and HSQLDB, including file-backed restart and Search migration/query paths, plus PostgreSQL and Microsoft SQL Server through Testcontainers when Docker is available. CI also checks JGit 7.5, 7.6, 7.7 and 7.8 compatibility, dependency changes, release consistency and repeatable JMH workloads. The existing performance workflow additionally runs the 1/16/128 MiB pack-capacity profile manually and weekly.
+`mvn verify` exercises H2 and HSQLDB, including file-backed restart and Search migration/query paths, plus PostgreSQL, Microsoft SQL Server and Oracle through Testcontainers when Docker is available. CI also checks JGit 7.5, 7.6, 7.7 and 7.8 compatibility, dependency changes, release consistency and repeatable JMH workloads. The existing performance workflow additionally runs the 1/16/128 MiB pack-capacity profile manually and weekly.
 
 ## Documentation
 

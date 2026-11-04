@@ -33,19 +33,20 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.engine.spi.SessionFactoryImplementor;
 
 /**
  * Storage-specific atomic processor for append-only queryable reflog projection records.
  *
  * <p>Every queue batch is repository-homogeneous, acquires the same repository coordination row as
- * refs and pack publication, validates all delivery IDs and ref-history transitions before the first
- * insert, and commits all new entries in one transaction. Exact delivery-ID replays return {@link
- * Status#ALREADY_APPLIED}; conflicting reuses reject the complete batch.
+ * refs and pack publication, validates all delivery IDs and ref-history transitions before the
+ * first insert, and commits all new entries in one transaction. Exact delivery-ID replays return
+ * {@link Status#ALREADY_APPLIED}; conflicting reuses reject the complete batch.
  *
- * <p>New rows use one JDBC {@link PreparedStatement} batch. The identity primary key is deliberately
- * omitted because the durable result is the caller's delivery ID, not a database-generated row ID.
- * This avoids Hibernate's identity-generation batch split while retaining the same mapped table and
- * transaction.
+ * <p>New rows use one JDBC {@link PreparedStatement} batch. The identity primary key is
+ * deliberately omitted because the durable result is the caller's delivery ID, not a
+ * database-generated row ID. This avoids Hibernate's identity-generation batch split while
+ * retaining the same mapped table and transaction.
  *
  * <p>This processor deliberately does not combine complete pushes or mutate refs. It is the narrow
  * first Git-semantic batch requested by the durable queue contract: an append-only projection whose
@@ -85,8 +86,8 @@ public final class HibernateReflogBatchProcessor
 
   /** Execute and commit one repository-homogeneous batch. */
   @Override
-  public List<ReflogAppendResult> execute(
-      String repositoryName, List<ReflogAppendCommand> commands) throws IOException {
+  public List<ReflogAppendResult> execute(String repositoryName, List<ReflogAppendCommand> commands)
+      throws IOException {
     return delegate.execute(repositoryName, commands);
   }
 
@@ -115,7 +116,14 @@ public final class HibernateReflogBatchProcessor
     LinkedHashSet<String> deliveryIds = validateUniqueDeliveryIds(commands);
     Map<String, GitReflogEntity> existing =
         loadExistingByDeliveryId(session, repositoryName, deliveryIds);
-    validateExistingPayloads(commands, existing);
+    boolean emptyStringTreatedAsNull =
+        session
+            .getSessionFactory()
+            .unwrap(SessionFactoryImplementor.class)
+            .getJdbcServices()
+            .getDialect()
+            .isEmptyStringTreatedAsNull();
+    validateExistingPayloads(commands, existing, emptyStringTreatedAsNull);
 
     Set<String> refsWithNewCommands = new LinkedHashSet<>();
     List<ReflogAppendCommand> newCommands = new ArrayList<>();
@@ -133,9 +141,7 @@ public final class HibernateReflogBatchProcessor
     List<ReflogAppendResult> results = new ArrayList<>(commands.size());
     for (ReflogAppendCommand command : commands) {
       Status status =
-          existing.containsKey(command.deliveryId())
-              ? Status.ALREADY_APPLIED
-              : Status.APPENDED;
+          existing.containsKey(command.deliveryId()) ? Status.ALREADY_APPLIED : Status.APPENDED;
       results.add(new ReflogAppendResult(command.deliveryId(), status));
     }
     return List.copyOf(results);
@@ -159,8 +165,7 @@ public final class HibernateReflogBatchProcessor
               statement.setString(7, command.newIdName());
               statement.setString(8, command.whoName());
               statement.setString(9, command.whoEmail());
-              statement.setObject(
-                  10, OffsetDateTime.ofInstant(command.when(), ZoneOffset.UTC));
+              statement.setObject(10, OffsetDateTime.ofInstant(command.when(), ZoneOffset.UTC));
               statement.setString(11, command.message());
               statement.addBatch();
             }
@@ -182,8 +187,8 @@ public final class HibernateReflogBatchProcessor
     }
   }
 
-  private static LinkedHashSet<String> validateUniqueDeliveryIds(
-      List<ReflogAppendCommand> commands) throws ReflogBatchRejectedException {
+  private static LinkedHashSet<String> validateUniqueDeliveryIds(List<ReflogAppendCommand> commands)
+      throws ReflogBatchRejectedException {
     LinkedHashSet<String> deliveryIds = new LinkedHashSet<>();
     for (ReflogAppendCommand command : commands) {
       Objects.requireNonNull(command, "commands must not contain null");
@@ -228,11 +233,13 @@ public final class HibernateReflogBatchProcessor
   }
 
   private static void validateExistingPayloads(
-      List<ReflogAppendCommand> commands, Map<String, GitReflogEntity> existing)
+      List<ReflogAppendCommand> commands,
+      Map<String, GitReflogEntity> existing,
+      boolean emptyStringTreatedAsNull)
       throws ReflogBatchRejectedException {
     for (ReflogAppendCommand command : commands) {
       GitReflogEntity row = existing.get(command.deliveryId());
-      if (row != null && !samePayload(row, command)) {
+      if (row != null && !samePayload(row, command, emptyStringTreatedAsNull)) {
         throw new ReflogBatchRejectedException(
             Reason.DELIVERY_ID_REUSED_WITH_DIFFERENT_PAYLOAD,
             command.deliveryId(),
@@ -312,14 +319,19 @@ public final class HibernateReflogBatchProcessor
     }
   }
 
-  private static boolean samePayload(GitReflogEntity row, ReflogAppendCommand command) {
+  private static boolean samePayload(
+      GitReflogEntity row, ReflogAppendCommand command, boolean emptyStringTreatedAsNull) {
     return Objects.equals(row.getRefName(), command.refName())
         && Objects.equals(row.getOldId(), command.oldIdName())
         && Objects.equals(row.getNewId(), command.newIdName())
         && Objects.equals(normalize(row.getWhoName()), command.whoName())
         && Objects.equals(normalize(row.getWhoEmail()), command.whoEmail())
         && Objects.equals(row.getWhen(), command.when())
-        && Objects.equals(row.getMessage(), command.message());
+        // Some dialects (including Oracle) persist an empty message as SQL NULL. Apply
+        // that equivalence only to persisted replay; other databases retain null/empty semantics.
+        && (emptyStringTreatedAsNull
+            ? Objects.equals(normalize(row.getMessage()), normalize(command.message()))
+            : Objects.equals(row.getMessage(), command.message()));
   }
 
   private static String normalize(String value) {

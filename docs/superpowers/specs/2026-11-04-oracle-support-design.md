@@ -25,7 +25,9 @@ A separate Oracle storage implementation would duplicate the existing one.
 ## Scope and boundaries
 
 - Official Oracle coverage starts with fresh installations at 0.12.0, using the
-  Oracle Free version pinned in the integration tests. Do not imply coverage for
+  Oracle Free 23.26.3 pinned as `gvenzl/oracle-free:23.26.3-slim-faststart`,
+  with AL32UTF8/AL16UTF16. The stream uses native BOOLEAN; older Oracle releases
+  are not qualified. Do not imply coverage for
   untested older Oracle releases or editions.
 - Cover migrations, Hibernate validation, repository writes/reads/reopening,
   transfer/deletion isolation, ref and reflog behavior, relational/Lucene Search,
@@ -50,3 +52,13 @@ checks, merge through the repository's normal protection rules, then use the
 documented `release-request/0.12.0` workflow. Verify public Maven artifacts,
 GitHub release/tag and server image publication. Restore the next snapshot via
 the generated development-version PR. Never replace existing release artifacts.
+
+## Oracle portability decisions
+
+Use a dedicated `JgitOracleDialect` in the provider to cap nationalized scalar
+capacity at 2000 and map longer Search values to NCLOB without altering existing
+backend mappings. Preserve custom application dialect/resolver choices. Normalize
+null/empty persisted reflog comparison only on dialects that collapse empty
+strings. Security managed-key unique indexes use conditional all-null keys for
+unmanaged rows. These decisions follow concrete source audits and receive
+regression coverage.

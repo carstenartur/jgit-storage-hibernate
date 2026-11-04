@@ -89,4 +89,6 @@ The complete gate is part of the standard build:
 mvn verify
 ```
 
-With Docker available, the same command also executes PostgreSQL and Microsoft SQL Server coverage through Testcontainers. Without Docker, those container-backed classes are disabled while H2, HSQLDB, API compatibility, Javadoc, packaged-JAR linkage and the remaining quality gates still run. See the [database support matrix](../consuming.md#supported-databases-and-operating-model) for module availability and integration limits.
+With Docker available, the same command also executes PostgreSQL, Microsoft SQL Server and Oracle coverage through Testcontainers. Without Docker, those container-backed classes are disabled while H2, HSQLDB, API compatibility, Javadoc, packaged-JAR linkage and the remaining quality gates still run. See the [database support matrix](../consuming.md#supported-databases-and-operating-model) for module availability and integration limits.
+
+CI and real release builds also verify the retained Oracle and SQL Server Surefire reports. Every required suite must contain executed tests with zero skips, failures and errors. The workflows upload the XML reports even on failure; a successful local build without Docker does not qualify those backends.

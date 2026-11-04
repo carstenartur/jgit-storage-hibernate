@@ -29,6 +29,10 @@ public final class CoreSchemaMigrations {
   public static final String POSTGRESQL_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/core/postgresql";
 
+  /** Flyway location for fresh Oracle 23+ schemas. */
+  public static final String ORACLE_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/core/oracle";
+
   /** Flyway location for Microsoft SQL Server migrations. */
   public static final String SQL_SERVER_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/core/sqlserver";

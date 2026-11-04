@@ -32,9 +32,12 @@ public final class SearchSchemaMigrations {
   public static final String SQL_SERVER_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/search/sqlserver";
 
+  /** Flyway location for a fresh Oracle 23+ Search installation. */
+  public static final String ORACLE_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/search/oracle";
+
   /** Dedicated Flyway schema history table for generic search projections. */
-  public static final String SCHEMA_HISTORY_TABLE =
-      "jgit_storage_hibernate_search_schema_history";
+  public static final String SCHEMA_HISTORY_TABLE = "jgit_storage_hibernate_search_schema_history";
 
   /** Baseline used when installing into a schema that contains only unrelated tables. */
   public static final String PRE_MIGRATION_BASELINE_VERSION = "0";
@@ -47,8 +50,7 @@ public final class SearchSchemaMigrations {
   public static final String LEGACY_SCHEMA_VERSION = "0.1.4";
 
   /** Description used when baselining a verified 0.1.4 search projection schema. */
-  public static final String LEGACY_BASELINE_DESCRIPTION =
-      "jgit-storage-hibernate-search 0.1.4";
+  public static final String LEGACY_BASELINE_DESCRIPTION = "jgit-storage-hibernate-search 0.1.4";
 
   private SearchSchemaMigrations() {}
 }
