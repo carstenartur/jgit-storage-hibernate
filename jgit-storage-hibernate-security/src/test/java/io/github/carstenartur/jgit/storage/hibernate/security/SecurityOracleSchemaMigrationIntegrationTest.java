@@ -469,14 +469,19 @@ class SecurityOracleSchemaMigrationIntegrationTest {
     try (var provider = provider()) {
       var factory = provider.getSessionFactory();
       var service = credentials(factory);
-      assertEquals(
-          SecurityAuthenticationReason.PASSWORD_LOCKED,
+      var locked =
           assertThrows(
-                  SecurityAuthenticationException.class,
-                  () ->
-                      service.authenticatePassword(
-                          "credential-login", "秘密-password".toCharArray(), trace("locked-restart")))
-              .reason());
+              SecurityAuthenticationException.class,
+              () ->
+                  service.authenticatePassword(
+                      "credential-login", "秘密-password".toCharArray(), trace("locked-restart")));
+      // Password denials conceal lockout details; precise reasons are durable audit evidence.
+      assertEquals(SecurityAuthenticationReason.INVALID_CREDENTIALS, locked.reason());
+      assertNull(locked.retryAt());
+      var lockedMetadata = service.findLocalCredential("credential-user").orElseThrow();
+      assertEquals(2, lockedMetadata.failedAttemptCount());
+      assertEquals(TIME.plusSeconds(300), lockedMetadata.lockedUntil());
+      assertTrue(lockedMetadata.lockedAt(TIME));
       assertEquals(
           SecurityAuthenticationReason.ACCESS_TOKEN_REVOKED,
           assertThrows(
@@ -499,6 +504,18 @@ class SecurityOracleSchemaMigrationIntegrationTest {
             assertEquals(TIME, token.getLastUsedAt());
           });
       var audit = new HibernateSecurityIdentityAuditService(factory);
+      var lockoutEvents = audit.findByCorrelationId("locked-restart", 10);
+      assertEquals(1, lockoutEvents.size());
+      var lockoutEvent = lockoutEvents.getFirst();
+      assertEquals(TIME, lockoutEvent.occurredAt());
+      assertEquals(
+          SecurityIdentityAuditOperation.PASSWORD_AUTHENTICATION,
+          lockoutEvent.record().operation());
+      assertEquals(SecurityAuditOutcome.DENIED, lockoutEvent.record().outcome());
+      assertEquals(
+          SecurityAuthenticationReason.PASSWORD_LOCKED.name(), lockoutEvent.record().reasonCode());
+      assertEquals("credential-user", lockoutEvent.record().subjectPrincipalId());
+      assertEquals(SecurityCredentialKind.PASSWORD, lockoutEvent.record().credentialKind());
       assertTrue(audit.findBySubjectPrincipal("credential-user", 100).size() >= 8);
       assertTrue(audit.findByCredentialId(tokenId, 100).size() >= 4);
       assertEquals(TIME, audit.findByCorrelationId("revoked-restart", 10).getFirst().occurredAt());

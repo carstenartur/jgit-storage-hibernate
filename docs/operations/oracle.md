@@ -78,7 +78,9 @@ Flyway.configure()
     .migrate();
 ```
 
-Use the corresponding `SecuritySchemaMigrations` constants for Security. The
+For Security, use the corresponding `SecuritySchemaMigrations` constants and
+omit the `baselineDescription(...)` call: Security exposes the baseline version
+but has no baseline-description constant. The
 [shared-schema runbook](../consuming.md#provisioning-runbook-b-shared-schema-without-jgit-tables)
 also applies when unrelated application tables precede the first Core install.
 Disable automatic baselining after the one-time installation. Run Flyway
