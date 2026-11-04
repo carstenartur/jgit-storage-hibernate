@@ -86,7 +86,7 @@ abstract class SearchDatabaseQueryContract {
 
     try (HibernateSessionFactoryProvider provider =
         new HibernateSessionFactoryProvider(
-            databaseProperties(luceneRoot), SearchEntities.annotatedClasses())) {
+            queryContractProperties(luceneRoot), SearchEntities.annotatedClasses())) {
       primaryHistory = createPrimaryHistory(provider);
       secondaryCommit = createSecondaryHistory(provider);
 
@@ -114,12 +114,14 @@ abstract class SearchDatabaseQueryContract {
         assertEquals(RebuildState.INTERRUPTED, interruptedProgress.getLast().state());
         assertEquals(
             InterruptedIOException.class.getName(), interruptedProgress.getLast().failureType());
-        assertEquals(5, countRows(provider, PRIMARY_REPOSITORY));
+        // Progress is emitted after a committed batch; interruption at its second item leaves
+        // exactly the first two-item batch durable and the remaining three commits unindexed.
+        assertEquals(2, countRows(provider, PRIMARY_REPOSITORY));
 
         RebuildResult primaryResult =
             rebuilder.rebuild(primary, new RepositoryName(PRIMARY_REPOSITORY));
         assertEquals(RebuildState.COMPLETED, primaryResult.state());
-        assertEquals(5, primaryResult.removedProjections());
+        assertEquals(2, primaryResult.removedProjections());
         assertEquals(2, primaryResult.refTips());
         assertEquals(5, primaryResult.visitedCommits());
         assertEquals(5, primaryResult.indexedCommits());
@@ -176,7 +178,7 @@ abstract class SearchDatabaseQueryContract {
 
     try (HibernateSessionFactoryProvider restarted =
             new HibernateSessionFactoryProvider(
-                databaseProperties(luceneRoot), SearchEntities.annotatedClasses());
+                queryContractProperties(luceneRoot), SearchEntities.annotatedClasses());
         HibernateRepository primary =
             HibernateRepository.create(restarted.getSessionFactory(), PRIMARY_REPOSITORY)) {
       GitHistorySearchService search = new GitHistorySearchService(restarted.getSessionFactory());
@@ -407,6 +409,12 @@ abstract class SearchDatabaseQueryContract {
     SessionFactory sessionFactory = provider.getSessionFactory();
     provider.close();
     return sessionFactory;
+  }
+
+  private Properties queryContractProperties(Path luceneRoot) {
+    Properties properties = databaseProperties(luceneRoot);
+    properties.put(CommitIndexer.INDEX_BATCH_SIZE_PROPERTY, "2");
+    return properties;
   }
 
   protected abstract void migrateSchemas();

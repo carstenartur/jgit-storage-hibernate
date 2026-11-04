@@ -124,9 +124,8 @@ class SearchOracleSchemaMigrationIntegrationTest {
         }
       }
       assertEquals(List.of("repository_name"), indexes.get("idx_commit_repo"));
-      assertEquals(List.of("repository_name", "commit_time"), indexes.get("idx_commit_repo_time"));
-      assertEquals(
-          List.of("repository_name", "author_time"), indexes.get("idx_commit_repo_author_time"));
+      assertTimestampIndex(connection, indexes, "idx_commit_repo_time", "commit_time");
+      assertTimestampIndex(connection, indexes, "idx_commit_repo_author_time", "author_time");
       assertEquals(
           List.of("repository_name", "author_email"), indexes.get("idx_commit_repo_author"));
       assertEquals(
@@ -144,6 +143,48 @@ class SearchOracleSchemaMigrationIntegrationTest {
             List.of("SHORT_MESSAGE", "FULL_MESSAGE", "CHANGED_PATHS", "CHANGED_TEXT"))
           assertEquals("NCLOB", types.get(name));
         assertEquals("NVARCHAR2", types.get("REPOSITORY_NAME"));
+      }
+    }
+  }
+
+  private static void assertTimestampIndex(
+      java.sql.Connection connection,
+      java.util.Map<String, java.util.List<String>> indexes,
+      String indexName,
+      String timestampColumn)
+      throws Exception {
+    var columns = indexes.get(indexName);
+    assertNotNull(columns, indexName);
+    assertEquals(2, columns.size(), indexName);
+    assertEquals("repository_name", columns.getFirst(), indexName);
+    // Oracle implements TIMESTAMP WITH TIME ZONE index keys as hidden UTC expressions.
+    // USER_IND_EXPRESSIONS exposes their function and ordered key position, unlike JDBC's
+    // physical SYS_NC... column name. Assert the full expression rather than accepting an
+    // arbitrary hidden key. See Oracle Database Reference, USER_IND_EXPRESSIONS.
+    try (var statement =
+        connection.prepareStatement(
+            "select column_position, column_expression from user_ind_expressions "
+                + "where table_name = 'GIT_COMMIT_INDEX' and index_name = ?")) {
+      statement.setString(1, indexName.toUpperCase(Locale.ROOT));
+      try (var expressions = statement.executeQuery()) {
+        assertTrue(expressions.next(), indexName);
+        assertEquals(2, expressions.getInt(1), indexName);
+        String expression =
+            expressions.getString(2).replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
+        assertEquals("sys_extract_utc(\"" + timestampColumn + "\")", expression, indexName);
+        assertFalse(expressions.next(), indexName);
+      }
+    }
+    try (var statement =
+        connection.prepareStatement(
+            "select hidden_column, virtual_column from user_tab_cols "
+                + "where table_name = 'GIT_COMMIT_INDEX' and column_name = ?")) {
+      statement.setString(1, columns.get(1).toUpperCase(Locale.ROOT));
+      try (var column = statement.executeQuery()) {
+        assertTrue(column.next(), indexName);
+        assertEquals("YES", column.getString(1), indexName);
+        assertEquals("YES", column.getString(2), indexName);
+        assertFalse(column.next(), indexName);
       }
     }
   }
