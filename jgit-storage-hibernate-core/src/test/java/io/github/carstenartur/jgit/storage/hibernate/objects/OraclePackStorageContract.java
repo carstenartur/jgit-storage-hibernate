@@ -21,6 +21,7 @@ import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateReposit
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
 import java.util.Random;
@@ -29,12 +30,71 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
+import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
+import org.eclipse.jgit.internal.storage.dfs.ReadableChannel;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.Session;
 
 /** Package access to the real staging paths, called by the Flyway-backed Oracle suite. */
 public final class OraclePackStorageContract {
   private OraclePackStorageContract() {}
+
+  /** Verify the storage API independently of a driver's representation of an empty binary bind. */
+  public static void verifyEmptyExtensionRead(
+      HibernateSessionFactoryProvider provider, String repositoryName, long packId)
+      throws Exception {
+    String packName;
+    try (Session session = provider.getSessionFactory().openSession()) {
+      GitPackEntity pack = session.find(GitPackEntity.class, packId);
+      assertNotNull(pack);
+      assertEquals(repositoryName, pack.getRepositoryName());
+      assertEquals("idx", pack.getPackExtension());
+      assertTrue(pack.isCommitted());
+      assertEquals(0, pack.getFileSize());
+      assertTrue(pack.getData() == null || pack.getData().length == 0);
+      packName = pack.getPackName();
+      assertEquals(
+          0L,
+          session
+              .createQuery(
+                  "select count(c) from GitPackChunkEntity c where c.packId = :id", Long.class)
+              .setParameter("id", packId)
+              .getSingleResult());
+    }
+    try (HibernateRepository repository =
+        HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      ReadAheadHibernateObjDatabase readAhead =
+          (ReadAheadHibernateObjDatabase) repository.getObjectDatabase();
+      DfsPackDescription description =
+          readAhead.listPacks().stream()
+              .filter(candidate -> baseName(candidate).equals(packName))
+              .findFirst()
+              .orElseThrow();
+      HibernateObjDatabase ordinary =
+          new HibernateObjDatabase(
+              repository,
+              new DfsReaderOptions(),
+              provider.getSessionFactory(),
+              repositoryName,
+              new HibernateTransactionContext(provider.getSessionFactory()));
+      try (ReadableChannel channel = readAhead.openFile(description, PackExt.INDEX)) {
+        assertEmptyChannel(channel);
+      }
+      try (ReadableChannel channel = ordinary.openFile(description, PackExt.INDEX)) {
+        assertEmptyChannel(channel);
+      }
+    }
+  }
+
+  private static void assertEmptyChannel(ReadableChannel channel) throws Exception {
+    assertEquals(0, channel.size());
+    assertEquals(0, channel.position());
+    ByteBuffer destination = ByteBuffer.allocate(1);
+    assertEquals(-1, channel.read(destination));
+    assertEquals(0, destination.position(), "EOF must not copy a byte into the destination");
+    channel.position(0);
+    assertEquals(-1, channel.read(ByteBuffer.allocate(1)));
+  }
 
   public static void verifyDuplicateConstraint(HibernateSessionFactoryProvider provider)
       throws Exception {

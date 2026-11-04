@@ -300,4 +300,3 @@ create table git_security_managed_policy (
 
 create index idx_git_sec_managed_policy_repository
     on git_security_managed_policy (repository_name, policy_generation);
-

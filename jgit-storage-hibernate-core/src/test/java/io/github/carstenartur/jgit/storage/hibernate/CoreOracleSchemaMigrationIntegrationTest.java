@@ -4,6 +4,9 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate;
 
+import static io.github.carstenartur.jgit.storage.hibernate.ReflogBatchDatabaseAssertions.assertBootstrapPreserved;
+import static io.github.carstenartur.jgit.storage.hibernate.ReflogBatchDatabaseAssertions.bootstrapSnapshot;
+import static io.github.carstenartur.jgit.storage.hibernate.ReflogBatchDatabaseAssertions.reflogSnapshot;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import io.github.carstenartur.jgit.storage.hibernate.ReflogBatchDatabaseAssertions.ReflogSnapshot;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitReflogEntity;
@@ -272,10 +276,13 @@ class CoreOracleSchemaMigrationIntegrationTest {
       try (Session session = reopened.getSessionFactory().openSession()) {
         GitPackEntity persisted = session.find(GitPackEntity.class, inlineId);
         assertArrayEquals(inline, persisted.getData());
-        assertArrayEquals(new byte[0], session.find(GitPackEntity.class, emptyInlineId).getData());
         assertEquals(WHEN, persisted.getCreatedAt());
         assertTrue(persisted.isCommitted());
       }
+      // Oracle may return SQL NULL for an empty binary bind. The storage contract is a
+      // zero-length readable extension, including after a new SessionFactory, on both read paths.
+      io.github.carstenartur.jgit.storage.hibernate.objects.OraclePackStorageContract
+          .verifyEmptyExtensionRead(reopened, name.value(), emptyInlineId);
       assertTrue(factory.deleteRepository(name).deletedAnything());
       try (Session session = reopened.getSessionFactory().openSession()) {
         assertEquals(
@@ -305,6 +312,7 @@ class CoreOracleSchemaMigrationIntegrationTest {
     String name = "reflog-資料庫-🦊";
     String prefix = "refs/heads/" + "長".repeat(128);
     String boundary = "🦊".repeat(999) + "漢字"; // Exactly 2000 UTF-16 code units.
+    List<ReflogSnapshot> bootstrap;
     List<ReflogAppendCommand> commands =
         List.of(
             command("unicode", prefix + "甲", ObjectId.zeroId(), id(1), boundary),
@@ -314,6 +322,7 @@ class CoreOracleSchemaMigrationIntegrationTest {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), name)) {
       repository.create(true);
+      bootstrap = bootstrapSnapshot(provider, name);
       assertEquals(
           List.of(
               ReflogAppendResult.Status.APPENDED,
@@ -341,9 +350,12 @@ class CoreOracleSchemaMigrationIntegrationTest {
         List<GitReflogEntity> rows =
             session
                 .createQuery(
-                    "from GitReflogEntity r where r.repositoryName = :repo order by r.id",
+                    "from GitReflogEntity r where r.repositoryName = :repo "
+                        + "and r.deliveryId in :deliveryIds order by r.id",
                     GitReflogEntity.class)
                 .setParameter("repo", name)
+                .setParameterList(
+                    "deliveryIds", commands.stream().map(ReflogAppendCommand::deliveryId).toList())
                 .getResultList();
         assertEquals(3, rows.size());
         assertEquals(boundary, rows.getFirst().getMessage());
@@ -354,12 +366,14 @@ class CoreOracleSchemaMigrationIntegrationTest {
         assertTrue(rows.getFirst().getId() > 0);
         assertTrue(rows.get(2).getId() > rows.getFirst().getId());
       }
+      assertBootstrapPreserved(provider, name, bootstrap, commands.size());
     }
   }
 
   @Test
   void failedJdbcBatchRollsBackAndCanRetryTheSameDeliveryIds() throws Exception {
     String name = "oracle-batch-rollback";
+    List<ReflogSnapshot> bootstrap;
     List<ReflogAppendCommand> commands =
         List.of(
             command("rollback-first", "refs/heads/main", ObjectId.zeroId(), id(1), "first"),
@@ -368,6 +382,7 @@ class CoreOracleSchemaMigrationIntegrationTest {
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), name)) {
       repository.create(true);
+      bootstrap = bootstrapSnapshot(provider, name);
       sql(
           "alter table git_reflog add constraint reject_oracle_explode check (message <>"
               + " 'explode')");
@@ -378,22 +393,16 @@ class CoreOracleSchemaMigrationIntegrationTest {
         assertEquals(
             HibernateReflogBatchProcessor.RetryAdvice.RETRY_WITH_SAME_DELIVERY_IDS,
             HibernateReflogBatchProcessor.retryAdvice(failure));
-        try (Session session = provider.getSessionFactory().openSession()) {
-          assertEquals(
-              0L,
-              session
-                  .createQuery(
-                      "select count(r) from GitReflogEntity r where r.repositoryName = :repo",
-                      Long.class)
-                  .setParameter("repo", name)
-                  .getSingleResult());
-        }
+        // Assert the complete pre-batch database state, including bootstrap HEAD content.
+        // This proves both attempted delivery rows rolled back without erasing existing history.
+        assertEquals(bootstrap, reflogSnapshot(provider, name));
       } finally {
         sql("alter table git_reflog drop constraint reject_oracle_explode");
       }
       assertTrue(
           processor.execute(name, commands).stream()
               .allMatch(result -> result.status() == ReflogAppendResult.Status.APPENDED));
+      assertBootstrapPreserved(provider, name, bootstrap, commands.size());
     }
     try (HibernateSessionFactoryProvider reopened = provider()) {
       assertTrue(
@@ -401,6 +410,7 @@ class CoreOracleSchemaMigrationIntegrationTest {
               .execute(name, commands).stream()
                   .allMatch(
                       result -> result.status() == ReflogAppendResult.Status.ALREADY_APPLIED));
+      assertBootstrapPreserved(reopened, name, bootstrap, commands.size());
     }
   }
 
