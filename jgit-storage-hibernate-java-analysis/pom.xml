@@ -19,7 +19,7 @@
 
   <properties>
     <!-- Match the Lucene runtime of Hibernate Search 8.4; do not rely on test transitives. -->
-    <lucene.version>9.12.3</lucene.version>
+    <lucene.version>10.6.0</lucene.version>
     <jacoco.minimum.line>0.81</jacoco.minimum.line>
     <jacoco.minimum.branch>0.64</jacoco.minimum.branch>
   </properties>
