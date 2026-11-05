@@ -28,7 +28,7 @@ public final class SecuritySchemaMigrations {
   public static final String SQL_SERVER_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/security/sqlserver";
 
-  /** Flyway location for fresh Oracle 23+ installations. */
+  /** Flyway location for fresh Oracle 23+ installations, starting at schema version 0.12.0. */
   public static final String ORACLE_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/security/oracle";
 
@@ -39,7 +39,12 @@ public final class SecuritySchemaMigrations {
   /** Baseline used when Security is installed beside Core in an existing schema. */
   public static final String PRE_MIGRATION_BASELINE_VERSION = "0";
 
-  /** Latest schema version produced by this module. */
+  /**
+   * Latest schema version for the H2, HSQLDB, PostgreSQL and Microsoft SQL Server migration streams.
+   *
+   * <p>The independent fresh-install Oracle stream starts at version {@code 0.12.0}. Flyway history
+   * reports the version for the selected migration location.
+   */
   public static final String CURRENT_SCHEMA_VERSION = "0.11.3";
 
   private SecuritySchemaMigrations() {}
