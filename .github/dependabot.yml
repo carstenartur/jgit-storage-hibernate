@@ -32,6 +32,11 @@ updates:
       - dependency-name: "org.eclipse.jgit:org.eclipse.jgit"
         update-types:
           - "version-update:semver-major"
+      # Lucene must match the selected Hibernate Search backend.
+      # A major upgrade requires coordinated backend and index qualification.
+      - dependency-name: "org.apache.lucene:*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"

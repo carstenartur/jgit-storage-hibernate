@@ -46,7 +46,7 @@ jobs:
           echo "run_id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
 
       - name: Download generated badge data outside the worktree
-        uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317 # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: badge-metrics
           path: ${{ runner.temp }}/build-badge-metrics

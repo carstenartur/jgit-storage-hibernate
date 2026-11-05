@@ -65,7 +65,7 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
         for fragment in (
             "needs: repository-aging-full-shard",
             "needs['repository-aging-full-shard'].result == 'success'",
-            "actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317",
+            "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
             "pattern: performance-investigation-repository-aging-full-*",
             "merge-multiple: true",
             "for backend in ('hsqldb', 'postgresql', 'postgresql-hikari')",
