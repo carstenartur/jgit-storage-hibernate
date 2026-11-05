@@ -68,7 +68,7 @@
     <byte-buddy.version>1.18.14</byte-buddy.version>
     <spring-boot.version>4.1.2</spring-boot.version>
     <flyway.version>13.12.0</flyway.version>
-    <jackson3-bom.version>3.2.3</jackson3-bom.version>
+    <jackson3-bom.version>3.2.4</jackson3-bom.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <postgresql.version>42.7.14</postgresql.version>
     <oracle-jdbc.version>23.26.4.0.0</oracle-jdbc.version>
