@@ -94,6 +94,9 @@ public final class JgitStorageSchemaManager {
       if (product.contains("microsoft sql server")) {
         return DatabaseKind.SQL_SERVER;
       }
+      if (product.equals("oracle")) {
+        return DatabaseKind.ORACLE;
+      }
       if (product.equals("h2")) {
         return DatabaseKind.H2;
       }
@@ -114,6 +117,7 @@ public final class JgitStorageSchemaManager {
       case HSQLDB -> CoreSchemaMigrations.HSQLDB_LOCATION;
       case POSTGRESQL -> CoreSchemaMigrations.POSTGRESQL_LOCATION;
       case SQL_SERVER -> CoreSchemaMigrations.SQL_SERVER_LOCATION;
+      case ORACLE -> CoreSchemaMigrations.ORACLE_LOCATION;
     };
   }
 
@@ -122,9 +126,10 @@ public final class JgitStorageSchemaManager {
       case H2 -> SearchSchemaMigrations.H2_LOCATION;
       case POSTGRESQL -> SearchSchemaMigrations.POSTGRESQL_LOCATION;
       case SQL_SERVER -> SearchSchemaMigrations.SQL_SERVER_LOCATION;
+      case ORACLE -> SearchSchemaMigrations.ORACLE_LOCATION;
       case HSQLDB ->
           throw new IllegalStateException(
-              "Hibernate Search persistence is not supported on HSQLDB; disable search or use H2, PostgreSQL or SQL Server");
+              "Automatic Hibernate Search schema management is not supported on HSQLDB; disable search, manage its schema externally or use H2, PostgreSQL, SQL Server or Oracle");
     };
   }
 
@@ -132,6 +137,7 @@ public final class JgitStorageSchemaManager {
     H2,
     HSQLDB,
     POSTGRESQL,
-    SQL_SERVER
+    SQL_SERVER,
+    ORACLE
   }
 }

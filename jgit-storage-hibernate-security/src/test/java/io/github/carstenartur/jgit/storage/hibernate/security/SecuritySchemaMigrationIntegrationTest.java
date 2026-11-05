@@ -57,6 +57,11 @@ class SecuritySchemaMigrationIntegrationTest {
   }
 
   static void verifyEmptyMigrationAndRestart(TestDatabase database) throws Exception {
+    verifyEmptyMigrationAndRestart(database, SecuritySchemaMigrations.CURRENT_SCHEMA_VERSION);
+  }
+
+  static void verifyEmptyMigrationAndRestart(TestDatabase database, String expectedVersion)
+      throws Exception {
     migrate(
         database,
         database.coreLocation(),
@@ -77,7 +82,7 @@ class SecuritySchemaMigrationIntegrationTest {
     }
 
     assertEquals(
-        SecuritySchemaMigrations.CURRENT_SCHEMA_VERSION,
+        expectedVersion,
         Flyway.configure()
             .dataSource(database.url(), database.username(), database.password())
             .locations(database.securityLocation())

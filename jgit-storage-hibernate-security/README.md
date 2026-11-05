@@ -3,7 +3,7 @@
 `jgit-storage-hibernate-security` is the optional, framework-neutral security capability described by
 [ADR-0003](../docs/adrs/0003-optional-principal-bound-security.md).
 
-The [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) defines supported backends, tested release versions and integration limits for this module. Oracle is not currently supported. Security migrations are managed separately from the Spring Boot starter's Core/Search schema manager.
+The [canonical database support matrix](../docs/consuming.md#supported-databases-and-operating-model) defines supported backends, tested release versions and integration limits for this module. Oracle support starts with 0.12.0 for new schemas on the tested Oracle Free version; follow the [Oracle deployment guide](../docs/operations/oracle.md). Security migrations are managed separately from the Spring Boot starter's Core/Search schema manager.
 
 It provides:
 
@@ -12,7 +12,7 @@ It provides:
 - deterministic principal/group grant and protected-ref evaluation;
 - module-owned Hibernate entities for principals, groups, memberships, grants, ref rules, credentials,
   access tokens, security versions and append-only authorization/identity audit;
-- independent Flyway migrations for H2, HSQLDB, PostgreSQL and Microsoft SQL Server;
+- independent Flyway migrations for H2, HSQLDB, PostgreSQL, Microsoft SQL Server and Oracle;
 - a database-backed adapter for Core's dependency-free repository access SPI;
 - principal-bound repository sessions that enforce direct JGit ref mutations and repository deletion;
 - bounded persistent evidence for allowed, denied and failed authorization evaluations;
@@ -85,7 +85,7 @@ branch or tag; authority-changing ref publication is enforced separately.
 
 ## Local passwords and one-way access tokens
 
-Apply the Security Flyway stream through version `0.11.2` and register every class returned by
+Apply the current Security Flyway stream (credentials were introduced in `0.11.2`; the Oracle initial schema includes them from `0.12.0`) and register every class returned by
 `SecurityEntities.annotatedClasses()`. Construct the service with an application-owned management
 policy, the persistent identity-audit service and an access-token pepper obtained from a secret manager:
 

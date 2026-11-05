@@ -28,6 +28,10 @@ public final class SecuritySchemaMigrations {
   public static final String SQL_SERVER_LOCATION =
       "classpath:db/migration/jgit-storage-hibernate/security/sqlserver";
 
+  /** Flyway location for fresh Oracle 23+ installations. */
+  public static final String ORACLE_LOCATION =
+      "classpath:db/migration/jgit-storage-hibernate/security/oracle";
+
   /** Dedicated Flyway history table for the optional Security capability. */
   public static final String SCHEMA_HISTORY_TABLE =
       "jgit_storage_hibernate_security_schema_history";

@@ -61,8 +61,7 @@ class HibernateReflogBatchProcessorH2Test {
                 .toList();
 
         for (int index = 0; index < submissions.size(); index++) {
-          ReflogAppendResult result =
-              submissions.get(index).completion().get(5, TimeUnit.SECONDS);
+          ReflogAppendResult result = submissions.get(index).completion().get(5, TimeUnit.SECONDS);
           assertEquals(commands.get(index).deliveryId(), result.deliveryId());
           assertEquals(Status.APPENDED, result.status());
           assertEquals(3, submissions.get(index).batchSize());
@@ -109,20 +108,16 @@ class HibernateReflogBatchProcessorH2Test {
     try (Fixture fixture = new Fixture()) {
       HibernateReflogBatchProcessor processor =
           new HibernateReflogBatchProcessor(fixture.provider.getSessionFactory());
-      ReflogAppendCommand committed =
-          command("delivery-1", ObjectId.zeroId(), id(1), "first");
+      ReflogAppendCommand committed = command("delivery-1", ObjectId.zeroId(), id(1), "first");
       processor.execute(fixture.repositoryName, List.of(committed));
 
-      ReflogAppendCommand newCommand =
-          command("delivery-2", id(1), id(2), "second");
+      ReflogAppendCommand newCommand = command("delivery-2", id(1), id(2), "second");
       ReflogAppendCommand conflicting =
           command("delivery-1", ObjectId.zeroId(), id(1), "changed-message");
       ReflogBatchRejectedException failure =
           assertThrows(
               ReflogBatchRejectedException.class,
-              () ->
-                  processor.execute(
-                      fixture.repositoryName, List.of(newCommand, conflicting)));
+              () -> processor.execute(fixture.repositoryName, List.of(newCommand, conflicting)));
 
       assertEquals(Reason.DELIVERY_ID_REUSED_WITH_DIFFERENT_PAYLOAD, failure.reason());
       assertEquals(RetryAdvice.DO_NOT_RETRY, HibernateReflogBatchProcessor.retryAdvice(failure));
@@ -159,8 +154,7 @@ class HibernateReflogBatchProcessorH2Test {
   void databaseFailureRollsBackEveryCommandAndSameIdsCanBeRetried() throws Exception {
     try (Fixture fixture = new Fixture()) {
       fixture.executeSql(
-          "ALTER TABLE git_reflog ADD CONSTRAINT reject_explode "
-              + "CHECK (message <> 'explode')");
+          "ALTER TABLE git_reflog ADD CONSTRAINT reject_explode " + "CHECK (message <> 'explode')");
       List<ReflogAppendCommand> commands =
           List.of(
               command("delivery-1", ObjectId.zeroId(), id(1), "first"),
@@ -199,15 +193,83 @@ class HibernateReflogBatchProcessorH2Test {
     }
   }
 
+  @Test
+  void persistedReplayRetainsNullAndEmptyMessageDistinctionOnH2() throws Exception {
+    try (Fixture fixture = new Fixture()) {
+      HibernateReflogBatchProcessor processor =
+          new HibernateReflogBatchProcessor(fixture.provider.getSessionFactory());
+      ReflogAppendCommand empty = command("empty-message", ObjectId.zeroId(), id(1), "");
+      ReflogAppendCommand absent = command("null-message", id(1), id(2), null);
+      processor.execute(fixture.repositoryName, List.of(empty, absent));
+      assertEquals(
+          List.of(Status.ALREADY_APPLIED, Status.ALREADY_APPLIED),
+          processor.execute(fixture.repositoryName, List.of(empty, absent)).stream()
+              .map(ReflogAppendResult::status)
+              .toList());
+      for (ReflogAppendCommand changed :
+          List.of(
+              command("empty-message", ObjectId.zeroId(), id(1), null),
+              command("null-message", id(1), id(2), ""))) {
+        ReflogBatchRejectedException failure =
+            assertThrows(
+                ReflogBatchRejectedException.class,
+                () -> processor.execute(fixture.repositoryName, List.of(changed)));
+        assertEquals(Reason.DELIVERY_ID_REUSED_WITH_DIFFERENT_PAYLOAD, failure.reason());
+      }
+      assertEquals(2, fixture.rows().size());
+    }
+  }
+
+  @Test
+  void persistedEmptyMessageReplayUsesTheDialectsEmptyStringCapability() throws Exception {
+    String name = "oracle-empty-" + UUID.randomUUID();
+    Properties properties = h2Properties(name);
+    properties.put(
+        "hibernate.connection.url", "jdbc:h2:mem:" + name + ";MODE=Oracle;DB_CLOSE_DELAY=-1");
+    properties.put("hibernate.dialect", EmptyStringsAsNullH2Dialect.class.getName());
+    properties.put("hibernate.hbm2ddl.auto", "create");
+    ReflogAppendCommand empty = command("empty-message", ObjectId.zeroId(), id(1), "");
+    try (HibernateSessionFactoryProvider provider =
+            new HibernateSessionFactoryProvider(properties);
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), name)) {
+      repository.create(true);
+      assertEquals(
+          Status.APPENDED,
+          new HibernateReflogBatchProcessor(provider.getSessionFactory())
+              .execute(name, List.of(empty))
+              .getFirst()
+              .status());
+    }
+    properties.put("hibernate.hbm2ddl.auto", "validate");
+    try (HibernateSessionFactoryProvider provider =
+        new HibernateSessionFactoryProvider(properties)) {
+      HibernateReflogBatchProcessor processor =
+          new HibernateReflogBatchProcessor(provider.getSessionFactory());
+      assertEquals(
+          Status.ALREADY_APPLIED, processor.execute(name, List.of(empty)).getFirst().status());
+      ReflogBatchRejectedException failure =
+          assertThrows(
+              ReflogBatchRejectedException.class,
+              () ->
+                  processor.execute(
+                      name,
+                      List.of(command("empty-message", ObjectId.zeroId(), id(1), "changed"))));
+      assertEquals(Reason.DELIVERY_ID_REUSED_WITH_DIFFERENT_PAYLOAD, failure.reason());
+    }
+  }
+
+  /** H2 Oracle mode supplies a local regression for the dialect capability, not Oracle proof. */
+  public static class EmptyStringsAsNullH2Dialect extends org.hibernate.dialect.H2Dialect {
+    @Override
+    public boolean isEmptyStringTreatedAsNull() {
+      return true;
+    }
+  }
+
   private static DurableStripedWriteQueue.Limits limits(int batchSize) {
     return new DurableStripedWriteQueue.Limits(
-        1,
-        100,
-        1024 * 1024,
-        batchSize,
-        1024 * 1024,
-        Duration.ofMinutes(1),
-        Duration.ofSeconds(1));
+        1, 100, 1024 * 1024, batchSize, 1024 * 1024, Duration.ofMinutes(1), Duration.ofSeconds(1));
   }
 
   private static ReflogAppendCommand command(
@@ -230,8 +292,7 @@ class HibernateReflogBatchProcessorH2Test {
   private static Properties h2Properties(String databaseName) {
     Properties properties = new Properties();
     properties.put(
-        "hibernate.connection.url",
-        "jdbc:h2:mem:" + databaseName + ";DB_CLOSE_DELAY=-1");
+        "hibernate.connection.url", "jdbc:h2:mem:" + databaseName + ";DB_CLOSE_DELAY=-1");
     properties.put("hibernate.connection.driver_class", "org.h2.Driver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
     properties.put("hibernate.hbm2ddl.auto", "create-drop");

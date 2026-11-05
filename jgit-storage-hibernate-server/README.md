@@ -7,8 +7,8 @@ reproducing a complete forge such as GitLab, Gitea or GitHub.
 
 The published image and supplied Compose deployment support **PostgreSQL**. The
 [library database support matrix](../docs/consuming.md#supported-databases-and-operating-model)
-also covers H2, HSQLDB and Microsoft SQL Server, but those backends are not supplied as
-ready-configured options in this server image. Oracle is not currently supported by the library.
+also covers H2, HSQLDB, Microsoft SQL Server and Oracle (from 0.12.0). These backends
+are not supplied as ready-configured options in this server image.
 
 ## Compatibility at a glance
 
