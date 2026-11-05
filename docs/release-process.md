@@ -91,7 +91,13 @@ GitHub intentionally suppresses ordinary workflow recursion for pushes made with
 After creating a generated release or next-development PR, the release workflow therefore invokes
 `.github/scripts/dispatch-generated-pr-checks.sh`. It uses `workflow_dispatch` on the exact remote
 branch head to start Maven, BOM, JGit compatibility, real-consumer compatibility, server-image,
-server-image-publication-contract and JMH checks without a PAT or manual workflow approval.
+server-image-publication-contract and JMH checks without a PAT. These dispatched runs provide
+validation evidence, but GitHub does not count `workflow_dispatch` jobs toward required PR status
+checks. PRs created with `GITHUB_TOKEN` also have ordinary `pull_request` runs awaiting approval.
+After reviewing the generated diff, a maintainer with write access must select **Approve workflows
+to run** in the PR merge panel and wait for the required PR checks before merging. See GitHub's
+[token-triggered workflow rules](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)
+and [required-check event rules](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated).
 
 The image publication job has only `contents: read` and `packages: write`. It logs in to GHCR with the
 short-lived `GITHUB_TOKEN`; final inspection uses a new Docker configuration with no credentials. If
@@ -108,13 +114,20 @@ repository files, logs or artifacts.
 
 The normal Maven workflow runs a `Public Maven repository contract` job. It derives the release
 version from the current snapshot, invokes the real release script with `DRY_RUN=true` and
-`SKIP_TESTS=true`, stages the complete repository locally and resolves all artifacts from a new empty
-Maven cache. This validates release layout without publishing.
+`SKIP_TESTS=true`, stages the complete repository locally and resolves the anonymous consumer's
+declared dependencies from a new empty Maven cache. This validates release layout without publishing.
 
-The staged repository verifier requires the parent and BOM POMs plus the expected primary, source and
-Javadoc artifacts for all public JAR modules. Every retained release file receives canonical
-SHA-256/SHA-512 evidence and a SHA-1 compatibility sidecar. The anonymous consumer then imports the
-candidate BOM and resolves every production module.
+The current staged repository verifier requires the parent and BOM POMs plus the primary, source and
+Javadoc artifacts for Core, Security, Smart HTTP, Search, Java Analysis, Architecture and Benchmarks.
+These 30 files receive canonical SHA-256/SHA-512 evidence and a SHA-1 compatibility sidecar. The
+anonymous consumer imports the candidate BOM and resolves Core, Security, Smart HTTP, Search, Java
+Analysis and Architecture.
+
+Publication deploys and copies the entire reactor, including Spring Boot Autoconfigure, the Spring
+Boot Starter, Server and Testcontainers. Those four optional modules are published with Maven's
+SHA-1 sidecars, but are not yet included in the manifest's additional SHA-256/SHA-512 generation or
+the anonymous consumer contract. Publication completeness and automated verification coverage are
+therefore separate scopes.
 
 `Server image publication contract` statically verifies immutable source selection, first-write
 version-tag behavior, full-SHA action pins, tag/reactor validation, non-rollback aliases,

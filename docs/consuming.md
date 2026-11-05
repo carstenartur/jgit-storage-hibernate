@@ -442,7 +442,7 @@ Operational monitoring should include temporary-disk free space and stale stagin
 
 ## Running integration tests locally
 
-With Docker available, the normal build starts PostgreSQL 17.10 and SQL Server 2022 through Testcontainers:
+With Docker available, the normal build starts PostgreSQL 17.10, SQL Server 2022 and Oracle Free 23.26.3 through Testcontainers:
 
 ```bash
 mvn verify
@@ -450,7 +450,7 @@ mvn verify
 
 The Core and Search suites exercise:
 
-- fresh Core and Search installation on H2, HSQLDB, PostgreSQL and SQL Server;
+- fresh Core and Search installation on H2, HSQLDB, PostgreSQL, SQL Server and Oracle;
 - Core file-database restart and Search file-database/Lucene restart, rebuild, query and deletion behavior on HSQLDB;
 - adoption of immutable 0.1.4 fixtures;
 - copied pre-library Core adoption on HSQLDB, PostgreSQL and SQL Server;
@@ -466,7 +466,9 @@ The Core and Search suites exercise:
 - projection-failure isolation from successful Git publication;
 - persistent Lucene `SessionFactory` restart.
 
-When Docker is unavailable, Testcontainers disables the PostgreSQL and SQL Server classes; H2 and HSQLDB tests still run. CI runners provide Docker and execute the real-database paths on every pull request.
+Security also exercises Oracle policy, credential/token and audit persistence. The Spring Boot integration suite verifies automatic Oracle Core and Search migration selection.
+
+When Docker is unavailable, Testcontainers disables the PostgreSQL, SQL Server and Oracle classes; H2 and HSQLDB tests still run. CI runners provide Docker and execute the real-database paths on every pull request. CI and real releases additionally require the designated Oracle and SQL Server qualification suites to pass without skipped tests; a local build that skips these suites does not provide database qualification evidence.
 
 ## Recommended integration in audio-analyzer
 
