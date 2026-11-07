@@ -20,6 +20,7 @@ import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitProjec
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitSearchHit;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,9 +28,11 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -56,6 +59,8 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.BenchmarkParams;
+import org.openjdk.jmh.infra.IterationParams;
+import org.openjdk.jmh.runner.IterationType;
 
 /**
  * Measures commit-projection indexing, rebuild and representative Search query paths.
@@ -110,9 +115,20 @@ public class HibernateSearchPerformanceBenchmark {
   private long prebuiltLuceneBytes;
   private long prebuiltSqlBytes;
   private long prebuiltSegmentCount;
+  private DatabaseTelemetryCollector telemetryCollector;
+  private DatabaseTelemetrySnapshot telemetryBefore;
+  private Path telemetryOutput;
+  private int measurementInvocation;
 
   @Setup(Level.Invocation)
-  public void setupInvocation(BenchmarkParams params) throws Exception {
+  public void setupInvocation(BenchmarkParams params, IterationParams iteration) throws Exception {
+    suppressConnectionMetadataLogging();
+    boolean collectTelemetry =
+        iteration.getType() == IterationType.MEASUREMENT
+            && Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
+    if (collectTelemetry) {
+      telemetryOutput = Path.of(requiredProperty(DatabaseTelemetryCollectors.OUTPUT_PROPERTY, null));
+    }
     operation = params.getBenchmark().substring(params.getBenchmark().lastIndexOf('.') + 1);
     repositoryName =
         "jmh-search-"
@@ -124,7 +140,8 @@ public class HibernateSearchPerformanceBenchmark {
             + "-"
             + Long.toHexString(System.nanoTime());
     indexRoot = Files.createTempDirectory("jgit-storage-search-jmh-");
-    provider = new HibernateSessionFactoryProvider(properties(), SearchEntities.annotatedClasses());
+    Properties settings = properties();
+    provider = new HibernateSessionFactoryProvider(settings, SearchEntities.annotatedClasses());
     repository = HibernateRepository.create(provider.getSessionFactory(), repositoryName);
     repository.create(true);
     headCommit = createHistory();
@@ -143,10 +160,43 @@ public class HibernateSearchPerformanceBenchmark {
     }
     statistics = provider.getSessionFactory().getStatistics();
     statistics.clear();
+    if (collectTelemetry) {
+      telemetryCollector =
+          DatabaseTelemetryCollectors.create(
+              HibernateRepositoryBenchmark.POSTGRESQL,
+              true,
+              settings.getProperty("hibernate.connection.url"),
+              settings.getProperty("hibernate.connection.username"),
+              settings.getProperty("hibernate.connection.password"));
+      telemetryBefore = telemetryCollector.capture();
+    }
   }
 
   @TearDown(Level.Invocation)
   public void tearDownInvocation() throws Exception {
+    try (DatabaseTelemetryCollector collector = telemetryCollector) {
+      if (telemetryBefore != null) {
+        DatabaseTelemetrySnapshot after = collector.capture();
+        DatabaseTelemetryJson.appendNdjson(
+            telemetryOutput,
+            new DatabaseTelemetryObservation(
+                Map.of(
+                    "benchmarkMethod", operation,
+                    "commitCount", Integer.toString(commitCount),
+                    "indexProfile", indexProfile,
+                    "measurementInvocation", Integer.toString(++measurementInvocation),
+                    "queryLimit", Integer.toString(queryLimit)),
+                telemetryBefore.deltaTo(after)));
+      }
+    } finally {
+      telemetryCollector = null;
+      telemetryBefore = null;
+      telemetryOutput = null;
+      closeFixture();
+    }
+  }
+
+  private void closeFixture() throws IOException {
     try {
       if (repository != null) {
         repository.close();
@@ -320,17 +370,18 @@ public class HibernateSearchPerformanceBenchmark {
     return content.toString().getBytes(StandardCharsets.UTF_8);
   }
 
-  private Properties properties() {
+  private Properties properties() throws IOException {
+    Properties connection = loadConnectionProperties();
     Properties properties = new Properties();
     properties.put(
         "hibernate.connection.url",
-        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY));
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY, connection));
     properties.put(
         "hibernate.connection.username",
-        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY));
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY, connection));
     properties.put(
         "hibernate.connection.password",
-        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+        requiredProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY, connection));
     properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
     properties.put("hibernate.hbm2ddl.auto", "create-drop");
@@ -398,12 +449,35 @@ public class HibernateSearchPerformanceBenchmark {
     }
   }
 
-  private static String requiredSystemProperty(String name) {
+  private static Properties loadConnectionProperties() throws IOException {
+    Properties properties = new Properties();
+    String path = System.getProperty(PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY);
+    if (path != null && !path.isBlank()) {
+      try (InputStream input = Files.newInputStream(Path.of(path))) {
+        properties.load(input);
+      }
+    }
+    return properties;
+  }
+
+  private static String requiredProperty(String name, Properties fallback) {
     String value = System.getProperty(name);
+    if ((value == null || value.isBlank()) && fallback != null) {
+      value = fallback.getProperty(name);
+    }
     if (value == null || value.isBlank()) {
       throw new IllegalStateException("Missing Search benchmark system property " + name);
     }
     return value;
+  }
+
+  private static void suppressConnectionMetadataLogging() {
+    java.util.logging.Level warning = java.util.logging.Level.WARNING;
+    Logger.getLogger("").setLevel(warning);
+    Logger.getLogger("org.hibernate").setLevel(warning);
+    Logger.getLogger("org.hibernate.orm.connections.pooling").setLevel(warning);
+    Logger.getLogger("org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
+        .setLevel(warning);
   }
 
   private static int entityChecksum(List<GitCommitIndex> hits) {

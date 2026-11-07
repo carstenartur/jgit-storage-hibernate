@@ -31,9 +31,11 @@ The integrated runners retain companion files beside raw JMH evidence:
 pack-storage-layout-database-telemetry.json
 write-queue-database-telemetry.json
 repository-aging-database-telemetry.json
+reflog-batch-database-telemetry.json
+search-database-telemetry.json
 ```
 
-The write-queue coordinate includes the benchmark method, shared versus isolated repository scope, backend/pool variant, execution mode, stripe count, pool size, payload, thread count and measurement-iteration number. Repository-aging coordinates add pushes, maintenance mode, cache state and one of three explicit phases: deterministic fixture build, maintenance, or measured read operation.
+The write-queue coordinate includes the benchmark method, shared versus isolated repository scope, backend/pool variant, execution mode, stripe count, pool size, payload, thread count and measurement-iteration number. Repository-aging coordinates add pushes, maintenance mode, cache state and an explicit phase: deterministic fixture build, maintenance, provider restart when requested, or measured read operation. Reflog batch coordinates record backend, batch size and first application versus replay.
 
 Counter resets and a counter missing from either snapshot are never converted to an invented value. They appear under `unsupported` as `counter-reset`, `missing-before-snapshot` or `missing-after-snapshot`. JSON serialization accepts only integral values and never emits `NaN` or Infinity.
 
@@ -104,7 +106,11 @@ The counters are observational. Cluster-wide PostgreSQL WAL/I/O and server-wide 
 
 The second integration brackets complete measurement iterations of `DurableWriteQueueBenchmark`. It covers direct publication and one/four/eight-stripe queues, shared-repository contention and independent repositories, and the internal Hibernate pool versus HikariCP at the same pool size. Iteration-level WAL, I/O and wait deltas can therefore be compared with JMH latency, queue delay, storage transactions, repository-lock time and payload amplification without pretending that a cluster-wide counter belongs to one overlapping invocation.
 
-This is evidence for the durable scheduling/publication path, not completion of Git-aware combined receiver-record batching. A queued command still performs its full object insertion and ref update. The narrower atomic multi-record processor and its batch-size distribution remain work in #162 and #187.
+This is evidence for the durable scheduling/publication path. A queued command in this benchmark still performs its full object insertion and ref update.
+
+## Atomic reflog projection batch interpretation
+
+The separate [Git-aware reflog batch contract](git-aware-reflog-batching.md#verification-and-native-telemetry) captures twelve windows: PostgreSQL and SQL Server, batch sizes 1/10/50, and first application versus idempotent replay. [Workflow run 32636555092](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32636555092) passed the complete matrix, including positive WAL or transaction-log file writes for first application and an unchanged persisted row count on replay. These counters measure append-only reflog projection records, which have a different transaction boundary from pack publication or an authoritative ref update.
 
 ## Repository-aging and maintenance interpretation
 
@@ -114,17 +120,31 @@ The focused aging matrix separates three boundaries for every selected JMH coord
 2. the selected maintenance action (`none`, compact-only or read-optimized);
 3. the later measured lookup/traversal/reopen iteration.
 
-This prevents repack WAL/log and file-I/O work from being misattributed to the read that benefits from it. The initial bounded profile uses ten pushes and representative oldest-object, clone-style and reopen lookups. PostgreSQL requires immediate WAL insert-LSN evidence; SQL Server requires transaction-log file-write evidence and retains data/log I/O and server-scoped wait categories from its isolated Testcontainers instance. This proves cross-database phase attribution and artifact contracts; the 32/100/300/1,000-push production matrix remains open.
+This prevents repack WAL/log and file-I/O work from being misattributed to the read that benefits from it. The bounded native profile uses ten pushes and representative oldest-object, clone-style and reopen lookups. PostgreSQL requires immediate WAL insert-LSN evidence; SQL Server requires transaction-log file-write evidence and retains data/log I/O and server-scoped wait categories from its isolated Testcontainers instance. The [repeated provider-restart profile](repository-aging-policy-evidence.md#provider-restart-evidence-at-ten-pushes) adds a fourth window around rebuilding the provider and pool. The [retained larger age matrix](../evidence/repository-aging-full-2026-09-04.md) measures latency and structural changes; it does not retain native counters across the larger ages.
+
+## Hibernate Search interpretation
+
+The [Search comparison](hibernate-search-performance.md) captures a PostgreSQL snapshot immediately
+before and after each measured indexing, projection rebuild or query invocation. The window starts
+after history creation and any prebuilt projection, and ends before the fixture is dropped. It
+records the operation, index profile, commit count, query limit and measurement invocation so
+observations can be matched to the JMH result without including SQL text or connection details.
+Positive immediate WAL is required for retained indexing and rebuild evidence. Query counters are
+observational; they are useful for comparing SQL-backed and Lucene-only paths, but PostgreSQL
+cluster-wide WAL and I/O can include work outside the query.
+
+The Search benchmark remains usable with telemetry disabled. The retained workflow enables it
+and verifies that JSON and NDJSON contain one observation per measured invocation. Its fork receives
+credentials through a temporary owner-readable file, and artifact upload is gated on a privacy scan.
 
 ## Remaining issue #187 work
 
 This foundation does not close #187. Follow-up integrations must apply the same contract to:
 
 1. full-scale repository aging/MIDX/repack;
-2. atomic durable receiver-record batches beyond queue scheduling;
-3. Hibernate Search incremental indexing and rebuild;
-4. representative history queries;
-5. safe focused plan capture without copying sensitive parameters or arbitrary SQL into artifacts;
-6. dashboard charts for WAL/log bytes per logical MiB, logical/physical reads and wait categories.
+2. receiver workloads beyond the retained append-only reflog batch contract;
+3. broader canonical history-query and Search-runtime tuning profiles;
+4. safe focused plan capture without copying sensitive parameters or arbitrary SQL into artifacts;
+5. dashboard charts for WAL/log bytes per logical MiB, logical/physical reads and wait categories.
 
 Each additional integration must preserve zero telemetry queries when disabled and retain an exact benchmark coordinate in the companion artifact.
