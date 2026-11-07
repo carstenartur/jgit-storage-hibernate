@@ -16,7 +16,7 @@ The large-pack write path is now substantially better understood:
 - a production receiver queue can commit up to 50 compatible records in one transaction and one observed JDBC batch, or flush a smaller batch after a configurable collection window;
 - read-ahead remains access-pattern-aware instead of forcing one global window;
 - the complete 512-MiB PostgreSQL/SQL Server matrix retains one-MiB chunks and a 256-KiB inline threshold: larger chunks improve sequential work but regress sparse reads by 37–171%, while 256-KiB chunks regress writes and sequential reads;
-- repository maintenance is not enabled automatically: the retained 1–1,000-push PostgreSQL matrix supports early intervention for cold reopen, but warm reopen regresses at 10–100 packs and improves only at the measured 300/1,000-pack conditions; larger-age repeats and SQL Server evidence remain required.
+- repository maintenance is explicit. The full PostgreSQL and SQL Server age matrix supports compacting fragmented repositories when cold reopen has degraded and the expected reads repay maintenance. Warm reopen regresses at 10–100 packs and improves at the measured 300/1,000-pack conditions.
 
 ## Current production decisions
 
@@ -29,7 +29,7 @@ The large-pack write path is now substantially better understood:
 | PgJDBC rewrite | Disabled by the library | Slightly slower in the local and calibrated network matrices; no RTT-slope reduction. |
 | Receiver batching | 50 records or 64 MiB, two-millisecond default wait, four stripes | Allows one transaction/JDBC batch for a burst while bounding sparse-stream delay and heap. |
 | Read-ahead | Honor JGit hint, one-MiB chunks, cap at 16 | Sequential access benefits from 16; sparse random and short reads strongly prefer 1. |
-| Automatic repack | Disabled | Useful crossover is visible by ten small packs, but full aging/database evidence is not complete. |
+| Automatic repack | Disabled | Warm and cold paths have different crossovers and payback. Operators can use the [measured maintenance decision](evidence/repository-aging-full-2026-11-07.md#manual-operating-decision). |
 | P6Spy in timed benchmarks | Not used | Hibernate session events expose statement and batch executions without JDBC-proxy/logging distortion. |
 
 ## What “theoretical maximum” means
@@ -235,11 +235,9 @@ The deterministic smoke fixture compares 1 and 10 incremental pushes, verifies c
 
 At one push, maintenance creates more packs and bytes. At ten pushes, both modes reduce ten packs to two. Reopen plus oldest-object lookup falls from 15.64 ms to 4.47 ms with compact-only and 4.60 ms with read-optimized maintenance. Clone-style traversal also improves modestly.
 
-The completed [full age matrix](evidence/repository-aging-full-2026-09-04.md) now retains 864 measurements across HSQLDB, PostgreSQL and PostgreSQL/HikariCP, cold/warm JGit cache, 1/10/32/100/300/1,000 pushes, three maintenance modes and eight reads. Its auxiliary counters were reprocessed with the corrected per-iteration normalization; latency scores are unchanged.
+The [full age matrix and charts](evidence/repository-aging-full-2026-11-07.md#charts) retain 1,152 measurements across SQL Server, two PostgreSQL configurations and HSQLDB, with cold and warm JGit cache and up to 1,000 pushes. On SQL Server at 1,000 packs, compact-only reduces cold reopen plus oldest lookup from 609.310 ms to 3.706 ms and warm reopen from 13.661 ms to 4.945 ms. It reduces the cold path from 1,002 Hibernate queries to 3. The estimated payback is 3 equivalent cold reopens or 229 warm reopens. [Latency and query amplification](evidence/repository-aging-full-2026-11-07.md#latency-and-query-amplification) · [Maintenance cost and payback](evidence/repository-aging-full-2026-11-07.md#maintenance-cost-and-payback) · [Storage and auxiliary indexes](evidence/repository-aging-full-2026-11-07.md#storage-and-auxiliary-indexes) · [Reads during repack](evidence/repository-aging-full-2026-11-07.md#readers-during-compact-repack)
 
-For PostgreSQL/HikariCP cold reopen plus oldest lookup, compact-only maintenance reduces 6.839 ms to 2.443 ms at ten pushes and 407.971 ms to 2.581 ms at 1,000. Warm reopen instead regresses at 10–100 packs, then improves from 4.444 to 2.940 ms at 300 and from 11.007 to 2.540 ms at 1,000. Compact-only payback at 1,000 is four equivalent cold reopens but 188 warm reopens. The built-in PostgreSQL pool shows the same crossover direction.
-
-The separate repeated PostgreSQL/SQL Server provider-restart rerun confirms the cold benefit and warm regression at ten packs. The larger age axis has only one independent repeat, uses small incremental packs and does not price reader interference during maintenance. It therefore brackets an operational question without enabling an automatic policy. See the [complete data and interpretation](evidence/repository-aging-full-2026-09-04.md) and [repack guide](operations/repack-and-gc.md).
+The [September matrix](evidence/repository-aging-full-2026-09-04.md) and the new run agree on the direction of the PostgreSQL warm crossover between 100 and 300 small packs. The separate provider-restart repeats confirm cold benefits and warm regressions at ten packs. Use the cache state, fragmentation, and read mix in the [repack guide](operations/repack-and-gc.md#resulting-operational-guidance) to plan maintenance.
 
 ## Byte amplification
 
@@ -261,7 +259,7 @@ These counters do not include SQL framing, WAL, page writes, replication or phys
 | Adaptive direct/pre-persisted publication | Size-based one-MiB selector, path/payload diagnostics, deterministic fallback and regression coverage | A contention-aware selector has not shown enough evidence to replace the deterministic policy. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
-| Repository aging/repack | Full 1–1,000-push PostgreSQL/HikariCP/HSQLDB matrix with 864 normalized rows; repeated PostgreSQL/SQL Server provider-restart evidence | Full SQL Server age axis, independent large-age repeats, concurrent-reader impact and an evidence-based automatic policy. |
+| Repository aging/repack | Full PostgreSQL/SQL Server/HSQLDB age matrix, repeated provider-restart evidence, and manual maintenance guidance | Broader large-repository repeats and operational budgets before considering automatic scheduling. |
 | Stateful/stateless writer | 16/128/512 matrix, automatic 16-MiB threshold, explicit overrides and integrity tests | Networked concurrent 128/512-MiB validation may refine but is not required for the current safe fallback policy. |
 
 ## Current distance to the useful ceiling

@@ -13,6 +13,7 @@ on:
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmarkTest.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingRepackOverlapIT.java'
       - 'docs/operations/database-native-telemetry.md'
       - 'docs/performance-status.md'
   push:
@@ -24,6 +25,7 @@ on:
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PerformanceInvestigationsBenchmarkIT.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingBenchmarkTest.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RepositoryAgingRepackOverlapIT.java'
       - 'docs/operations/database-native-telemetry.md'
       - 'docs/performance-status.md'
 
@@ -244,12 +246,12 @@ jobs:
               json.loads(line)
 
           forbidden = (
-              'jgit.storage.benchmark.postgresql.url=',
-              'jgit.storage.benchmark.postgresql.user=',
-              'jgit.storage.benchmark.postgresql.password=',
-              'jgit.storage.benchmark.sqlserver.url=',
-              'jgit.storage.benchmark.sqlserver.user=',
-              'jgit.storage.benchmark.sqlserver.password=',
+              'jgit.storage.benchmark.postgresql.url',
+              'jgit.storage.benchmark.postgresql.user',
+              'jgit.storage.benchmark.postgresql.password',
+              'jgit.storage.benchmark.sqlserver.url',
+              'jgit.storage.benchmark.sqlserver.user',
+              'jgit.storage.benchmark.sqlserver.password',
               'jdbc:postgresql://',
               'jdbc:sqlserver://',
               'Database JDBC URL',
@@ -286,15 +288,94 @@ jobs:
           )
           PY
 
+      - name: Measure and validate warm reads during compact repack
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/target/repository-aging-native-$BACKEND/repack-overlap"
+          backend="$BACKEND"
+          image="mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04"
+          if [[ "$backend" == postgresql ]]; then
+            backend=postgresql-hikari
+            image="postgres:17.10-alpine"
+          fi
+          mvn -B -pl jgit-storage-hibernate-benchmarks verify \
+            -Pperformance-investigations \
+            -Dtest=RepositoryAgingBenchmarkTest \
+            -Dit.test=RepositoryAgingRepackOverlapIT \
+            -DargLine=-Xmx1g \
+            -Djgit.storage.benchmark.repository-aging.backend="$backend" \
+            -Djgit.storage.benchmark.repository-aging.overlap.enabled=true \
+            -Djgit.storage.benchmark.repository-aging.overlap.output="$root"
+          python3 - "$root" "$backend" <<'PY'
+          import collections
+          import csv
+          import sys
+          from pathlib import Path
+
+          root, backend = Path(sys.argv[1]), sys.argv[2]
+          groups = collections.defaultdict(list)
+          windows = {}
+          coordinates = {(str(repeat), phase) for repeat in range(1, 4)
+                         for phase in ('baseline', 'overlap')}
+          for row in csv.DictReader((root / 'repack-read-samples.csv').open()):
+              assert (row['backend'], row['deployment'], row['pushes']) == (
+                  backend, 'local-testcontainers', '300')
+              repeat = row['repeat']
+              start, end, gc_start, gc_end = (int(row[key]) for key in (
+                  'start_ns', 'end_ns', 'repack_start_ns', 'repack_end_ns'))
+              assert 0 <= start < end and 0 < gc_start < gc_end
+              window = (gc_start, gc_end)
+              assert windows.setdefault(repeat, window) == window
+              overlaps = start < gc_end and end > gc_start
+              contained = overlaps and start >= gc_start and end <= gc_end
+              if row['phase'] == 'baseline':
+                  assert row['classification'] == 'quiet' and end <= gc_start
+                  groups[repeat, 'baseline'].append((start, end))
+              else:
+                  assert row['phase'] == 'concurrent'
+                  assert row['classification'] == (
+                      'contained' if contained else 'boundary' if overlaps else 'outside')
+                  if overlaps:
+                      groups[repeat, 'overlap'].append((start, end))
+          assert set(groups) == coordinates
+          for row in csv.DictReader((root / 'repack-read-summary.csv').open()):
+              assert (row['backend'], row['deployment'], row['pushes']) == (
+                  backend, 'local-testcontainers', '300')
+              repeat, phase = row['repeat'], row['phase']
+              coordinates.remove((repeat, phase))
+              samples = groups[repeat, phase]
+              durations = sorted(end - start for start, end in samples)
+              assert int(row['samples']) == len(durations)
+              for rank in (50, 95, 99):
+                  assert int(row[f'p{rank}_ns']) == durations[(len(durations) * rank + 99) // 100 - 1]
+              assert int(row['packs_before']) == 300
+              assert 0 < int(row['packs_after']) < 300
+              start, end = windows[repeat]
+              assert int(row['repack_ns']) == end - start
+              collector = int(row['collector_ns'])
+              assert 0 < collector <= end - start
+              other_work = end - start - collector
+              contained = sum(sample_start >= start + other_work and sample_end <= end - other_work
+                              for sample_start, sample_end in samples)
+              assert int(row['collector_contained_samples']) == contained
+              assert contained >= (1 if phase == 'overlap' else 0)
+          assert not coordinates
+          print(f'Validated {backend} repack overlap intervals and percentiles for three fresh histories.')
+          PY
+          {
+            printf 'commit=%s\nbackend=%s\ndatabase_image=%s\n' "$(git rev-parse HEAD)" "$backend" "$image"
+            java -version 2>&1
+          } > "$root/provenance.txt"
+
       - name: Upload exact native telemetry evidence
-        if: always()
+        if: success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: repository-aging-native-telemetry-${{ matrix.backend }}
-          path: |
-            target/repository-aging-native-${{ matrix.backend }}/**
-            jgit-storage-hibernate-benchmarks/target/failsafe-reports/**
-          if-no-files-found: warn
+          path: target/repository-aging-native-${{ matrix.backend }}/**
+          if-no-files-found: error
 
       - name: Report evidence contract
         if: success()
@@ -304,4 +385,5 @@ jobs:
           echo '- 9 exact JMH coordinates and 27 phase observations validated.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Fixture build, selected maintenance and measured read are attributed separately.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Native log, strict JSON and credential-free artifact contracts passed.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Raw warm read latency and p50/p95/p99 during compact repack validated for three fresh 300-push histories.' >> "$GITHUB_STEP_SUMMARY"
           echo '- This workflow does not change an automatic maintenance threshold.' >> "$GITHUB_STEP_SUMMARY"
