@@ -10,6 +10,9 @@ jgit-storage-hibernate-benchmarks
 
 It is not a runtime dependency for consumers. It exists for CI, maintainers and release review.
 
+The [consumer-shaped fixtures](benchmark-consumer-profiles.md) provide synthetic
+Git histories for future Audio, Taxonomy and sandbox benchmark comparisons.
+
 ## Repository backend comparison
 
 The storage benchmark runs the same public JGit workload against four repository configurations:
