@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "enabled": true,
-  "requestId": "initial-protected-main-full-aging-20260904",
-  "sourceCommit": "0c460a94d1086d8f095aee7a5d2b654c0cf4b2ae",
-  "reason": "Run the complete 1/10/32/100/300/1,000-push repository-aging matrix across HSQLDB, PostgreSQL and PostgreSQL-Hikari cold/warm shards from reviewed protected main."
+  "requestId": "sqlserver-full-aging-20261107-8bd4dc19",
+  "sourceCommit": "8bd4dc194d58e737acd0f4e374ed8c8e20afd093",
+  "reason": "Measure repository aging through 1,000 pushes for #165 with SQL Server, PostgreSQL and HSQLDB on protected main."
 }
