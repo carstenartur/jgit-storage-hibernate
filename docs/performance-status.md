@@ -37,9 +37,11 @@ The large-pack write path is now substantially better understood:
 The [PostgreSQL pool sizing guide](operations/reflog-pool-sizing.md) links the
 throughput, p95 phase, batch-size and repository-scaling charts and the
 [raw measurements](evidence/reflog-pool-sizing-2026-11-07/README.md).
-The recommendation applies to the append-only projection. Its workers share
-the application pool; sizing for full pushes, large chunked work and mixed
-traffic still requires measuring those paths together.
+The [shared-pool study](evidence/reflog-pack-pool-2026-11-07/README.md) adds
+48 trials with the append-only projection and one 8 MiB chunked pack
+publication. Independent repositories benefited from additional pool slots
+at 20 ms RTT. On the same repository, server observations also confirmed
+waits on the repository lock.
 
 ## What “theoretical maximum” means
 

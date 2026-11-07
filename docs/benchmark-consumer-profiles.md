@@ -103,9 +103,11 @@ Use `fixture.json` to match a run to [Real Consumer
 Compatibility](../.github/workflows/consumer-compatibility.yml) for the same
 checkout SHA before promoting a timing result. For release, main and candidate
 comparisons, launch the workflow from one fixed harness revision with the same
-profile and set **library-ref** separately to the release tag (for example,
-`v0.12.0`), the exact main SHA, and the exact candidate SHA. The comparison
-checkout receives only the fixture generators and benchmark sources. Its
+profile. Set **library-ref** to the approved release tag `v0.12.0` or a full
+commit SHA reachable from canonical `main`. Run candidate code from its
+workflow branch or pull request with **library-ref** blank. Comparison
+jobs disable the Maven cache. The comparison checkout receives only the
+fixture generators and benchmark sources. Its
 Maven reactor still builds the library and dependencies from the selected
 revision. The artifact records both `harnessSha` and `checkoutSha`; leave
 **library-ref** blank to measure the workflow's own revision. Join real

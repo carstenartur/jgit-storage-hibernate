@@ -6,7 +6,11 @@ on:
     paths:
       - '.github/workflows/consumer-profile-benchmarks.yml'
       - 'jgit-storage-hibernate-benchmarks/src/**/Consumer*Benchmark*.java'
+      - 'pom.xml'
       - 'jgit-storage-hibernate-benchmarks/pom.xml'
+      - 'jgit-storage-hibernate-core/pom.xml'
+      - 'jgit-storage-hibernate-search/pom.xml'
+      - 'jgit-storage-hibernate-java-analysis/pom.xml'
       - 'jgit-storage-hibernate-core/src/main/**'
       - 'jgit-storage-hibernate-search/src/main/**'
       - 'jgit-storage-hibernate-java-analysis/src/main/**'
@@ -20,7 +24,7 @@ on:
           - smoke
           - large
       library-ref:
-        description: Optional release tag or commit to measure with this workflow's harness
+        description: Optional approved release tag or full commit SHA from canonical main
         required: false
         type: string
 
@@ -45,15 +49,41 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Checkout comparison revision
-        if: inputs.library-ref != ''
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout canonical comparison history
+        if: env.LIBRARY_REF != ''
+        uses: actions/checkout@3d3c42e5aac5ba805da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.library-ref }}
+          repository: carstenartur/jgit-storage-hibernate
+          ref: refs/heads/main
+          fetch-depth: 0
           path: compared-library
           persist-credentials: false
+      - name: Verify and checkout the comparison revision
+        if: env.LIBRARY_REF != ''
+        working-directory: compared-library
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$LIBRARY_REF" in
+            v0.12.0)
+              revision="$(git rev-parse --verify 'refs/tags/v0.12.0^{commit}')"
+              if [[ "$revision" != ba6aeecc338968df4279fb9c7c72b15bbb3577fb ]]; then
+                echo "Release tag does not match its approved commit" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              if [[ ! "$LIBRARY_REF" =~ ^[0-9a-f]{40}$ ]] ||
+                 ! git merge-base --is-ancestor "$LIBRARY_REF" HEAD 2>/dev/null; then
+                echo "Use an approved release tag or a full commit SHA reachable from canonical main" >&2
+                exit 1
+              fi
+              revision="$LIBRARY_REF"
+              ;;
+          esac
+          git checkout --detach "$revision"
       - name: Use the same fixture harness across library revisions
-        if: inputs.library-ref != ''
+        if: env.LIBRARY_REF != ''
         run: |
           base=jgit-storage-hibernate-benchmarks/src
           package=java/io/github/carstenartur/jgit/storage/hibernate/benchmark
@@ -65,7 +95,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+          cache: ${{ env.LIBRARY_REF == '' && 'maven' || '' }}
       - name: Run deterministic fixtures and consumer benchmarks
         working-directory: ${{ env.LIBRARY_DIR }}
         run: |
