@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import unittest
+from itertools import product
 from pathlib import Path
 
 SCRIPT = Path(__file__).with_name("convert-jmh-repository-aging.py")
@@ -16,6 +17,24 @@ SPEC.loader.exec_module(CONVERTER)
 
 
 class RepositoryAgingConverterTest(unittest.TestCase):
+
+    def test_full_profile_accepts_all_four_backends(self) -> None:
+        report = CONVERTER.convert(self.full_results(), require_full_matrix=True)
+        self.assertEqual(1152, len(report["policyEvidence"]))
+
+    def test_full_profile_rejects_an_entire_missing_operation_at_one_age(self) -> None:
+        results = [
+            row
+            for row in self.full_results()
+            if not (
+                row["params"]["backend"] == "sqlserver"
+                and row["params"]["cacheState"] == "warm"
+                and row["params"]["pushes"] == "1000"
+                and row["benchmark"].endswith(".revisionWalk")
+            )
+        ]
+        with self.assertRaisesRegex(ValueError, "sqlserver.*1000.*warm.*revisionWalk"):
+            CONVERTER.convert(results, require_full_matrix=True)
 
     def test_break_even_and_no_maintenance_recommendations_are_derived(self) -> None:
         results = []
@@ -117,6 +136,29 @@ class RepositoryAgingConverterTest(unittest.TestCase):
             metric["score"] = value * 3
             metric["scorePercentiles"] = {"50.0": value}
             metric["rawData"] = [[value, value, value]]
+
+    def full_results(self) -> list[dict]:
+        results = []
+        for backend, pushes, cache, operation, mode in product(
+            ("hsqldb", "postgresql", "postgresql-hikari", "sqlserver"),
+            ("1", "10", "32", "100", "300", "1000"),
+            ("cold", "warm"),
+            (
+                "lookupOldestObject",
+                "lookupNewestObject",
+                "lookupMissingObject",
+                "cloneStyleTraversal",
+                "incrementalFetchTraversal",
+                "readAllRefs",
+                "reopenAndLookupOldest",
+                "revisionWalk",
+            ),
+            ("none", "compact-only", "read-optimized"),
+        ):
+            row = self.result(operation, mode, 2.0, 0, 0)
+            row["params"].update(backend=backend, pushes=pushes, cacheState=cache)
+            results.append(row)
+        return results
 
     @staticmethod
     def result(

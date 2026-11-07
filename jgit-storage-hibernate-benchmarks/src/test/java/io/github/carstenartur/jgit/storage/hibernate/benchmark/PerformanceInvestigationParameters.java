@@ -13,7 +13,34 @@ import java.util.List;
 /** Validates optional singleton selections for partitioned benchmark matrices. */
 final class PerformanceInvestigationParameters {
 
+  static final String REPOSITORY_AGING_BACKEND_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.backend";
+  static final String REPOSITORY_AGING_DATABASE_BACKEND_PROPERTY =
+      "jgit.storage.benchmark.repository-aging.database-backend";
+
   private PerformanceInvestigationParameters() {}
+
+  static String[] repositoryAgingBackends(
+      boolean full, boolean nativeSmoke, String backend, String nativeBackend) {
+    if (nativeSmoke) {
+      return select(
+          REPOSITORY_AGING_DATABASE_BACKEND_PROPERTY,
+          nativeBackend,
+          new String[] {HibernateRepositoryBenchmark.POSTGRESQL},
+          HibernateRepositoryBenchmark.POSTGRESQL,
+          PackStorageLayoutBenchmark.SQL_SERVER);
+    }
+    if (full) {
+      String[] backends = {
+        HibernateRepositoryBenchmark.HSQLDB,
+        HibernateRepositoryBenchmark.POSTGRESQL,
+        HibernateRepositoryBenchmark.POSTGRESQL_HIKARI,
+        PackStorageLayoutBenchmark.SQL_SERVER
+      };
+      return select(REPOSITORY_AGING_BACKEND_PROPERTY, backend, backends, backends);
+    }
+    return new String[] {HibernateRepositoryBenchmark.HSQLDB};
+  }
 
   static String[] select(
       String propertyName,
