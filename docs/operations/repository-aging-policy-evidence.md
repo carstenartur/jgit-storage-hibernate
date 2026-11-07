@@ -7,7 +7,7 @@ Long-lived repositories accumulate incremental packs. This page defines how the 
 The bounded smoke profile covers 1 and 10 deterministic incremental pushes on HSQLDB with a cold JGit block cache. The full manual/scheduled profile covers:
 
 - 1, 10, 32, 100, 300 and 1,000 pushes;
-- HSQLDB as a local reference plus PostgreSQL with the built-in pool and HikariCP;
+- HSQLDB as a local reference, PostgreSQL with the built-in pool and HikariCP, and SQL Server;
 - cold and warm JGit cache states;
 - no maintenance, compact-only maintenance and read-optimized maintenance;
 - oldest, newest and missing-object lookup;
@@ -17,6 +17,9 @@ The bounded smoke profile covers 1 and 10 deterministic incremental pushes on HS
 - repository reopen followed by oldest-object lookup.
 
 Each fixture uses deterministic content, closes and reopens before measurement, verifies persisted pack ordering and revalidates reachable objects and the main ref after maintenance.
+
+The full workflow runs a separate job for each backend and cache state. All eight shards must succeed
+and provide all 1,152 benchmark coordinates before the workflow publishes a complete result.
 
 A separate protected-main restart profile closes the repository and the complete Hibernate
 `SessionFactory`/connection pool, reconstructs them from the same durable database and only then
@@ -147,21 +150,36 @@ bitmap, commit-graph or changed-path workloads justify the read-optimized struct
 
 ## Multi-Pack-Index capability
 
-Every supported JGit compatibility job writes `jgit-dfs-midx-capability.json`. It records the selected JGit implementation version, every exposed `PackExt`, and whether a persisted DFS Multi-Pack-Index extension is visible.
+Every supported JGit compatibility job writes `jgit-dfs-midx-capability.json`. Its
+`persistedDfsMidxExtensionAvailable` field checks for an upstream extension, not Hibernate
+storage support. The exact supported release sources provide both the DFS writer and reader:
 
-The maintenance API must not expose a MIDX setting unless the selected supported JGit DFS version has a persistable extension that this backend can store. When the capability artifact reports no such extension, the supported choices remain no maintenance, compact-only repack and read-optimized repack.
+| JGit version | Upstream DFS MIDX reader and writer | Hibernate MIDX after reopen |
+|---|---|---|
+| [7.5.0.202512021534-r](https://github.com/eclipse-jgit/jgit/blob/402b0dd5c8e167cb0808fd6139e2270ada6611cc/org.eclipse.jgit/src/org/eclipse/jgit/internal/storage/dfs/DfsMidxWriter.java) | Available | Unsupported |
+| [7.6.0.202603022253-r](https://github.com/eclipse-jgit/jgit/blob/e1fefa5863d6380d091d04e6f0d890356a218fd6/org.eclipse.jgit/src/org/eclipse/jgit/internal/storage/dfs/DfsMidxWriter.java) | Available | Unsupported |
+| [7.7.0.202606012155-r](https://github.com/eclipse-jgit/jgit/blob/e15d6597f612ca4f3ad3abc19f5b112664b5ffcc/org.eclipse.jgit/src/org/eclipse/jgit/internal/storage/dfs/DfsMidxWriter.java) | Available | Unsupported |
+| [7.7.1.202607240634-r](https://github.com/eclipse-jgit/jgit/blob/ec341eceb301110cda4cce7c3a9983b380b004bf/org.eclipse.jgit/src/org/eclipse/jgit/internal/storage/dfs/DfsMidxWriter.java) | Available | Unsupported |
+| [7.8.0.202609011348-r](https://github.com/eclipse-jgit/jgit/blob/f386af5bb89c42eec92ee1547fc3201d743165cb/org.eclipse.jgit/src/org/eclipse/jgit/internal/storage/dfs/DfsMidxWriter.java) | Available | Unsupported |
+
+JGit writes the `MULTI_PACK_INDEX` bytes and puts the ordered covered packs and optional base MIDX on
+the pack description. Its [DFS reader](https://github.com/eclipse-jgit/jgit/blob/f386af5bb89c42eec92ee1547fc3201d743165cb/org.eclipse.jgit/src/org/eclipse/jgit/internal/storage/dfs/DfsObjDatabase.java)
+uses those relations to rebuild a combined pack view. The Hibernate catalog can store extension
+bytes, but it does not persist or reload the ordered covered packs or base links. Consequently the
+maintenance API exposes no MIDX option, and the age matrix does not measure MIDX even when the
+capability report finds the extension.
 
 ## Remaining evidence before an automatic policy
 
 Issue #165 remains open. The completed restart, payback and cross-database correctness slices narrow
 the remaining work to broader quantitative policy evidence:
 
-- add the full 32/100/300/1,000-push SQL Server age matrix and independent repeats of the now-retained PostgreSQL/PostgreSQL+HikariCP matrix;
+- retain the first full SQL Server age matrix and independent repeats of the now-retained PostgreSQL/PostgreSQL+HikariCP matrix;
 - extend lifecycle-specific maintenance payback beyond the retained ten-push condition;
 - measure read latency while maintenance is actively consuming database, WAL/log, I/O and storage resources;
 - repeat SQL Server cold measurements or use a controlled production-like runner before relying on exact percentages;
 - derive a stable condition from pack count, small-pack ratio, index bytes, unreachable bytes, measured degradation and time since maintenance;
 - publish direct links from the public performance history to retained charts and raw evidence;
-- re-evaluate MIDX only when a supported JGit DFS version exposes a persistable extension.
+- persist and reload the MIDX pack relationships safely across publication, repack and restart before comparing MIDX cost and read gains with full repack.
 
 Until then, operators should call `PackStorageMaintenance` explicitly and retain `PackRepackResult` together with application-level latency evidence.

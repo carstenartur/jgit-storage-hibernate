@@ -12,6 +12,8 @@ on:
       - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-performance.py'
       - '.github/scripts/test_convert_jmh_search_performance.py'
+      - '.github/scripts/validate_search_database_telemetry.py'
+      - '.github/scripts/test_validate_search_database_telemetry.py'
       - '.github/scripts/publish-benchmark-history.py'
       - '.github/benchmark-dashboard/**'
       - 'pom.xml'
@@ -26,6 +28,8 @@ on:
       - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-performance.py'
       - '.github/scripts/test_convert_jmh_search_performance.py'
+      - '.github/scripts/validate_search_database_telemetry.py'
+      - '.github/scripts/test_validate_search_database_telemetry.py'
       - '.github/scripts/publish-benchmark-history.py'
       - '.github/benchmark-dashboard/**'
       - 'pom.xml'
@@ -61,6 +65,7 @@ jobs:
         run: |
           python3 .github/scripts/test_benchmark_units.py
           python3 .github/scripts/test_convert_jmh_search_performance.py
+          python3 .github/scripts/test_validate_search_database_telemetry.py
 
       - name: Build benchmark module with Maven
         shell: bash
@@ -76,8 +81,14 @@ jobs:
           set -o pipefail
           mvn -B -pl jgit-storage-hibernate-benchmarks verify \
             -Psearch-performance \
+            -Dtest=DatabaseTelemetrySnapshotTest \
+            -Djgit.storage.benchmark.database-telemetry.enabled=true \
             -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/search-performance/jmh-result.json" 2>&1 \
             | tee target/search-performance/maven-benchmark.log
+
+      - name: Validate one PostgreSQL observation per Search measurement
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py target/search-performance
 
       - name: Convert results for grouped charts
         run: |
@@ -101,8 +112,15 @@ jobs:
           grep -F 'Hibernate Search content quality' target/search-performance/comparison.json
           grep -F 'Hibernate Search path quality' target/search-performance/comparison.json
 
-      - name: Upload Search performance evidence
+      - name: Check Search artifact privacy
+        id: privacy
         if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/search-performance jgit-storage-hibernate-benchmarks/target/failsafe-reports
+
+      - name: Upload Search performance evidence
+        if: always() && steps.privacy.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hibernate-search-performance-results
@@ -117,6 +135,9 @@ jobs:
           echo '### Hibernate Search performance' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo 'The retained PostgreSQL + local-filesystem Lucene fixture compares all versioned indexing profiles across indexing/rebuild cost, query latency, footprint and intentional recall trade-offs.' >> "$GITHUB_STEP_SUMMARY"
+          if [ -s target/search-performance/search-database-telemetry.json ]; then
+            echo 'The raw evidence includes PostgreSQL WAL and I/O observations for each timed indexing, rebuild and query invocation.' >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Full-text query chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-full-text-query)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Content query chart](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-content-query)' >> "$GITHUB_STEP_SUMMARY"

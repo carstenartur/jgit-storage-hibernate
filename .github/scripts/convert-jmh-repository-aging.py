@@ -3,15 +3,19 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
-import sys
 from collections import defaultdict
+from itertools import product
 from pathlib import Path
 from typing import Any
 
 CANONICAL_UNIT = "ms/op"
 MAINTENANCE_MODES = ("none", "compact-only", "read-optimized")
+FULL_BACKENDS = ("hsqldb", "postgresql", "postgresql-hikari", "sqlserver")
+FULL_PUSHES = (1, 10, 32, 100, 300, 1000)
+FULL_CACHE_STATES = ("cold", "warm")
 IMPORTANT_OPERATIONS = (
     "reopenAndLookupOldest",
     "lookupOldestObject",
@@ -181,7 +185,9 @@ def _row(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
+def convert(
+    results: list[dict[str, Any]], *, require_full_matrix: bool = False
+) -> dict[str, Any]:
     rows = [_row(result) for result in results]
     if not rows:
         raise ValueError("Repository-aging JMH result is empty")
@@ -193,6 +199,17 @@ def convert(results: list[dict[str, Any]]) -> dict[str, Any]:
         if mode in by_condition[key]:
             raise ValueError(f"Duplicate repository-aging result for {key!r} / {mode!r}")
         by_condition[key][mode] = row
+
+    if require_full_matrix:
+        expected = set(
+            product(FULL_BACKENDS, FULL_PUSHES, FULL_CACHE_STATES, OPERATION_LABELS)
+        )
+        actual = set(by_condition)
+        if actual != expected:
+            raise ValueError(
+                "Incomplete full repository-aging matrix: "
+                f"missing={sorted(expected - actual)}, unexpected={sorted(actual - expected)}"
+            )
 
     comparisons: list[dict[str, Any]] = []
     policy_evidence: list[dict[str, Any]] = []
@@ -345,16 +362,19 @@ def _write_markdown(report: dict[str, Any], target: Path) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
-        raise SystemExit(
-            "usage: convert-jmh-repository-aging.py <jmh-result.json> <output-directory>"
-        )
-    source = Path(sys.argv[1])
-    output = Path(sys.argv[2])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source", type=Path, help="Raw JMH JSON file")
+    parser.add_argument("output", type=Path, help="Evidence output directory")
+    parser.add_argument(
+        "--full-matrix", action="store_true", help="Require every full-profile coordinate"
+    )
+    args = parser.parse_args()
+    source = args.source
+    output = args.output
     raw = json.loads(source.read_text(encoding="utf-8"))
     if not isinstance(raw, list):
         raise ValueError(f"JMH result must be a JSON array: {source}")
-    report = convert(raw)
+    report = convert(raw, require_full_matrix=args.full_matrix)
     output.mkdir(parents=True, exist_ok=True)
     (output / "repository-aging-comparison.json").write_text(
         json.dumps(report["comparison"], indent=2, ensure_ascii=False) + "\n",
