@@ -121,7 +121,8 @@ def validate(root):
             f"{key}: invalid transaction timings, count or active stripes",
         )
         counts = Counter(r["batch_id"] for r in a)
-        paired = []
+        p95_acknowledgement = percentile(a, 95, "ack_nanos")
+        tail = None
         by_batch = defaultdict(set)
         for r in a:
             require(
@@ -138,7 +139,8 @@ def validate(root):
             hold = pool_by_id[batch]["hold_nanos"]
             remainder = r["ack_nanos"] - r["queue_wait_nanos"] - acquisition - hold
             require(remainder >= 0, f"{key}: latency phases overlap")
-            paired.append({**r, "acquisition_nanos": acquisition, "hold_nanos": hold, "other_nanos": remainder})
+            if r is p95_acknowledgement:
+                tail = {**r, "acquisition_nanos": acquisition, "hold_nanos": hold, "other_nanos": remainder}
             by_batch[batch].add(r["batch_size"])
         require(
             all(len(sizes) == 1 and counts[batch] <= next(iter(sizes))
@@ -146,6 +148,7 @@ def validate(root):
             f"{key}: mismatched batch membership",
         )
         require(counts[0] <= max(1, len(a) // 100), f"{key}: too few paired acknowledgements")
+        require(tail is not None, f"{key}: p95 acknowledgement has no paired transaction")
         if counts[0] == 0:
             require(
                 by_batch.keys() == pool_by_id.keys()
@@ -167,13 +170,12 @@ def validate(root):
             f"{key}: invalid sampled pool occupancy",
         )
 
-        tail = percentile(paired, 95, "ack_nanos")
         row = {
             "id": key,
             **run,
             "actual_rtt_ms": median_rtt,
             "ack_count": len(a),
-            "paired_count": len(paired),
+            "paired_count": len(a) - counts[0],
             "elapsed_ms": milliseconds(int(c["elapsedNanos"])),
             "records_per_second": len(a) * 1_000_000_000 / int(c["elapsedNanos"]),
             "active_stripes": active,
@@ -260,7 +262,7 @@ def render(rows, histograms, output):
     for ax, rtt in zip(plots.flat, [0, 5, 20, 50], strict=True):
         runs = []
         for s, p, scope, _ in cases:
-            candidates = sorted(select(s, p, 16, scope, rtt), key=lambda r: r["paired_tail_ack_ms"])
+            candidates = sorted(select(s, p, 16, scope, rtt), key=lambda r: r["ack_p95_ms"])
             runs.append(candidates[len(candidates) // 2])
         bottom = [0.0] * len(cases)
         for phase, label, color in phases:

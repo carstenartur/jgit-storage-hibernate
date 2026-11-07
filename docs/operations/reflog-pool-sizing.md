@@ -77,7 +77,8 @@ measurement, leaving provisioning and teardown outside the shaped window.
 
 The latency chart uses the measured phases for one actual p95 command in the
 trial with the middle observed p95 (the upper middle with an even number of
-trials). Each phase belongs to that same command. Connection hold covers the
+trials). The analyzer selects p95 from all acknowledgements and requires a
+matching transaction for that command. Connection hold covers the
 owning transaction, including client work, database queries, network delay and
 commit. A small remainder accounts for work outside the other three phases.
 
