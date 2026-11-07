@@ -58,7 +58,7 @@ current elapsed time
 
 This page therefore distinguishes:
 
-- **Physical ceiling:** host, network, database and storage-device throughput. The telemetry SPI brackets pack layout, write-queue iterations, bounded aging phases, Git-aware reflog batches, Search invocations and PostgreSQL read-ahead outside the timed path. Larger native aging and receiver matrices, safe plan capture and calibrated attribution remain open in #187. [Database-native evidence](operations/database-native-telemetry.md)
+- **Physical ceiling.** Host, network, database and storage-device throughput set this limit. The telemetry SPI brackets pack layout, write-queue iterations, bounded aging phases, Git-aware reflog batches, Search invocations and PostgreSQL read-ahead outside the timed path. The [native evidence charts](evidence/database-native-evidence-2026-11-07.md#charts) show pack WAL per logical MiB, read-ahead amplification, maintenance log bytes and SQL Server waits. The [telemetry guide](operations/database-native-telemetry.md) describes the scope of the counters.
 - **Semantic ceiling:** the fastest implementation preserving atomic publication, rollback, lifecycle, lease and multi-instance contracts.
 - **Practical comparison ceiling:** JGit `FileRepository` on the same benchmark workload. This is useful but not proof of a physical maximum because the durability and caching paths differ.
 

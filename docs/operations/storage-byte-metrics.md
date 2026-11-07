@@ -56,6 +56,8 @@ Consumption accounting examines only the requested range and keeps a running dis
 
 ### Measured policy trade-off
 
+The [native read-ahead chart](../evidence/database-native-evidence-2026-11-07.md#read-ahead-calls-and-payload) shows the PostgreSQL counterpart to the HSQLDB measurements below, with payload amplification and database block counters.
+
 The focused HSQLDB smoke matrix compared one-, four- and sixteen-chunk windows for three deliberately different access profiles. Values are point estimates from the smoke profile; the retained raw artifact is the evidence source rather than a claim of universal database timing.
 
 #### Sequential 20-MiB stream
