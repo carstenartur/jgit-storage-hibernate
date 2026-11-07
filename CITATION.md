@@ -17,4 +17,4 @@ If you use **jgit-storage-hibernate**, please cite it as:
 }
 ```
 
-A DOI can be added after the first archived release has been minted by Zenodo or another DOI provider.
+For archived releases, see the [project archive on Zenodo](https://doi.org/10.5281/zenodo.21210132).
