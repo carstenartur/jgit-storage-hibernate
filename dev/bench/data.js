@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794086829325,
+  "lastUpdate": 1794086866409,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -526409,475 +526409,6 @@ window.BENCHMARK_DATA = {
             "username": "carstenartur"
           },
           "distinct": true,
-          "id": "d3a104936c2a35b9d83319fa6843998d13e26e01",
-          "message": "Add Security Phase 1 authorization module (#242)\n\nAdd the optional framework-neutral Security module with repository-scoped principals, groups, grants, protected-ref policies, deterministic authorization evidence, dialect-specific Flyway migrations, publication integration, and measured JaCoCo gates.\n\nCloses #233 partially: this PR delivers the phase-1 policy model and persistence layer; direct JGit enforcement, credentials/tokens, audit, and protocol integration remain follow-up work.",
-          "timestamp": "2026-08-12T18:27:20+02:00",
-          "tree_id": "9c288c09c57e2f8c38053c5dec21fbf5a819b864",
-          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/d3a104936c2a35b9d83319fa6843998d13e26e01"
-        },
-        "date": 1786552248015,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Git history author + time query — 1,000 commits / FileRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 31.256951333333333,
-            "range": 71.74401741270428,
-            "extra": "Query: author-time\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history author + time query — 1,000 commits / HibernateRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 9.155626,
-            "range": 55.75328201546174,
-            "extra": "Query: author-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history author + time query — 1,000 commits / PostgreSQL compact projection",
-            "unit": "ms/op",
-            "value": 2.8833576666666665,
-            "range": 6.330662347805218,
-            "extra": "Query: author-time\nImplementation: PostgreSQL compact projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 1\nHibernate transactions: 0\nMeasured content-v1 projection build: 894.068 ms\nSpeedup vs FileRepository/JGit: 10.84x\nSpeedup vs HibernateRepository/JGit: 3.18x\nBreak-even vs FileRepository/JGit including one projection build: 31.51 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 142.54 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history commit-message query — 1,000 commits / FileRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 35.08980466666666,
-            "range": 28.631448059659892,
-            "extra": "Query: message-text\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history commit-message query — 1,000 commits / Hibernate Search full-text projection",
-            "unit": "ms/op",
-            "value": 3.2110246666666664,
-            "range": 9.300666835899689,
-            "extra": "Query: message-text\nImplementation: Hibernate Search full-text projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 894.068 ms\nSpeedup vs FileRepository/JGit: 10.93x\nSpeedup vs HibernateRepository/JGit: 3.00x\nBreak-even vs FileRepository/JGit including one projection build: 28.05 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 138.97 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history commit-message query — 1,000 commits / HibernateRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 9.644392000000002,
-            "range": 57.11365890276889,
-            "extra": "Query: message-text\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history compound audit query — 1,000 commits / FileRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 25.300781999999998,
-            "range": 59.417487423187815,
-            "extra": "Query: compound\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 3\nChanged blobs read: 3\nChanged blob bytes read: 1536\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history compound audit query — 1,000 commits / Hibernate Search compound projection",
-            "unit": "ms/op",
-            "value": 3.477547,
-            "range": 7.492447179606115,
-            "extra": "Query: compound\nImplementation: Hibernate Search compound projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 894.068 ms\nSpeedup vs FileRepository/JGit: 7.28x\nSpeedup vs HibernateRepository/JGit: 3.53x\nBreak-even vs FileRepository/JGit including one projection build: 40.97 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 101.45 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history compound audit query — 1,000 commits / HibernateRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 12.290844666666667,
-            "range": 64.74842216550499,
-            "extra": "Query: compound\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 3\nChanged blobs read: 3\nChanged blob bytes read: 1536\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history indexed projection build — 1,000 commits / content-v1",
-            "unit": "ms/op",
-            "value": 894.0683976666666,
-            "range": 3692.8512601486304,
-            "extra": "Projection: content-v1\nCommits in authoritative history: 1000\nIndexed commits: 1000\nHibernate prepared statements: 23\nHibernate transactions: 21\nMeasured operation is purge/rebuild from an already-created authoritative Git history.",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history path + changed-content query — 1,000 commits / FileRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 126.408418,
-            "range": 372.9739102423939,
-            "extra": "Query: path-content\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 1000\nChanged blobs read: 4\nChanged blob bytes read: 2048\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history path + changed-content query — 1,000 commits / Hibernate Search path + content projection",
-            "unit": "ms/op",
-            "value": 4.073168666666667,
-            "range": 3.621811189511959,
-            "extra": "Query: path-content\nImplementation: Hibernate Search path + content projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 894.068 ms\nSpeedup vs FileRepository/JGit: 31.03x\nSpeedup vs HibernateRepository/JGit: 4.07x\nBreak-even vs FileRepository/JGit including one projection build: 7.31 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 71.59 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history path + changed-content query — 1,000 commits / HibernateRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 16.562241333333333,
-            "range": 99.12591727141954,
-            "extra": "Query: path-content\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 1000\nChanged blobs read: 4\nChanged blob bytes read: 2048\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history path + time query — 1,000 commits / FileRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 110.99050333333332,
-            "range": 52.137393314864966,
-            "extra": "Query: path-time\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history path + time query — 1,000 commits / Hibernate Search exact-path projection",
-            "unit": "ms/op",
-            "value": 2.888047333333333,
-            "range": 6.164547246115086,
-            "extra": "Query: path-time\nImplementation: Hibernate Search exact-path projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 894.068 ms\nSpeedup vs FileRepository/JGit: 38.43x\nSpeedup vs HibernateRepository/JGit: 6.85x\nBreak-even vs FileRepository/JGit including one projection build: 8.27 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 52.96 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "Git history path + time query — 1,000 commits / HibernateRepository / JGit on demand",
-            "unit": "ms/op",
-            "value": 19.771296333333336,
-            "range": 89.58568462483538,
-            "extra": "Query: path-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
-            "consumers": [
-              "audio-analyzer"
-            ],
-            "contract": "search-projection-crossover",
-            "requiredModules": [
-              "jgit-storage-hibernate-search"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          }
-        ],
-        "consumerEvidence": {
-          "audio-analyzer": {
-            "displayName": "audio-analyzer",
-            "repository": "carstenartur/audio-analyzer",
-            "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-            "defaultBranch": "master",
-            "modules": [
-              "jgit-storage-hibernate-core",
-              "jgit-storage-hibernate-search"
-            ],
-            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-          }
-        }
-      },
-      {
-        "commit": {
-          "author": {
-            "email": "carsten.hammer@t-online.de",
-            "name": "Carsten Hammer",
-            "username": "carstenartur"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "carstenartur"
-          },
-          "distinct": true,
           "id": "81a5eaddb2c5c6abe27765913fea64212f65995c",
           "message": "Enforce principal-bound direct JGit mutations (#243)\n\nAdd dependency-free Core authorization hooks, principal-bound repository sessions, current database-backed ACL evaluation, atomic batch enforcement, repository deletion rechecks, durable rollback result semantics, and updated security documentation.\n\nPart of #233.",
           "timestamp": "2026-08-13T04:35:25+02:00",
@@ -586373,6 +585904,695 @@ window.BENCHMARK_DATA = {
             "unit": "ms/op",
             "value": 20.542816,
             "range": 126.12173163597951,
+            "extra": "Query: path-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          }
+        ],
+        "consumerEvidence": {
+          "audio-analyzer": {
+            "displayName": "audio-analyzer",
+            "repository": "carstenartur/audio-analyzer",
+            "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+            "defaultBranch": "master",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          },
+          "sandbox": {
+            "displayName": "sandbox",
+            "repository": "carstenartur/sandbox",
+            "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+            "defaultBranch": "main",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-java-analysis",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          }
+        }
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "ca3b29f4291d42b0c4a3c081548bee7ce8816df9",
+          "message": "Measure reflog and chunked pack publication on one Hikari pool (#456)\n\nMeasure durable reflog and chunked pack publication through a shared Hikari pool, retaining matched controls, verified cold pack reopens and separate connection and repository lock evidence.\n\nRefs #162.",
+          "timestamp": "2026-11-07T22:17:13+01:00",
+          "tree_id": "cba839d484f1ce19348b32dd3867a378b0c0c5b0",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/ca3b29f4291d42b0c4a3c081548bee7ce8816df9"
+        },
+        "date": 1794086866409,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Git history author + time query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 26.700372666666667,
+            "range": 63.13496063171215,
+            "extra": "Query: author-time\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history author + time query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 7.374758,
+            "range": 32.20685998223883,
+            "extra": "Query: author-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history author + time query — 1,000 commits / PostgreSQL compact projection",
+            "unit": "ms/op",
+            "value": 2.2360539999999998,
+            "range": 5.999101727939317,
+            "extra": "Query: author-time\nImplementation: PostgreSQL compact projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 1\nHibernate transactions: 0\nMeasured content-v1 projection build: 610.111 ms\nSpeedup vs FileRepository/JGit: 11.94x\nSpeedup vs HibernateRepository/JGit: 3.30x\nBreak-even vs FileRepository/JGit including one projection build: 24.94 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 118.73 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history commit-message query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 25.40346333333333,
+            "range": 60.33809080002316,
+            "extra": "Query: message-text\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history commit-message query — 1,000 commits / Hibernate Search full-text projection",
+            "unit": "ms/op",
+            "value": 3.888214666666667,
+            "range": 26.38596909125732,
+            "extra": "Query: message-text\nImplementation: Hibernate Search full-text projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 610.111 ms\nSpeedup vs FileRepository/JGit: 6.53x\nSpeedup vs HibernateRepository/JGit: 1.83x\nBreak-even vs FileRepository/JGit including one projection build: 28.36 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 189.96 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history commit-message query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 7.100087333333332,
+            "range": 29.195933887047385,
+            "extra": "Query: message-text\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history compound audit query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 19.23086,
+            "range": 47.75011043310553,
+            "extra": "Query: compound\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 3\nChanged blobs read: 3\nChanged blob bytes read: 1536\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history compound audit query — 1,000 commits / Hibernate Search compound projection",
+            "unit": "ms/op",
+            "value": 3.7043233333333334,
+            "range": 11.03614955499575,
+            "extra": "Query: compound\nImplementation: Hibernate Search compound projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 610.111 ms\nSpeedup vs FileRepository/JGit: 5.19x\nSpeedup vs HibernateRepository/JGit: 1.68x\nBreak-even vs FileRepository/JGit including one projection build: 39.29 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 241.41 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history compound audit query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 6.231565,
+            "range": 19.50200202742296,
+            "extra": "Query: compound\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 3\nChanged blobs read: 3\nChanged blob bytes read: 1536\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history indexed projection build — 1,000 commits / content-v1",
+            "unit": "ms/op",
+            "value": 610.1114796666667,
+            "range": 1574.1556845980347,
+            "extra": "Projection: content-v1\nCommits in authoritative history: 1000\nIndexed commits: 1000\nHibernate prepared statements: 23\nHibernate transactions: 21\nMeasured operation is purge/rebuild from an already-created authoritative Git history.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history path + changed-content query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 78.00426833333333,
+            "range": 47.37728946216065,
+            "extra": "Query: path-content\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 1000\nChanged blobs read: 4\nChanged blob bytes read: 2048\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history path + changed-content query — 1,000 commits / Hibernate Search path + content projection",
+            "unit": "ms/op",
+            "value": 2.6631590000000003,
+            "range": 4.557469375902574,
+            "extra": "Query: path-content\nImplementation: Hibernate Search path + content projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 610.111 ms\nSpeedup vs FileRepository/JGit: 29.29x\nSpeedup vs HibernateRepository/JGit: 3.96x\nBreak-even vs FileRepository/JGit including one projection build: 8.10 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 77.32 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history path + changed-content query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 10.554324666666668,
+            "range": 23.778146147848993,
+            "extra": "Query: path-content\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 4\nCommits visited on demand: 1000\nExact-path tree inspections: 1000\nChanged blobs read: 4\nChanged blob bytes read: 2048\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history path + time query — 1,000 commits / FileRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 73.87292933333335,
+            "range": 204.63796592098845,
+            "extra": "Query: path-time\nImplementation: FileRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history path + time query — 1,000 commits / Hibernate Search exact-path projection",
+            "unit": "ms/op",
+            "value": 3.053283,
+            "range": 9.485134613925707,
+            "extra": "Query: path-time\nImplementation: Hibernate Search exact-path projection\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 0\nExact-path tree inspections: 0\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0\nMeasured content-v1 projection build: 610.111 ms\nSpeedup vs FileRepository/JGit: 24.19x\nSpeedup vs HibernateRepository/JGit: 2.89x\nBreak-even vs FileRepository/JGit including one projection build: 8.62 queries\nBreak-even vs HibernateRepository/JGit including one projection build: 105.79 queries\nProjection build timing starts from an existing authoritative Git history; repository creation is excluded for every implementation.",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox"
+            ],
+            "contract": "search-projection-crossover",
+            "requiredModules": [
+              "jgit-storage-hibernate-search"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Git history path + time query — 1,000 commits / HibernateRepository / JGit on demand",
+            "unit": "ms/op",
+            "value": 8.820637666666666,
+            "range": 5.084595748691947,
             "extra": "Query: path-time\nImplementation: HibernateRepository / JGit on demand\nCommits in authoritative history: 1000\nQuery limit: 500\nHost/database caches are warm; every on-demand query creates a fresh ObjectReader/RevWalk.\nResults: 3\nCommits visited on demand: 901\nExact-path tree inspections: 800\nChanged blobs read: 0\nChanged blob bytes read: 0\nHibernate prepared statements: 0\nHibernate transactions: 0",
             "consumers": [
               "audio-analyzer",
