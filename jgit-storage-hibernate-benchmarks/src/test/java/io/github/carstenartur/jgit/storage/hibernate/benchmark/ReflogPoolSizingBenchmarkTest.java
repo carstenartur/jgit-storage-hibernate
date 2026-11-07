@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,6 +23,8 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.DurableReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.refs.ReflogAppendCommand;
 import io.github.carstenartur.jgit.storage.hibernate.refs.ReflogAppendResult;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -30,6 +33,8 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
 import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,6 +43,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -50,7 +56,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
+import org.eclipse.jgit.internal.storage.dfs.DfsBlockCacheConfig;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -61,6 +71,7 @@ class ReflogPoolSizingBenchmarkTest {
   static final String ENABLED = PREFIX + "enabled";
   private static final int WARMUP_PER_PRODUCER = 8;
   private static final long PHASE_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(60);
+  private static final int PACK_PAYLOAD_BYTES = (8 << 20) + 257;
   private static final Instant WHEN = Instant.parse("2026-08-22T00:00:00Z");
 
   @Test
@@ -135,7 +146,14 @@ class ReflogPoolSizingBenchmarkTest {
         coordinates.stream()
             .map(
                 coordinate ->
-                    new Run(coordinate, 0, 1, WARMUP_PER_PRODUCER, commandsPerProducer, 13))
+                    new Run(
+                        coordinate,
+                        0,
+                        1,
+                        WARMUP_PER_PRODUCER,
+                        commandsPerProducer,
+                        13,
+                        Workload.REFLOG))
             .toList();
     writeRuns(
         jdbcUrl, jdbcUrl, username, password, output, revision, "local-testcontainers", runs, null);
@@ -163,9 +181,10 @@ class ReflogPoolSizingBenchmarkTest {
         continue;
       }
       String[] f = row.split(",", -1);
-      if (f.length != 9) {
+      if (f.length != 9 && f.length != 10) {
         throw new IllegalArgumentException(
-            "plan needs stripes,pool,producers,scope,rtt,repeat,warmup,measured,messageChars");
+            "plan needs"
+                + " stripes,pool,producers,scope,rtt,repeat,warmup,measured,messageChars[,control|pack]");
       }
       runs.add(
           new Run(
@@ -174,7 +193,8 @@ class ReflogPoolSizingBenchmarkTest {
               Integer.parseInt(f[5]),
               Integer.parseInt(f[6]),
               Integer.parseInt(f[7]),
-              Integer.parseInt(f[8])));
+              Integer.parseInt(f[8]),
+              f.length == 9 ? Workload.REFLOG : Workload.mixed(f[9])));
     }
     assertTrue(!runs.isEmpty());
     assertEquals(runs.size(), runs.stream().map(Run::id).distinct().count());
@@ -211,6 +231,19 @@ class ReflogPoolSizingBenchmarkTest {
     Path poolFile = output.resolve("pool-borrows.csv");
     Path calibrationFile = output.resolve("rtt-calibration.csv");
     Path occupancyFile = output.resolve("occupancy.csv");
+    Path packFile = output.resolve("pack-publications.csv");
+    Path packBorrowFile = output.resolve("pack-borrows.csv");
+    Path timelineFile = output.resolve("mixed-ack-timeline.csv");
+    if (runs.stream().anyMatch(run -> run.workload() != Workload.REFLOG)) {
+      Files.writeString(
+          packFile,
+          "coordinate,started_offset_nanos,completed_offset_nanos,payload_bytes,committed_chunks,reopen_read_bytes,overlapping_acknowledgements\n");
+      Files.writeString(
+          packBorrowFile, "coordinate,acquired_offset_nanos,acquisition_nanos,hold_nanos\n");
+      Files.writeString(
+          timelineFile,
+          "coordinate,producer,ordinal,submitted_offset_nanos,completed_offset_nanos\n");
+    }
     Files.writeString(
         acknowledgementFile,
         "coordinate,producer,ordinal,batch_size,queue_wait_nanos,ack_nanos,batch_id\n");
@@ -240,7 +273,8 @@ class ReflogPoolSizingBenchmarkTest {
                 run.messageChars(),
                 run.rtt(),
                 shaper,
-                direct);
+                direct,
+                run.workload());
         assertTrue(
             measurement.nativeDelta().counters().getOrDefault("postgresql.wal.insert_lsn_bytes", 0L)
                 > 0,
@@ -259,6 +293,43 @@ class ReflogPoolSizingBenchmarkTest {
               ack.queueWaitNanos(),
               ack.ackNanos(),
               ack.batchId());
+        }
+        if (run.workload() != Workload.REFLOG) {
+          var timeline = new StringBuilder();
+          for (Acknowledgement ack : measurement.acknowledgements()) {
+            appendCsv(
+                timeline,
+                id,
+                ack.producer(),
+                ack.ordinal(),
+                ack.submittedAt() - measurement.startedAt(),
+                ack.completedAt() - measurement.startedAt());
+          }
+          Files.writeString(timelineFile, timeline, StandardOpenOption.APPEND);
+        }
+        if (measurement.pack() != null) {
+          var published = new StringBuilder();
+          PackEvidence pack = measurement.pack();
+          appendCsv(
+              published,
+              id,
+              pack.startedAt() - measurement.startedAt(),
+              pack.completedAt() - measurement.startedAt(),
+              PACK_PAYLOAD_BYTES,
+              pack.chunks(),
+              pack.reopenReadBytes(),
+              pack.overlappingAcknowledgements());
+          Files.writeString(packFile, published, StandardOpenOption.APPEND);
+          var packBorrows = new StringBuilder();
+          for (PoolBorrow borrow : pack.borrows()) {
+            appendCsv(
+                packBorrows,
+                id,
+                borrow.acquiredAt() - measurement.startedAt(),
+                borrow.acquisitionNanos(),
+                borrow.heldNanos());
+          }
+          Files.writeString(packBorrowFile, packBorrows, StandardOpenOption.APPEND);
         }
         for (PoolBorrow borrow : measurement.poolBorrows()) {
           appendCsv(
@@ -301,6 +372,7 @@ class ReflogPoolSizingBenchmarkTest {
                     Map.entry("javaVersion", Runtime.version().toString()),
                     Map.entry("deployment", deployment),
                     Map.entry("repositoryScope", coordinate.scope()),
+                    Map.entry("workload", run.workload().name()),
                     Map.entry("stripes", Integer.toString(coordinate.stripes())),
                     Map.entry("poolSize", Integer.toString(coordinate.poolSize())),
                     Map.entry("producers", Integer.toString(coordinate.producers())),
@@ -337,7 +409,18 @@ class ReflogPoolSizingBenchmarkTest {
       int measured)
       throws Exception {
     return measure(
-        jdbcUrl, username, password, telemetry, coordinate, warmup, measured, 13, 0, null, jdbcUrl);
+        jdbcUrl,
+        username,
+        password,
+        telemetry,
+        coordinate,
+        warmup,
+        measured,
+        13,
+        0,
+        null,
+        jdbcUrl,
+        Workload.REFLOG);
   }
 
   private static Measurement measure(
@@ -351,7 +434,8 @@ class ReflogPoolSizingBenchmarkTest {
       int messageChars,
       int rtt,
       NetworkShaper shaper,
-      String directUrl)
+      String directUrl,
+      Workload workload)
       throws Exception {
     var tracker = new BatchTracker();
     HikariConfig hikari = new HikariConfig();
@@ -366,7 +450,7 @@ class ReflogPoolSizingBenchmarkTest {
       hikari.addDataSourceProperty("ApplicationName", "jgit-reflog-sizing");
     }
     try (HikariDataSource pool = new HikariDataSource(hikari);
-        HibernateSessionFactoryProvider provider = provider(pool);
+        HibernateSessionFactoryProvider provider = provider(pool, workload != Workload.REFLOG);
         DurableReflogWriter writer =
             new DurableReflogWriter(
                 provider.getSessionFactory(), Limits.productionDefaults(coordinate.stripes()));
@@ -383,71 +467,113 @@ class ReflogPoolSizingBenchmarkTest {
         chains.add(commands(producer, warmup + measured, messageChars));
       }
       warmPool(pool, coordinate.poolSize());
-      if (shaper != null) {
-        shaper.delay(rtt);
-      }
-      List<Long> roundTrips;
-      Phase phase;
-      DatabaseTelemetryDelta delta;
-      DurableStripedWriteQueue.Metrics queueBefore;
-      List<Occupancy> occupancy;
-      try {
-        roundTrips =
-            shaper == null ? List.of() : shaper.calibrate(jdbcUrl, username, password, rtt);
-        execute(producers, writer, coordinate, chains, 0, warmup);
-        queueBefore = writer.metrics();
-        var databaseBefore = telemetry.capture();
-        tracker.measuring.set(true);
-        try (var sampler =
-            shaper == null
-                ? null
-                : new OccupancySampler(directUrl, username, password, pool, writer)) {
-          phase = execute(producers, writer, coordinate, chains, warmup, measured, tracker);
-          occupancy = sampler == null ? List.of() : sampler.finish();
-        } finally {
-          tracker.measuring.set(false);
-        }
-        delta = databaseBefore.deltaTo(telemetry.capture());
-      } finally {
+      try (var publication =
+          workload == Workload.PACK ? new PackPublication(provider, coordinate) : null) {
         if (shaper != null) {
-          shaper.delay(0);
+          shaper.delay(rtt);
         }
+        List<Long> roundTrips;
+        Phase phase;
+        DatabaseTelemetryDelta delta;
+        DurableStripedWriteQueue.Metrics queueBefore;
+        List<Occupancy> occupancy;
+        try {
+          roundTrips =
+              shaper == null ? List.of() : shaper.calibrate(jdbcUrl, username, password, rtt);
+          execute(producers, writer, coordinate, chains, 0, warmup);
+          queueBefore = writer.metrics();
+          var databaseBefore = telemetry.capture();
+          tracker.measuring.set(true);
+          try (var sampler =
+              shaper == null
+                  ? null
+                  : new OccupancySampler(directUrl, username, password, pool, writer)) {
+            phase =
+                execute(
+                    producers, writer, coordinate, chains, warmup, measured, tracker, publication);
+            occupancy = sampler == null ? List.of() : sampler.finish();
+          } finally {
+            tracker.measuring.set(false);
+          }
+          delta = databaseBefore.deltaTo(telemetry.capture());
+        } finally {
+          if (shaper != null) {
+            shaper.delay(0);
+          }
+        }
+        var queueAfter = writer.metrics();
+        long committedBatches = queueAfter.batches() - queueBefore.batches();
+        assertEquals(
+            (long) coordinate.producers() * measured,
+            queueAfter.completed() - queueBefore.completed());
+        assertEquals(queueBefore.failed(), queueAfter.failed());
+        long rejected = queueAfter.rejected() - queueBefore.rejected();
+        assertEquals(0, rejected);
+        PackEvidence pack = null;
+        var poolBorrows = new ArrayList<PoolBorrow>();
+        var packBorrows = new ArrayList<PoolBorrow>();
+        for (PoolBorrow borrow : tracker.borrows) {
+          if (phase.pack() != null && borrow.threadId() == phase.pack().threadId()) {
+            packBorrows.add(borrow);
+          } else {
+            poolBorrows.add(borrow);
+          }
+        }
+        if (publication != null) {
+          assertTrue(!packBorrows.isEmpty(), "pack flush must borrow from the same Hikari pool");
+          var overlapping =
+              phase.acknowledgements().stream()
+                  .filter(
+                      ack ->
+                          packBorrows.stream()
+                              .anyMatch(
+                                  borrow ->
+                                      ack.submittedAt() < borrow.acquiredAt() + borrow.heldNanos()
+                                          && ack.completedAt() > borrow.acquiredAt()))
+                  .count();
+          assertTrue(overlapping > 0, "reflog requests must overlap a pack JDBC checkout");
+          pack = publication.verify(phase.pack(), packBorrows, overlapping);
+        }
+        if (workload != Workload.REFLOG) {
+          verifyReflogOrder(provider, coordinate, chains);
+        }
+        assertEquals(
+            committedBatches, poolBorrows.size(), "one pool borrow per measured transaction");
+        assertEquals((long) coordinate.producers() * (warmup + measured), rowCount(provider));
+        long activeStripes =
+            poolBorrows.stream().mapToLong(PoolBorrow::threadId).distinct().count();
+        assertEquals(
+            coordinate.shared() ? 1 : Math.min(coordinate.stripes(), coordinate.producers()),
+            activeStripes,
+            "repository names should cover the intended writer stripes");
+        return new Measurement(
+            phase.elapsedNanos(),
+            committedBatches,
+            activeStripes,
+            phase.acknowledgements(),
+            List.copyOf(poolBorrows),
+            roundTrips,
+            occupancy,
+            rejected,
+            delta,
+            phase.startedAt(),
+            pack);
       }
-      var queueAfter = writer.metrics();
-      long committedBatches = queueAfter.batches() - queueBefore.batches();
-      assertEquals(
-          (long) coordinate.producers() * measured,
-          queueAfter.completed() - queueBefore.completed());
-      assertEquals(queueBefore.failed(), queueAfter.failed());
-      long rejected = queueAfter.rejected() - queueBefore.rejected();
-      assertEquals(0, rejected);
-      var poolBorrows = tracker.borrows;
-      assertEquals(
-          committedBatches, poolBorrows.size(), "one pool borrow per measured transaction");
-      assertEquals((long) coordinate.producers() * (warmup + measured), rowCount(provider));
-      long activeStripes = poolBorrows.stream().mapToLong(PoolBorrow::threadId).distinct().count();
-      assertEquals(
-          coordinate.shared() ? 1 : Math.min(coordinate.stripes(), coordinate.producers()),
-          activeStripes,
-          "repository names should cover the intended writer stripes");
-      return new Measurement(
-          phase.elapsedNanos(),
-          committedBatches,
-          activeStripes,
-          phase.acknowledgements(),
-          List.copyOf(poolBorrows),
-          roundTrips,
-          occupancy,
-          rejected,
-          delta);
     }
   }
 
   private static HibernateSessionFactoryProvider provider(HikariDataSource pool) {
+    return provider(pool, false);
+  }
+
+  private static HibernateSessionFactoryProvider provider(HikariDataSource pool, boolean metrics) {
     Properties properties = new Properties();
     properties.put("hibernate.connection.datasource", pool);
     properties.setProperty("hibernate.hbm2ddl.auto", "create-drop");
     properties.setProperty("hibernate.search.enabled", "false");
+    if (metrics) {
+      properties.setProperty(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
+    }
     return new HibernateSessionFactoryProvider(properties);
   }
 
@@ -513,7 +639,7 @@ class ReflogPoolSizingBenchmarkTest {
       int offset,
       int commands)
       throws Exception {
-    return execute(pool, writer, coordinate, chains, offset, commands, null);
+    return execute(pool, writer, coordinate, chains, offset, commands, null, null);
   }
 
   private static Phase execute(
@@ -523,91 +649,116 @@ class ReflogPoolSizingBenchmarkTest {
       List<List<ReflogAppendCommand>> chains,
       int offset,
       int commands,
-      BatchTracker tracker)
+      BatchTracker tracker,
+      PackPublication publication)
       throws Exception {
-    long deadline = System.nanoTime() + PHASE_TIMEOUT_NANOS;
-    CountDownLatch ready = new CountDownLatch(coordinate.producers());
-    CountDownLatch start = new CountDownLatch(1);
-    var completions = new ExecutorCompletionService<List<Acknowledgement>>(pool);
-    List<Future<List<Acknowledgement>>> futures = new ArrayList<>();
-    boolean finished = false;
-    try {
-      for (int producer = 0; producer < coordinate.producers(); producer++) {
-        int id = producer;
-        futures.add(
-            completions.submit(
-                () -> {
-                  ready.countDown();
-                  if (!start.await(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {
-                    throw new TimeoutException("reflog sizing start barrier exceeded its deadline");
-                  }
-                  List<Acknowledgement> acknowledgements = new ArrayList<>(commands);
-                  for (int ordinal = 0; ordinal < commands; ordinal++) {
-                    ReflogAppendCommand command = chains.get(id).get(offset + ordinal);
-                    long submitted = System.nanoTime();
-                    var submission = writer.append(coordinate.repositoryName(id), command);
-                    var completion = submission.completion();
-                    TimedResult observed;
-                    try {
-                      observed =
-                          completion
-                              .thenApply(
-                                  result ->
-                                      new TimedResult(
-                                          result,
-                                          System.nanoTime() - submitted,
-                                          tracker == null ? 0 : tracker.batchId(submitted)))
-                              .get(remainingNanos(deadline), TimeUnit.NANOSECONDS);
-                    } catch (InterruptedException | TimeoutException failure) {
-                      completion.cancel(false);
-                      throw failure;
+    try (ExecutorService publisher =
+        publication == null ? null : Executors.newSingleThreadExecutor()) {
+      long deadline = System.nanoTime() + PHASE_TIMEOUT_NANOS;
+      CountDownLatch ready =
+          new CountDownLatch(coordinate.producers() + (publisher == null ? 0 : 1));
+      CountDownLatch start = new CountDownLatch(1);
+      var completions = new ExecutorCompletionService<List<Acknowledgement>>(pool);
+      List<Future<List<Acknowledgement>>> futures = new ArrayList<>();
+      Future<PackInterval> pack =
+          publisher == null
+              ? null
+              : publisher.submit(
+                  () -> {
+                    ready.countDown();
+                    if (!start.await(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {
+                      throw new TimeoutException(
+                          "pack publication start barrier exceeded its deadline");
                     }
-                    ReflogAppendResult result = observed.result();
-                    assertEquals(ReflogAppendResult.Status.APPENDED, result.status());
-                    assertEquals(command.deliveryId(), result.deliveryId());
-                    if (!coordinate.shared()) {
-                      assertEquals(
-                          1,
-                          submission.batchSize(),
-                          "independent repositories cannot batch together");
+                    return publication.flush();
+                  });
+      boolean finished = false;
+      try {
+        for (int producer = 0; producer < coordinate.producers(); producer++) {
+          int id = producer;
+          futures.add(
+              completions.submit(
+                  () -> {
+                    ready.countDown();
+                    if (!start.await(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {
+                      throw new TimeoutException(
+                          "reflog sizing start barrier exceeded its deadline");
                     }
-                    acknowledgements.add(
-                        new Acknowledgement(
-                            id,
-                            ordinal,
+                    List<Acknowledgement> acknowledgements = new ArrayList<>(commands);
+                    for (int ordinal = 0; ordinal < commands; ordinal++) {
+                      ReflogAppendCommand command = chains.get(id).get(offset + ordinal);
+                      long submitted = System.nanoTime();
+                      var submission = writer.append(coordinate.repositoryName(id), command);
+                      var completion = submission.completion();
+                      TimedResult observed;
+                      try {
+                        observed =
+                            completion
+                                .thenApply(
+                                    result ->
+                                        new TimedResult(
+                                            result,
+                                            System.nanoTime(),
+                                            tracker == null ? 0 : tracker.batchId(submitted)))
+                                .get(remainingNanos(deadline), TimeUnit.NANOSECONDS);
+                      } catch (InterruptedException | TimeoutException failure) {
+                        completion.cancel(false);
+                        throw failure;
+                      }
+                      ReflogAppendResult result = observed.result();
+                      assertEquals(ReflogAppendResult.Status.APPENDED, result.status());
+                      assertEquals(command.deliveryId(), result.deliveryId());
+                      if (!coordinate.shared()) {
+                        assertEquals(
+                            1,
                             submission.batchSize(),
-                            submission.queueWaitNanos(),
-                            observed.elapsedNanos(),
-                            observed.batchId()));
-                  }
-                  return acknowledgements;
-                }));
-      }
-      if (!ready.await(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {
-        throw new TimeoutException("reflog sizing producers did not reach the start barrier");
-      }
-      long started = System.nanoTime();
-      start.countDown();
-      List<Acknowledgement> acknowledgements = new ArrayList<>();
-      for (int index = 0; index < futures.size(); index++) {
-        var future = completions.poll(remainingNanos(deadline), TimeUnit.NANOSECONDS);
-        if (future == null) {
-          throw new TimeoutException("reflog sizing phase exceeded its deadline");
+                            "independent repositories cannot batch together");
+                      }
+                      acknowledgements.add(
+                          new Acknowledgement(
+                              id,
+                              ordinal,
+                              submission.batchSize(),
+                              submission.queueWaitNanos(),
+                              observed.completedAt() - submitted,
+                              observed.batchId(),
+                              submitted,
+                              observed.completedAt()));
+                    }
+                    return acknowledgements;
+                  }));
         }
-        acknowledgements.addAll(future.get());
+        if (!ready.await(remainingNanos(deadline), TimeUnit.NANOSECONDS)) {
+          throw new TimeoutException("reflog sizing producers did not reach the start barrier");
+        }
+        long started = System.nanoTime();
+        start.countDown();
+        List<Acknowledgement> acknowledgements = new ArrayList<>();
+        for (int index = 0; index < futures.size(); index++) {
+          var future = completions.poll(remainingNanos(deadline), TimeUnit.NANOSECONDS);
+          if (future == null) {
+            throw new TimeoutException("reflog sizing phase exceeded its deadline");
+          }
+          acknowledgements.addAll(future.get());
+        }
+        long elapsed = System.nanoTime() - started;
+        acknowledgements.sort(
+            Comparator.comparingInt(Acknowledgement::producer)
+                .thenComparingInt(Acknowledgement::ordinal));
+        PackInterval interval =
+            pack == null ? null : pack.get(remainingNanos(deadline), TimeUnit.NANOSECONDS);
+        finished = true;
+        return new Phase(elapsed, acknowledgements, started, interval);
+      } finally {
+        if (!finished) {
+          futures.forEach(future -> future.cancel(true));
+          if (pack != null) {
+            pack.cancel(true);
+          }
+          writer.shutdownNow();
+        }
+        start.countDown();
       }
-      long elapsed = System.nanoTime() - started;
-      acknowledgements.sort(
-          Comparator.comparingInt(Acknowledgement::producer)
-              .thenComparingInt(Acknowledgement::ordinal));
-      finished = true;
-      return new Phase(elapsed, acknowledgements);
-    } finally {
-      if (!finished) {
-        futures.forEach(future -> future.cancel(true));
-        writer.shutdownNow();
-      }
-      start.countDown();
     }
   }
 
@@ -668,9 +819,16 @@ class ReflogPoolSizingBenchmarkTest {
   }
 
   private record Acknowledgement(
-      int producer, int ordinal, int batchSize, long queueWaitNanos, long ackNanos, long batchId) {}
+      int producer,
+      int ordinal,
+      int batchSize,
+      long queueWaitNanos,
+      long ackNanos,
+      long batchId,
+      long submittedAt,
+      long completedAt) {}
 
-  private record TimedResult(ReflogAppendResult result, long elapsedNanos, long batchId) {}
+  private record TimedResult(ReflogAppendResult result, long completedAt, long batchId) {}
 
   private record PoolBorrow(
       long id, long threadId, long acquiredAt, long acquisitionNanos, long heldNanos) {}
@@ -721,7 +879,13 @@ class ReflogPoolSizingBenchmarkTest {
   }
 
   private record Run(
-      Coordinate coordinate, int rtt, int repeat, int warmup, int measured, int messageChars) {
+      Coordinate coordinate,
+      int rtt,
+      int repeat,
+      int warmup,
+      int measured,
+      int messageChars,
+      Workload workload) {
     Run {
       if (!List.of(0, 5, 20, 50).contains(rtt)
           || repeat < 1
@@ -735,7 +899,7 @@ class ReflogPoolSizingBenchmarkTest {
     }
 
     String id() {
-      return coordinate.id() + "-rtt" + rtt + "-m" + messageChars + "-r" + repeat;
+      return coordinate.id() + "-rtt" + rtt + "-m" + messageChars + "-r" + repeat + workload.suffix;
     }
   }
 
@@ -897,7 +1061,158 @@ class ReflogPoolSizingBenchmarkTest {
     }
   }
 
-  private record Phase(long elapsedNanos, List<Acknowledgement> acknowledgements) {}
+  private enum Workload {
+    REFLOG(""),
+    CONTROL("-control"),
+    PACK("-pack");
+
+    private final String suffix;
+
+    Workload(String suffix) {
+      this.suffix = suffix;
+    }
+
+    static Workload mixed(String value) {
+      return switch (value) {
+        case "control" -> CONTROL;
+        case "pack" -> PACK;
+        default -> throw new IllegalArgumentException("mixed workload must be control or pack");
+      };
+    }
+  }
+
+  private static void verifyReflogOrder(
+      HibernateSessionFactoryProvider provider,
+      Coordinate coordinate,
+      List<List<ReflogAppendCommand>> chains) {
+    try (Session session = provider.getSessionFactory().openSession()) {
+      for (int producer = 0; producer < coordinate.producers(); producer++) {
+        var expected = chains.get(producer);
+        var rows =
+            session
+                .createQuery(
+                    "select r.deliveryId, r.oldId, r.newId from GitReflogEntity r"
+                        + " where r.repositoryName = :repo and r.refName = :ref order by r.id",
+                    Object[].class)
+                .setParameter("repo", coordinate.repositoryName(producer))
+                .setParameter("ref", expected.getFirst().refName())
+                .getResultList();
+        assertEquals(expected.size(), rows.size());
+        for (int ordinal = 0; ordinal < rows.size(); ordinal++) {
+          var command = expected.get(ordinal);
+          assertArrayEquals(
+              new Object[] {command.deliveryId(), command.oldId().name(), command.newId().name()},
+              rows.get(ordinal));
+        }
+      }
+    }
+  }
+
+  private static final class PackPublication implements AutoCloseable {
+    private final HibernateSessionFactoryProvider provider;
+    private final String name;
+    private final HibernateRepository repository;
+    private final ObjectInserter inserter;
+    private final ObjectId objectId;
+    private final byte[] expectedDigest;
+
+    PackPublication(HibernateSessionFactoryProvider provider, Coordinate coordinate)
+        throws Exception {
+      this.provider = provider;
+      name = coordinate.shared() ? coordinate.repositoryName(0) : "sizing-pack-only";
+      repository = HibernateRepository.create(provider.getSessionFactory(), name);
+      try {
+        if (!coordinate.shared()) {
+          repository.create(true);
+        }
+        inserter = repository.newObjectInserter();
+        try {
+          byte[] payload = new byte[PACK_PAYLOAD_BYTES];
+          new Random(162L).nextBytes(payload);
+          expectedDigest = MessageDigest.getInstance("SHA-256").digest(payload);
+          objectId = inserter.insert(Constants.OBJ_BLOB, payload);
+          assertEquals(0L, chunkCount(false), "pack chunks must be written inside the timed flush");
+        } catch (Exception | AssertionError failure) {
+          inserter.close();
+          throw failure;
+        }
+      } catch (Exception | AssertionError failure) {
+        repository.close();
+        throw failure;
+      }
+    }
+
+    PackInterval flush() throws Exception {
+      long started = System.nanoTime();
+      inserter.flush();
+      return new PackInterval(started, System.nanoTime(), Thread.currentThread().threadId());
+    }
+
+    PackEvidence verify(PackInterval interval, List<PoolBorrow> borrows, long overlapping)
+        throws Exception {
+      long chunks = chunkCount(true);
+      assertTrue(chunks >= 8, "the timed flush must publish a chunked PACK");
+      DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+      var digest = MessageDigest.getInstance("SHA-256");
+      long databaseRead;
+      try (HibernateRepository reopened =
+          HibernateRepository.create(provider.getSessionFactory(), name)) {
+        var loader = reopened.open(objectId);
+        assertEquals(Constants.OBJ_BLOB, loader.getType());
+        try (var stream = new DigestInputStream(loader.openStream(), digest)) {
+          assertEquals(PACK_PAYLOAD_BYTES, stream.transferTo(OutputStream.nullOutputStream()));
+        }
+        databaseRead = reopened.getStorageByteMetrics().databasePayloadBytesRead();
+        assertTrue(databaseRead >= PACK_PAYLOAD_BYTES, "verify via a cold database read");
+      }
+      assertArrayEquals(expectedDigest, digest.digest());
+      return new PackEvidence(
+          interval.startedAt(),
+          interval.completedAt(),
+          chunks,
+          databaseRead,
+          overlapping,
+          List.copyOf(borrows));
+    }
+
+    private long chunkCount(boolean committedOnly) {
+      try (Session session = provider.getSessionFactory().openSession()) {
+        return session
+            .createQuery(
+                "select count(c) from GitPackChunkEntity c join c.pack p"
+                    + " where p.repositoryName = :repo and p.packExtension = 'pack'"
+                    + " and (:committedOnly = false or p.committed = true)",
+                Long.class)
+            .setParameter("repo", name)
+            .setParameter("committedOnly", committedOnly)
+            .getSingleResult();
+      }
+    }
+
+    @Override
+    public void close() {
+      try (repository;
+          inserter) {
+        // Closing the inserter releases staging even when publication fails.
+      }
+    }
+  }
+
+  private record PackInterval(long startedAt, long completedAt, long threadId) {}
+
+  private record PackEvidence(
+      long startedAt,
+      long completedAt,
+      long chunks,
+      long reopenReadBytes,
+      long overlappingAcknowledgements,
+      List<PoolBorrow> borrows) {}
+
+  private record Phase(
+      long elapsedNanos,
+      List<Acknowledgement> acknowledgements,
+      long startedAt,
+      PackInterval pack) {}
 
   private record Measurement(
       long elapsedNanos,
@@ -908,5 +1223,7 @@ class ReflogPoolSizingBenchmarkTest {
       List<Long> roundTrips,
       List<Occupancy> occupancy,
       long rejected,
-      DatabaseTelemetryDelta nativeDelta) {}
+      DatabaseTelemetryDelta nativeDelta,
+      long startedAt,
+      PackEvidence pack) {}
 }
