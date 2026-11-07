@@ -35,6 +35,169 @@ names. The jobs do not append consumer samples to generic benchmark history.
 | Taxonomy | Two workspaces, 50 commits each | 1k, 10k and 100k total commits over ten workspaces | `taxonomyExactPathSummary` combines author, time and exact path. `taxonomyTextSummary` and `taxonomyTextEntity` use the same full-text term and limit, with one Git object verification per result. Setup checks the two text result lists match. |
 | sandbox | Ten generated classes plus the caller across five commits | 250 or 1,000 classes plus the caller across five commits | `sandboxAnalyzeBodyEdit` uses binding-aware JDT on the one file changed in the last commit. `sandboxRebuildSnapshot` rebuilds the binding-aware analysis of the same complete head snapshot. |
 
+### Audio concurrency and bounded pressure
+
+The manual `audio-concurrent-smoke` profile runs the two audio operations at
+256 KiB and 2 MiB with one and four repositories. `audio-concurrent` uses
+16 MiB payloads, both forced writers, one and four repositories, chunk batches
+of 8, 16 and 32, one warmup and three measured publications or reads. Both use a
+1 GiB heap and bounded analysis pressure. The existing generic smoke and large
+matrices keep their established operation names and sizes.
+
+One benchmark invocation releases a worker for each repository from a common
+barrier. The workers share one connection pool and independently publish their
+artifact/metadata refs or verify their complete recent payload. The counters
+sum bytes, repositories and JDBC batch executions across all workers. A
+four-repository observation represents four operations, so divide its time or
+aggregate bytes by four only when discussing amortized work, not the latency
+of an individual repository.
+
+`consumer.profiles.audio.repositories` selects 1–16 independent repositories;
+`consumer.profiles.audio.analysisMiB` selects an 8–128 MiB total working set;
+`consumer.profiles.audio.analysisWorkers` distributes that working set over
+1–8 CPU workers. The defaults are 32 MiB and one worker. These controls describe
+synthetic CPU/memory contention, not an audio algorithm or a measured percentage
+of the host's capacity. Background workers and repository executors must stop
+when the trial closes.
+
+`configuredRetainedChunkBytes` is the configured upper budget
+`repositories × chunkBatch × 1 MiB`, not an observed heap high-water mark.
+An uncompressed artifact requires at least its payload bytes to be consumed;
+its pack adds Git headers and metadata. At least
+`ceil(packChunks / chunkBatch)` chunk batches are needed for a chunked pack.
+Use the raw GC, byte and batch counters to check this structure before comparing
+timing. The production physical chunk size remains 1 MiB. Alternate physical
+layouts belong to the independently versioned
+[pack-layout experiment](operations/pack-storage-layout.md), which does not
+reinterpret existing production packs.
+
+The [retained 24-coordinate experiment](evidence/consumer-audio-concurrency-2026-11-07/README.md)
+records 72 observations on an exact source revision. It demonstrates the
+3/2/1 JDBC-batch tradeoff for chunk batches of 8/16/32 at 16 MiB, including
+four concurrent repositories. Its source predates cancellation fixes and its
+claim is limited to the measured one-analysis-worker, successful execution path.
+
+### Sandbox semantic projection experiment
+
+`sandbox-index-smoke` adds four operations over ten classes and the caller.
+Pull requests run this separately from the original analysis-only series.
+`sandbox-index` is the larger manual comparison: 250 and 1,000 classes plus the
+caller, one warmup and three measurements, always with a 1 GiB heap.
+
+| Operation | Measured work |
+|---|---|
+| `sandboxPersistBodyEdit` | Analyze the one known dependency-free body edit and atomically replace its run, symbols and references in one database transaction. |
+| `sandboxRebuildSemanticIndex` | Analyze the full head snapshot and replace every file's projection, one bounded transaction per fixture file. |
+| `sandboxPathSymbols` | Query symbols at the changed path and verify each hit's current blob and original commit through Git. |
+| `sandboxMethodReferences` | Query calls to the renamed method and perform the same Git provenance verification. |
+
+The experiment owns a disposable filesystem HSQLDB database and filesystem
+Lucene index. It uses the existing incubating Java Analysis entity mappings;
+the library does not acquire a supported projection writer, migrations or
+repository-deletion integration from this fixture. No application server or
+downstream application starts. The lifecycle tests close the provider, stop the
+embedded database engine, reopen both persistent stores and verify all facts
+and queries again. The tested pre-commit SQL constraint failure preserves the
+previous SQL rows and Lucene documents, including after reopening. Synchronous
+Search acknowledgment does not make SQL and Lucene one distributed transaction;
+post-commit index-I/O failure recovery is outside this experiment.
+
+This is a current-file view. Unchanged rows retain their actual original commit
+IDs; they are accepted only if their path/blob still belongs to the current
+snapshot. Querying only `commitId = head` would wrongly omit those reused rows.
+After each measured operation, canonical sorted semantic facts, including their
+path ownership and multiplicities, must match an independent full-snapshot
+analysis. A single path is replaced atomically. Replacement of a whole project
+uses multiple transactions and has no atomic project-wide publication contract.
+
+The measured body edit is already identified by Git blob changes and has no
+cross-file semantic impact. These results do not validate a general incremental
+indexer for renames, moves, changed signatures or dependency changes. The full
+operation rebuilds the current head, not every historical revision. Whole-file
+transactions remain bounded because this fixture has small, fixed-shape source
+files; arbitrary generated or exceptionally large files need separate controls.
+
+Each observation retains ORM statements and transaction counts, JDBC batches, GC metrics
+and filesystem `indexBytes`. Timing includes index-size accounting and query hit
+verification. Complete semantic equivalence checks occur after the timer. The
+GC profiler still covers the whole iteration, including snapshot preparation,
+analysis and persistence outside the timer. `indexBytes` is a non-atomic live
+on-disk gauge, not the memory consumed by the analysis engine or an Eclipse process. All
+retained segments, including deletions awaiting Lucene merge, contribute to that
+gauge; it is not a compacted minimum index size. All
+index-byte gauges cover Lucene files, excluding database and Git files. All
+queries use a prepared index in the same process; these are warm local-storage
+conditions with no network RTT or database-native log sampling.
+
+The [retained semantic projection experiment](evidence/consumer-sandbox-persistence-2026-11-07/README.md)
+contains all eight larger coordinates and 24 observations on one exact source
+revision. It supports one file/transaction for the proven body edit versus
+251 or 1,001 files/transactions for a complete replacement, with equivalent
+semantic facts. Its timing, GC and live-index gauges retain the limits above.
+
+### PostgreSQL history, recovery and network conditions
+
+[Taxonomy-shaped PostgreSQL Benchmarks](../.github/workflows/consumer-taxonomy-postgres.yml)
+uses a disposable PostgreSQL 17.10 database and a filesystem Lucene index. Each
+trial owns a randomly named schema. Closing the measured provider preserves both
+stores; final cleanup drops only that trial's schema and index directory.
+
+| Matrix | Total commits over ten workspaces | Database path | Operations |
+|---|---:|---|---|
+| Pull request smoke | 1,000 | Calibrated 0 and 20 ms RTT | Exact-path Lucene summary, literal-path SQL summary, text summary, hydrated text entities, bounded purge and full projection rebuild |
+| Manual standard | 1,000 and 10,000 | Calibrated 0 and 20 ms RTT | The same five operations |
+| Manual large | 1,000, 10,000 and 100,000 | Calibrated 0 and 20 ms RTT | The same five operations, with a 3 GiB heap |
+
+The SQL and Lucene path operations use the same full fixture path, author and
+time constraints. Setup compares their complete result membership, since SQL
+literal-substring and Lucene exact-path semantics are not generally identical.
+Every measured hit is then resolved through the authoritative Git repository.
+The generic smoke operations and their chart anchors remain unchanged.
+
+History construction uses a direct connection outside measurement. The measured
+provider reopens through Toxiproxy, and a retained 20-sample `SELECT 1` calibration
+must demonstrate the requested delay before JMH starts. `reopened` clears the
+JGit block cache after reopening; `warm` walks the prepared Git history and reads
+the text-query results first. Both conditions retain warm operating-system and
+database caches. These labels do not claim a cold host or a restarted database
+server. Select the cache condition in the manual workflow.
+
+The lifecycle contract interrupts indexing after the first committed 50-item
+batch, closes the provider, and verifies that the partial projection survives
+reopening. It then purges that partial projection, rebuilds the 100-commit
+workspace, reopens again, and compares all original text hits and the Git ref.
+The neighboring workspace must retain all 100 projections. The same lifecycle
+tests run locally with HSQLDB and filesystem Lucene; only the PostgreSQL workflow
+establishes native PostgreSQL behavior.
+
+Each artifact retains JMH JSON and logs, allocation/GC and ORM/JDBC counters,
+database-native telemetry for each measured operation, non-atomic live filesystem index bytes,
+RTT samples, the recovery record, and a `fixture.json` with the exact checkout
+SHA and file hashes. Native counters describe the dedicated database/instance;
+unsupported capabilities are recorded explicitly. Single-shot smoke values
+establish complete operation and evidence coverage, not stable latency rankings.
+
+To run against a disposable PostgreSQL schema locally, put the URL, user and
+password properties in an owner-readable connection file as described by the
+workflow, then use `-Dconsumer.profiles.matrix=postgres-taxonomy-smoke` (or
+`postgres-taxonomy` / `postgres-taxonomy-large`) with
+`-Djgit.storage.benchmark.connection-properties-file=/absolute/path/to/connection.properties`.
+`jgit.storage.benchmark.postgresql.measurement-url` may route the measured provider
+through a proxy while setup uses the direct URL. Set
+`-Dconsumer.profiles.taxonomy.rttMillis=20` only when that proxy is configured;
+calibration rejects an unapplied delay. The indexing and purge batch controls are
+`consumer.profiles.taxonomy.indexBatch` and `consumer.profiles.taxonomy.purgeBatch`,
+defaulting to 50 and 250. Raw JMH parameters retain both values.
+
+For a workspace containing `C` commits, projection replacement requires at least
+`ceil(C / purgeBatch) + ceil(C / indexBatch)` modifying transactions. Additional
+existence, final-page and verification queries increase that floor. SQL summary
+queries require at least one database request per queried workspace, while
+Lucene summaries can avoid ORM hydration; authoritative Git verification may
+still read the database when its object cache is empty. A networked transaction
+also has to reach the server to commit. These lower bounds explain why batch and
+cache conditions belong with each measurement.
+
 To run the smoke suite locally from the repository root with Java 21 or newer:
 
 ```bash
@@ -78,7 +241,7 @@ behavior for these fixtures, without providing reproducible timing rankings
 across releases or environments. Audio runs with Search disabled. Taxonomy
 uses embedded HSQLDB and in-memory Lucene; its history and index are prepared
 before queries, and verification reads through the existing repository.
-Sandbox uses a temporary filesystem Git fixture, reads source snapshots
+The original sandbox analysis-only series uses a temporary filesystem Git fixture, reads source snapshots
 before measurement and analyzes them without starting a database or server.
 The sandbox rebuild is a whole **head snapshot**, with no historical scan
 or persisted semantic index. The one-file operation measures the cost of
@@ -92,12 +255,11 @@ series does not establish JDBC batch or network round-trip lower bounds.
 Embedded HSQLDB has no separately sampled database log or measured network RTT.
 For PostgreSQL and SQL Server transaction-log, batching and pack throughput
 evidence see [database-native telemetry](operations/database-native-telemetry.md).
-Concurrent audio repositories, alternate physical chunk sizes, Taxonomy
-PostgreSQL/RTT and rebuild/restart/purge, and sandbox persisted index size
-are separate experiments. The Taxonomy follow-up needs a disposable
-PostgreSQL schema and filesystem Lucene directory, with matched local and
-proxied RTT coordinates, so it can close and reopen both systems while
-retaining the same Git history and projection.
+Alternate physical chunk sizes remain a separate layout experiment. The
+sandbox semantic projection experiment above adds persisted index-size evidence
+without changing the original analysis-only observations. The PostgreSQL lifecycle and
+RTT workflow above covers the Taxonomy provider/index restart and purge path;
+it does not claim a full database-server restart or production concurrency.
 
 Use `fixture.json` to match a run to [Real Consumer
 Compatibility](../.github/workflows/consumer-compatibility.yml) for the same

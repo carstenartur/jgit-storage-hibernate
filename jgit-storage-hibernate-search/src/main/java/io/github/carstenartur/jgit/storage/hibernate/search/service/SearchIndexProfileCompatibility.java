@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
+import io.github.carstenartur.jgit.storage.hibernate.search.RepositoryRoutingMappingConfigurer;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import java.util.Collections;
@@ -62,16 +63,18 @@ final class SearchIndexProfileCompatibility {
       SessionFactory sessionFactory, String repositoryName, String configuredProfile) {
     try (Session session = sessionFactory.openSession()) {
       SearchSession searchSession = Search.session(session);
-      return !searchSession
+      var query = searchSession
           .search(GitCommitIndex.class)
           .select(f -> f.id(String.class))
           .where(
               f ->
                   f.bool()
                       .filter(f.match().field("repositoryName").matching(repositoryName))
-                      .mustNot(f.match().field("indexProfile").matching(configuredProfile)))
-          .fetchHits(1)
-          .isEmpty();
+                      .mustNot(f.match().field("indexProfile").matching(configuredProfile)));
+      if (RepositoryRoutingMappingConfigurer.isEnabled(sessionFactory)) {
+        query.routing(repositoryName);
+      }
+      return !query.fetchHits(1).isEmpty();
     }
   }
 

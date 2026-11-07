@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.hibernate.search.engine.Version;
 import org.junit.jupiter.api.Test;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.results.RunResult;
@@ -58,9 +60,7 @@ class HibernateSearchRuntimeTuningBenchmarkIT {
     run.resources().verifyAffinity(affinity);
     List<String> scenarios = run.scenarios();
     Path resultFile =
-        Path.of(
-                System.getProperty(
-                    "benchmark.resultFile", "target/search-runtime/jmh-result.json"))
+        Path.of(System.getProperty("benchmark.resultFile", "target/search-runtime/jmh-result.json"))
             .toAbsolutePath();
     Files.createDirectories(resultFile.getParent());
     Path outputFile = resultFile.resolveSibling("jmh-output.txt");
@@ -98,6 +98,24 @@ class HibernateSearchRuntimeTuningBenchmarkIT {
     for (RunResult result : results) {
       assertEquals(Integer.toString(run.commitCount()), result.getParams().getParam("commitCount"));
       assertEquals(Integer.toString(run.burstCount()), result.getParams().getParam("burstCount"));
+      for (var fork : result.getBenchmarkResults()) {
+        for (var iteration : fork.getIterationResults()) {
+          var metrics = iteration.getSecondaryResults();
+          var documents = metrics.get("luceneCommittedDocuments");
+          assertNotNull(documents, "Missing persistent Lucene document count");
+          assertEquals(run.commitCount(), documents.getScore(), "Lucene documents after close");
+          for (String counter :
+              List.of(
+                  "luceneCommitGenerations",
+                  "luceneCommittedSegments",
+                  "luceneCommittedBytes",
+                  "peakHeapPoolBytes")) {
+            var measurement = metrics.get(counter);
+            assertNotNull(measurement, "Missing Search runtime observation " + counter);
+            assertTrue(measurement.getScore() > 0.0, "Empty Search runtime observation " + counter);
+          }
+        }
+      }
     }
     assertEquals(EXPECTED_OPERATIONS.size() * scenarios.size(), results.size());
     assertEquals(
@@ -131,15 +149,20 @@ class HibernateSearchRuntimeTuningBenchmarkIT {
     metadata.setProperty("resources", run.resources().id());
     metadata.setProperty("cpu.affinity", affinity);
     metadata.setProperty(
-        "launcher.available.processors", Integer.toString(Runtime.getRuntime().availableProcessors()));
-    metadata.setProperty("fork.resource.arguments", String.join(" ", run.resources().jvmArguments()));
+        "launcher.available.processors",
+        Integer.toString(Runtime.getRuntime().availableProcessors()));
+    metadata.setProperty(
+        "fork.resource.arguments", String.join(" ", run.resources().jvmArguments()));
     metadata.setProperty("java.runtime.version", System.getProperty("java.runtime.version"));
     metadata.setProperty("java.vm.name", System.getProperty("java.vm.name"));
+    metadata.setProperty("hibernate.search.version", Version.versionString());
+    metadata.setProperty("lucene.version", org.apache.lucene.util.Version.LATEST.toString());
     metadata.setProperty("os.name", System.getProperty("os.name"));
     metadata.setProperty("os.arch", System.getProperty("os.arch"));
     metadata.setProperty("os.version", System.getProperty("os.version"));
     metadata.setProperty("runner", System.getenv().getOrDefault("RUNNER_NAME", "local"));
-    metadata.setProperty("runner.image.version", System.getenv().getOrDefault("ImageVersion", "local"));
+    metadata.setProperty(
+        "runner.image.version", System.getenv().getOrDefault("ImageVersion", "local"));
     metadata.setProperty("commit", System.getProperty("benchmark.commit", "unknown"));
     metadata.setProperty("database.image", POSTGRESQL.getDockerImageName());
     try (var connection =

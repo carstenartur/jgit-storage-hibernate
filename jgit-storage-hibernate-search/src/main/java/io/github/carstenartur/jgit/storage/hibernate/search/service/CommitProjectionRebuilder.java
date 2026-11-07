@@ -9,7 +9,9 @@
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
+import io.github.carstenartur.jgit.storage.hibernate.search.RepositoryRoutingMappingConfigurer;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+import io.github.carstenartur.jgit.storage.hibernate.search.internal.ExactRepositoryProjectionDeletion;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -28,6 +30,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
+import org.hibernate.search.mapper.orm.Search;
 
 /**
  * Rebuilds the generic commit projection from authoritative Git history.
@@ -39,9 +42,10 @@ import org.hibernate.Transaction;
  * interrupted run may leave a partial derived projection; invoking the service again removes that
  * partial state and starts a deterministic rebuild. Git objects and refs are never modified.
  *
- * <p>Both deletion and indexing are bounded. Purge pages prevent the persistence context from
- * growing with repository history, while indexing batches reuse one Git walk/object reader and one
- * transaction for multiple commit projections.
+ * <p>With repository routing, a final purge also removes matching Search documents that no
+ * longer have a relational row. Both deletion and indexing are bounded. Purge pages prevent the
+ * persistence context from growing with repository history, while indexing batches reuse one Git
+ * walk/object reader and one transaction for multiple commit projections.
  *
  * <p>Callers must stop concurrent projection writers for the repository while a rebuild is active.
  */
@@ -129,6 +133,7 @@ public final class CommitProjectionRebuilder {
     try {
       requireNotInterrupted();
       removedProjections = removeExisting(repositoryName);
+      purgeOrphanedDocuments(repositoryName);
 
       publish(
           listener,
@@ -280,36 +285,40 @@ public final class CommitProjectionRebuilder {
 
   private int removeExisting(RepositoryName repositoryName) throws InterruptedIOException {
     int removed = 0;
+    String after = null;
     while (true) {
       requireNotInterrupted();
-      int pageSize;
+      ExactRepositoryProjectionDeletion.Page page;
       try (Session session = sessionFactory.openSession()) {
         Transaction transaction = session.beginTransaction();
         try {
-          List<GitCommitIndex> projections =
-              session
-                  .createQuery(
-                      "FROM GitCommitIndex c WHERE c.repositoryName = :repo ORDER BY c.id",
-                      GitCommitIndex.class)
-                  .setParameter("repo", repositoryName.value())
-                  .setMaxResults(purgeBatchSize)
-                  .getResultList();
-          pageSize = projections.size();
-          if (pageSize > 0) {
-            session.setJdbcBatchSize(pageSize);
-            projections.forEach(session::remove);
-            session.flush();
-          }
+          page = ExactRepositoryProjectionDeletion.deletePage(
+              session, repositoryName.value(), after, purgeBatchSize);
           transaction.commit();
         } catch (RuntimeException exception) {
           transaction.rollback();
           throw exception;
         }
       }
-      removed += pageSize;
-      if (pageSize < purgeBatchSize) {
+      removed = Math.addExact(removed, page.removedRows());
+      if (page.scannedRows() < purgeBatchSize) {
         return removed;
       }
+      after = page.lastProjectionKey();
+    }
+  }
+
+  private void purgeOrphanedDocuments(RepositoryName repositoryName) throws InterruptedIOException {
+    if (!RepositoryRoutingMappingConfigurer.isEnabled(sessionFactory)) {
+      return;
+    }
+    requireNotInterrupted();
+    // ORM removals above are transactional and target this repository's shard. Sweep any documents
+    // that outlived their SQL rows only after those transactions have committed.
+    try (Session session = sessionFactory.openSession()) {
+      var workspace = Search.session(session).workspace(GitCommitIndex.class);
+      workspace.purge(Set.of(repositoryName.value()));
+      workspace.refresh();
     }
   }
 

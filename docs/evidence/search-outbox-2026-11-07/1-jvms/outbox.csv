@@ -1,0 +1,15 @@
+mode,instances,phase,documents,ack_ms,ack_to_visible_ms,boot_to_visible_ms,indexed_documents,queued_before_restart,queued_after_visible,event_rows_inserted,event_rows_deleted,outbox_relations_bytes,postgres_network_bytes,search_network_bytes
+remote-direct-write-sync,1,burst,50,187.881,403.237,,50,0,0,0,0,0,17991,52046
+remote-direct-write-sync,1,burst,500,338.104,492.664,,550,0,0,0,0,0,172120,402916
+remote-direct-write-sync,1,burst,50,61.389,794.037,,600,0,0,0,0,0,17769,54938
+remote-direct-write-sync,1,burst,500,178.082,733.915,,1100,0,0,0,0,0,172410,405896
+remote-direct-write-sync,1,burst,50,102.833,733.943,,1150,0,0,0,0,0,17885,53903
+remote-direct-write-sync,1,burst,500,132.718,795.119,,1650,0,0,0,0,0,172282,404548
+remote-direct-write-sync,1,restart,0,,,2247.526,1650,0,0,0,0,0,24125,4748
+remote-outbox-eventual,1,burst,50,163.058,1160.328,,50,0,0,50,50,81920,92464,59469
+remote-outbox-eventual,1,burst,500,173.557,1669.345,,550,0,0,550,550,204800,637217,474373
+remote-outbox-eventual,1,burst,50,20.337,806.952,,600,0,0,600,600,212992,78837,56593
+remote-outbox-eventual,1,burst,500,60.707,722.606,,1100,0,0,1100,1100,286720,582632,457971
+remote-outbox-eventual,1,burst,50,10.193,854.645,,1150,0,0,1150,1150,294912,75331,54639
+remote-outbox-eventual,1,burst,500,40.499,762.419,,1650,0,0,1650,1650,393216,583696,454668
+remote-outbox-eventual,1,restart,50,,,3190.358,1700,50,0,1700,1650,401408,92283,79460

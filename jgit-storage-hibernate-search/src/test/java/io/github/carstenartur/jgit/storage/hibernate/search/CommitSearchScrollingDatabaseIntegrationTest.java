@@ -20,6 +20,7 @@ import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistor
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitSearchCursor;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitSearchHit;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,7 @@ import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -37,6 +39,8 @@ import org.testcontainers.mssqlserver.MSSQLServerContainer;
 
 @Testcontainers(disabledWithoutDocker = true)
 class CommitSearchScrollingDatabaseIntegrationTest {
+
+  @TempDir Path temporaryDirectory;
 
   private static final String AUTHOR_EMAIL = "alice@example.com";
   private static final String COMMITTER_EMAIL = "release-bot@example.com";
@@ -54,6 +58,21 @@ class CommitSearchScrollingDatabaseIntegrationTest {
   static final MSSQLServerContainer SQL_SERVER =
       new MSSQLServerContainer("mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04")
           .acceptLicense();
+
+  @Test
+  void exactRepositoryIdentityWorksOnPostgreSql() throws Exception {
+    Database database = new Database(
+        "postgresql-exact-repository", POSTGRESQL.getJdbcUrl(), POSTGRESQL.getUsername(),
+        POSTGRESQL.getPassword(), "org.postgresql.Driver", "org.hibernate.dialect.PostgreSQLDialect",
+        CoreSchemaMigrations.POSTGRESQL_LOCATION, SearchSchemaMigrations.POSTGRESQL_LOCATION);
+    migrate(database, database.coreLocation(), CoreSchemaMigrations.SCHEMA_HISTORY_TABLE);
+    migrate(database, database.searchLocation(), SearchSchemaMigrations.SCHEMA_HISTORY_TABLE);
+    var settings = database.hibernateProperties();
+    settings.put("hibernate.generate_statistics", "true");
+    try (var provider = new HibernateSessionFactoryProvider(settings, SearchEntities.annotatedClasses())) {
+      ExactRepositoryQueryContract.verify(provider, temporaryDirectory.resolve("exact-histories"));
+    }
+  }
 
   @Test
   void scrollingContractWorksOnPostgreSql() {

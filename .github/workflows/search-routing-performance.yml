@@ -1,0 +1,96 @@
+name: Search Repository Routing and Lucene Shards
+
+on:
+  push:
+    branches:
+      - 'benchmark/search-routing-full-198-*'
+  workflow_dispatch:
+    inputs:
+      documents:
+        description: Initial documents per layout and shard count
+        type: choice
+        default: '10000'
+        options: ['10000', '100000', '1000000']
+      repositories:
+        description: Repositories in the uniform and skewed layouts (single always uses one)
+        type: choice
+        default: '100'
+        options: ['10', '100', '1000']
+      compare_lucene_next:
+        description: Repeat the matrix with Hibernate Search's incubating Lucene backend
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: search-routing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sharding:
+    name: ${{ matrix.layout }} (${{ matrix.documents }} documents)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        layout: [single, uniform, skewed]
+        documents: ${{ fromJSON(github.event_name == 'push' && '["100000","1000000"]' || format('["{0}"]', inputs.documents)) }}
+    env:
+      SEARCH_DOCUMENTS: ${{ matrix.documents }}
+      SEARCH_REPOSITORIES: ${{ inputs.repositories || (matrix.layout == 'skewed' && '1000' || '100') }}
+      SEARCH_LAYOUT: ${{ matrix.layout }}
+      SEARCH_SHARDS: ${{ github.event_name == 'push' && matrix.documents == '1000000' && 'baseline,1,8' || 'baseline,1,2,4,8' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run the local Lucene shard matrix
+        env:
+          SEARCH_COMPARE_NEXT: ${{ github.event_name == 'push' || inputs.compare_lucene_next }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/target/search-routing"
+          mkdir -p "$root"
+          lscpu --json > "$root/cpu.json"
+          df -T "${TMPDIR:-/tmp}" > "$root/filesystem.txt"
+          IFS=',' read -ra shard_modes <<< "$SEARCH_SHARDS"
+          variants=(stable)
+          if [[ "$SEARCH_COMPARE_NEXT" == 'true' ]]; then
+            variants+=(next)
+          fi
+          for variant in "${variants[@]}"; do
+            artifact=hibernate-search-backend-lucene
+            if [[ "$variant" == 'next' ]]; then
+              artifact+=-next
+            fi
+            output="$root/$variant"
+            mkdir -p "$output"
+            mvn -B -pl jgit-storage-hibernate-search -am test \
+              -Dtest=SearchRoutingPerformanceIT -Dsurefire.failIfNoSpecifiedTests=false \
+              -Djacoco.skip=true '-DargLine=-Xmx1g -XX:ActiveProcessorCount=4' \
+              -Dsearch.routing.run=true \
+              "-Dsearch.routing.documents=$SEARCH_DOCUMENTS" \
+              "-Dsearch.routing.repositories=$SEARCH_REPOSITORIES" \
+              "-Dsearch.routing.layouts=$SEARCH_LAYOUT" \
+              "-Dsearch.routing.shards=$SEARCH_SHARDS" \
+              "-Dsearch.routing.source=$GITHUB_SHA" \
+              "-Dsearch.routing.output=$output" \
+              "-Dhibernate-search.lucene-backend-artifact=$artifact" 2>&1 \
+              | tee "$output/maven.log"
+            test "$(wc -l < "$output/shards.csv")" -eq "$((1 + ${#shard_modes[@]}))"
+            python3 .github/scripts/plot-search-routing.py "$output/shards.csv" "$output"
+          done
+      - name: Upload routing results and charts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: search-routing-${{ matrix.layout }}-${{ matrix.documents }}-${{ env.SEARCH_REPOSITORIES }}
+          path: target/search-routing/
+          if-no-files-found: error

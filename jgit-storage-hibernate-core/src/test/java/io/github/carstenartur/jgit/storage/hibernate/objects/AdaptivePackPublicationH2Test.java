@@ -8,22 +8,30 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationPolicySnapshot.Reason;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.junit.jupiter.api.Test;
 
 class AdaptivePackPublicationH2Test {
@@ -41,13 +49,58 @@ class AdaptivePackPublicationH2Test {
   void prePersistsLogicalPackAtDefaultOneMiBThreshold() throws Exception {
     int indexBytes = 97;
     int packBytes =
-        Math.toIntExact(
-            StagedPackExtensionStore.DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES - indexBytes);
+        Math.toIntExact(StagedPackExtensionStore.DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES - indexBytes);
     verifyPublicationMode(
-        "adaptive-pre-persisted",
-        packBytes,
-        2,
-        new StorageOperationMetrics(1, 1, 0, 0, 0));
+        "adaptive-pre-persisted", packBytes, 2, new StorageOperationMetrics(1, 1, 0, 0, 0));
+  }
+
+  @Test
+  void aHotRepositoryPublishesAnEligiblePackBelowTheSizeThreshold() throws Exception {
+    String repositoryName = "contention-promotion";
+    try (HibernateSessionFactoryProvider provider = provider(true);
+        HibernateRepository writer =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName);
+        HibernateRepository reader =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      writer.create(true);
+      PackPublicationSelector policy =
+          PackPublicationSelector.configured(provider.getSessionFactory(), repositoryName, true);
+      byte[] payload = new byte[768 * 1024];
+      new Random(17).nextBytes(payload);
+
+      // Supply completed timing samples directly so the path regression does not depend on host
+      // scheduling. The actual publication below uses both real Hibernate transactions.
+      long start = System.nanoTime() - TimeUnit.SECONDS.toNanos(1);
+      for (int sample = 0; sample < 3; sample++) {
+        long now = start + TimeUnit.MILLISECONDS.toNanos(100L * sample);
+        try (var holding = policy.begin(payload.length, now);
+            var waiting = policy.begin(payload.length, now)) {
+          holding.beforeLock();
+          waiting.beforeLock();
+          waiting.lockAcquired(TimeUnit.MILLISECONDS.toNanos(20));
+          holding.afterLock();
+          waiting.afterLock();
+          waiting.committed(now + TimeUnit.MILLISECONDS.toNanos(40));
+        }
+      }
+
+      StorageOperationBreakdown before = writer.getStorageOperationBreakdown();
+      ObjectId blob;
+      try (ObjectInserter inserter = writer.newObjectInserter()) {
+        blob = inserter.insert(Constants.OBJ_BLOB, payload);
+        inserter.flush();
+      }
+
+      assertEquals(
+          Reason.SUSTAINED_CONTENTION, writer.getPackPublicationPolicySnapshot().lastReason());
+      StorageOperationBreakdown written = writer.getStorageOperationBreakdown().minus(before);
+      assertEquals(
+          1, written.metrics(StorageOperationKind.PACK_EXTENSION_WRITE).transactionsCommitted());
+      assertEquals(
+          1, written.metrics(StorageOperationKind.PACK_PUBLICATION).transactionsCommitted());
+      assertEquals(1, writer.getPackPublicationSelectionMetrics().prePersistedSelections());
+      assertArrayEquals(payload, reader.open(blob, Constants.OBJ_BLOB).getBytes());
+    }
   }
 
   private static void verifyPublicationMode(
@@ -59,7 +112,7 @@ class AdaptivePackPublicationH2Test {
     byte[] packBytes = deterministicBytes(packLength, 17);
     byte[] indexBytes = deterministicBytes(97, 29);
 
-    try (HibernateSessionFactoryProvider provider = provider();
+    try (HibernateSessionFactoryProvider provider = provider(false);
         HibernateRepository repository =
             HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
       repository.create(true);
@@ -68,8 +121,7 @@ class AdaptivePackPublicationH2Test {
       ReadAheadHibernateObjDatabase database =
           (ReadAheadHibernateObjDatabase) repository.getObjectDatabase();
       DfsPackDescription description = database.newPack(PackSource.RECEIVE);
-      StagedPackExtensionStore store =
-          new StagedPackExtensionStore(repositoryName, context);
+      StagedPackExtensionStore store = new StagedPackExtensionStore(repositoryName, context);
       write(store, description, PackExt.PACK, packBytes);
       write(store, description, PackExt.INDEX, indexBytes);
 
@@ -89,8 +141,7 @@ class AdaptivePackPublicationH2Test {
       StorageOperationMetrics extensionWrite =
           breakdown.metrics(StorageOperationKind.PACK_EXTENSION_WRITE);
       assertEquals(
-          expectedExtensionWriteShape.transactionsStarted(),
-          extensionWrite.transactionsStarted());
+          expectedExtensionWriteShape.transactionsStarted(), extensionWrite.transactionsStarted());
       assertEquals(
           expectedExtensionWriteShape.transactionsCommitted(),
           extensionWrite.transactionsCommitted());
@@ -130,7 +181,7 @@ class AdaptivePackPublicationH2Test {
     return result;
   }
 
-  private static HibernateSessionFactoryProvider provider() {
+  private static HibernateSessionFactoryProvider provider(boolean adaptive) {
     Properties properties = new Properties();
     properties.put(
         "hibernate.connection.url",
@@ -142,6 +193,9 @@ class AdaptivePackPublicationH2Test {
     properties.put("hibernate.connection.pool_size", "4");
     properties.put("hibernate.search.enabled", "false");
     properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
+    if (adaptive) {
+      properties.put(HibernateStorageSettings.PACK_PUBLICATION_SELECTOR, "contention-aware");
+    }
     return new HibernateSessionFactoryProvider(properties);
   }
 }

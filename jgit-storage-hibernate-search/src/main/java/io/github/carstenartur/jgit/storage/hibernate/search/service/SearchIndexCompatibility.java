@@ -8,8 +8,12 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
+import io.github.carstenartur.jgit.storage.hibernate.search.RepositoryRoutingMappingConfigurer;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -18,12 +22,13 @@ import org.hibernate.SessionFactory;
 import org.hibernate.search.mapper.orm.Search;
 import org.hibernate.search.mapper.orm.session.SearchSession;
 
-/** One-time compatibility guard for persistent Hibernate Search commit indexes. */
+/** One-time guards for persistent document identifiers and opt-in repository routing. */
 final class SearchIndexCompatibility {
 
   private static final String DIRECTORY_TYPE_PROPERTY = "hibernate.search.backend.directory.type";
   private static final String PERSISTENT_DIRECTORY_TYPE = "local-filesystem";
   private static final String LEGACY_PROJECTION_PATTERN = "legacy-%";
+  private static final int ROUTING_COUNT_PAGE_SIZE = 256;
 
   /**
    * Session factories are application-owned and may be short-lived in tests, so keep only weak
@@ -51,7 +56,8 @@ final class SearchIndexCompatibility {
    */
   static void ensureCurrentDocumentIdentifiers(SessionFactory sessionFactory) {
     Objects.requireNonNull(sessionFactory, "sessionFactory");
-    if (!usesPersistentLocalFilesystem(sessionFactory)) {
+    if (!usesPersistentLocalFilesystem(sessionFactory)
+        || RepositoryRoutingMappingConfigurer.isEnabled(sessionFactory)) {
       return;
     }
     synchronized (VERIFIED_FACTORIES) {
@@ -64,6 +70,89 @@ final class SearchIndexCompatibility {
       VERIFIED_FACTORIES.add(sessionFactory);
     }
   }
+
+  /**
+   * Check the opt-in index before serving reads. Routing and shard layout changes require an offline
+   * reindex; an ordinary match-all count alone cannot detect documents on the wrong shard.
+   */
+  static void requireCurrentRepositoryRouting(SessionFactory sessionFactory) {
+    synchronized (VERIFIED_FACTORIES) {
+      if (VERIFIED_FACTORIES.contains(sessionFactory)) {
+        return;
+      }
+      try (Session session = sessionFactory.openSession()) {
+        Map<String, Long> rows = exactRepositoryCounts(session);
+        SearchSession search = Search.session(session);
+        search.workspace(GitCommitIndex.class).refresh();
+        long expectedTotal = rows.values().stream().mapToLong(Long::longValue).sum();
+        long actualTotal =
+            search.search(GitCommitIndex.class).where(f -> f.matchAll()).fetchTotalHitCount();
+        if (actualTotal != expectedTotal) {
+          throw routingMismatch(
+              "index contains " + actualTotal + " documents; expected " + expectedTotal);
+        }
+        for (Map.Entry<String, Long> row : rows.entrySet()) {
+          long routed =
+              search
+                  .search(GitCommitIndex.class)
+                  .where(f -> f.match().field("repositoryName").matching(row.getKey()))
+                  .routing(row.getKey())
+                  .fetchTotalHitCount();
+          if (routed != row.getValue()) {
+            throw routingMismatch(
+                "repository '"
+                    + row.getKey()
+                    + "' has "
+                    + routed
+                    + " of "
+                    + row.getValue()
+                    + " expected routed documents");
+          }
+        }
+      }
+      VERIFIED_FACTORIES.add(sessionFactory);
+    }
+  }
+
+  private static Map<String, Long> exactRepositoryCounts(Session session) {
+    // SQL grouping follows the database collation, while Search keyword fields and routes use
+    // exact repository names. Count scalar names in Java without hydrating entities or retaining
+    // all projections: memory is one page plus one counter per exact repository identity.
+    Map<String, Long> counts = new HashMap<>();
+    String after = null;
+    while (true) {
+      var query =
+          session
+              .createSelectionQuery(
+                  "SELECT c.projectionKey, c.repositoryName FROM GitCommitIndex c"
+                      + (after == null ? "" : " WHERE c.projectionKey > :after")
+                      + " ORDER BY c.projectionKey",
+                  RepositoryProjection.class)
+              .setMaxResults(ROUTING_COUNT_PAGE_SIZE);
+      if (after != null) {
+        query.setParameter("after", after);
+      }
+      List<RepositoryProjection> page = query.getResultList();
+      for (RepositoryProjection row : page) {
+        counts.merge(row.repository(), 1L, Long::sum);
+      }
+      if (page.size() < ROUTING_COUNT_PAGE_SIZE) {
+        return counts;
+      }
+      // The primary key is unique under the same database comparison used by ORDER BY and >.
+      // Its keyset therefore remains strict even when that comparison is case-insensitive.
+      after = page.getLast().projectionKey();
+    }
+  }
+
+  private static IllegalStateException routingMismatch(String mismatch) {
+    return new IllegalStateException(
+        "Repository-routed commit Search index is not ready: " + mismatch
+            + ". Stop projection writers, use the configured shard layout in a fresh index root, "
+            + "and run the GitCommitIndex Hibernate Search MassIndexer before serving reads.");
+  }
+
+  private record RepositoryProjection(String projectionKey, String repository) {}
 
   private static boolean usesPersistentLocalFilesystem(SessionFactory sessionFactory) {
     Object configured = sessionFactory.getProperties().get(DIRECTORY_TYPE_PROPERTY);

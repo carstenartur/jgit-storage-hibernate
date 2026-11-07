@@ -19,6 +19,7 @@ import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogReader;
 import io.github.carstenartur.jgit.storage.hibernate.refs.HibernateReflogWriter;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationPolicySnapshot;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationSelectionMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
@@ -266,9 +267,16 @@ public class HibernateRepository extends DfsRepository {
   }
 
   /**
-   * Return the deterministic staged-payload threshold for two-phase publication.
+   * @return the current publication threshold and most recent selection diagnostics
+   */
+  public PackPublicationPolicySnapshot getPackPublicationPolicySnapshot() {
+    return objectDatabase.publicationPolicySnapshot();
+  }
+
+  /**
+   * Return the configured deterministic staged-payload threshold for two-phase publication.
    *
-   * @return minimum staged logical-pack bytes selected for pre-persistence
+   * @return fallback size threshold in staged logical-pack bytes (one MiB by default)
    */
   public long getMinimumPrePersistedPackPayloadBytes() {
     return objectDatabase.minimumPrePersistedPayloadBytes();

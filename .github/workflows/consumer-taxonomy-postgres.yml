@@ -1,0 +1,188 @@
+name: Taxonomy-shaped PostgreSQL Benchmarks
+
+on:
+  push:
+    branches: [codex/consumer-211-postgres-validation]
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: History matrix
+        required: true
+        default: smoke
+        type: choice
+        options: [smoke, standard, large]
+      cache:
+        description: Provider and Git cache state (database and OS caches remain warm)
+        required: true
+        default: reopened
+        type: choice
+        options: [reopened, warm]
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/consumer-taxonomy-postgres.yml'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-core/**'
+      - 'jgit-storage-hibernate-search/**'
+      - 'jgit-storage-hibernate-benchmarks/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Taxonomy PostgreSQL at ${{ matrix.rtt }} ms RTT
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        rtt: [0, 20]
+    services:
+      postgres:
+        image: postgres:17.10-alpine
+        env:
+          POSTGRES_DB: taxonomy_benchmark
+          POSTGRES_USER: taxonomy_benchmark
+          POSTGRES_PASSWORD: fixture-only
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U taxonomy_benchmark -d taxonomy_benchmark"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      toxiproxy:
+        image: ghcr.io/shopify/toxiproxy:2.12.0
+        ports:
+          - 8474/tcp
+          - 8666/tcp
+    env:
+      MATRIX_SCALE: ${{ inputs.scale || 'smoke' }}
+      CACHE_STATE: ${{ inputs.cache || 'reopened' }}
+      REQUESTED_RTT: ${{ matrix.rtt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Configure deterministic PostgreSQL RTT
+        env:
+          CONTROL_PORT: ${{ job.services.toxiproxy.ports[8474] }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          base = "http://127.0.0.1:" + os.environ["CONTROL_PORT"]
+
+          def post(path, body):
+              request = urllib.request.Request(
+                  base + path, json.dumps(body).encode(),
+                  {"Content-Type": "application/json"}, method="POST")
+              with urllib.request.urlopen(request, timeout=10) as response:
+                  return json.load(response)
+
+          post("/proxies", {
+              "name": "taxonomy", "listen": "0.0.0.0:8666",
+              "upstream": "postgres:5432", "enabled": True})
+          rtt = int(os.environ["REQUESTED_RTT"])
+          for stream, latency in [("upstream", rtt // 2), ("downstream", rtt - rtt // 2)]:
+              if latency:
+                  post("/proxies/taxonomy/toxics", {
+                      "name": "latency-" + stream, "type": "latency",
+                      "stream": stream, "toxicity": 1.0,
+                      "attributes": {"latency": latency, "jitter": 0}})
+          PY
+      - name: Verify lifecycle and measure queries and rebuild
+        env:
+          POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+          PROXY_PORT: ${{ job.services.toxiproxy.ports[8666] }}
+        run: |
+          set -euo pipefail
+          umask 077
+          connection="$(mktemp)"
+          trap 'rm -f "$connection"' EXIT
+          printf '%s\n' \
+            "jgit.storage.benchmark.postgresql.url=jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/taxonomy_benchmark" \
+            "jgit.storage.benchmark.postgresql.measurement-url=jdbc:postgresql://127.0.0.1:$PROXY_PORT/taxonomy_benchmark" \
+            'jgit.storage.benchmark.postgresql.user=taxonomy_benchmark' \
+            'jgit.storage.benchmark.postgresql.password=fixture-only' > "$connection"
+          case "$MATRIX_SCALE" in
+            smoke) profile=postgres-taxonomy-smoke ;;
+            standard) profile=postgres-taxonomy ;;
+            large) profile=postgres-taxonomy-large ;;
+          esac
+          mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am test \
+            -Dtest=ConsumerTaxonomyLifecycleTest,ConsumerProfileBenchmarkTest \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dconsumer.profiles.run=true -Dconsumer.profiles.matrix="$profile" \
+            -Dconsumer.profiles.taxonomy.recovery=true \
+            -Dconsumer.profiles.taxonomy.rttMillis="$REQUESTED_RTT" \
+            -Dconsumer.profiles.taxonomy.cache="$CACHE_STATE" \
+            -Djgit.storage.benchmark.connection-properties-file="$connection" \
+            -Dconsumer.profiles.output="$GITHUB_WORKSPACE/target/taxonomy-postgres"
+      - name: Validate raw evidence and record provenance
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+          root = pathlib.Path("target/taxonomy-postgres")
+          raw = json.loads((root / "taxonomy.json").read_text())
+          native = json.loads((root / "taxonomy-native.json").read_text())["observations"]
+          calibration = json.loads((root / "taxonomy-rtt-calibration.json").read_text())
+          recovery = json.loads((root / "taxonomy-recovery.json").read_text())
+          expected = 5 * {"smoke": 1, "standard": 2, "large": 3}[os.environ["MATRIX_SCALE"]]
+          assert len(raw) == expected, "Incomplete JMH matrix"
+          assert len(native) == expected, "Incomplete native telemetry"
+          assert calibration["requestedRttMillis"] == int(os.environ["REQUESTED_RTT"])
+          assert recovery["partialProjections"] == recovery["projectionsAfterProviderRestart"] == 50
+          assert recovery["recoveredProjections"] == recovery["affectedWorkspaceCommits"] == 100
+          for observation in native:
+              assert observation["enabled"]
+              assert observation["gauges"]["consumer.lucene.index_bytes"] > 0
+              assert any("wal" in key for key in observation["counters"]), "Missing PostgreSQL WAL evidence"
+          files = {}
+          for path in sorted(root.iterdir()):
+              if path.is_file():
+                  data = path.read_bytes()
+                  assert b"jdbc:postgresql" not in data and b"fixture-only" not in data, path.name
+                  files[path.name] = hashlib.sha256(data).hexdigest()
+          sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          metadata = {
+              "schemaVersion": 1, "fixtureKind": "consumer-shaped", "consumerShape": "Taxonomy",
+              "checkoutSha": sha, "harnessSha": sha, "librarySha": sha,
+              "workflowRunId": os.environ["GITHUB_RUN_ID"],
+              "workflowRunAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "database": "PostgreSQL 17.10", "index": "filesystem Lucene",
+              "fixtureProfile": os.environ["MATRIX_SCALE"],
+              "network": {"requestedRttMillis": int(os.environ["REQUESTED_RTT"]), "calibration": calibration},
+              "setupNetwork": "direct loopback; measured provider reopens through Toxiproxy",
+              "cacheState": os.environ["CACHE_STATE"],
+              "cacheLimits": "OS and database caches remain warm; reopened clears the JGit block cache",
+              "samplesPerCoordinate": 1, "heap": "3 GiB" if os.environ["MATRIX_SCALE"] == "large" else "1 GiB",
+              "compatibilityWorkflow": "consumer-compatibility.yml",
+              "filesSha256": files
+          }
+          (root / "fixture.json").write_text(json.dumps(metadata, indent=2) + "\n")
+          PY
+      - name: Upload raw Taxonomy evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-shaped-taxonomy-postgres-${{ inputs.scale || 'smoke' }}-${{ matrix.rtt }}ms-${{ inputs.cache || 'reopened' }}
+          path: |
+            target/taxonomy-postgres/
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/
+          if-no-files-found: error

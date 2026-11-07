@@ -1,0 +1,7 @@
+instances,mode,boot_to_visible_ms,queued_before_restart,queued_after_visible,indexed_documents
+1,remote-direct-write-sync,2247.526,0,0,1650
+1,remote-outbox-eventual,3190.358,50,0,1700
+2,remote-direct-write-sync,2827.199,0,0,1650
+2,remote-outbox-eventual,4427.379,50,0,1700
+4,remote-direct-write-sync,4751.325,0,0,1650
+4,remote-outbox-eventual,6738.868,50,0,1700

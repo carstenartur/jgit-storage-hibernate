@@ -1,0 +1,232 @@
+{
+  "artifacts": [
+    {
+      "archive_bytes": 126032,
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591406131/zip",
+      "archive_sha256": "47a376e71d592f491e0515f56f55f0ab9e306d1b2b05f730410361556748129e",
+      "created_at": "2026-11-07T21:21:46Z",
+      "files": {
+        "cpu.json": {
+          "bytes": 4761,
+          "sha256": "35da6cd6a3d5984049d5f12db5aa4d434339d4fd115e0a730c08e07448673c7a"
+        },
+        "filesystem.txt": {
+          "bytes": 121,
+          "sha256": "5d8933fec37b1ef1df917b4a1a90c3ed1a804ba7f5e79e4bf48882da780492b0"
+        },
+        "next/environment.properties": {
+          "bytes": 325,
+          "sha256": "1423c8e978c5fbaf3fa140ab36ca01811df32990941735b7ea4b3895f700819b"
+        },
+        "next/shards.csv": {
+          "bytes": 1588,
+          "sha256": "9db69112339f0abaa57e572135271a4c39ef3433372a9068e182381da6c1b38f"
+        },
+        "stable/environment.properties": {
+          "bytes": 325,
+          "sha256": "a715e024b3f3b6b0f5ffa12d4823cb14d3c1f18624f2a5cba3018d5d5181546a"
+        },
+        "stable/shards.csv": {
+          "bytes": 1567,
+          "sha256": "e7e2bddc3b90c55d28c5be13000b08fc06ca82cd79273357cdebb69a6869a440"
+        }
+      },
+      "id": 13591406131,
+      "name": "search-routing-single-100000-100",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591406131"
+    },
+    {
+      "archive_bytes": 596726,
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591478815/zip",
+      "archive_sha256": "35e805e58588ffe011128e25dd5ce45d0c5e384877620e95d4f1d6f429aa848e",
+      "created_at": "2026-11-07T21:41:25Z",
+      "files": {
+        "cpu.json": {
+          "bytes": 4633,
+          "sha256": "688d220dbb2a22abc0ee7562fbe06e65e1e3096092d9b117d9d04b06ab00c9db"
+        },
+        "filesystem.txt": {
+          "bytes": 121,
+          "sha256": "5d8933fec37b1ef1df917b4a1a90c3ed1a804ba7f5e79e4bf48882da780492b0"
+        },
+        "next/environment.properties": {
+          "bytes": 325,
+          "sha256": "59c6d674df3bd89b5612ecf00a25e0005a0458e560172e7da5350fce126c4b98"
+        },
+        "next/shards.csv": {
+          "bytes": 1161,
+          "sha256": "863d677da20ba7aa946b83576c47a9f79e6f530f040f88412b4f050265795031"
+        },
+        "stable/environment.properties": {
+          "bytes": 325,
+          "sha256": "4b8201db4fc625a229ed684da56b447bd25521fdd1f8abce55350e945165e3ef"
+        },
+        "stable/shards.csv": {
+          "bytes": 1163,
+          "sha256": "96673e6a478ef2e013705be30c12eb69890782fd3b283bc00526cab3dd4e2ce2"
+        }
+      },
+      "id": 13591478815,
+      "name": "search-routing-single-1000000-100",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591478815"
+    },
+    {
+      "archive_bytes": 125739,
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591197507/zip",
+      "archive_sha256": "a946d4d3122e56ca847317187afd92936e51cbec541e99cdc24aac2c5df9df8b",
+      "created_at": "2026-11-07T21:20:10Z",
+      "files": {
+        "cpu.json": {
+          "bytes": 4656,
+          "sha256": "ecaa74ba6f379423fd11438d82a1f4f84a88aa1b41d2a3ddb4bd396e6b0061f8"
+        },
+        "filesystem.txt": {
+          "bytes": 121,
+          "sha256": "b85aacdddc4d8210e7b509d68295f447bb212bb750c25ef832d5ff1024f1b924"
+        },
+        "next/environment.properties": {
+          "bytes": 325,
+          "sha256": "140b72e4a491693cfe717d23770ea30c812b1481bbccb9371a858d9e59025aee"
+        },
+        "next/shards.csv": {
+          "bytes": 1603,
+          "sha256": "16b5001a19ee19d1b476421ad92814c3148c24a7cc197b0bc6fb22a2351e9f58"
+        },
+        "stable/environment.properties": {
+          "bytes": 325,
+          "sha256": "5d70bb2df037ac4e30052b479d1dd210b4357d42b77c1c12b3f9a95918a2c877"
+        },
+        "stable/shards.csv": {
+          "bytes": 1603,
+          "sha256": "84348a5e97b3f221784be90c46ca5f13be984efa78f65491f3387639e5ef6c5f"
+        }
+      },
+      "id": 13591197507,
+      "name": "search-routing-skewed-100000-1000",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591197507"
+    },
+    {
+      "archive_bytes": 599226,
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591604117/zip",
+      "archive_sha256": "a5635dda718b35ce90579d57843edf7fe99327053ddceffcbf78bf2fc04a047e",
+      "created_at": "2026-11-07T21:44:45Z",
+      "files": {
+        "cpu.json": {
+          "bytes": 4783,
+          "sha256": "0b9e580d732fdcf1959faae008e4d0d7ff5c47a032dad454b5c5642206d666e7"
+        },
+        "filesystem.txt": {
+          "bytes": 121,
+          "sha256": "e48b26a586a6e36f1661fdcc59c2811cf8d20e524541c74ecb5cab41a9eccfb7"
+        },
+        "next/environment.properties": {
+          "bytes": 325,
+          "sha256": "4d6fd8060359d1c5023bce0b5041ea9ccb7ebe18fd3fe2af7e224e5f494b7a9c"
+        },
+        "next/shards.csv": {
+          "bytes": 1206,
+          "sha256": "18508716bf1853ee555f5e27c1d0df79ee4e70f78e86ad510a6ccb83355533e6"
+        },
+        "stable/environment.properties": {
+          "bytes": 325,
+          "sha256": "57509d8bfeae3f6d04c347d2956ec79dd37b547dd83d33340f8d120a74de33ae"
+        },
+        "stable/shards.csv": {
+          "bytes": 1193,
+          "sha256": "2780124120927ed992eebfc0de19b2496f4656c3036adc8b07e6e02d3b5e1ef3"
+        }
+      },
+      "id": 13591604117,
+      "name": "search-routing-skewed-1000000-1000",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591604117"
+    },
+    {
+      "archive_bytes": 125685,
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591710495/zip",
+      "archive_sha256": "be1490ac170001aa50d8453b7f8eedea109d5b4554355a2cd93f85172a79256a",
+      "created_at": "2026-11-07T21:21:34Z",
+      "files": {
+        "cpu.json": {
+          "bytes": 4633,
+          "sha256": "98c62a06660a1033c081a6cfcd0a887866abb5d4052c867cd7d45525d61bde86"
+        },
+        "filesystem.txt": {
+          "bytes": 121,
+          "sha256": "fd097f93a85b9102abcda439b59f2b6d06bb7592b239f7026c3356739d351ad9"
+        },
+        "next/environment.properties": {
+          "bytes": 325,
+          "sha256": "395ffca912f2ab6bdd8714306a730b25655542f0ee1d99c107d8cd4b63df4105"
+        },
+        "next/shards.csv": {
+          "bytes": 1610,
+          "sha256": "40ab7275c4d89a4a39fad7dd8c5aaca86b3dd37da2ed0df55ca5dca7457677f5"
+        },
+        "stable/environment.properties": {
+          "bytes": 325,
+          "sha256": "872298885ae94347f36746f607e8cea26f98e04df63b2f8876e913e94d3645d3"
+        },
+        "stable/shards.csv": {
+          "bytes": 1602,
+          "sha256": "448841877daa253b6ff16e2e64613faae3f5c3222ce98ac63df9a50f27b7f43a"
+        }
+      },
+      "id": 13591710495,
+      "name": "search-routing-uniform-100000-100",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13591710495"
+    },
+    {
+      "archive_bytes": 599142,
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13592525551/zip",
+      "archive_sha256": "6ea740786cf87bbbff64aea17c8afdad3bdf51d55b109437b687be0f851e6103",
+      "created_at": "2026-11-07T21:49:35Z",
+      "files": {
+        "cpu.json": {
+          "bytes": 4633,
+          "sha256": "98c62a06660a1033c081a6cfcd0a887866abb5d4052c867cd7d45525d61bde86"
+        },
+        "filesystem.txt": {
+          "bytes": 121,
+          "sha256": "f85ea6ff98567e4157ee065c22d757f0bb4b2fbd3b7c9be6de31fc34746baf74"
+        },
+        "next/environment.properties": {
+          "bytes": 325,
+          "sha256": "16a478ae02ca25889d4a35319df26ed91bab5ebe1513d7fe144df27ff50ef538"
+        },
+        "next/shards.csv": {
+          "bytes": 1192,
+          "sha256": "393007b51de1eba570b715cc10644972b4f987611398a62b636b6cb2c99a1e39"
+        },
+        "stable/environment.properties": {
+          "bytes": 325,
+          "sha256": "383f6f25b347fc1f66db65eb01dcde072bb9083c96eba755be35363c45a18e71"
+        },
+        "stable/shards.csv": {
+          "bytes": 1186,
+          "sha256": "2dbe912e72486993c5dd59454ef4bdbf8449e279ff1fa89f1801c8d996915c88"
+        }
+      },
+      "id": 13592525551,
+      "name": "search-routing-uniform-1000000-100",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13592525551"
+    }
+  ],
+  "source_blobs": {
+    ".github/scripts/plot-search-routing.py": "741944136ac88382d9dfb896362b949863df24ac",
+    ".github/workflows/search-routing-performance.yml": "58ce099994efd6279028d38e5563c24fc276a26d",
+    "jgit-storage-hibernate-search/pom.xml": "8fd9944efe0ffaa67e80182f62e7dd4263246774",
+    "jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/RepositoryRoutingMappingConfigurer.java": "a66c88038a6269d0caa04a4cfc030f9b0919d9c7",
+    "jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/entity/GitCommitIndex.java": "dc4851ff8af82ad13b7db29e90174855aa64e1f4",
+    "jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/CommitProjectionRebuilder.java": "0a4a425dcc9e85750ce85e9efbd18995008bd46b",
+    "jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/GitHistorySearchService.java": "b1dc5c7d56099fcd00c4c95ced572a144ff9450a",
+    "jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/SearchIndexCompatibility.java": "9ed3faafd130bdb274de706e8964b71cffb305e8",
+    "jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/SearchIndexProfileCompatibility.java": "c2f9c71c3742bca67af6617dd3b81069fb2e0c25",
+    "jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/LuceneSingleWriterProcessH2Test.java": "8cd43ef88cc6bca461357e253a40538f598eea5c",
+    "jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/RepositoryRoutingH2Test.java": "6d4d4f040ed9b45af952b3e11f8d1af0f4a5d4f6",
+    "jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/SearchRoutingPerformanceIT.java": "5b9327d743c701b66f891ac7273cda9b8d4e752e"
+  },
+  "source_commit": "413fed75bb4f61eb839cffccf16874e6d81b8128",
+  "source_url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/413fed75bb4f61eb839cffccf16874e6d81b8128",
+  "workflow_run_id": 42415011355,
+  "workflow_run_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42415011355"
+}

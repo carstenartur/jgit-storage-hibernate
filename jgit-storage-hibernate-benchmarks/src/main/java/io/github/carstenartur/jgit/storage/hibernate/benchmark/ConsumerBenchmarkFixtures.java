@@ -11,6 +11,12 @@ package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -50,6 +56,29 @@ final class ConsumerBenchmarkFixtures {
   };
 
   private ConsumerBenchmarkFixtures() {}
+
+  /** Live, non-atomic disk gauge that tolerates Lucene removing a segment during a merge. */
+  static long liveDirectoryBytes(Path root) throws IOException {
+    long[] bytes = {0};
+    Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
+      @Override
+      public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+        if (attributes.isRegularFile()) {
+          bytes[0] += attributes.size();
+        }
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override
+      public FileVisitResult visitFileFailed(Path file, IOException failure) throws IOException {
+        if (failure instanceof NoSuchFileException && !file.equals(root)) {
+          return FileVisitResult.CONTINUE;
+        }
+        throw failure;
+      }
+    });
+    return bytes[0];
+  }
 
   /**
    * Append one binary artifact and one metadata commit to separate branches. Use the same seed and

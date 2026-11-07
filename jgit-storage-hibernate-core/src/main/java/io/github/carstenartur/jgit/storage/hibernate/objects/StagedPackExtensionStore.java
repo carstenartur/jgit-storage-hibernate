@@ -8,11 +8,14 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.objects.PackExtensionStagingBuffer.StagedPayload;
 import io.github.carstenartur.jgit.storage.hibernate.objects.PackExtensionStagingBuffer.StagedPayloadReader;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationPolicySnapshot;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationPolicySnapshot.Reason;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -28,6 +31,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongConsumer;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
@@ -42,37 +46,35 @@ import org.hibernate.exception.ConstraintViolationException;
  * and creates no database row. Extensions spill once after the 256-KiB staging-memory limit or the
  * process budget is exhausted.
  *
- * <p>Additive logical packs whose extensions all remain inline use one repository-locked transaction
- * for persistence and publication. Small chunked logical packs also retain that direct path: below
- * one MiB of total staged payload, the second transaction costs more than the lock interval it can
- * save under ordinary low-contention operation. Larger additive packs are persisted as a complete
- * invisible lease-owned generation in one lock-free Hibernate transaction, then atomically
- * published under one short repository lock. Readers continue to select only
- * {@code committed=true} rows.
+ * <p>Additive logical packs whose extensions all remain inline use one repository-locked
+ * transaction for persistence and publication. The default also uses that path for chunked packs
+ * below one MiB of total staged payload. The optional contention policy can lower that threshold.
+ * Eligible packs selected for pre-persistence are written as a complete invisible lease-owned
+ * generation before acquiring the repository lock to publish them atomically. Readers continue to
+ * select only {@code committed=true} rows.
  *
  * <p>Pack replacement and compaction remain on the established single locked transaction path. JGit
  * can validate refs before calling {@code commitPack}; releasing the repository lock between that
  * validation and source-pack replacement would permit a conflicting ref update to cross the race
  * check.
  *
- * <p>A crash after pre-persistence can leave a complete durable uncommitted group. Its shared writer
- * token and renewed lease make it eligible for the existing abandoned-write cleanup after expiry.
- * Normal publication, failure handling and rollback remove it explicitly. Local temporary files
- * remain derived unpublished state and are never imported as durable Git data.
+ * <p>A crash after pre-persistence can leave a complete durable uncommitted group. Its shared
+ * writer token and renewed lease make it eligible for the existing abandoned-write cleanup after
+ * expiry. Normal publication, failure handling and rollback remove it explicitly. Local temporary
+ * files remain derived unpublished state and are never imported as durable Git data.
  */
 final class StagedPackExtensionStore {
 
   private static final int CHUNK_BATCH_SIZE = 8;
-  static final long DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES = 1024L * 1024L;
-  private static final long MIN_PREPERSIST_PAYLOAD_BYTES =
-      HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD + 1L;
+  static final long DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES =
+      HibernateStorageSettings.DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES;
   private static final String PACK_EXTENSION_UNIQUE_CONSTRAINT = "uk_pack_repo_name_ext";
   private static final PrePublicationHook NO_PRE_PUBLICATION_HOOK = ignored -> {};
 
   private final String repositoryName;
   private final HibernateTransactionContext transactionContext;
   private final PrePublicationHook prePublicationHook;
-  private final long minimumPrePersistedPayloadBytes;
+  private final PackPublicationSelector publicationSelector;
   private final StorageByteCounters storageByteCounters;
   private final PackPublicationSelectionCounters publicationSelectionCounters;
   private final Map<ExtensionKey, StagedExtension> staged = new ConcurrentHashMap<>();
@@ -103,12 +105,25 @@ final class StagedPackExtensionStore {
   StagedPackExtensionStore(
       String repositoryName,
       HibernateTransactionContext transactionContext,
+      StorageByteCounters storageByteCounters,
+      PackPublicationSelector publicationSelector) {
+    this(
+        repositoryName,
+        transactionContext,
+        NO_PRE_PUBLICATION_HOOK,
+        storageByteCounters,
+        publicationSelector);
+  }
+
+  StagedPackExtensionStore(
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
       PrePublicationHook prePublicationHook) {
     this(
         repositoryName,
         transactionContext,
         prePublicationHook,
-        MIN_PREPERSIST_PAYLOAD_BYTES,
+        PackPublicationSelector.MIN_PREPERSIST_PAYLOAD_BYTES,
         StorageByteCounters.disabled());
   }
 
@@ -135,29 +150,26 @@ final class StagedPackExtensionStore {
         repositoryName,
         transactionContext,
         prePublicationHook,
-        minimumPrePersistedPayloadBytes,
         storageByteCounters,
-        PackPublicationSelectionCounters.from(storageByteCounters));
+        new PackPublicationSelector(
+            HibernateStorageSettings.SIZE_PUBLICATION_SELECTOR,
+            storageByteCounters.enabled(),
+            minimumPrePersistedPayloadBytes,
+            null));
   }
 
   private StagedPackExtensionStore(
       String repositoryName,
       HibernateTransactionContext transactionContext,
       PrePublicationHook prePublicationHook,
-      long minimumPrePersistedPayloadBytes,
       StorageByteCounters storageByteCounters,
-      PackPublicationSelectionCounters publicationSelectionCounters) {
+      PackPublicationSelector publicationSelector) {
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
     this.transactionContext = Objects.requireNonNull(transactionContext, "transactionContext");
     this.prePublicationHook = Objects.requireNonNull(prePublicationHook, "prePublicationHook");
-    if (minimumPrePersistedPayloadBytes < MIN_PREPERSIST_PAYLOAD_BYTES) {
-      throw new IllegalArgumentException(
-          "minimumPrePersistedPayloadBytes must be at least " + MIN_PREPERSIST_PAYLOAD_BYTES);
-    }
-    this.minimumPrePersistedPayloadBytes = minimumPrePersistedPayloadBytes;
+    this.publicationSelector = Objects.requireNonNull(publicationSelector, "publicationSelector");
     this.storageByteCounters = Objects.requireNonNull(storageByteCounters, "storageByteCounters");
-    this.publicationSelectionCounters =
-        Objects.requireNonNull(publicationSelectionCounters, "publicationSelectionCounters");
+    this.publicationSelectionCounters = PackPublicationSelectionCounters.from(storageByteCounters);
   }
 
   DfsOutputStream open(DfsPackDescription description, PackExt extension) throws IOException {
@@ -178,9 +190,9 @@ final class StagedPackExtensionStore {
     return commit(
         descriptions,
         replaces,
-        work ->
+        (work, observer) ->
             transactionContext.executeWithRepositoryLock(
-                StorageOperationKind.PACK_PUBLICATION, repositoryName, work));
+                StorageOperationKind.PACK_PUBLICATION, repositoryName, work, observer));
   }
 
   CommitResult commit(
@@ -189,14 +201,40 @@ final class StagedPackExtensionStore {
       PublicationTransaction transaction)
       throws IOException {
     List<Publication> publications = publications(descriptions);
-    boolean prePersisted = shouldPrePersist(publications, replaces);
-    publicationSelectionCounters.record(prePersisted, stagedPayloadBytes(publications));
-    CommitResult commitResult =
-        prePersisted
-            ? commitPrePersisted(publications, transaction)
-            : commitDirect(publications, replaces, transaction);
-    discard(publications);
-    return commitResult;
+    Reason exclusion = prePersistenceExclusion(publications, replaces);
+    long payloadBytes =
+        exclusion == null || storageByteCounters.enabled() ? stagedPayloadBytes(publications) : 0;
+    boolean observe = exclusion == null && publicationSelector.adaptive();
+    boolean nested = observe && transactionContext.hasActiveTransaction();
+    try (var observation =
+        observe && !nested ? publicationSelector.begin(payloadBytes, System.nanoTime()) : null) {
+      boolean prePersisted =
+          publicationSelector.prePersist(exclusion, payloadBytes, nested, observation);
+      publicationSelectionCounters.record(prePersisted, payloadBytes);
+      PublicationTransaction selectedTransaction =
+          observation == null ? transaction : observeLock(transaction, observation);
+      CommitResult result =
+          prePersisted
+              ? commitPrePersisted(publications, selectedTransaction)
+              : commitDirect(publications, replaces, selectedTransaction);
+      if (observation != null) {
+        observation.committed(System.nanoTime());
+      }
+      discard(publications);
+      return result;
+    }
+  }
+
+  private static PublicationTransaction observeLock(
+      PublicationTransaction transaction, PackPublicationSelector.Observation observation) {
+    return (work, ignored) -> {
+      observation.beforeLock();
+      try {
+        return transaction.execute(work, observation::lockAcquired);
+      } finally {
+        observation.afterLock();
+      }
+    };
   }
 
   private CommitResult commitDirect(
@@ -504,7 +542,11 @@ final class StagedPackExtensionStore {
   }
 
   long minimumPrePersistedPayloadBytes() {
-    return minimumPrePersistedPayloadBytes;
+    return publicationSelector.sizeThreshold();
+  }
+
+  PackPublicationPolicySnapshot publicationPolicySnapshot() {
+    return publicationSelector.snapshot(System.nanoTime());
   }
 
   private void register(StagedExtension extension) throws IOException {
@@ -534,26 +576,23 @@ final class StagedPackExtensionStore {
     return result;
   }
 
-  private boolean shouldPrePersist(
+  private static Reason prePersistenceExclusion(
       List<Publication> publications, Collection<DfsPackDescription> replaces) {
     if (replaces != null && !replaces.isEmpty()) {
-      return false;
+      return Reason.REPLACEMENT;
     }
     boolean chunked = false;
-    long totalPayloadBytes = 0;
     for (Publication publication : publications) {
       for (ExpectedExtension expected : publication.extensions()) {
         if (expected.staged() == null) {
-          return false;
+          return Reason.LEGACY_OR_MIXED;
         }
-        long extensionBytes = expected.staged().fileSize();
-        totalPayloadBytes = saturatingAdd(totalPayloadBytes, extensionBytes);
-        if (extensionBytes > HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD) {
+        if (expected.staged().fileSize() > HibernateObjDatabase.INLINE_PAYLOAD_THRESHOLD) {
           chunked = true;
         }
       }
     }
-    return chunked && totalPayloadBytes >= minimumPrePersistedPayloadBytes;
+    return chunked ? null : Reason.INLINE;
   }
 
   private static long saturatingAdd(long left, long right) {
@@ -839,7 +878,8 @@ final class StagedPackExtensionStore {
       PackDescriptionMetadata metadata) {
     CommittedExtension {
       if (inline != (inlineData != null)) {
-        throw new IllegalArgumentException("inline payload must be present exactly for inline rows");
+        throw new IllegalArgumentException(
+            "inline payload must be present exactly for inline rows");
       }
       metadata = Objects.requireNonNull(metadata, "metadata");
     }
@@ -875,7 +915,13 @@ final class StagedPackExtensionStore {
 
   @FunctionalInterface
   interface PublicationTransaction {
-    CommitResult execute(HibernateTransactionContext.Work<CommitResult> work) throws IOException;
+    CommitResult execute(HibernateTransactionContext.Work<CommitResult> work, LongConsumer observer)
+        throws IOException;
+
+    default CommitResult execute(HibernateTransactionContext.Work<CommitResult> work)
+        throws IOException {
+      return execute(work, null);
+    }
   }
 
   @FunctionalInterface

@@ -11,7 +11,9 @@ jgit-storage-hibernate-benchmarks
 It is not a runtime dependency for consumers. It exists for CI, maintainers and release review.
 
 The [consumer-shaped fixtures](benchmark-consumer-profiles.md) provide synthetic
-Git histories for future Audio, Taxonomy and sandbox benchmark comparisons.
+Git histories for separate Audio, Taxonomy and sandbox benchmark comparisons,
+including concurrent publication, native PostgreSQL recovery/RTT and an
+experimental persisted Java semantic projection.
 
 ## Repository backend comparison
 

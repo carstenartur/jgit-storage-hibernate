@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1050" height="414" viewBox="0 0 1050 414" role="img" aria-label="Acknowledgement and visibility by JVM count">
+<rect width="1050" height="414" rx="12" fill="#f7f9fc"/>
+<g font-family="system-ui, sans-serif" fill="#24324b">
+<text x="22" y="29" font-size="20" text-anchor="start" font-weight="700">Shared PostgreSQL + OpenSearch: acknowledgement and visibility</text>
+<text x="22" y="51" font-size="13" text-anchor="start" font-weight="400">Three bursts per point · 50 ms visibility polling · acknowledgement guarantees differ</text>
+<text x="67" y="83" font-size="15" text-anchor="start" font-weight="700">Burst acknowledgement</text>
+<text x="504" y="101" font-size="11" text-anchor="end" font-weight="400">ms</text>
+<line x1="67" x2="504" y1="306.0" y2="306.0" stroke="#d6deec"/>
+<text x="60" y="310.0" font-size="10" text-anchor="end" font-weight="400">0</text>
+<line x1="67" x2="504" y1="256.5" y2="256.5" stroke="#d6deec"/>
+<text x="60" y="260.5" font-size="10" text-anchor="end" font-weight="400">75</text>
+<line x1="67" x2="504" y1="207.0" y2="207.0" stroke="#d6deec"/>
+<text x="60" y="211.0" font-size="10" text-anchor="end" font-weight="400">150</text>
+<line x1="67" x2="504" y1="157.5" y2="157.5" stroke="#d6deec"/>
+<text x="60" y="161.5" font-size="10" text-anchor="end" font-weight="400">225</text>
+<line x1="67" x2="504" y1="108.0" y2="108.0" stroke="#d6deec"/>
+<text x="60" y="112.0" font-size="10" text-anchor="end" font-weight="400">300</text>
+<text x="103.41666666666666" y="325" font-size="11" text-anchor="middle" font-weight="400">1 JVM</text>
+<text x="103.41666666666666" y="341" font-size="10" text-anchor="middle" font-weight="400">50 docs</text>
+<rect x="80.4" y="238.1" width="21" height="67.9" rx="2" fill="#526780"><title>remote-direct-write-sync: 102.833 ms</title></rect>
+<rect x="103.4" y="292.6" width="21" height="13.4" rx="2" fill="#007c83"><title>remote-outbox-eventual: 20.337 ms</title></rect>
+<text x="176.25" y="325" font-size="11" text-anchor="middle" font-weight="400">1 JVM</text>
+<text x="176.25" y="341" font-size="10" text-anchor="middle" font-weight="400">500 docs</text>
+<rect x="153.2" y="188.5" width="21" height="117.5" rx="2" fill="#526780"><title>remote-direct-write-sync: 178.082 ms</title></rect>
+<rect x="176.2" y="265.9" width="21" height="40.1" rx="2" fill="#007c83"><title>remote-outbox-eventual: 60.707 ms</title></rect>
+<text x="249.08333333333334" y="325" font-size="11" text-anchor="middle" font-weight="400">2 JVM</text>
+<text x="249.08333333333334" y="341" font-size="10" text-anchor="middle" font-weight="400">50 docs</text>
+<rect x="226.1" y="264.4" width="21" height="41.6" rx="2" fill="#526780"><title>remote-direct-write-sync: 63.018 ms</title></rect>
+<rect x="249.1" y="292.1" width="21" height="13.9" rx="2" fill="#007c83"><title>remote-outbox-eventual: 21.105 ms</title></rect>
+<text x="321.91666666666663" y="325" font-size="11" text-anchor="middle" font-weight="400">2 JVM</text>
+<text x="321.91666666666663" y="341" font-size="10" text-anchor="middle" font-weight="400">500 docs</text>
+<rect x="298.9" y="169.6" width="21" height="136.4" rx="2" fill="#526780"><title>remote-direct-write-sync: 206.604 ms</title></rect>
+<rect x="321.9" y="257.3" width="21" height="48.7" rx="2" fill="#007c83"><title>remote-outbox-eventual: 73.841 ms</title></rect>
+<text x="394.75" y="325" font-size="11" text-anchor="middle" font-weight="400">4 JVM</text>
+<text x="394.75" y="341" font-size="10" text-anchor="middle" font-weight="400">50 docs</text>
+<rect x="371.8" y="246.5" width="21" height="59.5" rx="2" fill="#526780"><title>remote-direct-write-sync: 90.130 ms</title></rect>
+<rect x="394.8" y="289.9" width="21" height="16.1" rx="2" fill="#007c83"><title>remote-outbox-eventual: 24.454 ms</title></rect>
+<text x="467.5833333333333" y="325" font-size="11" text-anchor="middle" font-weight="400">4 JVM</text>
+<text x="467.5833333333333" y="341" font-size="10" text-anchor="middle" font-weight="400">500 docs</text>
+<rect x="444.6" y="146.0" width="21" height="160.0" rx="2" fill="#526780"><title>remote-direct-write-sync: 242.413 ms</title></rect>
+<rect x="467.6" y="247.9" width="21" height="58.1" rx="2" fill="#007c83"><title>remote-outbox-eventual: 87.959 ms</title></rect>
+<text x="582" y="83" font-size="15" text-anchor="start" font-weight="700">Acknowledgement to complete visibility</text>
+<text x="1019" y="101" font-size="11" text-anchor="end" font-weight="400">ms</text>
+<line x1="582" x2="1019" y1="306.0" y2="306.0" stroke="#d6deec"/>
+<text x="575" y="310.0" font-size="10" text-anchor="end" font-weight="400">0</text>
+<line x1="582" x2="1019" y1="256.5" y2="256.5" stroke="#d6deec"/>
+<text x="575" y="260.5" font-size="10" text-anchor="end" font-weight="400">225</text>
+<line x1="582" x2="1019" y1="207.0" y2="207.0" stroke="#d6deec"/>
+<text x="575" y="211.0" font-size="10" text-anchor="end" font-weight="400">450</text>
+<line x1="582" x2="1019" y1="157.5" y2="157.5" stroke="#d6deec"/>
+<text x="575" y="161.5" font-size="10" text-anchor="end" font-weight="400">675</text>
+<line x1="582" x2="1019" y1="108.0" y2="108.0" stroke="#d6deec"/>
+<text x="575" y="112.0" font-size="10" text-anchor="end" font-weight="400">900</text>
+<text x="618.4166666666666" y="325" font-size="11" text-anchor="middle" font-weight="400">1 JVM</text>
+<text x="618.4166666666666" y="341" font-size="10" text-anchor="middle" font-weight="400">50 docs</text>
+<rect x="595.4" y="144.5" width="21" height="161.5" rx="2" fill="#526780"><title>remote-direct-write-sync: 733.943 ms</title></rect>
+<rect x="618.4" y="118.0" width="21" height="188.0" rx="2" fill="#007c83"><title>remote-outbox-eventual: 854.645 ms</title></rect>
+<text x="691.25" y="325" font-size="11" text-anchor="middle" font-weight="400">1 JVM</text>
+<text x="691.25" y="341" font-size="10" text-anchor="middle" font-weight="400">500 docs</text>
+<rect x="668.2" y="144.5" width="21" height="161.5" rx="2" fill="#526780"><title>remote-direct-write-sync: 733.915 ms</title></rect>
+<rect x="691.2" y="138.3" width="21" height="167.7" rx="2" fill="#007c83"><title>remote-outbox-eventual: 762.419 ms</title></rect>
+<text x="764.0833333333334" y="325" font-size="11" text-anchor="middle" font-weight="400">2 JVM</text>
+<text x="764.0833333333334" y="341" font-size="10" text-anchor="middle" font-weight="400">50 docs</text>
+<rect x="741.1" y="131.4" width="21" height="174.6" rx="2" fill="#526780"><title>remote-direct-write-sync: 793.758 ms</title></rect>
+<rect x="764.1" y="131.5" width="21" height="174.5" rx="2" fill="#007c83"><title>remote-outbox-eventual: 793.349 ms</title></rect>
+<text x="836.9166666666666" y="325" font-size="11" text-anchor="middle" font-weight="400">2 JVM</text>
+<text x="836.9166666666666" y="341" font-size="10" text-anchor="middle" font-weight="400">500 docs</text>
+<rect x="813.9" y="151.3" width="21" height="154.7" rx="2" fill="#526780"><title>remote-direct-write-sync: 703.349 ms</title></rect>
+<rect x="836.9" y="134.8" width="21" height="171.2" rx="2" fill="#007c83"><title>remote-outbox-eventual: 778.137 ms</title></rect>
+<text x="909.75" y="325" font-size="11" text-anchor="middle" font-weight="400">4 JVM</text>
+<text x="909.75" y="341" font-size="10" text-anchor="middle" font-weight="400">50 docs</text>
+<rect x="886.8" y="131.5" width="21" height="174.5" rx="2" fill="#526780"><title>remote-direct-write-sync: 792.979 ms</title></rect>
+<rect x="909.8" y="113.9" width="21" height="192.1" rx="2" fill="#007c83"><title>remote-outbox-eventual: 873.237 ms</title></rect>
+<text x="982.5833333333333" y="325" font-size="11" text-anchor="middle" font-weight="400">4 JVM</text>
+<text x="982.5833333333333" y="341" font-size="10" text-anchor="middle" font-weight="400">500 docs</text>
+<rect x="959.6" y="157.9" width="21" height="148.1" rx="2" fill="#526780"><title>remote-direct-write-sync: 673.055 ms</title></rect>
+<rect x="982.6" y="130.5" width="21" height="175.5" rx="2" fill="#007c83"><title>remote-outbox-eventual: 797.899 ms</title></rect>
+<rect x="67" y="369" width="12" height="12" rx="2" fill="#526780"/>
+<text x="86" y="380" font-size="12" text-anchor="start" font-weight="400">Direct write-sync</text>
+<rect x="282" y="369" width="12" height="12" rx="2" fill="#007c83"/>
+<text x="301" y="380" font-size="12" text-anchor="start" font-weight="400">Outbox eventual</text>
+</g>
+</svg>

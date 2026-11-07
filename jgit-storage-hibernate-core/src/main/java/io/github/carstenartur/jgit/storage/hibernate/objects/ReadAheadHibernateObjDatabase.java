@@ -13,6 +13,7 @@ import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtension
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedPackExtensionStore.CommittedExtension;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationPolicySnapshot;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationSelectionMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
@@ -33,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.LongConsumer;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions;
@@ -108,7 +110,12 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
     this.transactionContext = transactionContext;
     this.storageByteCounters = StorageByteCounters.from(sessionFactory);
     this.stagedExtensions =
-        new StagedPackExtensionStore(repositoryName, transactionContext, storageByteCounters);
+        new StagedPackExtensionStore(
+            repositoryName,
+            transactionContext,
+            storageByteCounters,
+            PackPublicationSelector.configured(
+                sessionFactory, repositoryName, storageByteCounters.enabled()));
     this.packFileReadCounters = PackFileReadCounters.from(sessionFactory);
   }
 
@@ -299,7 +306,9 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       throws IOException {
     try {
       stagedExtensions.commit(
-          descriptions, replaces, work -> publishWithCatalogLock(replaces, work));
+          descriptions,
+          replaces,
+          (work, observer) -> publishWithCatalogLock(replaces, work, observer));
     } catch (IOException | RuntimeException publicationFailure) {
       // Some JGit paths propagate commitPack failure without calling rollbackPack.
       // The catalog lock has been released before rollback can acquire the database lock again.
@@ -310,7 +319,8 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
 
   private CommitResult publishWithCatalogLock(
       Collection<DfsPackDescription> replaces,
-      HibernateTransactionContext.Work<CommitResult> work)
+      HibernateTransactionContext.Work<CommitResult> work,
+      LongConsumer acquisitionObserver)
       throws IOException {
     try (CatalogPublication publication = new CatalogPublication(replaces)) {
       CommitResult result =
@@ -322,7 +332,8 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
                 // Take the catalog write lock in the same order, only for final publication.
                 publication.begin();
                 return work.execute(session);
-              });
+              },
+              acquisitionObserver);
       publication.complete(result);
       return result;
     }
@@ -431,6 +442,13 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   /** @return current direct-versus-pre-persisted publication selection diagnostics */
   public PackPublicationSelectionMetrics publicationSelectionMetricsSnapshot() {
     return stagedExtensions.publicationSelectionMetricsSnapshot();
+  }
+
+  /**
+   * @return the current publication threshold and most recent selection diagnostics
+   */
+  public PackPublicationPolicySnapshot publicationPolicySnapshot() {
+    return stagedExtensions.publicationPolicySnapshot();
   }
 
   /** @return deterministic staged-payload threshold used by the adaptive selector */

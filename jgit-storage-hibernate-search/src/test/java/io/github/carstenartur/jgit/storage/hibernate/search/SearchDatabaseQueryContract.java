@@ -75,6 +75,16 @@ abstract class SearchDatabaseQueryContract {
   @TempDir Path temporaryDirectory;
 
   @Test
+  void structuredQueriesPreserveExactRepositoryNamesBeforePagination() throws Exception {
+    migrateSchemas();
+    var settings = queryContractProperties(temporaryDirectory.resolve("exact-indexes"));
+    settings.put("hibernate.generate_statistics", "true");
+    try (var provider = new HibernateSessionFactoryProvider(settings, SearchEntities.annotatedClasses())) {
+      ExactRepositoryQueryContract.verify(provider, temporaryDirectory.resolve("exact-histories"));
+    }
+  }
+
+  @Test
   void provesIndexQueryRebuildDeletionFailureIsolationAndPersistentRestart() throws Exception {
     migrateSchemas();
     Path luceneRoot = temporaryDirectory.resolve("lucene");

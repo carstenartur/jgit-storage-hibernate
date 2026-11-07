@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
+import io.github.carstenartur.jgit.storage.hibernate.search.RepositoryRoutingMappingConfigurer;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistoryQuery.PathMatch;
 import java.time.Instant;
@@ -53,11 +54,17 @@ public class GitHistorySearchService {
 
   private final SessionFactory sessionFactory;
   private final int maxOffset;
+  private final boolean repositoryRouting;
 
   public GitHistorySearchService(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     maxOffset = configuredMaxOffset(sessionFactory);
-    SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(this.sessionFactory);
+    repositoryRouting = RepositoryRoutingMappingConfigurer.isEnabled(sessionFactory);
+    if (repositoryRouting) {
+      SearchIndexCompatibility.requireCurrentRepositoryRouting(sessionFactory);
+    } else {
+      SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(sessionFactory);
+    }
   }
 
   public List<GitCommitIndex> searchCommitText(String repositoryName, String query, int limit) {
@@ -162,6 +169,9 @@ public class GitHistorySearchService {
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
       SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
       var step = searchSession.search(scope).where(predicate);
+      if (repositoryRouting) {
+        step.routing(query.repositoryName());
+      }
       if (query.text() == null) {
         step = step.sort(chronologicalSort(scope, timeField));
       }
@@ -176,6 +186,9 @@ public class GitHistorySearchService {
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
       SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
       var step = searchSession.search(scope).select(CommitSearchHit.class).where(predicate);
+      if (repositoryRouting) {
+        step.routing(query.repositoryName());
+      }
       if (query.text() == null) {
         step = step.sort(chronologicalSort(scope, timeField));
       }
@@ -191,6 +204,9 @@ public class GitHistorySearchService {
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
       SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
       var step = searchSession.search(scope).select(CommitSearchHit.class).where(predicate);
+      if (repositoryRouting) {
+        step.routing(query.repositoryName());
+      }
       step =
           step.sort(
               query.text() == null
@@ -236,7 +252,8 @@ public class GitHistorySearchService {
     String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
         new StringBuilder(SUMMARY_PROJECTION)
-            .append("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+            .append("FROM GitCommitIndex c WHERE ")
+            .append(StructuredRepositoryPredicate.matchingRepository(sessionFactory));
     appendStructuredPredicates(hql, query, timeProperty);
     appendStructuredOrder(hql, timeProperty);
 
@@ -387,7 +404,8 @@ public class GitHistorySearchService {
   private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
     String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
-        new StringBuilder("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+        new StringBuilder("FROM GitCommitIndex c WHERE ")
+            .append(StructuredRepositoryPredicate.matchingRepository(sessionFactory));
     appendStructuredPredicates(hql, query, timeProperty);
     appendStructuredOrder(hql, timeProperty);
 
@@ -406,7 +424,8 @@ public class GitHistorySearchService {
     String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
         new StringBuilder(SUMMARY_PROJECTION)
-            .append("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+            .append("FROM GitCommitIndex c WHERE ")
+            .append(StructuredRepositoryPredicate.matchingRepository(sessionFactory));
     appendStructuredPredicates(hql, query, timeProperty);
     appendStructuredOrder(hql, timeProperty);
 
@@ -622,7 +641,9 @@ public class GitHistorySearchService {
       Long count =
           session
               .createQuery(
-                  "SELECT COUNT(c) FROM GitCommitIndex c WHERE c.repositoryName = :repo", Long.class)
+                  "SELECT COUNT(c) FROM GitCommitIndex c WHERE "
+                      + StructuredRepositoryPredicate.matchingRepository(sessionFactory),
+                  Long.class)
               .setParameter("repo", repositoryName)
               .uniqueResult();
       return count != null ? count.longValue() : 0L;

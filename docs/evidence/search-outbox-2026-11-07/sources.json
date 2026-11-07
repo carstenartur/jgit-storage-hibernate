@@ -1,0 +1,68 @@
+{
+  "source": "4434f22ee49cd083c11288273ddbcab231628369",
+  "source_blobs": {
+    ".github/workflows/search-remote-outbox.yml": "d4c649582064dce2ab3edf368552dac8d95e3197",
+    "docs/operations/search-remote-outbox-experiment.md": "4a803c965fc2225de901235c896f6c7aae7ee875",
+    "jgit-storage-hibernate-search/pom.xml": "e42f743822e9a7190de7e78c657297b55dbf31b3",
+    "jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/SearchRemoteOutboxIT.java": "42d6d9317355d0a8359397d541cd9295a4f67dfc"
+  },
+  "run": 42416222318,
+  "artifacts": [
+    {
+      "id": 13591592874,
+      "name": "search-outbox-2-jvms",
+      "digest": "sha256:26535c02b92329ed16e3834ee8713cf1404ef2bcd7892a991833d96ba0293bea",
+      "size_in_bytes": 15983
+    },
+    {
+      "id": 13591418261,
+      "name": "search-outbox-1-jvms",
+      "digest": "sha256:67b875a5af217915eefabb25ba2f5410e47fa746b342488450e532f2c7316a0a",
+      "size_in_bytes": 11426
+    },
+    {
+      "id": 13591099176,
+      "name": "search-outbox-4-jvms",
+      "digest": "sha256:22230c6bc280d1430d9d5eefe42bcc96bb9fb88e0625803ffc5fae8a356f77c3",
+      "size_in_bytes": 25541
+    }
+  ],
+  "files": [
+    {
+      "path": "1-jvms/outbox.csv",
+      "sha256": "0e82426ab195ea21ac3f4c4f3f479bb47cfee25c51fdd560ca4f899310c90799"
+    },
+    {
+      "path": "1-jvms/environment.properties",
+      "sha256": "fce83afd0c13d48cbc8ab4c10547f4201a012c2a1afd8e473d4a5cc1e5f107fd"
+    },
+    {
+      "path": "1-jvms/cpu.json",
+      "sha256": "446ec81bef0a235fd1f3fa4063922c6f7587e1da3882f2a7a42674ea9ed3df6e"
+    },
+    {
+      "path": "2-jvms/outbox.csv",
+      "sha256": "21ec397c05db52e50a6d0d2be04aeaad259b8b2bc01baa62bc7732bb600cbba2"
+    },
+    {
+      "path": "2-jvms/environment.properties",
+      "sha256": "91649c40837a3f578ffaea6297edc7dce06775f1c7385ae7385c176d99861d05"
+    },
+    {
+      "path": "2-jvms/cpu.json",
+      "sha256": "409f6f2c79c7db4c6686b69c02bb17cd4faa680d355a174fe2c398ef83b8b2ef"
+    },
+    {
+      "path": "4-jvms/outbox.csv",
+      "sha256": "436bb1e213b36c3dbe1b91a3880915a4b8e558cecdd2c83fe25cdd97b308957c"
+    },
+    {
+      "path": "4-jvms/environment.properties",
+      "sha256": "3545ae828b75a706a9f646b6ca3fdd6f594d945981602163b93e6bd9e7b805db"
+    },
+    {
+      "path": "4-jvms/cpu.json",
+      "sha256": "4faf2d476b88616bf2a0bbf9612e5ca27af13645b4259119ebbf675a22938d50"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1078" height="316" viewBox="0 0 1078 316" role="img" aria-label="Initial projection indexing throughput">
+<rect width="1078" height="316" rx="12" fill="#f7f9fc"/>
+<g font-family="system-ui, sans-serif">
+<text x="22.0" y="30.0" text-anchor="start" font-size="20" font-weight="700" fill="#24324b">Initial projection indexing throughput</text>
+<text x="22.0" y="52.0" text-anchor="start" font-size="13" font-weight="400" fill="#24324b">H2 + local Lucene 10.4.0 · 1,000,000 initial documents · one JVM / 1 GiB</text>
+<text x="22.0" y="90.0" text-anchor="start" font-size="14" font-weight="700" fill="#24324b">One repository</text>
+<text x="353.0" y="103.0" text-anchor="end" font-size="11" font-weight="400" fill="#24324b">docs/s</text>
+<line x1="76.0" x2="353.0" y1="253.0" y2="253.0" stroke="#d6deec"/>
+<text x="70.0" y="257.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">0</text>
+<line x1="76.0" x2="353.0" y1="205.3" y2="205.3" stroke="#d6deec"/>
+<text x="70.0" y="209.3" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">3,000</text>
+<line x1="76.0" x2="353.0" y1="157.7" y2="157.7" stroke="#d6deec"/>
+<text x="70.0" y="161.7" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">6,000</text>
+<line x1="76.0" x2="353.0" y1="110.0" y2="110.0" stroke="#d6deec"/>
+<text x="70.0" y="114.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">9,000</text>
+<text x="122.2" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">Base</text>
+<rect x="108.2" y="116.9" width="26.0" height="136.1" rx="2" fill="#5b6c87"><title>8,568.2 docs/s</title></rect>
+<text x="214.5" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">1</text>
+<rect x="200.5" y="115.7" width="26.0" height="137.3" rx="2" fill="#007c83"><title>8,644.3 docs/s</title></rect>
+<text x="306.8" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">8</text>
+<rect x="292.8" y="124.2" width="26.0" height="128.8" rx="2" fill="#007c83"><title>8,103.7 docs/s</title></rect>
+<text x="214.5" y="289.0" text-anchor="middle" font-size="11" font-weight="400" fill="#24324b">Lucene shards</text>
+<text x="368.0" y="90.0" text-anchor="start" font-size="14" font-weight="700" fill="#24324b">Uniform</text>
+<text x="699.0" y="103.0" text-anchor="end" font-size="11" font-weight="400" fill="#24324b">docs/s</text>
+<line x1="422.0" x2="699.0" y1="253.0" y2="253.0" stroke="#d6deec"/>
+<text x="416.0" y="257.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">0</text>
+<line x1="422.0" x2="699.0" y1="205.3" y2="205.3" stroke="#d6deec"/>
+<text x="416.0" y="209.3" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">1,667</text>
+<line x1="422.0" x2="699.0" y1="157.7" y2="157.7" stroke="#d6deec"/>
+<text x="416.0" y="161.7" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">3,333</text>
+<line x1="422.0" x2="699.0" y1="110.0" y2="110.0" stroke="#d6deec"/>
+<text x="416.0" y="114.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">5,000</text>
+<text x="468.2" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">Base</text>
+<rect x="454.2" y="129.9" width="26.0" height="123.1" rx="2" fill="#5b6c87"><title>4,303.6 docs/s</title></rect>
+<text x="560.5" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">1</text>
+<rect x="546.5" y="120.5" width="26.0" height="132.5" rx="2" fill="#007c83"><title>4,631.6 docs/s</title></rect>
+<text x="652.8" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">8</text>
+<rect x="638.8" y="161.2" width="26.0" height="91.8" rx="2" fill="#007c83"><title>3,210.6 docs/s</title></rect>
+<text x="560.5" y="289.0" text-anchor="middle" font-size="11" font-weight="400" fill="#24324b">Lucene shards</text>
+<text x="714.0" y="90.0" text-anchor="start" font-size="14" font-weight="700" fill="#24324b">80% in one repository</text>
+<text x="1045.0" y="103.0" text-anchor="end" font-size="11" font-weight="400" fill="#24324b">docs/s</text>
+<line x1="768.0" x2="1045.0" y1="253.0" y2="253.0" stroke="#d6deec"/>
+<text x="762.0" y="257.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">0</text>
+<line x1="768.0" x2="1045.0" y1="205.3" y2="205.3" stroke="#d6deec"/>
+<text x="762.0" y="209.3" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">2,333</text>
+<line x1="768.0" x2="1045.0" y1="157.7" y2="157.7" stroke="#d6deec"/>
+<text x="762.0" y="161.7" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">4,667</text>
+<line x1="768.0" x2="1045.0" y1="110.0" y2="110.0" stroke="#d6deec"/>
+<text x="762.0" y="114.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">7,000</text>
+<text x="814.2" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">Base</text>
+<rect x="800.2" y="120.5" width="26.0" height="132.5" rx="2" fill="#5b6c87"><title>6,486.8 docs/s</title></rect>
+<text x="906.5" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">1</text>
+<rect x="892.5" y="116.9" width="26.0" height="136.1" rx="2" fill="#007c83"><title>6,664.6 docs/s</title></rect>
+<text x="998.8" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">8</text>
+<rect x="984.8" y="144.9" width="26.0" height="108.1" rx="2" fill="#007c83"><title>5,291.2 docs/s</title></rect>
+<text x="906.5" y="289.0" text-anchor="middle" font-size="11" font-weight="400" fill="#24324b">Lucene shards</text>
+<rect x="22" y="297" width="11" height="11" rx="2" fill="#007c83"/>
+<text x="39.0" y="307.0" text-anchor="start" font-size="12" font-weight="400" fill="#24324b">Repository routing</text>
+<rect x="197" y="297" width="11" height="11" rx="2" fill="#5b6c87"/>
+<text x="214.0" y="307.0" text-anchor="start" font-size="12" font-weight="400" fill="#24324b">Unrouted baseline</text>
+</g>
+</svg>

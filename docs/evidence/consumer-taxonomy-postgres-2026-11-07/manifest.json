@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "workflowRunId": 42419257922,
+  "workflowUrl": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42419257922",
+  "workflowSha": "23a5f6a6a42d1042f9f68ffafe8a0ffaa0f3097b",
+  "localReviewedSha": "02a0dfb52e1a9ce83630771c95a2db5b22c2b473",
+  "workflowSourceTree": "9f3ae505a0c37aeb1925bb38926d477fc710b791",
+  "localSourceTree": "9f3ae505a0c37aeb1925bb38926d477fc710b791",
+  "sourceTreeVerification": "GitHub Git commit API tree compared with git rev-parse 02a0dfb^{tree}; identical on 2026-11-07.",
+  "sourceTreeApi": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/commits/23a5f6a6a42d1042f9f68ffafe8a0ffaa0f3097b",
+  "summaryCsv": "observations.csv",
+  "scope": "One single shot per operation on 1000 commits split across 10 workspaces; provider reopened, JGit cache cleared, OS/database caches warm. GC counters include the whole iteration and fixture lifecycle. Native cumulative counters are observational; wait gauges are endpoint snapshots. No stable latency or allocation ranking is inferred.",
+  "artifacts": [
+    {
+      "file": "rtt-0ms.zip",
+      "requestedRttMillis": 0,
+      "artifactId": 13592568904,
+      "jobId": 128543944106,
+      "jobConclusion": "success",
+      "name": "consumer-shaped-taxonomy-postgres-smoke-0ms-reopened",
+      "sha256": "6e8d2ae04c6e5dda34f568889fc27cdaa55c660fbc97ca16e7a8ddbad0168acf",
+      "sizeBytes": 20588
+    },
+    {
+      "file": "rtt-20ms.zip",
+      "requestedRttMillis": 20,
+      "artifactId": 13592768322,
+      "jobId": 128543943780,
+      "jobConclusion": "success",
+      "name": "consumer-shaped-taxonomy-postgres-smoke-20ms-reopened",
+      "sha256": "5e2b8807ed9a77980501fcf56cfb6a2f3650f8a27cf78e06db74c264f209e312",
+      "sizeBytes": 20801
+    }
+  ]
+}

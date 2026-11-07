@@ -1,0 +1,13 @@
+instances,mode,documents,median_postgres_network_bytes,median_search_network_bytes,max_outbox_relations_bytes
+1,remote-direct-write-sync,50,17885,53903,0
+1,remote-direct-write-sync,500,172282,404548,0
+1,remote-outbox-eventual,50,78837,56593,294912
+1,remote-outbox-eventual,500,583696,457971,393216
+2,remote-direct-write-sync,50,18506,60815,0
+2,remote-direct-write-sync,500,173020,415885,0
+2,remote-outbox-eventual,50,97921,58808,311296
+2,remote-outbox-eventual,500,630229,462025,409600
+4,remote-direct-write-sync,50,19748,70517,0
+4,remote-direct-write-sync,500,174460,421980,0
+4,remote-outbox-eventual,50,129750,65789,303104
+4,remote-outbox-eventual,500,684607,467357,417792

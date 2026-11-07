@@ -1,0 +1,651 @@
+{
+  "artifacts": [
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13594100004/zip",
+      "cell": "10000-500-normal-smoke",
+      "created_at": "2026-11-07T22:29:36Z",
+      "digest": "sha256:8d7795d915e385e3927a3d102ef69219d49b66525fe31c68f070ffa14049a3ad",
+      "files": {
+        "benchmark.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.HibernateSearchRuntimeTuningBenchmarkIT.txt",
+          "bytes": 440,
+          "original_bytes": 440,
+          "original_sha256": "41707024bdf8304eccf6b6e2eec11dab3ce9aaf78548c1a8fc04bab2cb8c3b8f",
+          "sha256": "41707024bdf8304eccf6b6e2eec11dab3ce9aaf78548c1a8fc04bab2cb8c3b8f"
+        },
+        "comparison.json.gz": {
+          "archive_member": "target/search-runtime/comparison.json",
+          "bytes": 4606,
+          "original_bytes": 127050,
+          "original_sha256": "953efbd1c304ba3341d728effcb5b06e103a8b49d0c363388f101a2133b43aca",
+          "sha256": "0dec6063301ceb6bcd90e64d1ba9203ac5e69793a62baf442b2a6d3904042e74"
+        },
+        "cpu.json": {
+          "archive_member": "target/search-runtime/cpu.json",
+          "bytes": 4656,
+          "original_bytes": 4656,
+          "original_sha256": "0bc4f90dc0b0c3620783a1a4a620c44c8d6af5e2328ed494c152c1c473769dcf",
+          "sha256": "0bc4f90dc0b0c3620783a1a4a620c44c8d6af5e2328ed494c152c1c473769dcf"
+        },
+        "environment.properties": {
+          "archive_member": "target/search-runtime/environment.properties",
+          "bytes": 857,
+          "original_bytes": 857,
+          "original_sha256": "ed7c9467fb9e4d921bf7d61cf90d072721740e8b40152e52a6201f41285d7171",
+          "sha256": "ed7c9467fb9e4d921bf7d61cf90d072721740e8b40152e52a6201f41285d7171"
+        },
+        "jmh-result.json.gz": {
+          "archive_member": "target/search-runtime/jmh-result.json",
+          "bytes": 22334,
+          "original_bytes": 533684,
+          "original_sha256": "74a7993397c729778e8ef8d3970a5efc10ca8a6fed96d687e68ae36786724871",
+          "sha256": "edb8940060d991ee07cdba925f86cd3b2c9926d63bf47f016a17f9a6a0a1020b"
+        },
+        "recovery.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.SearchRuntimeRecoveryTest.txt",
+          "bytes": 412,
+          "original_bytes": 412,
+          "original_sha256": "28fdfd18fc2d4e0b2df54f1ae92e99b693414c2a39d1cc08f4c1a1b60e8d4a0b",
+          "sha256": "28fdfd18fc2d4e0b2df54f1ae92e99b693414c2a39d1cc08f4c1a1b60e8d4a0b"
+        }
+      },
+      "id": 13594100004,
+      "name": "hibernate-search-runtime-results-10000-500-normal-smoke",
+      "size_in_bytes": 66635
+    },
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13593793075/zip",
+      "cell": "10000-500-constrained-smoke",
+      "created_at": "2026-11-07T22:56:02Z",
+      "digest": "sha256:5218f8c931acc02c0545044cc8d6d6d6690b0833c85b1fb6837d70fc568d7d56",
+      "files": {
+        "benchmark.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.HibernateSearchRuntimeTuningBenchmarkIT.txt",
+          "bytes": 439,
+          "original_bytes": 439,
+          "original_sha256": "f0cdb407b9f5cac600d1262c1815ea03a0a3d6172fedd7783de18e98ff7d39a2",
+          "sha256": "f0cdb407b9f5cac600d1262c1815ea03a0a3d6172fedd7783de18e98ff7d39a2"
+        },
+        "comparison.json.gz": {
+          "archive_member": "target/search-runtime/comparison.json",
+          "bytes": 4519,
+          "original_bytes": 126940,
+          "original_sha256": "7032d2ffbdaac4dc4bcd1e22a20bbb4bb34a758700f9306384d50ea12336cc4c",
+          "sha256": "88c53d857950417340b1aa4b7f520cc77a66cea050630073b70172bc74e4ac99"
+        },
+        "cpu.json": {
+          "archive_member": "target/search-runtime/cpu.json",
+          "bytes": 4483,
+          "original_bytes": 4483,
+          "original_sha256": "761fc1630bd5c364e1860ab3e22866b2afd6577885f9355269e56fa79e52e817",
+          "sha256": "761fc1630bd5c364e1860ab3e22866b2afd6577885f9355269e56fa79e52e817"
+        },
+        "environment.properties": {
+          "archive_member": "target/search-runtime/environment.properties",
+          "bytes": 859,
+          "original_bytes": 859,
+          "original_sha256": "ebb2826a2caa8ff2cd9359006df1162f0156624667788c20dea9386fdcf0f7d9",
+          "sha256": "ebb2826a2caa8ff2cd9359006df1162f0156624667788c20dea9386fdcf0f7d9"
+        },
+        "jmh-result.json.gz": {
+          "archive_member": "target/search-runtime/jmh-result.json",
+          "bytes": 22265,
+          "original_bytes": 534168,
+          "original_sha256": "e5f0ea3327ae017fa516bf5d8e2e1b1b139d951a2f949032b41a541c1435e7d8",
+          "sha256": "84b22cfbdc39ad2372032ae356b83c110c9e0e6e50b389e1e3ce5a19b02be194"
+        },
+        "recovery.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.SearchRuntimeRecoveryTest.txt",
+          "bytes": 412,
+          "original_bytes": 412,
+          "original_sha256": "7718eea38348ff4eb204f5694e81785245efea1e0280fd18cfdfaf6a47c085a1",
+          "sha256": "7718eea38348ff4eb204f5694e81785245efea1e0280fd18cfdfaf6a47c085a1"
+        }
+      },
+      "id": 13593793075,
+      "name": "hibernate-search-runtime-results-10000-500-constrained-smoke",
+      "size_in_bytes": 66386
+    },
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13592984689/zip",
+      "cell": "1000-500-normal-full",
+      "created_at": "2026-11-07T22:29:55Z",
+      "digest": "sha256:bece33451920c21c29d4c48fcf9864b92a8fca8be3b33d520ed7f70f296f2d5b",
+      "files": {
+        "benchmark.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.HibernateSearchRuntimeTuningBenchmarkIT.txt",
+          "bytes": 439,
+          "original_bytes": 439,
+          "original_sha256": "48e02c46217f75778537023e09210b91547cfc6480d1008c0710079fd04d8f5a",
+          "sha256": "48e02c46217f75778537023e09210b91547cfc6480d1008c0710079fd04d8f5a"
+        },
+        "comparison.json.gz": {
+          "archive_member": "target/search-runtime/comparison.json",
+          "bytes": 20504,
+          "original_bytes": 740284,
+          "original_sha256": "30db787cf335dae0e6381387a25a8364cd53e2673b2b3fa601e6a6771fcd6a05",
+          "sha256": "e0dc89b02d0e0bf0eb4a49acfdda685fb4c3d9928b5fdbfd99a9e0d9afe2337d"
+        },
+        "cpu.json": {
+          "archive_member": "target/search-runtime/cpu.json",
+          "bytes": 4633,
+          "original_bytes": 4633,
+          "original_sha256": "98c62a06660a1033c081a6cfcd0a887866abb5d4052c867cd7d45525d61bde86",
+          "sha256": "98c62a06660a1033c081a6cfcd0a887866abb5d4052c867cd7d45525d61bde86"
+        },
+        "environment.properties": {
+          "archive_member": "target/search-runtime/environment.properties",
+          "bytes": 1410,
+          "original_bytes": 1410,
+          "original_sha256": "9ab80dd399dbec3dea1677ff6580ec501ae118c6f39f50ef30b05b4d910ee857",
+          "sha256": "9ab80dd399dbec3dea1677ff6580ec501ae118c6f39f50ef30b05b4d910ee857"
+        },
+        "jmh-result.json.gz": {
+          "archive_member": "target/search-runtime/jmh-result.json",
+          "bytes": 139036,
+          "original_bytes": 3236760,
+          "original_sha256": "2dba87cf9915fb341d6e09f74653580f4b6e08b27642c9cb90cbeced0ffaad3a",
+          "sha256": "3d9ec06c42229712ae2bad42fb856a8d4e8ef69947e73f83542b8936fd691cc5"
+        },
+        "recovery.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.SearchRuntimeRecoveryTest.txt",
+          "bytes": 412,
+          "original_bytes": 412,
+          "original_sha256": "c9a787c63613a189c5302ea83243ca0188cf9cc2a2356e1d7ae49a65b7e9e277",
+          "sha256": "c9a787c63613a189c5302ea83243ca0188cf9cc2a2356e1d7ae49a65b7e9e277"
+        }
+      },
+      "id": 13592984689,
+      "name": "hibernate-search-runtime-results-1000-500-normal-full",
+      "size_in_bytes": 343894
+    },
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13592708327/zip",
+      "cell": "10000-50-normal-smoke",
+      "created_at": "2026-11-07T22:13:16Z",
+      "digest": "sha256:1045d5b2acb7770afc31078d77353b2b90738dd9f864b5f72afdbcc77eb11419",
+      "files": {
+        "benchmark.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.HibernateSearchRuntimeTuningBenchmarkIT.txt",
+          "bytes": 440,
+          "original_bytes": 440,
+          "original_sha256": "2eee668a6b848692b984cba3b6f3b84795497aeee1555010605ca990f137732c",
+          "sha256": "2eee668a6b848692b984cba3b6f3b84795497aeee1555010605ca990f137732c"
+        },
+        "comparison.json.gz": {
+          "archive_member": "target/search-runtime/comparison.json",
+          "bytes": 4478,
+          "original_bytes": 126819,
+          "original_sha256": "fc1ad48eb56ea65b301ea5720043bd55f276afa89ad40af768ab7db4f50202a0",
+          "sha256": "c7e8879be5149d283cbe1ef477a0540b8e6e4b658231765520d0cf66471d23ef"
+        },
+        "cpu.json": {
+          "archive_member": "target/search-runtime/cpu.json",
+          "bytes": 4633,
+          "original_bytes": 4633,
+          "original_sha256": "8f1b85a1b5f0ac8e9fa22fd79b9906dd4093ba63ff4b89417708202b49186f6f",
+          "sha256": "8f1b85a1b5f0ac8e9fa22fd79b9906dd4093ba63ff4b89417708202b49186f6f"
+        },
+        "environment.properties": {
+          "archive_member": "target/search-runtime/environment.properties",
+          "bytes": 856,
+          "original_bytes": 856,
+          "original_sha256": "db16e4e93b563af9f84c8bcab45db7964177be10b285f725d134723ce85b86ae",
+          "sha256": "db16e4e93b563af9f84c8bcab45db7964177be10b285f725d134723ce85b86ae"
+        },
+        "jmh-result.json.gz": {
+          "archive_member": "target/search-runtime/jmh-result.json",
+          "bytes": 21601,
+          "original_bytes": 532285,
+          "original_sha256": "31767c07f4536b31f1e8625cc14f92d34bbe7cd5a913af6c3bb190e1e67504aa",
+          "sha256": "21ff4bed98e067e162562c055fc406ca0c39616e755b3732419ebd1734de4541"
+        },
+        "recovery.txt": {
+          "archive_member": "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.SearchRuntimeRecoveryTest.txt",
+          "bytes": 412,
+          "original_bytes": 412,
+          "original_sha256": "44c36d089f56833c9d20282eca551cc9435ffa4be02937881b91c15177f08f0c",
+          "sha256": "44c36d089f56833c9d20282eca551cc9435ffa4be02937881b91c15177f08f0c"
+        }
+      },
+      "id": 13592708327,
+      "name": "hibernate-search-runtime-results-10000-50-normal-smoke",
+      "size_in_bytes": 65293
+    }
+  ],
+  "jobs": [
+    {
+      "conclusion": "success",
+      "id": 128541298986,
+      "logs_url": null,
+      "name": "Select Search runtime workloads",
+      "run_id": 42418358859,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Select workload, settings and resources",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 3,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "id": 128541319753,
+      "logs_url": null,
+      "name": "PostgreSQL + Lucene 1000-500 (normal, full)",
+      "run_id": 42418358859,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up JDK 21",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Test runtime chart conversion and units",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Build benchmark module with Maven",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Lucene crash recovery and run the PostgreSQL runtime matrix",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Convert runtime results for grouped charts",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Verify dashboard and runtime chart operations",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Search runtime evidence for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload Search runtime evidence",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Report runtime tuning charts",
+          "number": 11,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up JDK 21",
+          "number": 21,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout",
+          "number": 22,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 23,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "id": 128541319760,
+      "logs_url": null,
+      "name": "PostgreSQL + Lucene 10000-500 (constrained, smoke)",
+      "run_id": 42418358859,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up JDK 21",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Test runtime chart conversion and units",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Build benchmark module with Maven",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Lucene crash recovery and run the PostgreSQL runtime matrix",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Convert runtime results for grouped charts",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Verify dashboard and runtime chart operations",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Search runtime evidence for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload Search runtime evidence",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Report runtime tuning charts",
+          "number": 11,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up JDK 21",
+          "number": 21,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout",
+          "number": 22,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 23,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "id": 128541319824,
+      "logs_url": null,
+      "name": "PostgreSQL + Lucene 10000-50 (normal, smoke)",
+      "run_id": 42418358859,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up JDK 21",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Test runtime chart conversion and units",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Build benchmark module with Maven",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Lucene crash recovery and run the PostgreSQL runtime matrix",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Convert runtime results for grouped charts",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Verify dashboard and runtime chart operations",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Search runtime evidence for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload Search runtime evidence",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Report runtime tuning charts",
+          "number": 11,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up JDK 21",
+          "number": 21,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout",
+          "number": 22,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 23,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "id": 128541319892,
+      "logs_url": null,
+      "name": "PostgreSQL + Lucene 10000-500 (normal, smoke)",
+      "run_id": 42418358859,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up JDK 21",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Test runtime chart conversion and units",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Build benchmark module with Maven",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Lucene crash recovery and run the PostgreSQL runtime matrix",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Convert runtime results for grouped charts",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Verify dashboard and runtime chart operations",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check Search runtime evidence for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload Search runtime evidence",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Report runtime tuning charts",
+          "number": 11,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up JDK 21",
+          "number": 21,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout",
+          "number": 22,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 23,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "skipped",
+      "id": 128554950319,
+      "logs_url": null,
+      "name": "Publish Hibernate Search runtime benchmark history",
+      "run_id": 42418358859,
+      "status": "completed",
+      "steps": null
+    }
+  ],
+  "source_blobs": {
+    ".github/scripts/benchmark_units.py": "e5829a93fa07626259a2bed08965158be89c0910",
+    ".github/scripts/convert-jmh-search-runtime.py": "c15dcb3c4df9f32a5c51a4a956515e25552e0d35",
+    ".github/scripts/test_convert_jmh_search_runtime.py": "c8814ed2954c12b481887678420f5f09dce68878",
+    ".github/scripts/validate_search_database_telemetry.py": "cee00c47c4d8989388abc8b6d5a9d1b267c56b16",
+    ".github/workflows/search-runtime-performance.yml": "9474fa1e12a7b9097d9cdacb988d768d41d66f5e",
+    "jgit-storage-hibernate-benchmarks/pom.xml": "8712524a104cd7ae8d84c7c3c53c2342c80f2cac",
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/HibernateSearchRuntimeTuningBenchmark.java": "9b987aab74cece2ccb6821b7fb75f7581a68b123",
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RuntimeBenchmarkFailureHandler.java": "2325a87911e13a7830d685b443007bc6aaa333d7",
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeScenario.java": "a69ab0ee3d6162cce902ef9d2743c06dcc5d840a",
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/HibernateSearchRuntimeTuningBenchmarkIT.java": "e19b7820f01adaffeccf1cd9aa461c0fef0f83df",
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeRecoveryTest.java": "6bd0f6c9cad9b7b2c02e0c4b61458db16feed717",
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeRun.java": "cd0e284c039c16c0cd0dcce5ce20238b89327d5c",
+    "jgit-storage-hibernate-core/pom.xml": "75e17ffde68fceb38880d7f05d9584764eeabdeb",
+    "jgit-storage-hibernate-search/pom.xml": "a606e4afb15369dbd30ebcd9e1ca7cf51987b143",
+    "pom.xml": "3026b6e9daa73b96026f7c42167c9022687bc2a1"
+  },
+  "source_commit": "3feecec268c0608e440a7169527501fe33590dfd",
+  "workflow_run_id": 42418358859,
+  "workflow_run_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42418358859"
+}
