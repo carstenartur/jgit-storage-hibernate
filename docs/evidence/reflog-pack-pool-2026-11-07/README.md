@@ -27,7 +27,9 @@ including the warmup records.
 Every pack trial requires at least one reflog request interval to intersect
 an actual pack JDBC hold. The summary compares the p95 of the exposed
 requests with the p95 of requests from the same producer and ordinal in the
-same-repeat control. It also reports full-phase reflog throughput and
+same-repeat control. Checkout p95 uses the requests with paired checkout
+records. The summary reports that sample count and leaves checkout p95
+blank if the count is zero. It also reports full-phase reflog throughput and
 p50/p95/p99, measured checkout and queue times, the pack flush interval,
 WAL and sampled lock, pool and heap counters. The exposed requests can
 include commands that started before a pack checkout or completed after it.

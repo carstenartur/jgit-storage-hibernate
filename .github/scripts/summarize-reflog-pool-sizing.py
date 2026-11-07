@@ -264,7 +264,9 @@ def mixed_metrics(key, run, acknowledgements, all_acknowledgements, reflog_borro
         "overlapping_ack_count": "",
         "overlapping_ack_p95_ms": "",
         "matched_control_ack_p95_ms": "",
+        "overlapping_ack_checkout_paired_count": "",
         "overlapping_ack_checkout_p95_ms": "",
+        "matched_control_ack_checkout_paired_count": "",
         "matched_control_ack_checkout_p95_ms": "",
     }
     if run["workload"] == "control":
@@ -296,12 +298,17 @@ def mixed_metrics(key, run, acknowledgements, all_acknowledgements, reflog_borro
     matched = [ack for ack in all_acknowledgements[control] if coordinate(ack) in overlap]
     require(len(exposed) == len(matched) == len(overlap), f"{key}: unmatched control submissions")
 
-    def checkout_p95(trial, samples):
+    def paired_checkout_summary(trial, samples):
         by_batch = {row["batch_id"]: row for row in reflog_borrows[trial]}
         observations = [by_batch[ack["batch_id"]] for ack in samples if ack["batch_id"] in by_batch]
-        require(len(observations) == len(samples), f"{trial}: overlap group lacks paired checkouts")
-        return milliseconds(percentile(observations, 95, "acquisition_nanos")["acquisition_nanos"])
+        if not observations:
+            return 0, ""
+        return len(observations), milliseconds(
+            percentile(observations, 95, "acquisition_nanos")["acquisition_nanos"]
+        )
 
+    exposed_checkout_count, exposed_checkout_p95 = paired_checkout_summary(key, exposed)
+    control_checkout_count, control_checkout_p95 = paired_checkout_summary(control, matched)
     result.update(
         pack_flush_ms=milliseconds(completed - started),
         pack_hold_sum_ms=milliseconds(sum(hold["hold_nanos"] for hold in holds)),
@@ -313,8 +320,10 @@ def mixed_metrics(key, run, acknowledgements, all_acknowledgements, reflog_borro
         overlapping_ack_count=len(overlap),
         overlapping_ack_p95_ms=milliseconds(percentile(exposed, 95, "ack_nanos")["ack_nanos"]),
         matched_control_ack_p95_ms=milliseconds(percentile(matched, 95, "ack_nanos")["ack_nanos"]),
-        overlapping_ack_checkout_p95_ms=checkout_p95(key, exposed),
-        matched_control_ack_checkout_p95_ms=checkout_p95(control, matched),
+        overlapping_ack_checkout_paired_count=exposed_checkout_count,
+        overlapping_ack_checkout_p95_ms=exposed_checkout_p95,
+        matched_control_ack_checkout_paired_count=control_checkout_count,
+        matched_control_ack_checkout_p95_ms=control_checkout_p95,
     )
     return result
 
