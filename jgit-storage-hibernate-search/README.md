@@ -273,6 +273,9 @@ The consuming application owns that directory, must prevent uncoordinated concur
 
 ## Update and consistency model
 
+For optional repository routing, shard measurements and the single-writer deployment boundary, see
+[Repository routing and Search topology](../docs/operations/search-routing-and-topology.md).
+
 - Git/Core remains authoritative.
 - The Search projection may temporarily lag behind Git when indexing is asynchronous.
 - `CommitIndexer` upserts each `GitCommitIndex` row in an explicit Hibernate transaction.

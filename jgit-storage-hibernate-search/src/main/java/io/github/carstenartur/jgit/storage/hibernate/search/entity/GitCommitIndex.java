@@ -19,6 +19,7 @@ import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.search.engine.backend.analysis.AnalyzerNames;
@@ -87,7 +88,7 @@ public class GitCommitIndex {
 
   @KeywordField
   @Nationalized
-  @Column(name = "repository_name", nullable = false, length = 255)
+  @Column(name = "repository_name", nullable = false, updatable = false, length = 255)
   private String repositoryName;
 
   @KeywordField(projectable = Projectable.YES, sortable = Sortable.YES)
@@ -192,7 +193,12 @@ public class GitCommitIndex {
     return repositoryName;
   }
 
+  /** Assign the repository identity of this projection. It also determines its Search route. */
   public void setRepositoryName(String repositoryName) {
+    Objects.requireNonNull(repositoryName, "repositoryName");
+    if (this.repositoryName != null && !this.repositoryName.equals(repositoryName)) {
+      throw new IllegalStateException("The repository of a commit projection is immutable");
+    }
     this.repositoryName = repositoryName;
   }
 

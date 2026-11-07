@@ -18,6 +18,7 @@
   </description>
 
   <properties>
+    <hibernate-search.lucene-backend-artifact>hibernate-search-backend-lucene</hibernate-search.lucene-backend-artifact>
     <jacoco.minimum.line>0.85</jacoco.minimum.line>
     <jacoco.minimum.branch>0.75</jacoco.minimum.branch>
   </properties>
@@ -36,7 +37,7 @@
 
     <dependency>
       <groupId>org.hibernate.search</groupId>
-      <artifactId>hibernate-search-backend-lucene</artifactId>
+      <artifactId>${hibernate-search.lucene-backend-artifact}</artifactId>
       <version>${hibernate-search.version}</version>
     </dependency>
 

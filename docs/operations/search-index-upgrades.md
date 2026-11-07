@@ -41,3 +41,7 @@ For an upgrade from a release that persisted numeric Search document identifiers
 - after a successful rebuild, subsequent Search service/indexer construction on the same `SessionFactory` does not repeat the probe or rebuild.
 
 The retained `PersistentNumericDocumentIdCompatibilityH2Test` creates an old-style on-disk index with two logical repositories, reopens it using the current mapping, verifies queries after the compatibility rebuild, deletes one repository's projection without hiding the other, and verifies the result again after restart.
+
+## Repository routing and shard layout changes
+
+Routing uses a separate opt-in index. Follow the [offline rebuild procedure](search-routing-and-topology.md#switch-an-existing-index-or-change-the-shard-layout) when enabling it, changing the shard layout, or switching back after the routed index received writes. The numeric identifier guard does not make documents portable across those layouts.

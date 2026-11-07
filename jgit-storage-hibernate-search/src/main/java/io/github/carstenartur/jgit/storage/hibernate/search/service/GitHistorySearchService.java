@@ -8,6 +8,7 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
+import io.github.carstenartur.jgit.storage.hibernate.search.RepositoryRoutingMappingConfigurer;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistoryQuery.PathMatch;
 import java.time.Instant;
@@ -53,11 +54,17 @@ public class GitHistorySearchService {
 
   private final SessionFactory sessionFactory;
   private final int maxOffset;
+  private final boolean repositoryRouting;
 
   public GitHistorySearchService(SessionFactory sessionFactory) {
     this.sessionFactory = Objects.requireNonNull(sessionFactory, "sessionFactory");
     maxOffset = configuredMaxOffset(sessionFactory);
-    SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(this.sessionFactory);
+    repositoryRouting = RepositoryRoutingMappingConfigurer.isEnabled(sessionFactory);
+    if (repositoryRouting) {
+      SearchIndexCompatibility.requireCurrentRepositoryRouting(sessionFactory);
+    } else {
+      SearchIndexCompatibility.ensureCurrentDocumentIdentifiers(sessionFactory);
+    }
   }
 
   public List<GitCommitIndex> searchCommitText(String repositoryName, String query, int limit) {
@@ -162,6 +169,9 @@ public class GitHistorySearchService {
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
       SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
       var step = searchSession.search(scope).where(predicate);
+      if (repositoryRouting) {
+        step.routing(query.repositoryName());
+      }
       if (query.text() == null) {
         step = step.sort(chronologicalSort(scope, timeField));
       }
@@ -176,6 +186,9 @@ public class GitHistorySearchService {
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
       SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
       var step = searchSession.search(scope).select(CommitSearchHit.class).where(predicate);
+      if (repositoryRouting) {
+        step.routing(query.repositoryName());
+      }
       if (query.text() == null) {
         step = step.sort(chronologicalSort(scope, timeField));
       }
@@ -191,6 +204,9 @@ public class GitHistorySearchService {
       SearchScope<GitCommitIndex> scope = searchSession.scope(GitCommitIndex.class);
       SearchPredicate predicate = indexedPredicate(scope.predicate(), query, timeField);
       var step = searchSession.search(scope).select(CommitSearchHit.class).where(predicate);
+      if (repositoryRouting) {
+        step.routing(query.repositoryName());
+      }
       step =
           step.sort(
               query.text() == null
