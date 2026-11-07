@@ -123,4 +123,6 @@ These are application-level logical byte counters. They do not include:
 - compression performed below the Java payload boundary;
 - JGit DFS block-cache hits that avoid this backend entirely.
 
-Use database-native telemetry when WAL, network or physical storage bytes are required.
+Use [database-native telemetry](database-native-telemetry.md#read-ahead-policy-interpretation)
+for complementary PostgreSQL block and I/O counters. Client payload counters do not measure WAL,
+network framing or physical storage bytes.
