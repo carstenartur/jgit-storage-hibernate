@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "harnessCommit": "92c4f9972ee2534276045b23199a897b353dc86c",
+  "harnessTree": "e74322f2ba4ffa12e7f71f794e576bfd72aca032",
+  "profile": "sandbox-index",
+  "database": "filesystem HSQLDB 2.7.4",
+  "index": "filesystem Lucene 9.12.3",
+  "heapMiB": 1024,
+  "network": "none",
+  "cache": "prepared current snapshot in the same process; OS cache not reset",
+  "gcScope": "whole iteration including fixture preparation and verification; not isolated query allocation",
+  "indexGauge": "all retained index files, including deleted segments pending merge; not compacted minimum or heap use",
+  "compatibility": "Join hosted consumer contracts to the integrated publication SHA before promoting a timing result. These are exact-source structural/capacity observations.",
+  "raw": {
+    "sandbox.json.gz": "0383eb1d7b6dbb097549fda8f5dbad822b9fefde5f6b09ef08cc81d5ed1445a2",
+    "sandbox.log.gz": "c199cb8286287a2f948e680528d6111829fdecd879132dff9de929c181925f88"
+  },
+  "harness": {
+    "ConsumerBenchmarkFixtures.java.gz": "75d0c808fe40e006e7ec51571bc687d5582048bd93edc2f0577ce82ec35b371c",
+    "ConsumerSandboxIndexBenchmark.java.gz": "8325bbddf59e63afbd5a6ce5c36bd73e7e5f17aeaba8b66c8e9fa11603e8791c",
+    "ConsumerProfileBenchmarkTest.java.gz": "203e1b5c22b66ce975915466bab5531d9991970ce027c43a7e38834faa0d4a71",
+    "ConsumerSandboxPersistenceTest.java.gz": "1ca3e612fb556a88223637f165318d8c2b3990416da07685cf5e031ce9a763e9"
+  },
+  "libraryModuleTrees": {
+    "jgit-storage-hibernate-core": "908b2b2fe6c29cee11b2997e296a481cdb7a8b91",
+    "jgit-storage-hibernate-search": "14db3138b502194b9558876b48158ebeb94772da",
+    "jgit-storage-hibernate-java-analysis": "30608349d417d48d71d03c29e663a6b702a466c9",
+    "jgit-storage-hibernate-benchmarks": "f5074c2df7dcd9115518e2f39895be88e22e030f"
+  }
+}

@@ -10,24 +10,27 @@ package io.github.carstenartur.jgit.storage.hibernate.search;
 
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryDeletionParticipant;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
-import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
-import java.util.List;
+import io.github.carstenartur.jgit.storage.hibernate.search.internal.ExactRepositoryProjectionDeletion;
 import org.hibernate.Session;
 
 /** Removes Hibernate Search commit projections in the core repository deletion transaction. */
 public final class SearchRepositoryDeletionParticipant
     implements RepositoryDeletionParticipant {
 
+  private static final int PAGE_SIZE = 256;
+
   @Override
   public int deleteRepository(Session session, RepositoryName repositoryName) {
-    List<GitCommitIndex> projections =
-        session
-            .createQuery(
-                "FROM GitCommitIndex c WHERE c.repositoryName = :repo",
-                GitCommitIndex.class)
-            .setParameter("repo", repositoryName.value())
-            .getResultList();
-    projections.forEach(session::remove);
-    return projections.size();
+    int removed = 0;
+    String after = null;
+    while (true) {
+      var page = ExactRepositoryProjectionDeletion.deletePage(
+          session, repositoryName.value(), after, PAGE_SIZE);
+      removed = Math.addExact(removed, page.removedRows());
+      if (page.scannedRows() < PAGE_SIZE) {
+        return removed;
+      }
+      after = page.lastProjectionKey();
+    }
   }
 }

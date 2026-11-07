@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "normalizedCsv": "../consumer-shaped-benchmarks-2026-11-07.csv",
+  "provenance": "Original local JMH outputs recovered intact. Library and harness revisions come from the contemporaneous evidence report; both concatenated harness hashes were independently verified against retained git source. These samples are not measurements of a newer candidate.",
+  "harnesses": {
+    "25ce2ffda12263fb986a47a95bb1dc5e3985f88c": {
+      "sourcesSha256": "6a762c0ca3772fc00148cdb2e79b8f1047157e4d858c4f88a19145c905dceca1",
+      "sources": [
+        "harness-25ce2ff/ConsumerBenchmarkFixtures.java.gz",
+        "harness-25ce2ff/ConsumerBenchmarkFixturesTest.java.gz",
+        "harness-25ce2ff/ConsumerProfileBenchmarkTest.java.gz",
+        "harness-25ce2ff/ConsumerShapeBenchmark.java.gz"
+      ]
+    },
+    "a1a26e35253c300d4876824d897f6467974eea18": {
+      "sourcesSha256": "72c3eac895ccf8a27671a141784159dbb89fb781e1c1f96543c98b13564c7a30",
+      "sources": [
+        "harness-a1a26e3/ConsumerBenchmarkFixtures.java.gz",
+        "harness-a1a26e3/ConsumerBenchmarkFixturesTest.java.gz",
+        "harness-a1a26e3/ConsumerProfileBenchmarkTest.java.gz",
+        "harness-a1a26e3/ConsumerShapeBenchmark.java.gz"
+      ]
+    }
+  },
+  "series": [
+    {
+      "suite": "release-smoke",
+      "librarySha": "ba6aeecc338968df4279fb9c7c72b15bbb3577fb",
+      "harnessSha": "25ce2ffda12263fb986a47a95bb1dc5e3985f88c",
+      "raw": [
+        {
+          "shape": "audio",
+          "json": "release-smoke/audio.json.gz",
+          "jsonSha256": "0747778e36d10dacc20b97501c19330777f0b0593a09e547cd0a3eac6db7b776",
+          "log": "release-smoke/audio.log.gz",
+          "logSha256": "747713a819650b503941bcf670c5a8e3fe5e52361bfad541770b60f6ab294a79"
+        },
+        {
+          "shape": "sandbox",
+          "json": "release-smoke/sandbox.json.gz",
+          "jsonSha256": "9ba23728a7e43a6ee0c09d1419b836fc6287c685f79a8d23da1a5a8e70c43fbd",
+          "log": "release-smoke/sandbox.log.gz",
+          "logSha256": "7138617625452c29624183c4bee5013635eb07ccc03e2dceaa2a852316c680b0"
+        },
+        {
+          "shape": "taxonomy",
+          "json": "release-smoke/taxonomy.json.gz",
+          "jsonSha256": "a4e1585fe930d2340f1e4e1b3774bef3bac1fccd0d6530918ba791cdf51c8b39",
+          "log": "release-smoke/taxonomy.log.gz",
+          "logSha256": "a9262c44cef125be9f35308e17c5490e5602f1ef4b3d78e25278d7953692f54c"
+        }
+      ]
+    },
+    {
+      "suite": "current-smoke",
+      "librarySha": "3bfa6aff12014b88424c48cf349e33c794e80765",
+      "harnessSha": "25ce2ffda12263fb986a47a95bb1dc5e3985f88c",
+      "raw": [
+        {
+          "shape": "audio",
+          "json": "current-smoke/audio.json.gz",
+          "jsonSha256": "2b60e9ad1afed7d45ed87f2f2fff0458e459d3a0f20fea08cda6aba9e07fe53e",
+          "log": "current-smoke/audio.log.gz",
+          "logSha256": "b375eaf57b1b231699aaedf5351953519bdb378d52990e1c4fe30521edba8c8b"
+        },
+        {
+          "shape": "sandbox",
+          "json": "current-smoke/sandbox.json.gz",
+          "jsonSha256": "4824cf215649b038859c6fe8b97a1264a6ee3b4864c8f3b68080616d45a3f908",
+          "log": "current-smoke/sandbox.log.gz",
+          "logSha256": "08a7a302e75186cc46478298d19c72e59a09df8145f3c9b8bd1ba402c242d4a4"
+        },
+        {
+          "shape": "taxonomy",
+          "json": "current-smoke/taxonomy.json.gz",
+          "jsonSha256": "1ac0c7a48a5e75d6f24b9ff7cf6b2751f69e09cb227405e7a91c0d54b1437321",
+          "log": "current-smoke/taxonomy.log.gz",
+          "logSha256": "6ce2484d524e4af4e64cc91b3c431b45a0cc3adcf474d9f96e5f49054d86332c"
+        }
+      ]
+    },
+    {
+      "suite": "audio-controls",
+      "librarySha": "3bfa6aff12014b88424c48cf349e33c794e80765",
+      "harnessSha": "25ce2ffda12263fb986a47a95bb1dc5e3985f88c",
+      "raw": [
+        {
+          "shape": "audio",
+          "json": "audio-controls/audio.json.gz",
+          "jsonSha256": "8026fdab4f05a7b73d394a75f6b70de7ebebef89c97f7f6e7ea9b8c3ccc8d9f6",
+          "log": "audio-controls/audio.log.gz",
+          "logSha256": "9da21e2dfc2d183258e87ea0aff332c8428b59406dbf52de5988b85722fc28f9"
+        }
+      ]
+    },
+    {
+      "suite": "sandbox-large",
+      "librarySha": "3bfa6aff12014b88424c48cf349e33c794e80765",
+      "harnessSha": "a1a26e35253c300d4876824d897f6467974eea18",
+      "raw": [
+        {
+          "shape": "sandbox",
+          "json": "sandbox-large/sandbox.json.gz",
+          "jsonSha256": "198ed4cb5ed7859f1bbd2bfb67c9db2c991fc0e0dd561b409a35d7260e351ac1",
+          "log": "sandbox-large/sandbox.log.gz",
+          "logSha256": "128c21615ad71c80425d1a5594e8d50d6e806388642ea4f98fdb7c7270e6948f"
+        }
+      ]
+    }
+  ]
+}

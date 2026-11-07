@@ -52,6 +52,44 @@ class RepositoryRoutingH2Test {
   @TempDir Path temporaryDirectory;
 
   @Test
+  void caseInsensitiveDatabaseDoesNotMergeExactRepositoryRoutes() throws Exception {
+    String lowerCaseRepository = "team/beta";
+    String mixedCaseRepository = "Team/Beta";
+    // Enough projections to cross a bounded scalar-read page. Object IDs differ because a
+    // case-insensitive database also applies that collation to the repository/object unique key.
+    try (var provider = provider("create", true, 2, "indexes", true)) {
+      var factory = provider.getSessionFactory();
+      try (Session session = factory.openSession()) {
+        session.beginTransaction();
+        for (int i = 0; i < 260; i++) {
+          var row = new GitCommitIndex();
+          row.setRepositoryName(i < 257 ? lowerCaseRepository : mixedCaseRepository);
+          row.setObjectId(String.format("%040x", i + 1));
+          row.setShortMessage("routing case-sensitive identity");
+          row.setFullMessage("routing case-sensitive identity");
+          session.persist(row);
+        }
+        session.getTransaction().commit();
+        assertEquals(
+            1L,
+            session
+                .createSelectionQuery(
+                    "SELECT COUNT(DISTINCT c.repositoryName) FROM GitCommitIndex c", Long.class)
+                .getSingleResult(),
+            "the fixture must use a case-insensitive SQL comparison");
+      }
+      var search = new GitHistorySearchService(factory);
+      assertEquals(257, search.searchCommitTextSummaries(lowerCaseRepository, "routing", 300).size());
+      assertEquals(3, search.searchCommitTextSummaries(mixedCaseRepository, "routing", 300).size());
+    }
+    try (var provider = provider("validate", true, 2, "indexes", true)) {
+      var search = new GitHistorySearchService(provider.getSessionFactory());
+      assertEquals(257, search.searchCommitTextSummaries(lowerCaseRepository, "routing", 300).size());
+      assertEquals(3, search.searchCommitTextSummaries(mixedCaseRepository, "routing", 300).size());
+    }
+  }
+
+  @Test
   void enablingOneShardRoutingRequiresReindexingAndLeavesTheDefaultIndexIntact() throws Exception {
     try (var provider = provider("create", false, 1)) {
       persist(provider.getSessionFactory());
@@ -322,10 +360,16 @@ class RepositoryRoutingH2Test {
 
   private HibernateSessionFactoryProvider provider(
       String schemaAction, boolean routing, int shards, String indexRoot) {
+    return provider(schemaAction, routing, shards, indexRoot, false);
+  }
+
+  private HibernateSessionFactoryProvider provider(
+      String schemaAction, boolean routing, int shards, String indexRoot, boolean ignoreCase) {
     Properties settings = new Properties();
     settings.put(
         "hibernate.connection.url",
-        "jdbc:h2:file:" + temporaryDirectory.resolve("database/search"));
+        "jdbc:h2:file:" + temporaryDirectory.resolve("database/search")
+            + (ignoreCase ? ";IGNORECASE=TRUE" : ""));
     settings.put("hibernate.connection.driver_class", "org.h2.Driver");
     settings.put("hibernate.hbm2ddl.auto", schemaAction);
     settings.put("hibernate.search.backend.type", "lucene");

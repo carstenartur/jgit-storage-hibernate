@@ -5,7 +5,12 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/consumer-profile-benchmarks.yml'
-      - 'jgit-storage-hibernate-benchmarks/src/**/Consumer*Benchmark*.java'
+      - '.github/scripts/*consumer*evidence*.py'
+      - 'docs/evidence/consumer-shaped*'
+      - 'docs/evidence/consumer-shaped-2026-11-07/**'
+      - 'docs/evidence/consumer-audio-concurrency-2026-11-07/**'
+      - 'docs/evidence/consumer-sandbox-persistence-2026-11-07/**'
+      - 'jgit-storage-hibernate-benchmarks/src/**/Consumer*.java'
       - 'pom.xml'
       - 'jgit-storage-hibernate-benchmarks/pom.xml'
       - 'jgit-storage-hibernate-core/pom.xml'
@@ -23,6 +28,10 @@ on:
         options:
           - smoke
           - large
+          - audio-concurrent-smoke
+          - audio-concurrent
+          - sandbox-index-smoke
+          - sandbox-index
       library-ref:
         description: Optional approved release tag or full commit SHA from canonical main
         required: false
@@ -39,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shape: [audio, taxonomy, sandbox]
+        shape: ${{ fromJSON(startsWith(inputs.profile, 'audio-concurrent') && '["audio"]' || startsWith(inputs.profile, 'sandbox-index') && '["sandbox"]' || '["audio", "taxonomy", "sandbox"]') }}
     env:
       SHAPE: ${{ matrix.shape }}
       PROFILE: ${{ inputs.profile || 'smoke' }}
@@ -49,6 +58,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify retained original consumer evidence
+        run: |
+          python3 .github/scripts/test_verify_consumer_benchmark_evidence.py
+          python3 .github/scripts/verify-consumer-benchmark-evidence.py \
+            docs/evidence/consumer-shaped-2026-11-07/manifest.json
+          python3 .github/scripts/verify-consumer-audio-concurrency-evidence.py \
+            docs/evidence/consumer-audio-concurrency-2026-11-07
+          python3 .github/scripts/verify-consumer-sandbox-persistence-evidence.py \
+            docs/evidence/consumer-sandbox-persistence-2026-11-07
       - name: Checkout canonical comparison history
         if: env.LIBRARY_REF != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,8 +105,10 @@ jobs:
         run: |
           base=jgit-storage-hibernate-benchmarks/src
           package=java/io/github/carstenartur/jgit/storage/hibernate/benchmark
-          cp "$base/main/$package/ConsumerBenchmarkFixtures.java" "$LIBRARY_DIR/$base/main/$package/"
-          for source in ConsumerBenchmarkFixturesTest ConsumerShapeBenchmark ConsumerProfileBenchmarkTest; do
+          for source in ConsumerBenchmarkFixtures BenchmarkConnectionProperties; do
+            cp "$base/main/$package/$source.java" "$LIBRARY_DIR/$base/main/$package/"
+          done
+          for source in ConsumerBenchmarkFixturesTest ConsumerShapeBenchmark ConsumerProfileBenchmarkTest ConsumerAudioConcurrencyTest ConsumerSandboxIndexBenchmark ConsumerSandboxPersistenceTest; do
             cp "$base/test/$package/$source.java" "$LIBRARY_DIR/$base/test/$package/"
           done
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -100,7 +120,7 @@ jobs:
         working-directory: ${{ env.LIBRARY_DIR }}
         run: |
           mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am test \
-            -Dtest=ConsumerBenchmarkFixturesTest,ConsumerProfileBenchmarkTest \
+            -Dtest=ConsumerBenchmarkFixturesTest,ConsumerAudioConcurrencyTest,ConsumerSandboxPersistenceTest,ConsumerProfileBenchmarkTest \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dconsumer.profiles.run=true -Dconsumer.profiles.shape="$SHAPE" \
             -Dconsumer.profiles.matrix="$PROFILE" \
@@ -115,6 +135,7 @@ jobs:
 
           root = Path("target/consumer-profiles")
           shape = os.environ["SHAPE"]
+          persisted_sandbox = os.environ["PROFILE"].startswith("sandbox-index")
           results = json.loads((root / f"{shape}.json").read_text())
           metadata = {
               "schemaVersion": 1,
@@ -129,8 +150,8 @@ jobs:
               "workflowRunId": os.environ["GITHUB_RUN_ID"],
               "workflowRunAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
               "compatibilityWorkflow": "consumer-compatibility.yml",
-              "database": "embedded HSQLDB" if shape != "sandbox" else None,
-              "index": "in-memory Lucene" if shape == "taxonomy" else None,
+              "database": "filesystem HSQLDB" if persisted_sandbox else "embedded HSQLDB" if shape != "sandbox" else None,
+              "index": "filesystem Lucene" if persisted_sandbox else "in-memory Lucene" if shape == "taxonomy" else None,
               "network": "none",
               "cache": "fixtures prepared in the same process before measurement",
               "operations": sorted({result["benchmark"].rsplit(".", 1)[-1] for result in results}),
@@ -145,4 +166,52 @@ jobs:
             target/consumer-profiles/${{ matrix.shape }}.json
             target/consumer-profiles/${{ matrix.shape }}.log
             target/consumer-profiles/fixture.json
+          if-no-files-found: error
+
+  sandbox-persistence:
+    name: sandbox semantic projection
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify durable semantic projection and bounded measurements
+        run: |
+          mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am test \
+            -Dtest=ConsumerSandboxPersistenceTest,ConsumerProfileBenchmarkTest \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dconsumer.profiles.run=true -Dconsumer.profiles.matrix=sandbox-index-smoke \
+            -Dconsumer.profiles.output=target/consumer-sandbox-index
+      - name: Record exact source and storage conditions
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          root = Path('jgit-storage-hibernate-benchmarks/target/consumer-sandbox-index')
+          manifest = {
+              'schemaVersion': 1,
+              'fixtureKind': 'consumer-shaped-experimental-semantic-projection',
+              'harnessSha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'workflowRunId': os.environ['GITHUB_RUN_ID'],
+              'workflowRunAttempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'database': 'filesystem HSQLDB', 'index': 'filesystem Lucene',
+              'heapMiB': 1024, 'network': 'none',
+              'cache': 'prepared current snapshot in the same process',
+              'gcScope': 'whole iteration including fixture lifecycle',
+              'sha256': {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                         for path in root.iterdir() if path.is_file()},
+          }
+          (root / 'fixture.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-shaped-sandbox-index-smoke
+          path: |
+            jgit-storage-hibernate-benchmarks/target/consumer-sandbox-index
           if-no-files-found: error

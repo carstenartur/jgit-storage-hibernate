@@ -12,12 +12,16 @@ import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.search.SearchEntities;
+import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import io.github.carstenartur.jgit.storage.hibernate.search.profile.SearchIndexingProfile;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitIndexer;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitProjectionRebuilder;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitSearchHit;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +40,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import org.apache.lucene.index.SegmentInfos;
+import org.apache.lucene.store.FSDirectory;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -44,6 +50,7 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.TreeFormatter;
+import org.hibernate.search.engine.environment.bean.BeanReference;
 import org.hibernate.stat.Statistics;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -92,6 +99,7 @@ public class HibernateSearchRuntimeTuningBenchmark {
   private static final Duration VISIBILITY_TIMEOUT = Duration.ofSeconds(15);
   private static final String STEADY_NEEDLE = "steadyneedle";
   private static final String BURST_NEEDLE = "burstneedle";
+  private static final String HISTORY_NEEDLE = "runtime";
   private static final String PATH = "services/payments/fraud/runtime.txt";
   private static final int CONTENT_BYTES = 4 * 1024;
 
@@ -105,6 +113,7 @@ public class HibernateSearchRuntimeTuningBenchmark {
   public String runtimeScenario;
 
   private SearchRuntimeScenario scenario;
+  private RuntimeBenchmarkFailureHandler failureHandler;
   private HibernateSessionFactoryProvider provider;
   private HibernateRepository repository;
   private GitHistorySearchService search;
@@ -115,6 +124,12 @@ public class HibernateSearchRuntimeTuningBenchmark {
   private ObjectId head;
   private String operation;
   private boolean awaitBurstInTearDown;
+  private RuntimeCounters invocationCounters;
+  private long initialCommitGeneration;
+  private final List<MemoryPoolMXBean> heapPools =
+      ManagementFactory.getMemoryPoolMXBeans().stream()
+          .filter(pool -> pool.getType() == MemoryType.HEAP)
+          .toList();
 
   @Setup(Level.Invocation)
   public void setupInvocation(BenchmarkParams params) throws Exception {
@@ -122,7 +137,7 @@ public class HibernateSearchRuntimeTuningBenchmark {
       throw new IllegalArgumentException("burstCount must be between 1 and commitCount - 1");
     }
     suppressConnectionMetadataLogging();
-    RuntimeBenchmarkFailureHandler.reset();
+    failureHandler = new RuntimeBenchmarkFailureHandler();
     scenario = SearchRuntimeScenario.fromId(runtimeScenario);
     operation = params.getBenchmark().substring(params.getBenchmark().lastIndexOf('.') + 1);
     repositoryName =
@@ -155,39 +170,72 @@ public class HibernateSearchRuntimeTuningBenchmark {
     statistics = provider.getSessionFactory().getStatistics();
     statistics.clear();
     awaitBurstInTearDown = false;
+    try (FSDirectory directory = FSDirectory.open(indexDirectory())) {
+      initialCommitGeneration = SegmentInfos.getLastCommitGeneration(directory);
+    }
+    heapPools.forEach(MemoryPoolMXBean::resetPeakUsage);
   }
 
   @TearDown(Level.Invocation)
   public void tearDownInvocation() throws Exception {
     try {
-      if (awaitBurstInTearDown && search != null) {
-        awaitVisible(BURST_NEEDLE, burstCount, null);
+      try (var openProvider = provider;
+          var openRepository = repository) {
+        if (awaitBurstInTearDown && search != null) {
+          awaitVisible(BURST_NEEDLE, burstCount, null);
+        }
+        failureHandler.assertNoFailure();
+        // The pools may peak at different times. Their sum bounds the peak used heap from above.
+        if (invocationCounters != null) {
+          invocationCounters.peakHeapPoolBytes =
+              heapPools.stream().mapToLong(pool -> pool.getPeakUsage().getUsed()).sum();
+        }
       }
-      RuntimeBenchmarkFailureHandler.assertNoFailure();
+      failureHandler.assertNoFailure();
+      if (invocationCounters != null) {
+        captureClosedIndex(invocationCounters);
+      }
     } finally {
-      if (repository != null) {
-        repository.close();
-        repository = null;
-      }
-      if (provider != null) {
-        provider.close();
-        provider = null;
-      }
       deleteRecursively(indexRoot);
       indexRoot = null;
+      repository = null;
+      provider = null;
       search = null;
       statistics = null;
       commits = null;
       head = null;
+      invocationCounters = null;
     }
   }
 
-  /** Application-thread cost of submitting a burst; visibility is verified in unmeasured teardown. */
+  private Path indexDirectory() {
+    return indexRoot.resolve(GitCommitIndex.class.getSimpleName());
+  }
+
+  private void captureClosedIndex(RuntimeCounters counters) throws IOException {
+    try (FSDirectory directory = FSDirectory.open(indexDirectory())) {
+      SegmentInfos commit = SegmentInfos.readLatestCommit(directory);
+      counters.luceneCommitGenerations =
+          commit.getGeneration() - Math.max(0L, initialCommitGeneration);
+      counters.luceneCommittedSegments = commit.size();
+      counters.luceneCommittedDocuments =
+          commit.asList().stream()
+              .mapToLong(segment -> segment.info.maxDoc() - segment.getDelCount())
+              .sum();
+      for (String file : commit.files(true)) {
+        counters.luceneCommittedBytes += directory.fileLength(file);
+      }
+    }
+  }
+
+  /**
+   * Application-thread cost of submitting a burst; visibility is verified in unmeasured teardown.
+   */
   @Benchmark
   public int incrementalBurstSubmission(RuntimeCounters counters) throws Exception {
     int indexed = indexBurst();
     awaitBurstInTearDown = true;
-    counters.captureDatabase(statistics, indexed);
+    captureOperation(counters, indexed);
     return indexed;
   }
 
@@ -196,10 +244,10 @@ public class HibernateSearchRuntimeTuningBenchmark {
   public int incrementalBurstReady(RuntimeCounters counters) throws Exception {
     int indexed = indexBurst();
     Visibility visibility = awaitVisible(BURST_NEEDLE, burstCount, counters);
-    counters.captureDatabase(statistics, indexed);
+    captureOperation(counters, indexed);
     counters.visibilityPolls = visibility.polls();
     counters.visibilityWaitMicros = visibility.waitMicros();
-    RuntimeBenchmarkFailureHandler.assertNoFailure();
+    failureHandler.assertNoFailure();
     return indexed;
   }
 
@@ -212,7 +260,8 @@ public class HibernateSearchRuntimeTuningBenchmark {
       int checksum = 0;
       while (!writer.isDone() || queryMicros.size() < 5) {
         long started = System.nanoTime();
-        List<CommitSearchHit> hits = search.searchCommitTextSummaries(repositoryName, STEADY_NEEDLE, 10);
+        List<CommitSearchHit> hits =
+            search.searchCommitTextSummaries(repositoryName, STEADY_NEEDLE, 10);
         long elapsedMicros = TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - started);
         queryMicros.add(Math.max(1L, elapsedMicros));
         if (hits.isEmpty()) {
@@ -225,12 +274,12 @@ public class HibernateSearchRuntimeTuningBenchmark {
         throw new IllegalStateException(
             "Expected burst of " + burstCount + " commits but indexed " + indexed);
       }
-      counters.captureDatabase(statistics, indexed);
+      captureOperation(counters, indexed);
       counters.captureQueryDistribution(queryMicros);
       Visibility visibility = awaitVisible(BURST_NEEDLE, burstCount, counters);
       counters.visibilityPolls = visibility.polls();
       counters.visibilityWaitMicros = visibility.waitMicros();
-      RuntimeBenchmarkFailureHandler.assertNoFailure();
+      failureHandler.assertNoFailure();
       return checksum ^ indexed;
     }
   }
@@ -245,12 +294,17 @@ public class HibernateSearchRuntimeTuningBenchmark {
       throw new IllegalStateException(
           "Expected rebuild of " + commitCount + " commits but indexed " + result.indexedCommits());
     }
-    Visibility visibility = awaitVisible(BURST_NEEDLE, burstCount, counters);
-    counters.captureDatabase(statistics, result.indexedCommits());
+    Visibility visibility = awaitVisible(HISTORY_NEEDLE, commitCount, counters);
+    captureOperation(counters, result.indexedCommits());
     counters.visibilityPolls = visibility.polls();
     counters.visibilityWaitMicros = visibility.waitMicros();
-    RuntimeBenchmarkFailureHandler.assertNoFailure();
+    failureHandler.assertNoFailure();
     return result.indexedCommits();
+  }
+
+  private void captureOperation(RuntimeCounters counters, long indexedCommits) {
+    counters.captureDatabase(statistics, indexedCommits);
+    invocationCounters = counters;
   }
 
   private int indexBurst() throws IOException {
@@ -278,7 +332,7 @@ public class HibernateSearchRuntimeTuningBenchmark {
     long deadline = started + VISIBILITY_TIMEOUT.toNanos();
     int polls = 0;
     while (true) {
-      RuntimeBenchmarkFailureHandler.assertNoFailure();
+      failureHandler.assertNoFailure();
       int visible = search.searchCommitTextSummaries(repositoryName, query, commitCount).size();
       polls++;
       if (visible == expected) {
@@ -364,13 +418,16 @@ public class HibernateSearchRuntimeTuningBenchmark {
     Properties properties = new Properties();
     properties.put(
         "hibernate.connection.url",
-        requiredConnectionProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY, connection));
+        requiredConnectionProperty(
+            HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY, connection));
     properties.put(
         "hibernate.connection.username",
-        requiredConnectionProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY, connection));
+        requiredConnectionProperty(
+            HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY, connection));
     properties.put(
         "hibernate.connection.password",
-        requiredConnectionProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY, connection));
+        requiredConnectionProperty(
+            HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY, connection));
     properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
     properties.put("hibernate.hbm2ddl.auto", "create-drop");
@@ -383,8 +440,7 @@ public class HibernateSearchRuntimeTuningBenchmark {
     properties.put("hibernate.search.backend.directory.root", indexRoot.toString());
     properties.put(SearchIndexingProfile.PROFILE_PROPERTY, SearchIndexingProfile.CONTENT.id());
     properties.put(
-        "hibernate.search.background_failure_handler",
-        "class:" + RuntimeBenchmarkFailureHandler.class.getName());
+        "hibernate.search.background_failure_handler", BeanReference.ofInstance(failureHandler));
     scenario.apply(properties);
     return properties;
   }
@@ -396,7 +452,8 @@ public class HibernateSearchRuntimeTuningBenchmark {
 
   private static Properties loadConnectionProperties() throws IOException {
     Properties connection = new Properties();
-    String path = System.getProperty(PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY);
+    String path =
+        System.getProperty(PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY);
     if (path != null && !path.isBlank()) {
       try (var reader = Files.newBufferedReader(Path.of(path))) {
         connection.load(reader);
@@ -462,6 +519,11 @@ public class HibernateSearchRuntimeTuningBenchmark {
     public long queryP50Micros;
     public long queryP95Micros;
     public long queryP99Micros;
+    public long luceneCommitGenerations;
+    public long luceneCommittedSegments;
+    public long luceneCommittedDocuments;
+    public long luceneCommittedBytes;
+    public long peakHeapPoolBytes;
 
     @Setup(Level.Invocation)
     public void reset() {
@@ -476,6 +538,11 @@ public class HibernateSearchRuntimeTuningBenchmark {
       queryP50Micros = 0L;
       queryP95Micros = 0L;
       queryP99Micros = 0L;
+      luceneCommitGenerations = 0L;
+      luceneCommittedSegments = 0L;
+      luceneCommittedDocuments = 0L;
+      luceneCommittedBytes = 0L;
+      peakHeapPoolBytes = 0L;
     }
 
     private void captureDatabase(Statistics statistics, long indexedCommits) {

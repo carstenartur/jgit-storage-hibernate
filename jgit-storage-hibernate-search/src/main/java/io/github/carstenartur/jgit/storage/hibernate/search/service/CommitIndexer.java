@@ -55,6 +55,11 @@ import org.hibernate.Transaction;
  * only missing commits are extracted, and all new projections are written in one transaction. The
  * same {@link RevWalk} and {@link ObjectReader} remain open for the walk, avoiding reparsing and
  * reopening Git storage once per commit.
+ *
+ * <p>Repository names retain their exact identity even when database comparisons do not. If a
+ * commit lookup matches a different exact repository name, indexing fails instead of reusing that
+ * projection. The database's repository/object-id unique constraint cannot represent both in that
+ * case.
  */
 public class CommitIndexer {
 
@@ -417,15 +422,22 @@ public class CommitIndexer {
   private Set<String> findExistingObjectIds(List<RevCommit> commits) {
     List<String> objectIds = commits.stream().map(RevCommit::name).toList();
     try (Session session = sessionFactory.openSession()) {
-      return new HashSet<>(
+      List<ExistingProjection> projections =
           session
               .createQuery(
-                  "SELECT c.objectId FROM GitCommitIndex c WHERE c.repositoryName = :repo "
+                  "SELECT c.repositoryName, c.objectId FROM GitCommitIndex c "
+                      + "WHERE c.repositoryName = :repo "
                       + "AND c.objectId IN :objectIds",
-                  String.class)
+                  ExistingProjection.class)
               .setParameter("repo", repositoryName)
               .setParameter("objectIds", objectIds)
-              .getResultList());
+              .getResultList();
+      Set<String> existing = new HashSet<>(projections.size());
+      for (ExistingProjection projection : projections) {
+        requireExactRepositoryName(projection.repositoryName());
+        existing.add(projection.objectId());
+      }
+      return existing;
     }
   }
 
@@ -464,6 +476,7 @@ public class CommitIndexer {
         if (existing == null) {
           session.persist(projection);
         } else {
+          requireExactRepositoryName(existing.getRepositoryName());
           copyMutableProjection(existing, projection);
         }
         transaction.commit();
@@ -471,6 +484,14 @@ public class CommitIndexer {
         transaction.rollback();
         throw exception;
       }
+    }
+  }
+
+  private void requireExactRepositoryName(String persistedRepositoryName) {
+    if (!repositoryName.equals(persistedRepositoryName)) {
+      throw new IllegalStateException(
+          "Database collation matched a different repository name; "
+              + "refusing to reuse its commit projection");
     }
   }
 
@@ -488,6 +509,8 @@ public class CommitIndexer {
     target.setChangedPaths(source.getChangedPaths());
     target.setChangedText(source.getChangedText());
   }
+
+  private record ExistingProjection(String repositoryName, String objectId) {}
 
   private record TreeText(List<String> paths, String text) {}
 }

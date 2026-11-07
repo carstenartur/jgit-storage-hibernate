@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1410" height="340" viewBox="0 0 1410 340" role="img" aria-label="Search runtime: 10,000 commits / 50 burst / normal / coordination">
+<rect width="1410" height="340" rx="12" fill="#f7f9fc"/>
+<g font-family="system-ui, sans-serif" fill="#24324b">
+<text x="20.0" y="29.0" font-size="20" text-anchor="start" font-weight="700">Search runtime: 10,000 commits / 50 burst / normal / coordination</text>
+<text x="20.0" y="51.0" font-size="12" text-anchor="start" font-weight="400">2 shots per operation · whiskers: observed min–max, not confidence intervals · each panel has its own scale</text>
+<text x="20.0" y="85.0" font-size="15" text-anchor="start" font-weight="700">Submission rate (higher is better)</text>
+<text x="462.0" y="101.0" font-size="11" text-anchor="end" font-weight="400">commits/s</text>
+<line x1="173.0" x2="173.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="173.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">0</text>
+<line x1="269.3" x2="269.3" y1="108" y2="268" stroke="#d6deec"/>
+<text x="269.3" y="285.0" font-size="10" text-anchor="middle" font-weight="400">667</text>
+<line x1="365.7" x2="365.7" y1="108" y2="268" stroke="#d6deec"/>
+<text x="365.7" y="285.0" font-size="10" text-anchor="middle" font-weight="400">1,333</text>
+<line x1="462.0" x2="462.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="462.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">2,000</text>
+<text x="165.0" y="128.0" font-size="11" text-anchor="end" font-weight="400">write-sync 0 ms (ref)</text>
+<rect x="173.0" y="115" width="76.3" height="18" rx="2" fill="#007c83"><title>reference: 527.725 commits/s; observed 363.758–960.820</title></rect>
+<path d="M 225.6 124 H 311.8 M 225.6 120 V 128 M 311.8 120 V 128" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="160.0" font-size="11" text-anchor="end" font-weight="400">async / 500 ms</text>
+<rect x="173.0" y="147" width="169.3" height="18" rx="2" fill="#007c83"><title>sync-async-r500: 1171.660 commits/s; observed 943.643–1544.981</title></rect>
+<path d="M 309.4 156 H 396.2 M 309.4 152 V 160 M 396.2 152 V 160" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="192.0" font-size="11" text-anchor="end" font-weight="400">read-sync / 0 ms</text>
+<rect x="173.0" y="179" width="78.0" height="18" rx="2" fill="#007c83"><title>sync-read-sync-r0: 539.998 commits/s; observed 364.707–1039.725</title></rect>
+<path d="M 225.7 188 H 323.2 M 225.7 184 V 192 M 323.2 184 V 192" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="224.0" font-size="11" text-anchor="end" font-weight="400">sync / 0 ms</text>
+<rect x="173.0" y="211" width="48.1" height="18" rx="2" fill="#007c83"><title>sync-sync-r0: 332.903 commits/s; observed 254.506–481.098</title></rect>
+<path d="M 209.8 220 H 242.5 M 209.8 216 V 224 M 242.5 216 V 224" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="256.0" font-size="11" text-anchor="end" font-weight="400">write-sync / 500 ms</text>
+<rect x="173.0" y="243" width="133.1" height="18" rx="2" fill="#007c83"><title>sync-write-sync-r500: 921.059 commits/s; observed 726.500–1257.939</title></rect>
+<path d="M 278.0 252 H 354.8 M 278.0 248 V 256 M 354.8 248 V 256" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="490.0" y="85.0" font-size="15" text-anchor="start" font-weight="700">Visibility wait after submission</text>
+<text x="932.0" y="101.0" font-size="11" text-anchor="end" font-weight="400">ms</text>
+<line x1="643.0" x2="643.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="643.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">0</text>
+<line x1="739.3" x2="739.3" y1="108" y2="268" stroke="#d6deec"/>
+<text x="739.3" y="285.0" font-size="10" text-anchor="middle" font-weight="400">167</text>
+<line x1="835.7" x2="835.7" y1="108" y2="268" stroke="#d6deec"/>
+<text x="835.7" y="285.0" font-size="10" text-anchor="middle" font-weight="400">333</text>
+<line x1="932.0" x2="932.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="932.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">500</text>
+<text x="635.0" y="128.0" font-size="11" text-anchor="end" font-weight="400">write-sync 0 ms (ref)</text>
+<rect x="643.0" y="115" width="4.1" height="18" rx="2" fill="#a04425"><title>reference: 7.064 ms; observed 6.178–7.951</title></rect>
+<path d="M 646.6 124 H 647.6 M 646.6 120 V 128 M 647.6 120 V 128" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="160.0" font-size="11" text-anchor="end" font-weight="400">async / 500 ms</text>
+<rect x="643.0" y="147" width="207.1" height="18" rx="2" fill="#a04425"><title>sync-async-r500: 358.228 ms; observed 306.316–410.140</title></rect>
+<path d="M 820.1 156 H 880.1 M 820.1 152 V 160 M 880.1 152 V 160" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="192.0" font-size="11" text-anchor="end" font-weight="400">read-sync / 0 ms</text>
+<rect x="643.0" y="179" width="14.6" height="18" rx="2" fill="#a04425"><title>sync-read-sync-r0: 25.174 ms; observed 23.137–27.210</title></rect>
+<path d="M 656.4 188 H 658.7 M 656.4 184 V 192 M 658.7 184 V 192" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="224.0" font-size="11" text-anchor="end" font-weight="400">sync / 0 ms</text>
+<rect x="643.0" y="211" width="3.5" height="18" rx="2" fill="#a04425"><title>sync-sync-r0: 6.135 ms; observed 3.089–9.180</title></rect>
+<path d="M 644.8 220 H 648.3 M 644.8 216 V 224 M 648.3 216 V 224" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="256.0" font-size="11" text-anchor="end" font-weight="400">write-sync / 500 ms</text>
+<rect x="643.0" y="243" width="133.2" height="18" rx="2" fill="#a04425"><title>sync-write-sync-r500: 230.514 ms; observed 114.880–346.149</title></rect>
+<path d="M 709.4 252 H 843.1 M 709.4 248 V 256 M 843.1 248 V 256" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="960.0" y="85.0" font-size="15" text-anchor="start" font-weight="700">Mean concurrent query p95</text>
+<text x="1402.0" y="101.0" font-size="11" text-anchor="end" font-weight="400">ms</text>
+<line x1="1113.0" x2="1113.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1113.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">0</text>
+<line x1="1209.3" x2="1209.3" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1209.3" y="285.0" font-size="10" text-anchor="middle" font-weight="400">20</text>
+<line x1="1305.7" x2="1305.7" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1305.7" y="285.0" font-size="10" text-anchor="middle" font-weight="400">40</text>
+<line x1="1402.0" x2="1402.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1402.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">60</text>
+<text x="1105.0" y="128.0" font-size="11" text-anchor="end" font-weight="400">write-sync 0 ms (ref)</text>
+<rect x="1113.0" y="115" width="59.2" height="18" rx="2" fill="#526780"><title>reference: 12.284 ms; observed 8.542–16.025</title></rect>
+<path d="M 1154.1 124 H 1190.2 M 1154.1 120 V 128 M 1190.2 120 V 128" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="160.0" font-size="11" text-anchor="end" font-weight="400">async / 500 ms</text>
+<rect x="1113.0" y="147" width="147.4" height="18" rx="2" fill="#526780"><title>sync-async-r500: 30.597 ms; observed 5.606–55.588</title></rect>
+<path d="M 1140.0 156 H 1380.7 M 1140.0 152 V 160 M 1380.7 152 V 160" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="192.0" font-size="11" text-anchor="end" font-weight="400">read-sync / 0 ms</text>
+<rect x="1113.0" y="179" width="126.1" height="18" rx="2" fill="#526780"><title>sync-read-sync-r0: 26.186 ms; observed 20.538–31.834</title></rect>
+<path d="M 1211.9 188 H 1266.3 M 1211.9 184 V 192 M 1266.3 184 V 192" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="224.0" font-size="11" text-anchor="end" font-weight="400">sync / 0 ms</text>
+<rect x="1113.0" y="211" width="104.1" height="18" rx="2" fill="#526780"><title>sync-sync-r0: 21.608 ms; observed 9.979–33.238</title></rect>
+<path d="M 1161.1 220 H 1273.1 M 1161.1 216 V 224 M 1273.1 216 V 224" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="256.0" font-size="11" text-anchor="end" font-weight="400">write-sync / 500 ms</text>
+<rect x="1113.0" y="243" width="52.4" height="18" rx="2" fill="#526780"><title>sync-write-sync-r500: 10.889 ms; observed 5.885–15.892</title></rect>
+<path d="M 1141.3 252 H 1189.5 M 1141.3 248 V 256 M 1189.5 248 V 256" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="20.0" y="308.0" font-size="11" text-anchor="start" font-weight="400">Query p95 is computed within each invocation; query sample counts and all raw shots are retained separately.</text>
+<text x="20.0" y="328.0" font-size="12" text-anchor="start" font-weight="500">Acknowledgment: write-sync = durable, refresh-dependent; async = submitted only; read-sync = visible, may be uncommitted; sync = durable + visible.</text>
+</g>
+</svg>

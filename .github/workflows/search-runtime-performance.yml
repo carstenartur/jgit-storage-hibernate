@@ -47,8 +47,11 @@ on:
       - 'jgit-storage-hibernate-search/**'
       - 'jgit-storage-hibernate-benchmarks/**'
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - 'benchmark/search-runtime-full-196-*'
     paths:
+      - '.github/benchmark-triggers/issue196-runtime-evidence.json'
       - '.github/workflows/search-runtime-performance.yml'
       - '.github/scripts/benchmark_units.py'
       - '.github/scripts/test_benchmark_units.py'
@@ -70,13 +73,67 @@ permissions:
   contents: read
 
 jobs:
+  select-runtime-runs:
+    name: Select Search runtime workloads
+    if: github.event_name != 'push' || !github.event.deleted
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - name: Select workload, settings and resources
+        id: select
+        env:
+          RUNTIME_WORKLOAD: ${{ inputs.workload || '100-50' }}
+          RUNTIME_RESOURCES: ${{ inputs.resources || 'host' }}
+          RUNTIME_MATRIX: ${{ inputs.matrix || 'smoke' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          event = os.environ['GITHUB_EVENT_NAME']
+          ref = os.environ['GITHUB_REF_NAME']
+          hosted = event == 'push' and ref.startswith('benchmark/search-runtime-full-196-')
+          if hosted:
+              coordinates = [
+                  ('1000-500', 'normal', 'full'),
+                  ('10000-50', 'normal', 'smoke'),
+                  ('10000-500', 'normal', 'smoke'),
+                  ('10000-500', 'constrained', 'smoke'),
+              ]
+          else:
+              settings = 'full' if event == 'schedule' else os.environ['RUNTIME_MATRIX']
+              coordinates = [(os.environ['RUNTIME_WORKLOAD'], os.environ['RUNTIME_RESOURCES'], settings)]
+
+          runs = []
+          for workload, resources, settings in coordinates:
+              if settings == 'full' and workload.startswith('10000-'):
+                  raise SystemExit('Use the smoke settings matrix for 10,000 commits.')
+              suffix = f'-{workload}-{resources}-{settings}' if hosted else ''
+              runs.append(dict(workload=workload, resources=resources, settings=settings,
+                               artifact=f'hibernate-search-runtime-results{suffix}'))
+          matrix = json.dumps({'include': runs}, separators=(',', ':'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              print(f'matrix={matrix}', file=output)
+          print(f'Search runtime runs: {matrix}')
+          PY
+
   runtime-tuning:
-    name: PostgreSQL + Lucene runtime coordination matrix
+    name: >-
+      ${{ matrix.artifact == 'hibernate-search-runtime-results' && 'PostgreSQL + Lucene runtime coordination matrix' ||
+          format('PostgreSQL + Lucene {0} ({1}, {2})', matrix.workload, matrix.resources, matrix.settings) }}
+    needs: select-runtime-runs
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.select-runtime-runs.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
     env:
-      RUNTIME_WORKLOAD: ${{ inputs.workload || '100-50' }}
-      RUNTIME_RESOURCES: ${{ inputs.resources || 'host' }}
+      RUNTIME_WORKLOAD: ${{ matrix.workload }}
+      RUNTIME_RESOURCES: ${{ matrix.resources }}
+      RUNTIME_FULL: ${{ matrix.settings == 'full' }}
 
     steps:
       - name: Checkout
@@ -88,23 +145,6 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-
-      - name: Select runtime matrix
-        id: matrix
-        shell: bash
-        env:
-          RUNTIME_MATRIX: ${{ inputs.matrix || 'smoke' }}
-        run: |
-          full=false
-          if [[ "$GITHUB_EVENT_NAME" == "schedule" || "$RUNTIME_MATRIX" == "full" ]]; then
-            full=true
-          fi
-          if [[ "$full" == "true" && "$RUNTIME_WORKLOAD" == 10000-* ]]; then
-            echo 'Use the smoke settings matrix for 10,000 commits.' >&2
-            exit 1
-          fi
-          echo "full=$full" >> "$GITHUB_OUTPUT"
-          echo "Full matrix: $full; workload: $RUNTIME_WORKLOAD; resources: $RUNTIME_RESOURCES"
 
       - name: Test runtime chart conversion and units
         run: |
@@ -119,15 +159,13 @@ jobs:
           mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
             | tee target/search-runtime/maven-build.log
 
-      - name: Run PostgreSQL and Lucene runtime matrix
+      - name: Check Lucene crash recovery and run the PostgreSQL runtime matrix
         shell: bash
-        env:
-          RUNTIME_FULL: ${{ steps.matrix.outputs.full }}
         run: |
           set -o pipefail
           lscpu --json > target/search-runtime/cpu.json
           command=(mvn -B -pl jgit-storage-hibernate-benchmarks test
-            -Dtest=HibernateSearchRuntimeTuningBenchmarkIT
+            -Dtest=SearchRuntimeRecoveryTest,HibernateSearchRuntimeTuningBenchmarkIT
             -Dsurefire.failIfNoSpecifiedTests=false
             "-Dsearch.runtime.full=$RUNTIME_FULL"
             "-Dsearch.runtime.workload=$RUNTIME_WORKLOAD"
@@ -176,6 +214,9 @@ jobs:
           grep -F 'Hibernate Search runtime burst visibility observation wait' target/search-runtime/comparison.json
           grep -F 'Hibernate Search runtime burst visibility polls' target/search-runtime/comparison.json
           grep -F 'Hibernate Search runtime burst prepared statements' target/search-runtime/comparison.json
+          grep -F 'Hibernate Search runtime burst committed index bytes' target/search-runtime/comparison.json
+          grep -F 'Hibernate Search runtime rebuild committed segments' target/search-runtime/comparison.json
+          grep -F 'Hibernate Search runtime rebuild sum of peak heap pools in bytes' target/search-runtime/comparison.json
 
       - name: Check Search runtime evidence for connection details
         id: evidence-privacy
@@ -188,7 +229,7 @@ jobs:
         if: always() && steps.evidence-privacy.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: hibernate-search-runtime-results
+          name: ${{ matrix.artifact }}
           path: |
             target/search-runtime/**
             jgit-storage-hibernate-benchmarks/target/surefire-reports/**
@@ -199,10 +240,11 @@ jobs:
         run: |
           echo '### Hibernate Search runtime tuning' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo "Full matrix: ${{ steps.matrix.outputs.full }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Full matrix: $RUNTIME_FULL" >> "$GITHUB_STEP_SUMMARY"
           echo "Total commits and burst commits: $RUNTIME_WORKLOAD; resources: $RUNTIME_RESOURCES" >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo 'The matrix keeps the semantic Search profile fixed at content-v1 and varies runtime coordination, refresh, Lucene writer RAM/backend threads, and projection batching in controlled families.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'write-sync waits for a Lucene commit, sync waits for commit and refresh, read-sync waits for refresh, and async can acknowledge work before either. The index size and segment charts describe the committed index after graceful close.' >> "$GITHUB_STEP_SUMMARY"
           echo 'The run artifact contains its exact workload, host, Java, and database metadata. Only default runs on main enter the chart history below.' >> "$GITHUB_STEP_SUMMARY"
           echo "[Runtime benchmark reproduction guide](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/operations/search-runtime-tuning.md)" >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"

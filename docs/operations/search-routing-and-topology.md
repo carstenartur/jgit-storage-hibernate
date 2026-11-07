@@ -64,6 +64,31 @@ change can leave the total hit count unchanged while making documents unreachabl
    topology/readiness check and assumes writes are paused during startup; it does not compare
    document IDs or detect every kind of drift after startup.
 
+The readiness check counts exact Java repository-name strings because a case-insensitive database
+can group distinct routes such as `team/beta` and `Team/Beta` together. It reads only projection keys
+and names in pages of at most 256 rows, using the database's primary-key order and comparison for
+keyset pagination. It retains one page plus one counter per exact repository name and does not load
+projection entities. This replaces a grouped SQL query with `floor(projections / 256) + 1` bounded
+SQL queries, followed by the total and per-repository Search counts. Startup work therefore grows
+with the total projection count; keep writers paused until this one-time factory check finishes.
+
+Projection rebuilds and the Search repository-deletion participant also preserve exact names when
+SQL equality includes case or other collation aliases. They scan bounded scalar key/name pages,
+compare names in Java, and delete only the selected projection keys. Neighboring aliases remain in
+both SQL and Search, including when they share a shard. Search document deletes stay in the same
+ORM transaction; a rollback does not publish them. Rebuilds commit each purge page separately. Core
+repository deletion keeps its single atomic transaction and can retain compact pending Search
+delete work until commit, while the scalar pages avoid loading full projection entities. This does
+not change the database collation or the Core repository catalog's name constraints.
+
+The indexer also checks the actual repository name before reusing an existing object-ID match.
+If database equality finds a different exact name, indexing fails before skipping that commit or
+changing the other projection. The existing database uniqueness constraint may prevent both
+names from storing the same object ID; the indexer reports that collision instead of silently
+sharing or overwriting the projection. This guard applies to both routed and default indexes.
+Structured reads use the [exact SQL identity comparison](search-pagination-and-export.md#exact-repository-identity-in-structured-queries)
+before database pagination; the query builder's existing trimming behavior is documented there.
+
 If reindexing is interrupted, keep traffic paused and run the full MassIndexer again. If Git history
 itself has not been projected correctly, rebuild that repository from Git instead of mass indexing
 the incorrect rows. To switch back after a routed index received writes, rebuild the unrouted index

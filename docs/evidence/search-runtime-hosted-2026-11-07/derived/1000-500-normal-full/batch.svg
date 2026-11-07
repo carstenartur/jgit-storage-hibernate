@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1410" height="340" viewBox="0 0 1410 340" role="img" aria-label="Search runtime: 1,000 commits / 500 burst / normal / batch">
+<rect width="1410" height="340" rx="12" fill="#f7f9fc"/>
+<g font-family="system-ui, sans-serif" fill="#24324b">
+<text x="20.0" y="29.0" font-size="20" text-anchor="start" font-weight="700">Search runtime: 1,000 commits / 500 burst / normal / batch</text>
+<text x="20.0" y="51.0" font-size="12" text-anchor="start" font-weight="400">3 shots per operation · whiskers: observed min–max, not confidence intervals · each panel has its own scale</text>
+<text x="20.0" y="85.0" font-size="15" text-anchor="start" font-weight="700">Submission rate (higher is better)</text>
+<text x="462.0" y="101.0" font-size="11" text-anchor="end" font-weight="400">commits/s</text>
+<line x1="173.0" x2="173.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="173.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">0</text>
+<line x1="269.3" x2="269.3" y1="108" y2="268" stroke="#d6deec"/>
+<text x="269.3" y="285.0" font-size="10" text-anchor="middle" font-weight="400">1,000</text>
+<line x1="365.7" x2="365.7" y1="108" y2="268" stroke="#d6deec"/>
+<text x="365.7" y="285.0" font-size="10" text-anchor="middle" font-weight="400">2,000</text>
+<line x1="462.0" x2="462.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="462.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">3,000</text>
+<text x="165.0" y="128.0" font-size="11" text-anchor="end" font-weight="400">write-sync 0 ms (ref)</text>
+<rect x="173.0" y="115" width="75.4" height="18" rx="2" fill="#007c83"><title>reference: 782.601 commits/s; observed 642.684–1239.666</title></rect>
+<path d="M 234.9 124 H 292.4 M 234.9 120 V 128 M 292.4 120 V 128" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="160.0" font-size="11" text-anchor="end" font-weight="400">batch 1</text>
+<rect x="173.0" y="147" width="13.1" height="18" rx="2" fill="#007c83"><title>batch-1: 135.823 commits/s; observed 127.132–151.080</title></rect>
+<path d="M 185.2 156 H 187.6 M 185.2 152 V 160 M 187.6 152 V 160" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="192.0" font-size="11" text-anchor="end" font-weight="400">batch 50</text>
+<rect x="173.0" y="179" width="108.9" height="18" rx="2" fill="#007c83"><title>batch-50: 1130.153 commits/s; observed 1025.747–1334.172</title></rect>
+<path d="M 271.8 188 H 301.5 M 271.8 184 V 192 M 301.5 184 V 192" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="224.0" font-size="11" text-anchor="end" font-weight="400">batch 250</text>
+<rect x="173.0" y="211" width="122.5" height="18" rx="2" fill="#007c83"><title>batch-250: 1271.296 commits/s; observed 1055.361–1826.602</title></rect>
+<path d="M 274.7 220 H 349.0 M 274.7 216 V 224 M 349.0 216 V 224" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="165.0" y="256.0" font-size="11" text-anchor="end" font-weight="400">batch 500</text>
+<rect x="173.0" y="243" width="210.5" height="18" rx="2" fill="#007c83"><title>batch-500: 2184.616 commits/s; observed 1974.331–2453.262</title></rect>
+<path d="M 363.2 252 H 409.3 M 363.2 248 V 256 M 409.3 248 V 256" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="490.0" y="85.0" font-size="15" text-anchor="start" font-weight="700">Visibility wait after submission</text>
+<text x="932.0" y="101.0" font-size="11" text-anchor="end" font-weight="400">ms</text>
+<line x1="643.0" x2="643.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="643.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">0</text>
+<line x1="739.3" x2="739.3" y1="108" y2="268" stroke="#d6deec"/>
+<text x="739.3" y="285.0" font-size="10" text-anchor="middle" font-weight="400">10</text>
+<line x1="835.7" x2="835.7" y1="108" y2="268" stroke="#d6deec"/>
+<text x="835.7" y="285.0" font-size="10" text-anchor="middle" font-weight="400">20</text>
+<line x1="932.0" x2="932.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="932.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">30</text>
+<text x="635.0" y="128.0" font-size="11" text-anchor="end" font-weight="400">write-sync 0 ms (ref)</text>
+<rect x="643.0" y="115" width="174.5" height="18" rx="2" fill="#a04425"><title>reference: 18.113 ms; observed 15.488–21.591</title></rect>
+<path d="M 792.2 124 H 851.0 M 792.2 120 V 128 M 851.0 120 V 128" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="160.0" font-size="11" text-anchor="end" font-weight="400">batch 1</text>
+<rect x="643.0" y="147" width="132.8" height="18" rx="2" fill="#a04425"><title>batch-1: 13.789 ms; observed 11.699–16.174</title></rect>
+<path d="M 755.7 156 H 798.8 M 755.7 152 V 160 M 798.8 152 V 160" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="192.0" font-size="11" text-anchor="end" font-weight="400">batch 50</text>
+<rect x="643.0" y="179" width="178.4" height="18" rx="2" fill="#a04425"><title>batch-50: 18.518 ms; observed 15.973–21.758</title></rect>
+<path d="M 796.9 188 H 852.6 M 796.9 184 V 192 M 852.6 184 V 192" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="224.0" font-size="11" text-anchor="end" font-weight="400">batch 250</text>
+<rect x="643.0" y="211" width="234.4" height="18" rx="2" fill="#a04425"><title>batch-250: 24.336 ms; observed 19.793–27.912</title></rect>
+<path d="M 833.7 220 H 911.9 M 833.7 216 V 224 M 911.9 216 V 224" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="635.0" y="256.0" font-size="11" text-anchor="end" font-weight="400">batch 500</text>
+<rect x="643.0" y="243" width="159.5" height="18" rx="2" fill="#a04425"><title>batch-500: 16.553 ms; observed 12.708–18.811</title></rect>
+<path d="M 765.4 252 H 824.2 M 765.4 248 V 256 M 824.2 248 V 256" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="960.0" y="85.0" font-size="15" text-anchor="start" font-weight="700">Mean concurrent query p95</text>
+<text x="1402.0" y="101.0" font-size="11" text-anchor="end" font-weight="400">ms</text>
+<line x1="1113.0" x2="1113.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1113.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">0.0</text>
+<line x1="1209.3" x2="1209.3" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1209.3" y="285.0" font-size="10" text-anchor="middle" font-weight="400">2.3</text>
+<line x1="1305.7" x2="1305.7" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1305.7" y="285.0" font-size="10" text-anchor="middle" font-weight="400">4.7</text>
+<line x1="1402.0" x2="1402.0" y1="108" y2="268" stroke="#d6deec"/>
+<text x="1402.0" y="285.0" font-size="10" text-anchor="middle" font-weight="400">7.0</text>
+<text x="1105.0" y="128.0" font-size="11" text-anchor="end" font-weight="400">write-sync 0 ms (ref)</text>
+<rect x="1113.0" y="115" width="33.0" height="18" rx="2" fill="#526780"><title>reference: 0.799 ms; observed 0.421–1.183</title></rect>
+<path d="M 1130.4 124 H 1161.8 M 1130.4 120 V 128 M 1161.8 120 V 128" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="160.0" font-size="11" text-anchor="end" font-weight="400">batch 1</text>
+<rect x="1113.0" y="147" width="91.3" height="18" rx="2" fill="#526780"><title>batch-1: 2.212 ms; observed 2.180–2.235</title></rect>
+<path d="M 1203.0 156 H 1205.3 M 1203.0 152 V 160 M 1205.3 152 V 160" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="192.0" font-size="11" text-anchor="end" font-weight="400">batch 50</text>
+<rect x="1113.0" y="179" width="152.7" height="18" rx="2" fill="#526780"><title>batch-50: 3.700 ms; observed 1.374–5.816</title></rect>
+<path d="M 1169.7 188 H 1353.1 M 1169.7 184 V 192 M 1353.1 184 V 192" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="224.0" font-size="11" text-anchor="end" font-weight="400">batch 250</text>
+<rect x="1113.0" y="211" width="194.9" height="18" rx="2" fill="#526780"><title>batch-250: 4.721 ms; observed 3.052–6.875</title></rect>
+<path d="M 1239.0 220 H 1396.8 M 1239.0 216 V 224 M 1396.8 216 V 224" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="1105.0" y="256.0" font-size="11" text-anchor="end" font-weight="400">batch 500</text>
+<rect x="1113.0" y="243" width="141.8" height="18" rx="2" fill="#526780"><title>batch-500: 3.434 ms; observed 2.241–4.210</title></rect>
+<path d="M 1205.5 252 H 1286.8 M 1205.5 248 V 256 M 1286.8 248 V 256" stroke="#24324b" stroke-width="1.2" fill="none"/>
+<text x="20.0" y="308.0" font-size="11" text-anchor="start" font-weight="400">Query p95 is computed within each invocation; query sample counts and all raw shots are retained separately.</text>
+<text x="20.0" y="328.0" font-size="12" text-anchor="start" font-weight="500">Acknowledgment: write-sync = durable, refresh-dependent; async = submitted only; read-sync = visible, may be uncommitted; sync = durable + visible.</text>
+</g>
+</svg>

@@ -252,7 +252,8 @@ public class GitHistorySearchService {
     String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
         new StringBuilder(SUMMARY_PROJECTION)
-            .append("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+            .append("FROM GitCommitIndex c WHERE ")
+            .append(StructuredRepositoryPredicate.matchingRepository(sessionFactory));
     appendStructuredPredicates(hql, query, timeProperty);
     appendStructuredOrder(hql, timeProperty);
 
@@ -403,7 +404,8 @@ public class GitHistorySearchService {
   private List<GitCommitIndex> findStructuredChanges(CommitHistoryQuery query) {
     String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
-        new StringBuilder("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+        new StringBuilder("FROM GitCommitIndex c WHERE ")
+            .append(StructuredRepositoryPredicate.matchingRepository(sessionFactory));
     appendStructuredPredicates(hql, query, timeProperty);
     appendStructuredOrder(hql, timeProperty);
 
@@ -422,7 +424,8 @@ public class GitHistorySearchService {
     String timeProperty = hqlTimeProperty(query);
     StringBuilder hql =
         new StringBuilder(SUMMARY_PROJECTION)
-            .append("FROM GitCommitIndex c WHERE c.repositoryName = :repo");
+            .append("FROM GitCommitIndex c WHERE ")
+            .append(StructuredRepositoryPredicate.matchingRepository(sessionFactory));
     appendStructuredPredicates(hql, query, timeProperty);
     appendStructuredOrder(hql, timeProperty);
 
@@ -638,7 +641,9 @@ public class GitHistorySearchService {
       Long count =
           session
               .createQuery(
-                  "SELECT COUNT(c) FROM GitCommitIndex c WHERE c.repositoryName = :repo", Long.class)
+                  "SELECT COUNT(c) FROM GitCommitIndex c WHERE "
+                      + StructuredRepositoryPredicate.matchingRepository(sessionFactory),
+                  Long.class)
               .setParameter("repo", repositoryName)
               .uniqueResult();
       return count != null ? count.longValue() : 0L;

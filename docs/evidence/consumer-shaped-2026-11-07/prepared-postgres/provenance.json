@@ -1,0 +1,11 @@
+{
+  "status": "recovered-historical-evidence",
+  "sourceLibraryReportedByPriorWork": "3bfa6aff12014b88424c48cf349e33c794e80765",
+  "exactRuntimeHarnessSha": null,
+  "limits": "Original local PostgreSQL rebuild and in-process recovery outputs. No exact runtime harness manifest was retained; these are preserved for audit, not relabeled as current-candidate or restart evidence. The new workflow emits exact revision provenance.",
+  "uncompressedSha256": {
+    "taxonomy.json.gz": "fe1132d84dbf383ea3696d79a6b2aae94cbd0c205ac87091df7be674efbe3c83",
+    "taxonomy.log.gz": "319f40d18d1914ba47b952711ed098db1bb105950cfa4e80680092be612de27f",
+    "taxonomy-recovery.json.gz": "01baa1328f060ff1ad279a06155fd5f89462fa45d8e763d5743ddfc337bcc21a"
+  }
+}

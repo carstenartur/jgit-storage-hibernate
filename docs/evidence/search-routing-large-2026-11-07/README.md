@@ -146,7 +146,13 @@ coordinates, required columns, finite positive metrics, percentile ordering, sha
 heap budget, throughput arithmetic and the environment/source identity before writing results.
 It reuses the measured plotting script and retains the exact measured source revision. The Java
 benchmark harness is unchanged. Integration also includes the independently tested transaction-start
-session cleanup; that failure-path correction does not change the successful query paths measured here.
+session cleanup and exact repository-count validation on databases with case-insensitive collations.
+The latter uses bounded scalar keyset pages instead of SQL grouping. Its startup query count and
+cost differ from the measured version: the retained restart/readiness timings are observations of
+the original source, not a rerun of this follow-up. The follow-up also deletes projection keys
+selected by exact Java repository identity, coordinating SQL and Search removal in the same
+transaction. Retained purge/rebuild timings therefore describe the earlier removal implementation.
+Query, indexing and recovery results likewise retain their recorded source identity.
 
 From the repository root:
 

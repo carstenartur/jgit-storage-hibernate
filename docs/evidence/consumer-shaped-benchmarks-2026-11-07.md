@@ -13,7 +13,7 @@ They form a separate evidence series from the generic performance charts.
 
 The release checkout was [v0.12.0](https://github.com/carstenartur/jgit-storage-hibernate/tree/ba6aeecc338968df4279fb9c7c72b15bbb3577fb)
 and the current library source was [3bfa6af](https://github.com/carstenartur/jgit-storage-hibernate/tree/3bfa6aff12014b88424c48cf349e33c794e80765).
-The current library source passed all three [real-consumer contracts](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42410329161).
+The current library source at that measurement passed all three [real-consumer contracts](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42410329161).
 The nine-coordinate comparison and audio pressure run used the benchmark harness from
 local revision `25ce2ffda12263fb986a47a95bb1dc5e3985f88c`.
 The release reactor received byte-identical copies of the four fixture and runner sources.
@@ -24,9 +24,37 @@ Audio used Core with Search disabled and one optional worker retaining 32 MiB. T
 embedded HSQLDB and in-memory Lucene. Sandbox analyzed a filesystem Git snapshot with binding-aware JDT.
 
 The CSV keeps per-iteration counts. Blank fields identify metrics absent from that harness revision.
+The original [raw JMH JSON and logs](consumer-shaped-2026-11-07/manifest.json)
+are retained as gzip files, together with both historical harness source snapshots.
+The manifest records SHA-256 hashes of the uncompressed originals. Verify all 46
+normalized observations, allocation/GC data, and source hashes with:
+
+```bash
+python3 .github/scripts/verify-consumer-benchmark-evidence.py \
+  docs/evidence/consumer-shaped-2026-11-07/manifest.json
+```
+
 These runs establish operation and counter behavior. They do not establish comparative latency,
 production database log or network costs, or application compatibility. Compare exact-revision
 [real-consumer contract](../../.github/workflows/consumer-compatibility.yml) evidence before promoting
 a run into application performance history.
 
 The SHA-256 of the four concatenated harness sources was `6a762c0ca3772fc00148cdb2e79b8f1047157e4d858c4f88a19145c905dceca1` for smoke and pressure, and `72c3eac895ccf8a27671a141784159dbb89fb781e1c1f96543c98b13564c7a30` for large sandbox. Concatenate the generator, fixture test, runner test and benchmark class in that order.
+
+## Separately retained follow-up experiments
+
+The dashboard anchor still leads to this evidence index. Later experiments keep
+their own immutable source, cache conditions and raw data; they do not overwrite
+the original release/main comparison above.
+
+| Experiment | Retained evidence | Supported operational consequence |
+|---|---|---|
+| [Native Taxonomy PostgreSQL](consumer-taxonomy-postgres-2026-11-07/README.md) | Five JMH/native observations at each of calibrated 0/20 ms RTT, plus partial projection, reopen and recovery checks. | Use summary hits when hydration is unnecessary; retain bounded rebuild batches and a Git-authoritative recovery path. |
+| [Concurrent audio](consumer-audio-concurrency-2026-11-07/README.md) | 24 coordinates, 72 observations, one/four repositories, two writers and three chunk batches. | At a 32 MiB aggregate chunk budget across four repositories, batch 8 trades twelve JDBC batch executions for that explicit memory bound. Cache residency differs across repository counts. |
+| [Persisted sandbox projection](consumer-sandbox-persistence-2026-11-07/README.md) | Eight coordinates, 24 observations, 251/1,001-file head snapshots in a 1 GiB heap. | For a known dependency-free body edit, one-file replacement produces equivalent semantic facts with one transaction instead of 251/1,001. |
+
+These comparisons do not establish a universal production default or a release
+timing ranking for every follow-up profile. Exact-source consumer compatibility
+is a separate publication gate. The broader Taxonomy concurrent-publication
+workload and paired release/current/candidate runs for every new profile remain
+visible follow-up scope.

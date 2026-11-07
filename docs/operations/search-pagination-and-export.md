@@ -30,6 +30,25 @@ jgit.storage.hibernate.search.max_offset=20000
 
 A value of `0` allows only the first offset page. The property must be a non-negative integer.
 
+## Exact repository identity in structured queries
+
+Structured pages, summary cursors and `countIndexedCommits` distinguish stored repository names
+exactly, even when the database's ordinary string comparison ignores case or trailing spaces.
+The query retains `repository_name = :repo` as an indexable prefilter and applies an additional
+exact comparison inside SQL, before ordering, offset and limit. It does not traverse earlier
+pages in Java. Summary queries still select compact fields without loading the projection payload.
+
+The internal comparison uses `RAWTOHEX` on H2 and Oracle, exact character position plus length on
+HSQLDB, UTF-8 binary encoding on PostgreSQL, and `BIN2` plus byte length on SQL Server. Unsupported
+dialects fail explicitly on structured queries instead of relying on an unknown collation.
+These extra SQL expressions add database work for candidate rows; their performance cost has not
+been measured. The retained paging/export timings below predate this identity correction.
+
+`CommitHistoryQuery` continues to trim the caller's repository argument. A stored name with trailing
+spaces therefore cannot be addressed separately through that builder, but it cannot contribute
+rows to the normalized name's results. The raw-string count API preserves its argument. This
+correction does not change database uniqueness constraints or introduce a schema migration.
+
 ## Sequential export
 
 For a complete export, use a zero-offset query and opt in to an unbounded total result limit:

@@ -89,6 +89,31 @@ The consumer-shaped benchmark series tracks audio publication, Taxonomy
 history queries and sandbox Java analysis as separate synthetic workloads.
 [Consumer fixtures and results](benchmark-consumer-profiles.md)
 
+The follow-up experiments make three bounded operating decisions explicit:
+
+- [Concurrent audio publication](evidence/consumer-audio-concurrency-2026-11-07/README.md):
+  four 16 MiB publications with chunk batch 8 require twelve JDBC batch executions
+  and a 32 MiB aggregate configured chunk window. Batch 32 saves eight batch
+  executions while adding 96 MiB to that configured window. This is a payload
+  window budget, not a measured peak-heap bound. Unequal cache residency prevents
+  a pure one-versus-four concurrency timing comparison.
+- [Taxonomy on PostgreSQL](evidence/consumer-taxonomy-postgres-2026-11-07/README.md):
+  compact indexed summaries avoid the ten additional prepared statements seen
+  with entity hydration across ten workspaces. The 1,000-commit fixture also
+  verifies interrupted rebuild recovery and authoritative Git membership at
+  measured 2.194 and 20.634 ms median RTT. Single-shot timings do not establish
+  a stable query crossover or a larger-history recommendation.
+- [Persisted sandbox analysis](evidence/consumer-sandbox-persistence-2026-11-07/README.md):
+  a known dependency-free body edit needs one file analysis and one ORM
+  transaction, versus 251 or 1,001 file analyses and transactions for the full
+  replacement. Complete semantic equivalence is checked after each operation.
+  Dependency discovery, rename/move invalidation and a production projection
+  writer remain outside this benchmark-owned experiment.
+
+These observations retain their exact measured source and conditions. The final
+integration's compatibility checks do not relabel older measurements as a rerun
+of later fixes or as a complete release/main/candidate comparison.
+
 The table uses the existing complete protocol point estimates. “Reference efficiency” is `filesystem time / PostgreSQL time`; values above 100% mean only that PostgreSQL had the lower point estimate in that controlled run. Single-shot confidence intervals are wide.
 
 | Workload | Filesystem | PostgreSQL | PostgreSQL vs filesystem | Reference efficiency | Chart |
@@ -172,6 +197,16 @@ Deployment overrides remain useful:
 - regional 15–35 ms and sufficient heap: 32;
 - 35–60 ms, low writer concurrency: 50.
 
+## Adaptive pack publication
+
+The one-MiB size rule remains the default. An opt-in contention selector can move
+eligible sub-MiB payload writes outside the repository lock. Five paired
+PostgreSQL/Hikari forks with eight writers, 768 KiB payloads and about 5.8 ms RTT
+measured 39.9% higher shared-repository throughput (paired 95% interval +32.4% to
++47.9%). The independent-repository interval, −21.6% to +19.7%, still permits a
+material regression. The [policy comparison and raw evidence](evidence/pack-publication-2026-11-07/README.md)
+use tmpfs database storage and do not justify a default change.
+
 ## Automatic stateful/stateless threshold
 
 The focused PostgreSQL + HikariCP matrix uses the production batch window of 16 and verifies close/reopen SHA-256 integrity.
@@ -192,6 +227,14 @@ jgit.storage.hibernate.pack.stateless_min_payload_bytes=16777216
 ```
 
 Explicit `stateful` and `stateless` modes remain available for troubleshooting or deployment-specific policy. See [JDBC batching and pack-chunk writers](operations/jdbc-batching.md).
+
+## Staged chunk transfer experiment
+
+A bounded two-window prototype overlapped file reads with the existing
+chunk writer. The paced 128 MiB trial at 51 ms RTT reduced staged publication
+from 1,993 ms to 1,181 ms with a virtual reader, with an additional 16 MiB
+payload window. This measures the staged transfer and transaction commit.
+[Raw evidence and phase charts](evidence/staging-pipeline-2026-11-07/README.md)
 
 ## Durable receiver batching
 
@@ -271,6 +314,29 @@ at 10,000, 100,000 and 1,000,000 indexed commits. It compares offset pages,
 continuation on an open cursor, and the full cursor prefix.
 [History scroll and deep-offset charts](evidence/history-scroll-2026-11-07/README.md)
 
+All six database/size jobs completed, retaining 444 exports and 2,304 checked
+offset-page comparisons. Each export released its sessions and borrowed JDBC
+connections. The fixed-memory requirement remains open for Lucene: Hibernate
+Search can retain a growing ranked-hit buffer even when API chunks are bounded.
+A successful million-result run within a 2 GiB heap does not prove constant
+space. The structured-cursor transaction-start failure now closes its newly
+opened session and preserves the original exception, with a regression test.
+
+## Search runtime settings and recovery
+
+The [hosted runtime evidence](evidence/search-runtime-hosted-2026-11-07/README.md)
+retains the full synchronization/refresh, RAM-buffer/thread and transaction-batch
+families at 1,000 commits, plus 10,000-commit smoke cells with 50/500-event bursts
+and normal/constrained resources. The four successful PostgreSQL/Lucene jobs
+include persistent-index recovery and failure-handler checks. They preserve
+acknowledgement and search-visibility semantics as separate measurements.
+
+The safe `write-sync` reference remains unchanged. Repeated identical settings
+within the full run vary materially, so the evidence does not justify ranking
+small timing differences or promoting named production profiles. File/segment
+gauges are not exact refresh/merge event counts; queue saturation and a measured
+live-heap bound also require separate evidence.
+
 ## Byte amplification
 
 For the measured 16-MiB publication:
@@ -288,6 +354,13 @@ These counters exclude SQL framing, WAL, page writes, replication and physical s
 
 The [routing guide](operations/search-routing-and-topology.md) documents the opt-in mapping,
 offline index migration, repository-isolated purge/rebuild, and the single-writer boundary.
+Readiness, mutation and indexing checks preserve exact logical repository names when database
+collation equality includes another spelling. Structured reads apply an exact SQL comparison
+before offset/limit, while rebuild and deletion select exact projection keys and keep Search
+deletes in the owning transaction. Indexer collisions fail before skipping or changing another
+repository's projection. The additional comparison and scan costs have not been benchmarked;
+the retained measurements remain attached to their original source.
+
 The [large retained matrix](evidence/search-routing-large-2026-11-07/README.md) contains 48
 observations from six successful hosted jobs: 100,000 projections with baseline/1/2/4/8 shards
 and one million with baseline/1/8, each with stable Lucene and `lucene-next`. It covers one
@@ -311,12 +384,16 @@ scalability. [Measurement boundaries and reproducibility](evidence/search-routin
 
 | Issue area | Completed | Remaining |
 |---|---|---|
-| Adaptive direct/pre-persisted publication | Size-based one-MiB selector, path/payload diagnostics, deterministic fallback and regression coverage | A contention-aware selector has not shown enough evidence to replace the deterministic policy. |
+| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, opt-in bounded contention selector, path/payload diagnostics, schema-isolation regressions and retained paired PostgreSQL comparison | Independent-repository non-regression, the remaining payload/writer/RTT matrix and representative-storage evidence before any default change. |
+| [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Benchmark-only two-window prototype, cancellation/rollback/reopen tests and 27 retained native trials | Full Git publication, 512 MiB and multiwriter/storage comparisons, rollback latency and repeatable local non-regression; production stays synchronous. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
 | Repository aging/repack | Full PostgreSQL/SQL Server/HSQLDB age matrix, repeated provider-restart evidence, and manual maintenance guidance | Broader large-repository repeats and operational budgets before considering automatic scheduling. |
 | Stateful/stateless writer | 16/128/512 matrix, automatic 16-MiB threshold, explicit overrides and integrity tests | Networked concurrent 128/512-MiB validation may refine but is not required for the current safe fallback policy. |
-| Local Search routing | Opt-in mapping, routed queries, readiness guard, isolated purge/replay, local writer-lock recovery test and 48 large local observations | Repeated workload-specific crossover; million-document 2/4-shard cells and networked/multi-instance comparisons are outside this local matrix. |
+| [Search runtime settings (#196)](https://github.com/carstenartur/jgit-storage-hibernate/issues/196) | Four complete hosted cells, bounded configuration recipes, explicit durability/visibility contracts, tested failure handler and persistent-index crash/interruption recovery | Exact refresh/merge activity, queue saturation and peak-heap evidence; repeated measurements before any default or named-profile promotion. |
+| [Search routing and topology (#198)](https://github.com/carstenartur/jgit-storage-hibernate/issues/198) | Opt-in routing, exact repository isolation under database collations, transactional purge/replay, local writer-lock recovery, 48 large local observations and 42 remote burst/restart observations across 1/2/4 JVMs | Repeated workload-specific crossover, omitted million-document shard cells, large remote indexes and processor/backend outage recovery. |
+| [Consumer-shaped profiles (#211)](https://github.com/carstenartur/jgit-storage-hibernate/issues/211) | Three deterministic shapes, retained release/main evidence, native PostgreSQL lifecycle/RTT, concurrent audio and persisted sandbox experiments with explicit operating decisions | Larger native Taxonomy histories/concurrent publication, representative audio pressure and physical chunk comparisons, broader semantic invalidation, and exact-source compatibility/comparison evidence for each promoted series. |
+| [History scroll/export (#230)](https://github.com/carstenartur/jgit-storage-hibernate/issues/230) | PostgreSQL/SQL Server 10k/100k/1m matrix, checked ordering/membership, resource release, measured deep-offset guidance and transaction-start cleanup | A supported Lucene continuation that bounds retained hits while preserving snapshot/order semantics; native statement/wait and genuinely cold-cache measurements. |
 
 ## Current distance to the useful ceiling
 

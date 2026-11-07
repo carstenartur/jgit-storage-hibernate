@@ -11,6 +11,7 @@ package io.github.carstenartur.jgit.storage.hibernate.search.service;
 import io.github.carstenartur.jgit.storage.hibernate.RepositoryName;
 import io.github.carstenartur.jgit.storage.hibernate.search.RepositoryRoutingMappingConfigurer;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
+import io.github.carstenartur.jgit.storage.hibernate.search.internal.ExactRepositoryProjectionDeletion;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -284,36 +285,26 @@ public final class CommitProjectionRebuilder {
 
   private int removeExisting(RepositoryName repositoryName) throws InterruptedIOException {
     int removed = 0;
+    String after = null;
     while (true) {
       requireNotInterrupted();
-      int pageSize;
+      ExactRepositoryProjectionDeletion.Page page;
       try (Session session = sessionFactory.openSession()) {
         Transaction transaction = session.beginTransaction();
         try {
-          List<GitCommitIndex> projections =
-              session
-                  .createQuery(
-                      "FROM GitCommitIndex c WHERE c.repositoryName = :repo ORDER BY c.id",
-                      GitCommitIndex.class)
-                  .setParameter("repo", repositoryName.value())
-                  .setMaxResults(purgeBatchSize)
-                  .getResultList();
-          pageSize = projections.size();
-          if (pageSize > 0) {
-            session.setJdbcBatchSize(pageSize);
-            projections.forEach(session::remove);
-            session.flush();
-          }
+          page = ExactRepositoryProjectionDeletion.deletePage(
+              session, repositoryName.value(), after, purgeBatchSize);
           transaction.commit();
         } catch (RuntimeException exception) {
           transaction.rollback();
           throw exception;
         }
       }
-      removed += pageSize;
-      if (pageSize < purgeBatchSize) {
+      removed = Math.addExact(removed, page.removedRows());
+      if (page.scannedRows() < purgeBatchSize) {
         return removed;
       }
+      after = page.lastProjectionKey();
     }
   }
 

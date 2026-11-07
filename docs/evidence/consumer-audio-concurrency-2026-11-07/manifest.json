@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "harnessCommit": "30f569e97cd1dd703d707a7376dbb8060ec9d8fe",
+  "harnessTree": "ae73e90b8baf7736f8b5640ff078fd3afdb08fb6",
+  "profile": "audio-concurrent",
+  "database": "embedded HSQLDB 2.7.4",
+  "search": "disabled",
+  "heapMiB": 1024,
+  "cache": "prepared in-process, recent payloads may remain in the JGit block cache",
+  "network": "none",
+  "pressure": "32 MiB total working set, one CPU worker",
+  "gcScope": "whole iteration including lifecycle; not isolated operation allocation",
+  "compatibility": "Exact-source consumer contracts remain a hosted publication gate. This local experiment makes structural counter and bounded-budget conclusions only.",
+  "raw": {
+    "audio.json.gz": "74907aa4fa9e7286dc55171dadd80f63983b531375108eaf83247329a665b8af",
+    "audio.log.gz": "d5b99cd59705299e43a6ed65b244f0505a44125fab0c768050c7c612707b8fbf"
+  },
+  "harness": {
+    "ConsumerBenchmarkFixtures.java.gz": "75d0c808fe40e006e7ec51571bc687d5582048bd93edc2f0577ce82ec35b371c",
+    "ConsumerShapeBenchmark.java.gz": "f099de366437da67124e9748d3a1e18076428fc2b704f82e20e70dcb56dbbf53",
+    "ConsumerProfileBenchmarkTest.java.gz": "d99236ca2292ae5bae0f0917ecbc276fe46237a7e6893a5226aff06ddaf7098c",
+    "ConsumerAudioConcurrencyTest.java.gz": "97dc9148693b1f9efef6989e933ee55fe3c882848d1bea97fc669f0e956bf871"
+  },
+  "libraryModuleTrees": {
+    "jgit-storage-hibernate-core": "908b2b2fe6c29cee11b2997e296a481cdb7a8b91",
+    "jgit-storage-hibernate-search": "14db3138b502194b9558876b48158ebeb94772da",
+    "jgit-storage-hibernate-java-analysis": "30608349d417d48d71d03c29e663a6b702a466c9",
+    "jgit-storage-hibernate-benchmarks": "9bb4366afba719c7374344e0025c22fc13a1aa29"
+  }
+}
