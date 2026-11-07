@@ -604,6 +604,34 @@ public class RepositoryAgingBenchmark {
     }
   }
 
+  RepackReadSnapshot readRepackSnapshot() throws IOException {
+    Ref main = repository.exactRef("refs/heads/main");
+    try (ObjectReader reader = repository.newObjectReader()) {
+      return new RepackReadSnapshot(
+          main == null ? null : main.getObjectId(),
+          reader.open(oldestBlob, Constants.OBJ_BLOB).getBytes(PAYLOAD_BYTES),
+          reader.open(newestBlob, Constants.OBJ_BLOB).getBytes(PAYLOAD_BYTES));
+    }
+  }
+
+  RepackReadSnapshot expectedRepackSnapshot() {
+    return new RepackReadSnapshot(
+        headCommit, deterministicPayload(0), deterministicPayload(pushes - 1));
+  }
+
+  PackRepackResult compactAgedRepository() {
+    return new PackStorageMaintenance(provider.getSessionFactory())
+        .repack(new RepositoryName(repositoryName), PackRepackOptions.compactOnly());
+  }
+
+  RepackReadSnapshot reopenAndReadRepackSnapshot() throws Exception {
+    closeAndReopen();
+    verifyPersistedPackOrdering();
+    return readRepackSnapshot();
+  }
+
+  record RepackReadSnapshot(ObjectId main, byte[] oldest, byte[] newest) {}
+
   private long objectSize(ObjectId id) throws Exception {
     try (ObjectReader reader = repository.newObjectReader()) {
       ObjectLoader loader = reader.open(id, Constants.OBJ_BLOB);

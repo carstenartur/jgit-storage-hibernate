@@ -7,7 +7,7 @@ Long-lived repositories accumulate incremental packs. This page defines how the 
 The bounded smoke profile covers 1 and 10 deterministic incremental pushes on HSQLDB with a cold JGit block cache. The full manual/scheduled profile covers:
 
 - 1, 10, 32, 100, 300 and 1,000 pushes;
-- HSQLDB as a local reference, PostgreSQL with the built-in pool and HikariCP, and SQL Server;
+- HSQLDB as a local reference, two PostgreSQL configurations, and SQL Server;
 - cold and warm JGit cache states;
 - no maintenance, compact-only maintenance and read-optimized maintenance;
 - oldest, newest and missing-object lookup;
@@ -61,7 +61,12 @@ Together these files preserve all three repeat scores, mean, range, population s
 coefficient of variation, matching maintenance duration and the exact workflow run and artifact
 digest.
 
-## Completed full age matrix
+## Completed full age matrices
+
+The [2026-11-07 full matrix](../evidence/repository-aging-full-2026-11-07.md) retains all 1,152
+coordinates and charts. It includes SQL Server at all six ages and reproduces the PostgreSQL warm
+crossover direction between 100 and 300 pushes. The [manual decision](../evidence/repository-aging-full-2026-11-07.md#manual-operating-decision)
+combines measured degradation, fragmentation and payback for the expected reads.
 
 The [full 2026-09-04 matrix and corrected CSV](../evidence/repository-aging-full-2026-09-04.md)
 now retain all 864 coordinates for HSQLDB, PostgreSQL and PostgreSQL/HikariCP, including
@@ -171,15 +176,7 @@ capability report finds the extension.
 
 ## Remaining evidence before an automatic policy
 
-Issue #165 remains open. The completed restart, payback and cross-database correctness slices narrow
-the remaining work to broader quantitative policy evidence:
-
-- retain the first full SQL Server age matrix and independent repeats of the now-retained PostgreSQL/PostgreSQL+HikariCP matrix;
-- extend lifecycle-specific maintenance payback beyond the retained ten-push condition;
-- measure read latency while maintenance is actively consuming database, WAL/log, I/O and storage resources;
-- repeat SQL Server cold measurements or use a controlled production-like runner before relying on exact percentages;
-- derive a stable condition from pack count, small-pack ratio, index bytes, unreachable bytes, measured degradation and time since maintenance;
-- publish direct links from the public performance history to retained charts and raw evidence;
-- persist and reload the MIDX pack relationships safely across publication, repack and restart before comparing MIDX cost and read gains with full repack.
-
-Until then, operators should call `PackStorageMaintenance` explicitly and retain `PackRepackResult` together with application-level latency evidence.
+Automatic scheduling would require production-like repeats at the larger ages, including
+read-latency and resource budgets while maintenance is active. A separate MIDX comparison requires
+persisting and reloading the ordered pack relationships across publication, repack and restart.
+Operators can call `PackStorageMaintenance` explicitly using the measured manual decision above.

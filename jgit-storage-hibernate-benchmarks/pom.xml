@@ -348,6 +348,7 @@
             <configuration>
               <includes>
                 <include>**/PerformanceInvestigationsBenchmarkIT.java</include>
+                <include>**/RepositoryAgingRepackOverlapIT.java</include>
               </includes>
             </configuration>
             <executions>

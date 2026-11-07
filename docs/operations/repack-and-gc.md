@@ -65,7 +65,7 @@ Maintenance for different logical repositories uses different lock rows and can 
 
 The deterministic smoke fixture creates one fresh pack per incremental push, closes and reopens the repository, verifies persisted `committedAt` ordering and then compares no maintenance, compact-only maintenance and the read-optimized preset.
 
-The smoke profile covers 1 and 10 pushes. The scheduled and manually dispatched full profile covers 1, 10, 32, 100, 300 and 1,000 pushes, cold and warm JGit cache states, HSQLDB as a reference, PostgreSQL through both the built-in pool and HikariCP, and SQL Server. Its raw JMH JSON is converted into structural comparison and break-even evidence only after all coordinates are validated. The [retained full-age evidence](../evidence/repository-aging-full-2026-09-04.md) covers HSQLDB and both PostgreSQL pool variants; the full SQL Server result remains outstanding.
+The smoke profile covers 1 and 10 pushes. The scheduled and manually dispatched full profile covers 1, 10, 32, 100, 300 and 1,000 pushes, cold and warm JGit cache states, HSQLDB as a reference, two PostgreSQL configurations, and SQL Server. The [retained full-age evidence](../evidence/repository-aging-full-2026-11-07.md#charts) contains all 1,152 coordinates, with [query amplification](../evidence/repository-aging-full-2026-11-07.md#latency-and-query-amplification), [storage impact](../evidence/repository-aging-full-2026-11-07.md#storage-and-auxiliary-indexes), and [payback](../evidence/repository-aging-full-2026-11-07.md#maintenance-cost-and-payback).
 
 A separate protected-main profile closes and rebuilds the complete Hibernate `SessionFactory` and connection pool before measurement. Its first complete retained run covers PostgreSQL and SQL Server, cold and warm cache states and three independent repeats at ten pushes. It answers the restart/lifecycle question but does not replace the larger age axis.
 
@@ -124,7 +124,7 @@ For the retained `reopenAndLookupOldest` path, every maintenance result is paire
 
 Thus the cold ten-pack maintenance cost is repaid by roughly six equivalent reopens for compact-only and roughly seven to eight for read-optimized maintenance. The warm path never repays the maintenance in this fixture. The [payback decision record](../evidence/repository-aging-restart-payback-2026-09-04.md) retains the method and every paired input.
 
-The result therefore does **not** justify a universal automatic threshold. Maintenance can materially help cold reconstruction while regressing a warm path at the same pack count. The full SQL Server age results, independent larger-age repeats, and reader latency during active maintenance are still required before choosing an automatic policy.
+The full SQL Server age results show the same warm crossover direction as PostgreSQL between 100 and 300 pushes. At 1,000 pushes, compact-only maintenance repays its cost in three equivalent cold SQL Server reopens or 229 warm reopens. Those values use the same-provider lifecycle and describe a different condition from the ten-push provider-restart experiment.
 
 ## Generated policy evidence
 
@@ -140,16 +140,9 @@ A candidate is emitted only when the mode both removes packs and improves the me
 
 ## Resulting operational guidance
 
-- Do not repack a newly created or one-pack repository.
-- Do not trigger maintenance from pack count alone. Around ten small incremental packs, first check whether cold reopen, clone/fetch or index-memory behavior has measurably degraded.
-- Treat a predominantly warm repository separately: the retained ten-pack restart matrix shows that maintenance can regress an already warmed reopen path and therefore has no measured payback there.
-- For the measured cold reopen problem, expect approximately six equivalent reads to repay compact-only maintenance and roughly seven to eight to repay read-optimized maintenance; recalculate for the deployment rather than treating these fixture values as constants.
-- Prefer `compactOnly()` as the first intervention when the goal is simply fewer packs; it has lower maintenance and auxiliary-storage cost, while the cold reopen result is effectively tied with the read-optimized preset.
-- Use the read-optimized preset when clone/fetch negotiation or path-history workloads justify bitmap, commit-graph and Bloom-filter construction.
-- Trigger from a combination of lifecycle/cache state, active pack count, small-pack ratio, index bytes, unreachable bytes, measured lookup/fetch degradation and time since last maintenance—not from a single hard-coded count.
-- Keep automatic maintenance opt-in until repeated larger-scale PostgreSQL, PostgreSQL+HikariCP and SQL Server matrices establish stable breakpoints and read-payback.
+Use the [manual maintenance decision](../evidence/repository-aging-full-2026-11-07.md#manual-operating-decision) to compare current reads with the repository's own baseline, confirm fragmentation from the inventory, and price the expected read savings against maintenance cost. Match the cache state and operation to the deployment. For a one-pack repository the fixture creates more packs and stored bytes, and at 10–100 packs warm reopen is slower after maintenance. For those conditions, defer repack until another measured read or storage problem justifies it.
 
-A practical operator can record the condition before and after each maintenance run and retain `PackRepackResult` together with application latency. That deployment history is more reliable than assuming every repository has the same object mix and storage hardware.
+Begin with `compactOnly()` for a fragmentation or reopen problem. Use the read-optimized preset when measurements of clone/fetch negotiation or path history repay the cost of bitmap, commit-graph and Bloom-filter construction. Schedule explicit maintenance in a window with room for the measured read latency and storage activity. Keep the `PackRepackResult`, inventory, and workload latencies to validate the decision against the next maintenance cycle.
 
 ## Failure and recovery
 
