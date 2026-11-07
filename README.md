@@ -7,6 +7,7 @@
 [![JMH Workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml/badge.svg)](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/performance.yml)
 [![Java 21+](https://img.shields.io/badge/Java-21%2B-blue)](pom.xml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21210132.svg)](https://doi.org/10.5281/zenodo.21210132)
 
 ## Git history as indexed application knowledge
 
