@@ -151,4 +151,24 @@
       <plugin><artifactId>maven-javadoc-plugin</artifactId></plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>search-remote-outbox</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.hibernate.search</groupId>
+          <artifactId>hibernate-search-backend-elasticsearch</artifactId>
+          <version>${hibernate-search.version}</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.hibernate.search</groupId>
+          <artifactId>hibernate-search-mapper-orm-outbox-polling</artifactId>
+          <version>${hibernate-search.version}</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 </project>
