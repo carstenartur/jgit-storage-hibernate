@@ -32,21 +32,29 @@ class HistoryScrollExportBenchmarkTest {
         properties, directory.resolve("index"), output, 11, List.of(4), 1);
 
     List<String> exports = Files.readAllLines(output.resolve("exports.csv"));
-    assertEquals(3, exports.size(), "header and one full export per query path");
-    assertTrue(exports.get(1).startsWith("orm,11,4,1,11,3,"));
-    assertTrue(exports.get(2).startsWith("search,11,4,1,11,3,"));
+    assertEquals(11, exports.size(), "header, two reopened exports and eight warmed workloads");
+    assertTrue(exports.getFirst().contains("chunk_p99_upper_ns"));
+    assertTrue(exports.getFirst().contains("heap_after_gc_bytes"));
+    assertTrue(
+        exports.stream().anyMatch(line -> line.startsWith("orm,repository,reopened,11,4,1,11,3,")));
+    assertTrue(
+        exports.stream()
+            .anyMatch(line -> line.startsWith("search,indexed-export,reopened,11,4,1,11,3,")));
+    assertTrue(exports.stream().anyMatch(line -> line.startsWith("search,path,warm,11,4,1,6,2,")));
+    assertTrue(exports.stream().anyMatch(line -> line.startsWith("orm,author,warm,11,4,1,4,1,")));
+    assertTrue(exports.stream().anyMatch(line -> line.startsWith("search,rare,warm,11,4,1,1,1,")));
+    assertTrue(exports.stream().anyMatch(line -> line.startsWith("search,empty,warm,11,4,1,0,0,")));
 
     List<String> pages = Files.readAllLines(output.resolve("offsets.csv"));
-    assertEquals(7, pages.size(), "three nonempty pages per query path");
-    for (String engine : List.of("orm", "search")) {
+    for (String prefix : List.of("orm,repository", "search,indexed-export")) {
       String[] deepPage =
           pages.stream()
-              .filter(line -> line.startsWith(engine + ",11,4,1,8,3,"))
+              .filter(line -> line.startsWith(prefix + ",warm,11,4,1,8,3,"))
               .findFirst()
               .orElseThrow()
               .split(",");
-      assertEquals("0".repeat(39) + "1", deepPage[9]);
-      assertEquals("0".repeat(39) + "3", deepPage[10]);
+      assertEquals("0".repeat(39) + "1", deepPage[11]);
+      assertEquals("0".repeat(39) + "3", deepPage[12]);
     }
 
     Properties metadata = new Properties();

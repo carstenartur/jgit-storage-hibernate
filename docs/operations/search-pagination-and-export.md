@@ -59,7 +59,7 @@ The cursor returns the lightweight `CommitSearchHit` projection rather than hydr
 
 `CommitSearchCursor` is `AutoCloseable`. Always use try-with-resources when the caller may stop before exhaustion. Reaching the end, an exception, or thread interruption closes the underlying cursor automatically. Thread interruption is reported as `CancellationException`, and the interrupted status is preserved.
 
-The Search-backed path uses Hibernate Search's stateful scroll API. Structured-only queries use one forward-only Hibernate ORM result cursor. Both paths retain only a bounded result chunk in application memory instead of accumulating the complete export.
+The Search-backed path uses Hibernate Search's stateful scroll API. Structured-only queries use one forward-only Hibernate ORM result cursor. Each call returns at most one configured chunk. Hibernate Search's Lucene backend can grow an internal ranked-hit buffer during traversal. ORM buffering depends on the JDBC driver. Consume each returned chunk before requesting the next so the caller retains only the current chunk.
 
 ## Ordering and consistency
 
@@ -77,25 +77,95 @@ The scrolling API intentionally rejects a non-zero query offset. Combining a dee
 
 ## Benchmark evidence
 
-The manual [History Scroll and Export Benchmark](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/history-scroll-export.yml) runs separate PostgreSQL 17 and SQL Server 2022 Testcontainers jobs. Select 10,000, 100,000, or 1,000,000 projected commits per run. It applies the normal schema migrations and seeds deterministic projections in bounded batches. Both repository-only ORM queries and exact-path Lucene queries traverse the same full export, with tied timestamps and a matching row in a second repository to check ordering and isolation.
+The History Scroll and Export Benchmark runs PostgreSQL 17.10 and SQL Server
+2022 CU20 Testcontainers jobs with the normal schema migrations. Pull requests
+that touch the runner or cursor run the 10,000-commit fixture with one warm
+trial per coordinate. To measure 10,000, 100,000 and 1,000,000 commits on both
+engines, dispatch the workflow with `documents=all` or push an exact benchmark
+commit to a branch named `benchmark/history-scroll-full-*`. A manual run can
+also select one exact size. The full matrix uses three warm trials per
+coordinate and separate artifacts for each database and size.
+[Benchmark workflow](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/history-scroll-export.yml)
 
-Each job reopens the filesystem Lucene index with a new Hibernate session factory and warms the query shapes. It repeats exports with chunks of 25, 100 and 500 and compares them with nonempty offset pages at the start, first continuation, midpoint, end and near the default guard, when those windows exist. It checks the default guard before raising it on the disposable comparison factory. The 10,000-row fixture has no nonempty offset beyond the guard; use the larger fixtures to collect those observations.
+Each fixture uses tied timestamps, a matching row in another repository, and
+the following filters. The runner checks the complete projected row and order
+against a deterministic oracle for every export and sampled page. The oracle
+walks the fixture one row at a time.
 
-The artifact includes:
+| Filter | API path | Fixture selectivity |
+| --- | --- | --- |
+| Repository | ORM | All rows |
+| Repository and common exact path | Lucene | All rows |
+| Repository and selected exact path | Lucene | About half |
+| Repository and author | ORM | About one third |
+| Repository and recent time range | ORM | About one quarter |
+| Repository, exact path, author and time range | Lucene | About one twenty-fourth |
+| Repository and rare exact path | Lucene | About one in 997 |
+| Repository and unmatched exact basename | Lucene | Empty |
 
-- `exports.csv`: time until the first chunk is available, summed cursor API time, wall time and rows per second for the validated export, GC deltas, sampled used heap, and Hibernate session, JDBC connection and completed-transaction counts.
-- `offsets.csv`: one offset page's latency, latency of the corresponding cursor chunk (later chunks continue an already open cursor), and summed cursor API time to reach that chunk from the start. Each compared window checks every projected hit and records the first and last object IDs.
-- `environment.properties` and `cpu.txt`: database and driver versions, JVM, heap, CPU and runner, fixture version, offset bounds and source commit.
+For each shape, warm runs exercise chunks of 25, 100 and 500. Before warming,
+each full export path also gets a first-query trial on a freshly opened
+Hibernate session factory. This reopens the persisted index and leaves the
+database process and OS caches in place.
 
-With Java 21+, Maven and Docker, run the same benchmark locally, replacing `postgresql` with `sqlserver` for the other database:
+The artifact contains:
+
+- `exports.csv` with time until the first row is available in the first
+  returned chunk, cursor API time, total wall time, rows/second, approximate
+  per-chunk p50/p95/p99 and GC deltas. The percentiles are upper bounds from a
+  fixed-memory histogram, and zero denotes that an empty result had no
+  nonempty chunk.
+- Resource columns in `exports.csv` show the observed heap peak and process
+  heap before and after requesting explicit GC outside the timed window.
+  They also show open Hibernate sessions and borrowed JDBC connections before,
+  during and after traversal, along with cumulative completed-transaction
+  counters. The harness enforces a one-chunk result limit, one cursor session,
+  one JDBC borrow for ORM only, and release on exhaustion, early close and
+  interruption. The 2 GiB JVM cap is a process budget for these jobs. Process
+  heap samples cannot establish a constant memory bound for the Lucene
+  backend's ranked hits or distinguish cursor memory from other live objects.
+- `offsets.csv` with validated pages at shallow and deep positions, including
+  just below, at and beyond the configured default guard when those windows
+  exist. The benchmark verifies rejection at 10,001 on a factory with the
+  default guard and raises the guard on the disposable comparison factory.
+- `comparisons.csv` and `comparison.md` with median latency for the offset
+  page, the corresponding chunk on an already open cursor, and cursor API time
+  to reach that chunk from the start. The report identifies the first sampled
+  position where each comparison favored the cursor. Each threshold applies to
+  the sampled windows and may vary at later offsets. The 10,000-commit export
+  ends before any nonempty page beyond the guard.
+- `environment.properties` and `cpu.txt` with database and JDBC versions,
+  JVM, heap, CPU and runner, fixture version, guard values and source commit.
+
+Use a single offset page for random access if the cost to traverse the prefix
+exceeds the measured page cost. For an ongoing sequential export, compare
+the page with the already-open chunk. Start with the API's current
+100-row chunk and compare the 25- and 500-row results against your latency and
+heap targets before changing it. A database-specific chunk recommendation
+needs the repeated results from both engines. The SQL Server driver uses
+adaptive buffering by default, while PostgreSQL uses the positive JDBC fetch
+size in the ORM cursor transaction.
+[SQL Server adaptive buffering](https://learn.microsoft.com/en-us/sql/connect/jdbc/using-adaptive-buffering)
+
+With Java 21+, Maven and Docker, run one cell locally:
 
 ```bash
+evidence="$PWD/target/history-scroll"
 mvn -B -pl jgit-storage-hibernate-search -am test \
   -Dtest=HistoryScrollExportBenchmarkIT -Dsurefire.failIfNoSpecifiedTests=false \
   -Djacoco.skip=true -DargLine="-Xms1g -Xmx2g" \
   -Dbenchmark.scroll.backend=postgresql -Dbenchmark.scroll.documents=10000 \
-  -Dbenchmark.scroll.output="$PWD/target/history-scroll" \
+  -Dbenchmark.scroll.output="$evidence" \
   -Dbenchmark.commit="$(git rev-parse HEAD)"
+python3 .github/scripts/summarize-history-scroll-export.py "$evidence" \
+  --documents 10000 --repetitions 3
 ```
 
-The harness checks cleanup on exhaustion, early close and interruption. These runs warm the application after reopening its session factory; they do not restart the database or clear filesystem caches. Heap figures are observations before, during and immediately after the export, without forcing GC, so they cannot establish retained heap or a memory budget. A sampled offset page is useful for random access; compare it with cursor prefix time for that use case, and with cursor chunk time when the cursor is already open. The H2 fixture exercises the harness as a correctness test. The broader selectivity matrix, chunk latency percentiles, native database plans, retained heap measurements and crossover conclusions remain tracked in [#230](https://github.com/carstenartur/jgit-storage-hibernate/issues/230).
+The benchmark compares a single offset page with two cursor costs and leaves
+repeated deep offset scans, native statement-plan and wait measurements,
+database restart trials and dashboard publication tracked in #230. Hibernate
+Search exposes a snapshot-consistent scroll and separate offset queries.
+Replacing the scroll with multiple public query calls would change the
+consistency contract as the index changes.
+[Hibernate Search scrolling contract](https://docs.hibernate.org/search/8.4/reference/en-US/html_single/#search-dsl-query-scroll)
+[Scalability issue #230](https://github.com/carstenartur/jgit-storage-hibernate/issues/230)
