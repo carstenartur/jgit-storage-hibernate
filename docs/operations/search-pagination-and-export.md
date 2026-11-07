@@ -74,3 +74,28 @@ A scrolling cursor represents one sequential traversal. Changes indexed after th
 Use offset/limit when a person moves among a small number of UI pages and random access to a nearby page is useful. Use scrolling when the application consumes many results in order, writes an export, feeds a batch processor, or would otherwise request progressively larger offsets.
 
 The scrolling API intentionally rejects a non-zero query offset. Combining a deep initial offset with a cursor would retain the expensive part of offset pagination while obscuring it behind an export-oriented API.
+
+## Benchmark evidence
+
+The manual [History Scroll and Export Benchmark](https://github.com/carstenartur/jgit-storage-hibernate/actions/workflows/history-scroll-export.yml) runs separate PostgreSQL 17 and SQL Server 2022 Testcontainers jobs. Select 10,000, 100,000, or 1,000,000 projected commits per run. It applies the normal schema migrations and seeds deterministic projections in bounded batches. Both repository-only ORM queries and exact-path Lucene queries traverse the same full export, with tied timestamps and a matching row in a second repository to check ordering and isolation.
+
+Each job reopens the filesystem Lucene index with a new Hibernate session factory and warms the query shapes. It repeats exports with chunks of 25, 100 and 500 and compares them with nonempty offset pages at the start, first continuation, midpoint, end and near the default guard, when those windows exist. It checks the default guard before raising it on the disposable comparison factory. The 10,000-row fixture has no nonempty offset beyond the guard; use the larger fixtures to collect those observations.
+
+The artifact includes:
+
+- `exports.csv`: time until the first chunk is available, summed cursor API time, wall time and rows per second for the validated export, GC deltas, sampled used heap, and Hibernate session, JDBC connection and completed-transaction counts.
+- `offsets.csv`: one offset page's latency, latency of the corresponding cursor chunk (later chunks continue an already open cursor), and summed cursor API time to reach that chunk from the start. Each compared window checks every projected hit and records the first and last object IDs.
+- `environment.properties` and `cpu.txt`: database and driver versions, JVM, heap, CPU and runner, fixture version, offset bounds and source commit.
+
+With Java 21+, Maven and Docker, run the same benchmark locally, replacing `postgresql` with `sqlserver` for the other database:
+
+```bash
+mvn -B -pl jgit-storage-hibernate-search -am test \
+  -Dtest=HistoryScrollExportBenchmarkIT -Dsurefire.failIfNoSpecifiedTests=false \
+  -Djacoco.skip=true -DargLine="-Xms1g -Xmx2g" \
+  -Dbenchmark.scroll.backend=postgresql -Dbenchmark.scroll.documents=10000 \
+  -Dbenchmark.scroll.output="$PWD/target/history-scroll" \
+  -Dbenchmark.commit="$(git rev-parse HEAD)"
+```
+
+The harness checks cleanup on exhaustion, early close and interruption. These runs warm the application after reopening its session factory; they do not restart the database or clear filesystem caches. Heap figures are observations before, during and immediately after the export, without forcing GC, so they cannot establish retained heap or a memory budget. A sampled offset page is useful for random access; compare it with cursor prefix time for that use case, and with cursor chunk time when the cursor is already open. The H2 fixture exercises the harness as a correctness test. The broader selectivity matrix, chunk latency percentiles, native database plans, retained heap measurements and crossover conclusions remain tracked in [#230](https://github.com/carstenartur/jgit-storage-hibernate/issues/230).

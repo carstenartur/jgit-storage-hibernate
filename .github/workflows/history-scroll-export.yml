@@ -1,0 +1,68 @@
+name: History Scroll and Export Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      documents:
+        description: Projected commits per database
+        type: choice
+        required: true
+        default: '10000'
+        options:
+          - '10000'
+          - '100000'
+          - '1000000'
+
+permissions:
+  contents: read
+
+jobs:
+  scroll-export:
+    name: ${{ matrix.backend }} / ${{ inputs.documents }} documents
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [postgresql, sqlserver]
+    env:
+      BENCHMARK_BACKEND: ${{ matrix.backend }}
+      BENCHMARK_DOCUMENTS: ${{ inputs.documents }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Compare cursor exports and offset pages
+        shell: bash
+        run: |
+          set -o pipefail
+          evidence="$GITHUB_WORKSPACE/target/history-scroll"
+          mkdir -p "$evidence"
+          lscpu > "$evidence/cpu.txt"
+          mvn -B -pl jgit-storage-hibernate-search -am test \
+            -Dtest=HistoryScrollExportBenchmarkIT \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Djacoco.skip=true -DargLine="-Xms1g -Xmx2g" \
+            -Dbenchmark.scroll.backend="$BENCHMARK_BACKEND" \
+            -Dbenchmark.scroll.documents="$BENCHMARK_DOCUMENTS" \
+            -Dbenchmark.scroll.output="$evidence" \
+            -Dbenchmark.commit="$GITHUB_SHA" 2>&1 | tee "$evidence/maven.log"
+          test -s "$evidence/exports.csv"
+          test -s "$evidence/offsets.csv"
+          test -s "$evidence/environment.properties"
+
+      - name: Upload raw benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: history-scroll-${{ matrix.backend }}-${{ inputs.documents }}
+          path: target/history-scroll/
+          if-no-files-found: error
