@@ -1,0 +1,148 @@
+name: Consumer-shaped Benchmarks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/consumer-profile-benchmarks.yml'
+      - 'jgit-storage-hibernate-benchmarks/src/**/Consumer*Benchmark*.java'
+      - 'pom.xml'
+      - 'jgit-storage-hibernate-benchmarks/pom.xml'
+      - 'jgit-storage-hibernate-core/pom.xml'
+      - 'jgit-storage-hibernate-search/pom.xml'
+      - 'jgit-storage-hibernate-java-analysis/pom.xml'
+      - 'jgit-storage-hibernate-core/src/main/**'
+      - 'jgit-storage-hibernate-search/src/main/**'
+      - 'jgit-storage-hibernate-java-analysis/src/main/**'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Fixture matrix
+        required: true
+        type: choice
+        options:
+          - smoke
+          - large
+      library-ref:
+        description: Optional approved release tag or full commit SHA from canonical main
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: ${{ matrix.shape }} synthetic fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        shape: [audio, taxonomy, sandbox]
+    env:
+      SHAPE: ${{ matrix.shape }}
+      PROFILE: ${{ inputs.profile || 'smoke' }}
+      LIBRARY_REF: ${{ inputs.library-ref }}
+      LIBRARY_DIR: ${{ inputs.library-ref != '' && 'compared-library' || '.' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checkout canonical comparison history
+        if: env.LIBRARY_REF != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: carstenartur/jgit-storage-hibernate
+          ref: refs/heads/main
+          fetch-depth: 0
+          path: compared-library
+          persist-credentials: false
+      - name: Verify and checkout the comparison revision
+        if: env.LIBRARY_REF != ''
+        working-directory: compared-library
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$LIBRARY_REF" in
+            v0.12.0)
+              revision="$(git rev-parse --verify 'refs/tags/v0.12.0^{commit}')"
+              if [[ "$revision" != ba6aeecc338968df4279fb9c7c72b15bbb3577fb ]]; then
+                echo "Release tag does not match its approved commit" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              if [[ ! "$LIBRARY_REF" =~ ^[0-9a-f]{40}$ ]] ||
+                 ! git merge-base --is-ancestor "$LIBRARY_REF" HEAD 2>/dev/null; then
+                echo "Use an approved release tag or a full commit SHA reachable from canonical main" >&2
+                exit 1
+              fi
+              revision="$LIBRARY_REF"
+              ;;
+          esac
+          git checkout --detach "$revision"
+      - name: Use the same fixture harness across library revisions
+        if: env.LIBRARY_REF != ''
+        run: |
+          base=jgit-storage-hibernate-benchmarks/src
+          package=java/io/github/carstenartur/jgit/storage/hibernate/benchmark
+          cp "$base/main/$package/ConsumerBenchmarkFixtures.java" "$LIBRARY_DIR/$base/main/$package/"
+          for source in ConsumerBenchmarkFixturesTest ConsumerShapeBenchmark ConsumerProfileBenchmarkTest; do
+            cp "$base/test/$package/$source.java" "$LIBRARY_DIR/$base/test/$package/"
+          done
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: ${{ env.LIBRARY_REF == '' && 'maven' || '' }}
+      - name: Run deterministic fixtures and consumer benchmarks
+        working-directory: ${{ env.LIBRARY_DIR }}
+        run: |
+          mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am test \
+            -Dtest=ConsumerBenchmarkFixturesTest,ConsumerProfileBenchmarkTest \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dconsumer.profiles.run=true -Dconsumer.profiles.shape="$SHAPE" \
+            -Dconsumer.profiles.matrix="$PROFILE" \
+            -Dconsumer.profiles.output="$GITHUB_WORKSPACE/target/consumer-profiles"
+      - name: Record exact fixture provenance
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          root = Path("target/consumer-profiles")
+          shape = os.environ["SHAPE"]
+          results = json.loads((root / f"{shape}.json").read_text())
+          metadata = {
+              "schemaVersion": 1,
+              "fixtureKind": "consumer-shaped",
+              "fixtureProfile": os.environ["PROFILE"],
+              "consumerShape": {"audio": "audio-analyzer", "taxonomy": "Taxonomy", "sandbox": "sandbox"}[shape],
+              "harnessSha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "checkoutSha": subprocess.check_output(
+                  ["git", "-C", os.environ["LIBRARY_DIR"], "rev-parse", "HEAD"], text=True
+              ).strip(),
+              "libraryRef": os.environ["LIBRARY_REF"] or None,
+              "workflowRunId": os.environ["GITHUB_RUN_ID"],
+              "workflowRunAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "compatibilityWorkflow": "consumer-compatibility.yml",
+              "database": "embedded HSQLDB" if shape != "sandbox" else None,
+              "index": "in-memory Lucene" if shape == "taxonomy" else None,
+              "network": "none",
+              "cache": "fixtures prepared in the same process before measurement",
+              "operations": sorted({result["benchmark"].rsplit(".", 1)[-1] for result in results}),
+          }
+          (root / "fixture.json").write_text(json.dumps(metadata, indent=2) + "\n")
+          PY
+      - name: Upload raw consumer fixture results
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-shaped-${{ matrix.shape }}-${{ inputs.profile || 'smoke' }}
+          path: |
+            target/consumer-profiles/${{ matrix.shape }}.json
+            target/consumer-profiles/${{ matrix.shape }}.log
+            target/consumer-profiles/fixture.json
+          if-no-files-found: error
