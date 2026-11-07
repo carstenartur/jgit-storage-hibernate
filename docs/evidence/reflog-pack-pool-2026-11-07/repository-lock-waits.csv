@@ -1,0 +1,7 @@
+coordinate,timestamp_utc,wait_ms,relation
+shared-s2-p4-w4-rtt20-m13-r1-pack,2026-11-07T20:50:20.554000+00:00,58.156,git_repository_lock
+shared-s2-p2-w4-rtt20-m13-r1-pack,2026-11-07T20:50:52.621000+00:00,76.603,git_repository_lock
+shared-s2-p2-w4-rtt20-m13-r2-pack,2026-11-07T20:51:43.876000+00:00,64.919,git_repository_lock
+shared-s2-p4-w4-rtt20-m13-r2-pack,2026-11-07T20:51:52.196000+00:00,54.180,git_repository_lock
+shared-s2-p2-w4-rtt20-m13-r3-pack,2026-11-07T20:52:18.383000+00:00,67.248,git_repository_lock
+shared-s2-p4-w4-rtt20-m13-r3-pack,2026-11-07T20:52:48.217000+00:00,79.249,git_repository_lock

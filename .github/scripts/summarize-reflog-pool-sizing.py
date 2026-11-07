@@ -49,6 +49,7 @@ def run_id(c):
     return (
         f"{c['scope']}-s{c['stripes']}-p{c['pool']}-w{c['producers']}"
         f"-rtt{c['rtt']}-m{c['message']}-r{c['repeat']}"
+        + ("-" + c["workload"] if "workload" in c else "")
     )
 
 
@@ -56,10 +57,16 @@ def validate(root):
     with (root / "plan.csv").open(encoding="utf-8", newline="") as stream:
         plan = {}
         for values in csv.reader(line for line in stream if not line.startswith("#")):
+            if not values:
+                continue
             run = {
                 name: value if name == "scope" else int(value)
-                for name, value in zip(AXES, values, strict=True)
+                for name, value in zip(AXES, values[:len(AXES)], strict=True)
             }
+            if len(values) != len(AXES):
+                require(len(values) == len(AXES) + 1 and values[-1] in ("control", "pack"),
+                        "Mixed trials must specify control or pack")
+                run["workload"] = values[-1]
             key = run_id(run)
             require(key not in plan, f"Duplicate plan row: {key}")
             plan[key] = run
@@ -81,6 +88,18 @@ def validate(root):
         "Mixed source revisions or PostgreSQL versions",
     )
 
+    mixed = any("workload" in run for run in plan.values())
+    if mixed:
+        require(all("workload" in run for run in plan.values()),
+                "Keep the mixed and reflog-only sizing profiles in separate plans")
+        timeline = group_csv(root, "mixed-ack-timeline.csv")
+        publications = group_csv(root, "pack-publications.csv")
+        pack_borrows = group_csv(root, "pack-borrows.csv")
+        require(timeline.keys() == plan.keys(), "Missing or unexpected acknowledgement timeline")
+        pack_runs = {key for key, run in plan.items() if run["workload"] == "pack"}
+        require(publications.keys() == pack_borrows.keys() == pack_runs,
+                "Pack evidence must cover exactly the pack trials")
+
     for key, run in plan.items():
         n = native[key]
         c = n["coordinate"]
@@ -96,6 +115,8 @@ def validate(root):
         ):
             require(int(c[source]) == run[dest], f"{key}: {source} does not match plan")
         require(c["repositoryScope"] == run["scope"], f"{key}: unexpected layout")
+        if mixed:
+            require(c["workload"].lower() == run["workload"], f"{key}: unexpected workload")
         require(
             n["backend"] == "postgresql"
             and n["serverVersion"].split()[0] == "17.10"
@@ -207,7 +228,104 @@ def validate(root):
                 f"{key}: acknowledgements do not form whole batches")
         histogram = Counter({size: count // size for size, count in sizes.items()})
         require(sum(histogram.values()) == len(p), f"{key}: wrong measured batch count")
+        if mixed:
+            row.update(mixed_metrics(key, run, a, acks, borrows, timeline[key],
+                                     publications, pack_borrows, int(c["elapsedNanos"])))
         yield row, histogram
+
+
+def mixed_metrics(key, run, acknowledgements, all_acknowledgements, reflog_borrows,
+                  timeline, publications, pack_borrows, reflog_elapsed):
+    def coordinate(row):
+        return row["producer"], row["ordinal"]
+
+    submissions = {coordinate(row): row for row in timeline}
+    require(len(submissions) == len(timeline) == len(acknowledgements),
+            f"{key}: missing or duplicate timed submissions")
+    for ack in acknowledgements:
+        sample = submissions[coordinate(ack)]
+        started = sample["submitted_offset_nanos"]
+        completed = sample["completed_offset_nanos"]
+        require(0 <= started < completed <= reflog_elapsed and completed - started == ack["ack_nanos"],
+                f"{key}: inconsistent submission interval")
+        if ack["ordinal"] > 0:
+            previous = submissions[(ack["producer"], ack["ordinal"] - 1)]
+            require(previous["completed_offset_nanos"] <= started,
+                    f"{key}: producer issued a command before its previous acknowledgement")
+
+    result = {
+        "pack_flush_ms": "",
+        "pack_hold_sum_ms": "",
+        "pack_checkout_count": "",
+        "pack_checkout_max_ms": "",
+        "pack_payload_bytes": "",
+        "pack_committed_chunks": "",
+        "pack_cold_read_bytes": "",
+        "overlapping_ack_count": "",
+        "overlapping_ack_p95_ms": "",
+        "matched_control_ack_p95_ms": "",
+        "overlapping_ack_checkout_paired_count": "",
+        "overlapping_ack_checkout_p95_ms": "",
+        "matched_control_ack_checkout_paired_count": "",
+        "matched_control_ack_checkout_p95_ms": "",
+    }
+    if run["workload"] == "control":
+        return result
+
+    require(len(publications[key]) == 1, f"{key}: expected exactly one pack publication")
+    pack = publications[key][0]
+    started = pack["started_offset_nanos"]
+    completed = pack["completed_offset_nanos"]
+    holds = pack_borrows[key]
+    require(0 <= started < completed and pack["payload_bytes"] == (8 << 20) + 257
+            and pack["committed_chunks"] >= 8 and pack["reopen_read_bytes"] >= pack["payload_bytes"],
+            f"{key}: invalid chunked publication or cold verification")
+    require(holds and all(
+        started <= hold["acquired_offset_nanos"] < hold["acquired_offset_nanos"] + hold["hold_nanos"]
+        <= completed and hold["acquisition_nanos"] >= 0 for hold in holds
+    ), f"{key}: invalid publisher checkout")
+    overlap = {
+        coordinate(ack) for ack in timeline if any(
+            ack["submitted_offset_nanos"] < hold["acquired_offset_nanos"] + hold["hold_nanos"]
+            and ack["completed_offset_nanos"] > hold["acquired_offset_nanos"] for hold in holds
+        )
+    }
+    require(len(overlap) == pack["overlapping_acknowledgements"] > 0,
+            f"{key}: missing or inconsistent overlap")
+    control = run_id({**run, "workload": "control"})
+    require(control in all_acknowledgements, f"{key}: missing matched reflog-only control")
+    exposed = [ack for ack in acknowledgements if coordinate(ack) in overlap]
+    matched = [ack for ack in all_acknowledgements[control] if coordinate(ack) in overlap]
+    require(len(exposed) == len(matched) == len(overlap), f"{key}: unmatched control submissions")
+
+    def paired_checkout_summary(trial, samples):
+        by_batch = {row["batch_id"]: row for row in reflog_borrows[trial]}
+        observations = [by_batch[ack["batch_id"]] for ack in samples if ack["batch_id"] in by_batch]
+        if not observations:
+            return 0, ""
+        return len(observations), milliseconds(
+            percentile(observations, 95, "acquisition_nanos")["acquisition_nanos"]
+        )
+
+    exposed_checkout_count, exposed_checkout_p95 = paired_checkout_summary(key, exposed)
+    control_checkout_count, control_checkout_p95 = paired_checkout_summary(control, matched)
+    result.update(
+        pack_flush_ms=milliseconds(completed - started),
+        pack_hold_sum_ms=milliseconds(sum(hold["hold_nanos"] for hold in holds)),
+        pack_checkout_count=len(holds),
+        pack_checkout_max_ms=milliseconds(max(hold["acquisition_nanos"] for hold in holds)),
+        pack_payload_bytes=pack["payload_bytes"],
+        pack_committed_chunks=pack["committed_chunks"],
+        pack_cold_read_bytes=pack["reopen_read_bytes"],
+        overlapping_ack_count=len(overlap),
+        overlapping_ack_p95_ms=milliseconds(percentile(exposed, 95, "ack_nanos")["ack_nanos"]),
+        matched_control_ack_p95_ms=milliseconds(percentile(matched, 95, "ack_nanos")["ack_nanos"]),
+        overlapping_ack_checkout_paired_count=exposed_checkout_count,
+        overlapping_ack_checkout_p95_ms=exposed_checkout_p95,
+        matched_control_ack_checkout_paired_count=control_checkout_count,
+        matched_control_ack_checkout_p95_ms=control_checkout_p95,
+    )
+    return result
 
 
 def render(rows, histograms, output):
@@ -332,6 +450,7 @@ def main():
         for row in rows:
             writer.writerow({k: f"{v:.6f}" if isinstance(v, float) else v for k, v in row.items()})
     if args.charts:
+        require("workload" not in rows[0], "--charts requires the standard reflog-only sizing plan")
         render(rows, {r["id"]: c for r, c in zip(rows, counters, strict=True)}, output)
     print(f"Validated {len(rows)} runs, {sum(row['ack_count'] for row in rows):,} acknowledgements, "
           f"{sum(row['transactions'] for row in rows):,} transactions.")

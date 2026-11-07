@@ -90,11 +90,43 @@ delay in the shaped runs. The largest tested message is one reflog record of
 2,000 characters, at the field limit.
 
 Separate studies measure chunked publication under different layout, network
-and staging conditions. The combined workload of chunked publication and
-reflog projection needs its own shared-pool measurement. [Pack layout and
-concurrency](pack-storage-layout.md) · [Network latency and chunk
-batching](network-latency-and-chunk-batching.md) · [Staging and JDBC
-evidence](staging-jdbc-evidence.md)
+and staging conditions. [Pack layout and concurrency](pack-storage-layout.md)
+· [Network latency and chunk batching](network-latency-and-chunk-batching.md)
+· [Staging and JDBC evidence](staging-jdbc-evidence.md)
+
+## Chunked publication on the same pool
+
+Four closed-loop reflog producers used two stripes and shared a Hikari
+pool and a SessionFactory with one staged 8 MiB chunked pack publication.
+Each pack trial has a reflog-only control. The table compares the requests
+whose lifetime intersected a pack checkout with the same producer and
+command ordinals in the matching control. Values are medians of three
+trial p95s. [Fixture and raw evidence](../evidence/reflog-pack-pool-2026-11-07/README.md)
+
+| Requested RTT | Repository layout | Hikari slots | Control acknowledgement p95 | Overlap acknowledgement p95 | Overlap checkout p95 |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 0 ms | Independent | 2 | 6.7 ms | 11.2 ms | 3.8 ms |
+| 0 ms | Independent | 4 | 10.1 ms | 11.5 ms | <0.01 ms |
+| 0 ms | Shared | 2 | 10.0 ms | 12.9 ms | <0.01 ms |
+| 0 ms | Shared | 4 | 4.5 ms | 14.8 ms | <0.01 ms |
+| 20 ms | Independent | 2 | 224.2 ms | 337.6 ms | 111.5 ms |
+| 20 ms | Independent | 4 | 215.8 ms | 245.1 ms | 21.2 ms |
+| 20 ms | Shared | 2 | 109.2 ms | 249.8 ms | 22.3 ms |
+| 20 ms | Shared | 4 | 113.8 ms | 150.2 ms | 21.3 ms |
+
+For two reflog stripes and a publisher on independent repositories, four
+pool slots reduced the measured overlap checkout p95 at 20 ms RTT from
+111.5 to 21.2 ms.
+Budget for concurrent checkout holders when testing independent traffic,
+then check the application-wide connection limit. When the pack and the
+reflogs used the same repository, PostgreSQL logged 6 waits of
+54.2–79.2 ms on the repository lock across the pack
+trials. Use repository lock waits to diagnose a shared-repository slowdown
+before increasing the pool. [PostgreSQL lock records](../evidence/reflog-pack-pool-2026-11-07/repository-lock-waits.csv)
+
+The experiment isolates one staged JGit flush. Include upload, staging,
+other pool users and your normal publication concurrency when testing an
+application's service limits.
 
 ## Whole pack publication comparison
 
@@ -107,4 +139,4 @@ A [hosted PostgreSQL JMH run](https://github.com/carstenartur/jgit-storage-hiber
 | Shared | 64 KiB | 75.1 ms | 84.4 ms | 79.8 ms | 79.6 ms |
 | Shared | 384 KiB | 113.9 ms | 170.8 ms | 158.0 ms | 166.7 ms |
 
-Four stripes lowered the independent 384-KiB publication p95 from 146.1 to 86.0 ms in this run. The shared repository stayed on one worker in every queued case and showed a smaller difference across stripe counts. This is scheduling evidence for a separate local workload at revision `f8a4e91a0c043eadf0c0ac46bb42a39b00e2c032`. The [large-pack artifact](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42384374593/artifacts/13579490914) retains additional 16- and 128-MiB throughput and allocation measurements. Sizing a pool shared by those publications and reflog writers requires a combined workload.
+Four stripes lowered the independent 384-KiB publication p95 from 146.1 to 86.0 ms in this run. The shared repository stayed on one worker in every queued case and showed a smaller difference across stripe counts. This is scheduling evidence for a separate local workload at revision `f8a4e91a0c043eadf0c0ac46bb42a39b00e2c032`. The [large-pack artifact](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42384374593/artifacts/13579490914) retains additional 16- and 128-MiB throughput and allocation measurements.

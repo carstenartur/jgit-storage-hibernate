@@ -17,6 +17,7 @@ on:
     paths:
       - '.github/workflows/history-scroll-export.yml'
       - '.github/scripts/summarize-history-scroll-export.py'
+      - '.github/scripts/test_summarize_history_scroll_export.py'
       - 'docs/operations/search-pagination-and-export.md'
       - 'jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/CommitSearchCursor.java'
       - 'jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/GitHistorySearchService.java'
@@ -39,6 +40,12 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test evidence validation
+        run: python3 .github/scripts/test_summarize_history_scroll_export.py
+
       - name: Choose smoke or full evidence coordinates
         id: matrix
         env:
