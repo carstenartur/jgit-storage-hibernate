@@ -1,3201 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794051228089,
+  "lastUpdate": 1794054291134,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
-      {
-        "commit": {
-          "author": {
-            "email": "carsten.hammer@t-online.de",
-            "name": "Carsten Hammer",
-            "username": "carstenartur"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "carstenartur"
-          },
-          "distinct": true,
-          "id": "0e7ab43d8ee2c5aa03a4fa8fba002fba5eb12e15",
-          "message": "Add database-native benchmark telemetry foundation (#292)\n\nAdd a benchmark-only native telemetry SPI for PostgreSQL and SQL Server, integrate exact measurement-invocation evidence into pack-layout benchmarks, and retain deterministic credential-free JSON artifacts.\n\nValidated on Java 21 with PostgreSQL 17.10, SQL Server 2022 CU20, all benchmark and compatibility workflows, and real audio-analyzer, Taxonomy, and sandbox consumer contracts.\n\nRefs #187.",
-          "timestamp": "2026-08-22T00:26:04+02:00",
-          "tree_id": "277e48885999eb9d28c48e1f14cf9ff4e9c5ea41",
-          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/0e7ab43d8ee2c5aa03a4fa8fba002fba5eb12e15"
-        },
-        "date": 1787351587238,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "incrementalFetchViaUploadPack — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 20.9888228,
-            "range": 16.302596231438294,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "incrementalFetchViaUploadPack — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 20.7344652,
-            "range": 18.463131949565103,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "incrementalFetchViaUploadPack — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 21.011751599999997,
-            "range": 22.425156867837053,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "incrementalFetchViaUploadPack — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 23.2106506,
-            "range": 11.389215023821858,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "incrementalPushViaReceivePack — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 32.7309882,
-            "range": 29.347776541959348,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "incrementalPushViaReceivePack — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 34.7927354,
-            "range": 30.401021718233817,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "incrementalPushViaReceivePack — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 35.87053440000001,
-            "range": 29.200051102905626,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "incrementalPushViaReceivePack — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 70.7149876,
-            "range": 270.661866054589,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialCloneViaUploadPack — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 124.4877458,
-            "range": 24.30109959772206,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialCloneViaUploadPack — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 124.673216,
-            "range": 31.3431038065881,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialCloneViaUploadPack — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 126.45713860000001,
-            "range": 32.96232095329438,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialCloneViaUploadPack — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 141.3142752,
-            "range": 26.646326317811155,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialPushViaReceivePack — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 138.8033182,
-            "range": 16.955045311076205,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialPushViaReceivePack — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 150.8771614,
-            "range": 39.435053381595736,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialPushViaReceivePack — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 147.5051118,
-            "range": 23.57826588399181,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "initialPushViaReceivePack — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 130.58936260000002,
-            "range": 39.605061570672056,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishLargePack — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 558.0489682,
-            "range": 109.38035797562274,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishLargePack — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 546.2664926000001,
-            "range": 85.49242054443388,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishLargePack — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 590.976546,
-            "range": 406.55866809574866,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishLargePack — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 541.0058134,
-            "range": 32.36849686548326,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: ss\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToDifferentRepositories — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 8.549535180385845,
-            "range": 23.523480670159685,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 116.96542313717568 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToDifferentRepositories — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 10.828721828328716,
-            "range": 26.62744208689932,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 92.34700233816405 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToDifferentRepositories — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 10.032806568247926,
-            "range": 39.35280689194809,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 99.67300706911112 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToDifferentRepositories — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 2.8179901996607284,
-            "range": 3.789879194745358,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 354.8628381036935 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToSameRepository — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 10.223567030120808,
-            "range": 32.67038288881726,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 97.81321891408221 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToSameRepository — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 14.484274012875977,
-            "range": 18.649362179043205,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 69.04039505956857 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToSameRepository — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 14.757941013245624,
-            "range": 15.573226211462881,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 67.76012989227121 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "publishToSameRepository — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 3.088142931394974,
-            "range": 17.69362882780566,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: thrpt\nForks: 1\nOriginal metric: 323.81920857150243 ops/s",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobAfterJGitCacheReset — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 0.0023967358029794764,
-            "range": 0.0008638332988345252,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobAfterJGitCacheReset — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 0.0023996336507272503,
-            "range": 0.0009000647640433616,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobAfterJGitCacheReset — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 0.002360115263934668,
-            "range": 0.0001432617879225625,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobAfterJGitCacheReset — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 0.011652190580612731,
-            "range": 0.0008773849785849802,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobFromWarmCache — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 0.00028128759912728274,
-            "range": 0.00012831402987233736,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobFromWarmCache — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 0.0002801676695112361,
-            "range": 2.2975381783170263e-05,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobFromWarmCache — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 0.0003005004035417838,
-            "range": 0.00011770711642943768,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readBlobFromWarmCache — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 0.00956855223798731,
-            "range": 0.000697027136670874,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 0.9053507617381321,
-            "range": 0.03759096794054069,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 0.9030771671286756,
-            "range": 0.03450503373846334,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 0.9036972356612663,
-            "range": 0.0882842351798187,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 1.230955459045054,
-            "range": 0.4509394464855483,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "reopenAndResolveMain — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 0.25492761864066577,
-            "range": 2.6475358962689985,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "reopenAndResolveMain — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 1.0654682907191264,
-            "range": 2.275992083767938,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "reopenAndResolveMain — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 1.034566769600139,
-            "range": 2.2146096468502288,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "reopenAndResolveMain — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 0.099666867294263,
-            "range": 0.16719489532558618,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "resolveMainOnOpenRepository — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 0.00014229909335552494,
-            "range": 2.917034945012427e-05,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "resolveMainOnOpenRepository — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 0.0001418994909265536,
-            "range": 1.3506621285655493e-05,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "resolveMainOnOpenRepository — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 0.0001458428925729571,
-            "range": 8.050695567081237e-05,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "resolveMainOnOpenRepository — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 0.018915589634481547,
-            "range": 0.0008144189565613565,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBatchOf100Blobs — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 5.6649962891555,
-            "range": 22.190700200122343,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBatchOf100Blobs — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 5.317328321729547,
-            "range": 8.040151683745243,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBatchOf100Blobs — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 5.287739875310635,
-            "range": 8.744186020385657,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBatchOf100Blobs — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 13.395375781336147,
-            "range": 12.04010658467509,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBlob — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 2.412164217780353,
-            "range": 5.143716046207786,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBlob — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 2.5339641284876855,
-            "range": 1.580027453960518,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBlob — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 2.619813882244354,
-            "range": 4.416687134756493,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeBlob — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 0.13190447010507883,
-            "range": 0.10363572369089498,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitAndUpdateRef — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 7.383784377802478,
-            "range": 20.797555035547177,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitAndUpdateRef — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 8.327180978496246,
-            "range": 5.748453673391951,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitAndUpdateRef — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 8.550263558115493,
-            "range": 8.835271526475562,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitAndUpdateRef — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 0.9702356216610756,
-            "range": 0.41627886287231464,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitSeries10AndUpdateMain — JGit + HSQLDB (in-memory)",
-            "unit": "ms/op",
-            "value": 9.158151345926267,
-            "range": 8.768650026176989,
-            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitSeries10AndUpdateMain — JGit + PostgreSQL",
-            "unit": "ms/op",
-            "value": 9.71600553725966,
-            "range": 6.095274042580115,
-            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitSeries10AndUpdateMain — JGit + PostgreSQL + HikariCP",
-            "unit": "ms/op",
-            "value": 10.989161851184527,
-            "range": 10.594330798204249,
-            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          },
-          {
-            "name": "writeCommitSeries10AndUpdateMain — JGit + filesystem",
-            "unit": "ms/op",
-            "value": 5.810428054427855,
-            "range": 7.764705340631141,
-            "extra": "Backend: JGit + filesystem\nJDK: 21.0.12\nMode: avgt\nForks: 1",
-            "consumers": [
-              "audio-analyzer",
-              "sandbox",
-              "taxonomy"
-            ],
-            "contract": "core-storage-and-pack-publication",
-            "requiredModules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "consumerEvidence": {
-              "audio-analyzer": {
-                "displayName": "audio-analyzer",
-                "repository": "carstenartur/audio-analyzer",
-                "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-                "defaultBranch": "master",
-                "modules": [
-                  "jgit-storage-hibernate-core",
-                  "jgit-storage-hibernate-search"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "sandbox": {
-                "displayName": "sandbox",
-                "repository": "carstenartur/sandbox",
-                "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              },
-              "taxonomy": {
-                "displayName": "Taxonomy",
-                "repository": "carstenartur/Taxonomy",
-                "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-                "defaultBranch": "main",
-                "modules": [
-                  "jgit-storage-hibernate-core"
-                ],
-                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-              }
-            }
-          }
-        ],
-        "consumerEvidence": {
-          "audio-analyzer": {
-            "displayName": "audio-analyzer",
-            "repository": "carstenartur/audio-analyzer",
-            "ref": "7b4db46a9f94d67df9adcae122e0648eb8a5f0b9",
-            "defaultBranch": "master",
-            "modules": [
-              "jgit-storage-hibernate-core",
-              "jgit-storage-hibernate-search"
-            ],
-            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-          },
-          "sandbox": {
-            "displayName": "sandbox",
-            "repository": "carstenartur/sandbox",
-            "ref": "5f9e286566da8affcaccd69cc38062014c369bc5",
-            "defaultBranch": "main",
-            "modules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-          },
-          "taxonomy": {
-            "displayName": "Taxonomy",
-            "repository": "carstenartur/Taxonomy",
-            "ref": "f445cd70801b2847389c535c1fe164da738ae351",
-            "defaultBranch": "main",
-            "modules": [
-              "jgit-storage-hibernate-core"
-            ],
-            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
-          }
-        }
-      },
       {
         "commit": {
           "author": {
@@ -323118,6 +319925,3394 @@ window.BENCHMARK_DATA = {
             "unit": "ms/op",
             "value": 7.237233725677522,
             "range": 15.068109450480717,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          }
+        ],
+        "consumerEvidence": {
+          "audio-analyzer": {
+            "displayName": "audio-analyzer",
+            "repository": "carstenartur/audio-analyzer",
+            "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+            "defaultBranch": "master",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          },
+          "sandbox": {
+            "displayName": "sandbox",
+            "repository": "carstenartur/sandbox",
+            "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+            "defaultBranch": "main",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-java-analysis",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          },
+          "taxonomy": {
+            "displayName": "Taxonomy",
+            "repository": "carstenartur/Taxonomy",
+            "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+            "defaultBranch": "main",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-smart-http"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          }
+        }
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "9118217023527c33475d6a0c3afd717beafdeeeb",
+          "message": "Merge pull request #446 from carstenartur/docs/zenodo-project-doi",
+          "timestamp": "2026-11-07T13:14:08+01:00",
+          "tree_id": "7d5a4e226a96563e03269c90dbdae357bd9a8be4",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/9118217023527c33475d6a0c3afd717beafdeeeb"
+        },
+        "date": 1794054291134,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "incrementalFetchViaUploadPack — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 23.537385,
+            "range": 23.248751451627843,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "incrementalFetchViaUploadPack — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 23.700259199999998,
+            "range": 19.946188396455387,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "incrementalFetchViaUploadPack — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 23.025068600000004,
+            "range": 15.11146520863339,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "incrementalFetchViaUploadPack — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 28.916559,
+            "range": 18.785641118410766,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "incrementalPushViaReceivePack — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 32.2121648,
+            "range": 17.194227292642523,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "incrementalPushViaReceivePack — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 34.8179762,
+            "range": 27.886569898518037,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "incrementalPushViaReceivePack — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 35.4241888,
+            "range": 41.76677418302597,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "incrementalPushViaReceivePack — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 18.3823728,
+            "range": 6.433241505571097,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialCloneViaUploadPack — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 148.6408894,
+            "range": 46.883409641299515,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialCloneViaUploadPack — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 145.532004,
+            "range": 24.26068574282797,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialCloneViaUploadPack — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 150.8075116,
+            "range": 40.60390856862403,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialCloneViaUploadPack — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 169.783545,
+            "range": 45.538724086982576,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialPushViaReceivePack — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 165.4274972,
+            "range": 38.37212674482572,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialPushViaReceivePack — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 179.01992860000001,
+            "range": 53.7447984487828,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialPushViaReceivePack — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 182.031165,
+            "range": 87.94724004878144,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "initialPushViaReceivePack — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 151.7797696,
+            "range": 38.06652743761115,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishLargePack — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 621.1470592,
+            "range": 87.05190357480514,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishLargePack — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 579.2439216,
+            "range": 73.0419291287712,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishLargePack — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 649.3034776000001,
+            "range": 319.7763649688311,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishLargePack — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 579.7715823999999,
+            "range": 92.97641785759247,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: ss\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToDifferentRepositories — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 10.565222965165974,
+            "range": 25.453916969588242,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 94.65015582700393 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToDifferentRepositories — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 11.764534448136843,
+            "range": 26.513866082113264,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 85.00123863026052 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToDifferentRepositories — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 11.83701637870438,
+            "range": 13.761765841484351,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 84.48074818913572 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToDifferentRepositories — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 3.270340848413569,
+            "range": 2.1632686896945525,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 305.778524732398 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToSameRepository — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 13.099919380448661,
+            "range": 34.02830943174653,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 76.33634764901514 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToSameRepository — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 17.90876452366218,
+            "range": 22.677181742289058,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 55.83858108574365 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToSameRepository — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 18.282718174717463,
+            "range": 20.364302484300037,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 54.69646200546182 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "publishToSameRepository — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 3.3559407759597613,
+            "range": 2.855231568057294,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: thrpt\nForks: 1\nOriginal metric: 297.97903680645595 ops/s",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobAfterJGitCacheReset — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 0.004313083017098286,
+            "range": 0.0006488045686398437,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobAfterJGitCacheReset — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 0.004357558517884432,
+            "range": 0.0002007495032326659,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobAfterJGitCacheReset — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 0.004386908022140669,
+            "range": 0.0005996671863958468,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobAfterJGitCacheReset — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 0.010598131925978188,
+            "range": 0.005368290072963046,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobFromWarmCache — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 0.0004544786021169131,
+            "range": 0.00017223301804089716,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobFromWarmCache — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 0.0004678459195599102,
+            "range": 0.00017508089856625123,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobFromWarmCache — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 0.00046141491842211364,
+            "range": 3.824040967374777e-05,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readBlobFromWarmCache — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 0.006814227730540692,
+            "range": 0.003349316969053169,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 1.2137498381389553,
+            "range": 0.032733236625785964,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 1.2087721375838012,
+            "range": 0.020491761786225353,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 1.2325515957058264,
+            "range": 0.6562997474628605,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "readLargeBlobSequentiallyAfterJGitCacheReset — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 1.5089177238086602,
+            "range": 0.12112013923657379,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "reopenAndResolveMain — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 0.49359512161273117,
+            "range": 4.567977978744274,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "reopenAndResolveMain — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 1.3050101417267692,
+            "range": 4.157732848041331,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "reopenAndResolveMain — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 1.2642671773144605,
+            "range": 4.002774559754324,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "reopenAndResolveMain — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 0.09241473297768706,
+            "range": 0.32504494409404955,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "resolveMainOnOpenRepository — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 0.00021821566538429856,
+            "range": 0.00011238774961016172,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "resolveMainOnOpenRepository — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 0.00022371371328186885,
+            "range": 0.00010521029166913182,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "resolveMainOnOpenRepository — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 0.00022044819656828296,
+            "range": 3.386942875764617e-06,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "resolveMainOnOpenRepository — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 0.018933537247699122,
+            "range": 0.003917164411249636,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBatchOf100Blobs — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 5.971886130057842,
+            "range": 5.565167830442535,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBatchOf100Blobs — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 6.622051162214642,
+            "range": 4.046826087054869,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBatchOf100Blobs — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 6.532259884528422,
+            "range": 4.483992376684494,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBatchOf100Blobs — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 10.766893932405699,
+            "range": 2.788035265490299,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBlob — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 3.271310331568339,
+            "range": 4.486651664711291,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBlob — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 3.485954817387777,
+            "range": 2.9561554967877144,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBlob — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 3.327739578960434,
+            "range": 2.4557907940007055,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeBlob — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 0.09704718665871748,
+            "range": 0.08193430216368547,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitAndUpdateRef — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 9.115443026089759,
+            "range": 20.200699970704143,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitAndUpdateRef — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 10.247676333185783,
+            "range": 8.495889411495718,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitAndUpdateRef — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 10.27837172656922,
+            "range": 11.04202179854079,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitAndUpdateRef — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 0.9049119160474423,
+            "range": 1.8261912668965783,
+            "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitSeries10AndUpdateMain — JGit + HSQLDB (in-memory)",
+            "unit": "ms/op",
+            "value": 9.985912864224664,
+            "range": 33.34184399308052,
+            "extra": "Backend: JGit + HSQLDB (in-memory)\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitSeries10AndUpdateMain — JGit + PostgreSQL",
+            "unit": "ms/op",
+            "value": 11.131550300211467,
+            "range": 6.603922000812063,
+            "extra": "Backend: JGit + PostgreSQL\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitSeries10AndUpdateMain — JGit + PostgreSQL + HikariCP",
+            "unit": "ms/op",
+            "value": 11.29563870984663,
+            "range": 10.576474967416923,
+            "extra": "Backend: JGit + PostgreSQL + HikariCP\nJDK: 21.0.13\nMode: avgt\nForks: 1",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-storage-and-pack-publication",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "writeCommitSeries10AndUpdateMain — JGit + filesystem",
+            "unit": "ms/op",
+            "value": 4.826762509660227,
+            "range": 16.257204876096722,
             "extra": "Backend: JGit + filesystem\nJDK: 21.0.13\nMode: avgt\nForks: 1",
             "consumers": [
               "audio-analyzer",
