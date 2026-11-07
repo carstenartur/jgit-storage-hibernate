@@ -5,7 +5,7 @@ The optional Search module keeps Git as the authoritative history and materializ
 1. extracting and persisting projections when commits arrive or a repository is rebuilt;
 2. serving bounded queries without traversing Git or materializing data that the result does not need.
 
-The dedicated `Hibernate Search Performance` workflow retains raw JMH JSON, GC/ORM counters, Maven/Failsafe reports and grouped chart input for PostgreSQL 17.10 plus local-filesystem Lucene.
+The dedicated `Hibernate Search Performance` workflow retains raw JMH JSON, GC/ORM counters, Maven/Failsafe reports and grouped chart input for PostgreSQL 17.10 plus local-filesystem Lucene. Its [native telemetry companion](database-native-telemetry.md#hibernate-search-interpretation) separates the database cost of the timed indexing, rebuild or query from setup and cleanup.
 
 Versioned Search profiles now make a third dimension explicit: indexing cost is meaningful only together with the path/content recall that the selected profile promises. See [Search indexing profiles](search-indexing-profiles.md) for the semantic and configuration contract.
 
@@ -129,6 +129,9 @@ Run the bounded smoke matrix with Docker available:
 mvn -pl jgit-storage-hibernate-benchmarks verify \
   -Psearch-performance
 ```
+
+Add `-Djgit.storage.benchmark.database-telemetry.enabled=true` to retain native PostgreSQL
+counters alongside the JMH result.
 
 The workflow also converts the raw result into grouped dashboard series and publishes history only from a successful `main` run. Pull requests upload evidence but do not mutate the public benchmark history.
 
