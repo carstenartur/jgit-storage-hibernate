@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
   "label": "JMH",
-  "message": "publishToDifferentRepositories 524.00 ops/s",
+  "message": "publishToDifferentRepositories 518.58 ops/s",
   "color": "brightgreen"
 }
