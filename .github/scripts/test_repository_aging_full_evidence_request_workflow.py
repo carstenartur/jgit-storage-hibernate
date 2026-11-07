@@ -86,12 +86,13 @@ class FullAgingEvidenceRequestWorkflowTest(unittest.TestCase):
     def test_target_retains_complete_sharded_age_matrix(self) -> None:
         for fragment in (
             "repository-aging-full-shard:",
-            "backend:\n          - hsqldb\n          - postgresql\n          - postgresql-hikari",
+            "backend:\n          - hsqldb\n          - postgresql\n          - postgresql-hikari\n          - sqlserver",
             "cache_state:\n          - cold\n          - warm",
             "jgit.storage.benchmark.investigation.profile=full",
             "repository-aging-full-summary:",
-            "Expected six repository-aging shards",
+            "Expected {len(expected)} repository-aging shards",
             "convert-jmh-repository-aging.py",
+            "--full-matrix",
         ):
             self.assertIn(fragment, self.target)
 
