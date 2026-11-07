@@ -175,24 +175,37 @@ final class StagedPackExtensionStore {
   CommitResult commit(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
+    return commit(
+        descriptions,
+        replaces,
+        work ->
+            transactionContext.executeWithRepositoryLock(
+                StorageOperationKind.PACK_PUBLICATION, repositoryName, work));
+  }
+
+  CommitResult commit(
+      Collection<DfsPackDescription> descriptions,
+      Collection<DfsPackDescription> replaces,
+      PublicationTransaction transaction)
+      throws IOException {
     List<Publication> publications = publications(descriptions);
     boolean prePersisted = shouldPrePersist(publications, replaces);
     publicationSelectionCounters.record(prePersisted, stagedPayloadBytes(publications));
     CommitResult commitResult =
         prePersisted
-            ? commitPrePersisted(publications)
-            : commitDirect(publications, replaces);
+            ? commitPrePersisted(publications, transaction)
+            : commitDirect(publications, replaces, transaction);
     discard(publications);
     return commitResult;
   }
 
   private CommitResult commitDirect(
-      List<Publication> publications, Collection<DfsPackDescription> replaces)
+      List<Publication> publications,
+      Collection<DfsPackDescription> replaces,
+      PublicationTransaction transaction)
       throws IOException {
     CommitResult result =
-        transactionContext.executeWithRepositoryLock(
-            StorageOperationKind.PACK_PUBLICATION,
-            repositoryName,
+        transaction.execute(
             session -> {
               deletePackRows(session, packNames(replaces));
 
@@ -225,7 +238,8 @@ final class StagedPackExtensionStore {
     return result;
   }
 
-  private CommitResult commitPrePersisted(List<Publication> publications) throws IOException {
+  private CommitResult commitPrePersisted(
+      List<Publication> publications, PublicationTransaction transaction) throws IOException {
     Instant preparedAt = Instant.now();
     String writeToken = UUID.randomUUID().toString();
     Set<String> preparedPackNames = publicationPackNames(publications);
@@ -238,7 +252,7 @@ final class StagedPackExtensionStore {
 
     try {
       prePublicationHook.afterPayloadPersisted(writeToken);
-      CommitResult result = publishPrepared(persisted, writeToken, Instant.now());
+      CommitResult result = publishPrepared(persisted, writeToken, Instant.now(), transaction);
       clearPreparedMappings(preparedPackNames, writeToken);
       return result;
     } catch (IOException | RuntimeException failure) {
@@ -326,11 +340,12 @@ final class StagedPackExtensionStore {
   }
 
   private CommitResult publishPrepared(
-      List<PersistedExtension> persisted, String writeToken, Instant committedAt)
+      List<PersistedExtension> persisted,
+      String writeToken,
+      Instant committedAt,
+      PublicationTransaction transaction)
       throws IOException {
-    return transactionContext.executeWithRepositoryLock(
-        StorageOperationKind.PACK_PUBLICATION,
-        repositoryName,
+    return transaction.execute(
         session -> {
           int updated =
               session
@@ -857,6 +872,11 @@ final class StagedPackExtensionStore {
 
   private record Publication(
       String packName, DfsPackDescription description, List<ExpectedExtension> extensions) {}
+
+  @FunctionalInterface
+  interface PublicationTransaction {
+    CommitResult execute(HibernateTransactionContext.Work<CommitResult> work) throws IOException;
+  }
 
   @FunctionalInterface
   interface PrePublicationHook {
