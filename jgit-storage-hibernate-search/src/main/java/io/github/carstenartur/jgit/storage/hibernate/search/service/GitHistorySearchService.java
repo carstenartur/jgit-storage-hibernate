@@ -241,7 +241,13 @@ public class GitHistorySearchService {
     appendStructuredOrder(hql, timeProperty);
 
     Session session = sessionFactory.openSession();
-    Transaction transaction = session.beginTransaction();
+    Transaction transaction;
+    try {
+      transaction = session.beginTransaction();
+    } catch (RuntimeException | Error failure) {
+      session.close();
+      throw failure;
+    }
     try {
       var selection = session.createQuery(hql.toString(), CommitSearchHit.class);
       selection.setFetchSize(chunkSize);

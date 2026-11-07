@@ -254,6 +254,13 @@ The [full age matrix and charts](evidence/repository-aging-full-2026-11-07.md#ch
 
 The [September matrix](evidence/repository-aging-full-2026-09-04.md) and the new run agree on the direction of the PostgreSQL warm crossover between 100 and 300 small packs. The separate provider-restart repeats confirm cold benefits and warm regressions at ten packs. Use the cache state, fragmentation, and read mix in the [repack guide](operations/repack-and-gc.md#resulting-operational-guidance) to plan maintenance.
 
+## History scroll and export
+
+History exports have a separate comparison across PostgreSQL and SQL Server
+at 10,000, 100,000 and 1,000,000 indexed commits. It compares offset pages,
+continuation on an open cursor, and the full cursor prefix.
+[History scroll and deep-offset charts](evidence/history-scroll-2026-11-07/README.md)
+
 ## Byte amplification
 
 For the measured 16-MiB publication:

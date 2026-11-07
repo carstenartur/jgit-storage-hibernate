@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       documents:
-        description: Projected commits per database
+        description: Projected commits per database (all selects the complete matrix)
         type: choice
         required: true
         default: '10000'
@@ -12,22 +12,83 @@ on:
           - '10000'
           - '100000'
           - '1000000'
+          - 'all'
+  pull_request:
+    paths:
+      - '.github/workflows/history-scroll-export.yml'
+      - '.github/scripts/summarize-history-scroll-export.py'
+      - '.github/scripts/test_summarize_history_scroll_export.py'
+      - 'docs/operations/search-pagination-and-export.md'
+      - 'jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/CommitSearchCursor.java'
+      - 'jgit-storage-hibernate-search/src/main/java/io/github/carstenartur/jgit/storage/hibernate/search/service/GitHistorySearchService.java'
+      - 'jgit-storage-hibernate-search/src/test/java/io/github/carstenartur/jgit/storage/hibernate/search/HistoryScrollExportBenchmark*.java'
+  push:
+    branches:
+      - 'benchmark/history-scroll-full-*'
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test evidence validation
+        run: python3 .github/scripts/test_summarize_history_scroll_export.py
+
+      - name: Choose smoke or full evidence coordinates
+        id: matrix
+        env:
+          REQUESTED_DOCUMENTS: ${{ inputs.documents }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          event = os.environ["GITHUB_EVENT_NAME"]
+          requested = os.environ["REQUESTED_DOCUMENTS"]
+          all_sizes = [10_000, 100_000, 1_000_000]
+          if event == "pull_request":
+              sizes, repeats = [10_000], 1
+          elif event == "push" or requested == "all":
+              sizes, repeats = all_sizes, 3
+          elif requested in {str(size) for size in all_sizes}:
+              sizes, repeats = [int(requested)], 3
+          else:
+              raise SystemExit("Unsupported history scroll benchmark selection")
+          matrix = {
+              "include": [
+                  {"backend": backend, "documents": size, "repetitions": repeats}
+                  for backend in ("postgresql", "sqlserver")
+                  for size in sizes
+              ],
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"matrix={json.dumps(matrix, separators=(',', ':'))}", file=output)
+          PY
+
   scroll-export:
-    name: ${{ matrix.backend }} / ${{ inputs.documents }} documents
+    name: ${{ matrix.backend }} / ${{ matrix.documents }} documents
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      matrix:
-        backend: [postgresql, sqlserver]
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       BENCHMARK_BACKEND: ${{ matrix.backend }}
-      BENCHMARK_DOCUMENTS: ${{ inputs.documents }}
+      BENCHMARK_DOCUMENTS: ${{ matrix.documents }}
+      BENCHMARK_REPETITIONS: ${{ matrix.repetitions }}
 
     steps:
       - name: Checkout
@@ -43,7 +104,7 @@ jobs:
       - name: Compare cursor exports and offset pages
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           evidence="$GITHUB_WORKSPACE/target/history-scroll"
           mkdir -p "$evidence"
           lscpu > "$evidence/cpu.txt"
@@ -53,16 +114,18 @@ jobs:
             -Djacoco.skip=true -DargLine="-Xms1g -Xmx2g" \
             -Dbenchmark.scroll.backend="$BENCHMARK_BACKEND" \
             -Dbenchmark.scroll.documents="$BENCHMARK_DOCUMENTS" \
+            -Dbenchmark.scroll.repetitions="$BENCHMARK_REPETITIONS" \
             -Dbenchmark.scroll.output="$evidence" \
-            -Dbenchmark.commit="$GITHUB_SHA" 2>&1 | tee "$evidence/maven.log"
-          test -s "$evidence/exports.csv"
-          test -s "$evidence/offsets.csv"
+            -Dbenchmark.commit="$GITHUB_SHA"
           test -s "$evidence/environment.properties"
+          python3 .github/scripts/summarize-history-scroll-export.py "$evidence" \
+            --documents "$BENCHMARK_DOCUMENTS" --repetitions "$BENCHMARK_REPETITIONS"
+          cat "$evidence/comparison.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload raw benchmark evidence
-        if: always()
+      - name: Upload raw benchmark evidence and comparisons
+        if: success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: history-scroll-${{ matrix.backend }}-${{ inputs.documents }}
+          name: history-scroll-${{ matrix.backend }}-${{ matrix.documents }}
           path: target/history-scroll/
           if-no-files-found: error
