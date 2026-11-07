@@ -2,6 +2,11 @@ name: Git-aware Reflog Batch
 
 on:
   workflow_dispatch:
+    inputs:
+      sizing_coordinate:
+        description: Optional stripes,pool,producers,scope (for example 8,4,16,independent); blank runs smoke
+        type: string
+        default: ''
   schedule:
     - cron: '23 5 11 * *'
   pull_request:
@@ -16,6 +21,7 @@ on:
       - 'jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/refs/**'
       - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ReflogBatchNativeTelemetryTest.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ReflogPoolSizingBenchmarkTest.java'
       - 'docs/operations/git-aware-reflog-batching.md'
       - 'docs/operations/durable-striped-write-queue.md'
   push:
@@ -30,6 +36,7 @@ on:
       - 'jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/refs/**'
       - 'jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/DatabaseTelemetry*.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ReflogBatchNativeTelemetryTest.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ReflogPoolSizingBenchmarkTest.java'
       - 'docs/operations/git-aware-reflog-batching.md'
       - 'docs/operations/durable-striped-write-queue.md'
 
@@ -68,6 +75,8 @@ jobs:
 
       - name: Run PostgreSQL and SQL Server native evidence
         shell: bash
+        env:
+          REFLOG_SIZING_COORDINATE: ${{ inputs.sizing_coordinate }}
         run: |
           set -euo pipefail
           rm -rf target/git-aware-reflog-batch
@@ -76,15 +85,25 @@ jobs:
             -Dtest=ReflogBatchNativeTelemetryTest \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Djgit.storage.benchmark.reflog-batch.native.enabled=true \
+            -Djgit.storage.benchmark.reflog-batch.sizing.enabled=true \
+            -Djgit.storage.benchmark.reflog-batch.sizing.coordinate="$REFLOG_SIZING_COORDINATE" \
+            -Djgit.storage.benchmark.reflog-batch.sizing.revision="$(git rev-parse HEAD)" \
             -Djgit.storage.benchmark.database-telemetry.output="$GITHUB_WORKSPACE/target/git-aware-reflog-batch/reflog-batch-database-telemetry.ndjson"
 
       - name: Validate exact matrix, physical writes and privacy
+        id: validate_evidence
         shell: bash
+        env:
+          REFLOG_SIZING_COORDINATE: ${{ inputs.sizing_coordinate }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import csv
           import json
-          import math
+          import os
+          import subprocess
+          from collections import Counter
+          from itertools import product
           from pathlib import Path
 
           root = Path('target/git-aware-reflog-batch')
@@ -162,31 +181,101 @@ jobs:
           for line in lines:
               json.loads(line)
 
+          sizing = root / 'sizing'
+          observations = json.loads((sizing / 'native.json').read_text())['observations']
+          raw = [json.loads(line) for line in (sizing / 'native.ndjson').read_text().splitlines()]
+          if raw != observations:
+              raise SystemExit('Sizing native JSON and NDJSON disagree')
+          requested = os.environ['REFLOG_SIZING_COORDINATE'].strip()
+          if requested:
+              stripes, pool, producers, scope = requested.split(',')
+              expected_sizing = {(int(stripes), int(pool), int(producers), scope)}
+              commands_per_producer = 128
+          else:
+              expected_sizing = set(product((1, 4), (2, 4), (4,), ('shared', 'independent')))
+              commands_per_producer = 24
+          revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          actual_sizing = set()
+          expected_acks = set()
+          expected_borrows = {}
+          for item in observations:
+              c = item['coordinate']
+              key = (int(c['stripes']), int(c['poolSize']), int(c['producers']), c['repositoryScope'])
+              if key in actual_sizing or c['id'] in expected_borrows:
+                  raise SystemExit(f'Duplicate sizing coordinate: {key}')
+              actual_sizing.add(key)
+              if (c['revision'] != revision or item['backend'] != 'postgresql'
+                  or int(c['measuredCommandsPerProducer']) != commands_per_producer
+                  or int(c['elapsedNanos']) <= 0
+                  or item['counters'].get('postgresql.wal.insert_lsn_bytes', 0) <= 0):
+                  raise SystemExit(f'Invalid sizing provenance or native counters: {c}')
+              expected_acks.update(
+                  (c['id'], producer, ordinal)
+                  for producer in range(key[2])
+                  for ordinal in range(commands_per_producer)
+              )
+              expected_borrows[c['id']] = int(c['committedBatches'])
+          if actual_sizing != expected_sizing:
+              raise SystemExit(f'Unexpected sizing matrix: {actual_sizing}')
+          with (sizing / 'acknowledgements.csv').open(newline='') as stream:
+              acks = list(csv.DictReader(stream))
+          actual_acks = {(r['coordinate'], int(r['producer']), int(r['ordinal'])) for r in acks}
+          if actual_acks != expected_acks or len(acks) != len(expected_acks) or any(
+              not 0 <= int(r['queue_wait_nanos']) <= int(r['ack_nanos']) or int(r['batch_size']) < 1
+              for r in acks
+          ):
+              raise SystemExit('Sizing acknowledgement coordinates or timing are invalid')
+          with (sizing / 'pool-borrows.csv').open(newline='') as stream:
+              borrows = list(csv.DictReader(stream))
+          if Counter(r['coordinate'] for r in borrows) != expected_borrows or any(
+              int(r['acquisition_nanos']) < 0 for r in borrows
+          ):
+              raise SystemExit('Sizing pool borrow counts or timing are invalid')
+
           forbidden = (
-              'jdbc:postgresql://',
-              'jdbc:sqlserver://',
-              'jgit.storage.benchmark.postgresql.password',
-              'jgit.storage.benchmark.sqlserver.password',
-              'Database JDBC URL',
-              'Default catalog/schema',
+              'jdbc:postgresql:',
+              'jdbc:sqlserver:',
+              'database jdbc url',
+              'default catalog/schema',
+              *(
+                  f'jgit.storage.benchmark.{backend}.{field}'
+                  for backend in ('postgresql', 'sqlserver')
+                  for field in ('url', 'user', 'password')
+              ),
+              *(
+                  f'hibernate.connection.{field}'
+                  for field in ('url', 'username', 'password')
+              ),
+              *(
+                  f'hibernate.hikari.{field}'
+                  for field in ('jdbcurl', 'username', 'password', 'datasource.user',
+                                'datasource.password')
+              ),
           )
           for path in root.rglob('*'):
               if not path.is_file():
                   continue
-              content = path.read_text(encoding='utf-8', errors='replace')
+              content = path.read_text(encoding='utf-8', errors='replace').lower()
               for token in forbidden:
                   if token in content:
                       raise SystemExit(f'Sensitive token {token!r} found in {path}')
 
           print('Validated 12 exact apply/replay observations across PostgreSQL and SQL Server')
+          print(f'Validated {len(observations)} PostgreSQL sizing coordinates on {revision}')
           PY
 
       - name: Upload native batch evidence
-        if: always()
+        if: success() && steps.validate_evidence.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: git-aware-reflog-batch-native-telemetry
-          path: target/git-aware-reflog-batch/**
+          path: |
+            target/git-aware-reflog-batch/reflog-batch-database-telemetry.json
+            target/git-aware-reflog-batch/reflog-batch-database-telemetry.ndjson
+            target/git-aware-reflog-batch/sizing/acknowledgements.csv
+            target/git-aware-reflog-batch/sizing/pool-borrows.csv
+            target/git-aware-reflog-batch/sizing/native.json
+            target/git-aware-reflog-batch/sizing/native.ndjson
           if-no-files-found: error
 
       - name: Report semantic boundary
@@ -197,4 +286,5 @@ jobs:
           echo '- Atomic append and rollback semantics passed.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Exact delivery-ID replay returned ALREADY_APPLIED without duplicate rows.' >> "$GITHUB_STEP_SUMMARY"
           echo '- PostgreSQL WAL and SQL Server transaction-log evidence passed for batch sizes 1, 10 and 50.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PostgreSQL sizing evidence retains raw acknowledgements and shared Hikari pool borrows.' >> "$GITHUB_STEP_SUMMARY"
           echo '- This processor does not batch refs, packs or complete pushes.' >> "$GITHUB_STEP_SUMMARY"

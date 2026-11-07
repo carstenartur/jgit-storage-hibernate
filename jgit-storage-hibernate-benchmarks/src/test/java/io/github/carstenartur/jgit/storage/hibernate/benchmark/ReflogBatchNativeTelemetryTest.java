@@ -54,7 +54,17 @@ class ReflogBatchNativeTelemetryTest {
       new PostgreSQLContainer<>("postgres:17.10-alpine")
           .withDatabaseName("jgit_reflog_batch")
           .withUsername("benchmark")
-          .withPassword("benchmark");
+          .withPassword("benchmark")
+          .withUrlParam("connectTimeout", "10")
+          .withUrlParam("socketTimeout", "20")
+          .withCommand(
+              "postgres",
+              "-c", "fsync=on",
+              "-c", "synchronous_commit=on",
+              "-c", "track_io_timing=on",
+              "-c", "track_wal_io_timing=on",
+              "-c", "lock_timeout=10000",
+              "-c", "statement_timeout=15000");
 
   @Container
   static final MSSQLServerContainer SQL_SERVER =
@@ -63,12 +73,7 @@ class ReflogBatchNativeTelemetryTest {
 
   @Test
   void writesCrossDatabaseApplyAndReplayEvidence() throws Exception {
-    Path ndjson =
-        Path.of(
-                System.getProperty(
-                    DatabaseTelemetryCollectors.OUTPUT_PROPERTY,
-                    "target/reflog-batch-native/reflog-batch-database-telemetry.ndjson"))
-            .toAbsolutePath();
+    Path ndjson = nativeOutput();
     Path aggregate =
         ndjson.resolveSibling("reflog-batch-database-telemetry.json");
     Files.createDirectories(ndjson.getParent());
@@ -84,6 +89,24 @@ class ReflogBatchNativeTelemetryTest {
     assertEquals(12, observations);
     assertTrue(Files.size(ndjson) > 100);
     assertTrue(Files.size(aggregate) > 100);
+  }
+
+  @Test
+  @EnabledIfSystemProperty(named = ReflogPoolSizingBenchmarkTest.ENABLED, matches = "true")
+  void writesPostgresqlSharedPoolSizingEvidence() throws Exception {
+    ReflogPoolSizingBenchmarkTest.writeNativeEvidence(
+        POSTGRESQL.getJdbcUrl(),
+        POSTGRESQL.getUsername(),
+        POSTGRESQL.getPassword(),
+        nativeOutput().resolveSibling("sizing"));
+  }
+
+  private static Path nativeOutput() {
+    return Path.of(
+            System.getProperty(
+                DatabaseTelemetryCollectors.OUTPUT_PROPERTY,
+                "target/reflog-batch-native/reflog-batch-database-telemetry.ndjson"))
+        .toAbsolutePath();
   }
 
   private static int measure(DatabaseTarget target, Path ndjson) throws Exception {
