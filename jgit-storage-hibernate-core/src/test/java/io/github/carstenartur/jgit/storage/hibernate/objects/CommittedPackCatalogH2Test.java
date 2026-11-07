@@ -28,6 +28,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.dfs.DfsOutputStream;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
@@ -38,11 +44,14 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.hibernate.Session;
+import org.hibernate.SessionEventListener;
 import org.hibernate.Transaction;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 
 class CommittedPackCatalogH2Test {
+
+  private static final long WAIT_SECONDS = 10;
 
   @Test
   void opensChunkedExtensionsFromCatalogWithoutRepeatingMetadataQuery() throws Exception {
@@ -248,6 +257,97 @@ class CommittedPackCatalogH2Test {
   }
 
   @Test
+  void staleScanKeepsTheReplacementAndItsCachedInlinePayload() throws Exception {
+    assertReplacementSurvivesOverlappingScan(2, ScanPhase.AFTER_QUERY);
+  }
+
+  @Test
+  void publicationFinishesWhileCatalogScanIsPausedBeforeJdbcCheckout() throws Exception {
+    assertReplacementSurvivesOverlappingScan(1, ScanPhase.BEFORE_CHECKOUT);
+  }
+
+  private static void assertReplacementSurvivesOverlappingScan(int poolSize, ScanPhase phase)
+      throws Exception {
+    String repositoryName = "catalog-concurrent-replacement";
+    Properties properties = providerProperties();
+    properties.put("hibernate.connection.pool_size", Integer.toString(poolSize));
+    properties.put("hibernate.session.events.auto", CatalogScanListener.class.getName());
+    try (HibernateSessionFactoryProvider provider = new HibernateSessionFactoryProvider(properties);
+        HibernateRepository repository =
+            HibernateRepository.create(provider.getSessionFactory(), repositoryName)) {
+      ReadAheadHibernateObjDatabase database = objectDatabase(repository);
+      persistCommittedPack(provider, repositoryName, "pack-replaced");
+      DfsPackDescription replaced = description(database.listPacks(), "pack-replaced");
+      DfsPackDescription replacement = database.newPack(PackSource.COMPACT);
+      byte[] payload = {3, 1, 4, 1, 5};
+      write(database, replacement, PackExt.PACK, payload);
+
+      List<DfsPackDescription> scanned = replaceDuringScan(database, replaced, replacement, phase);
+
+      assertEquals(
+          List.of(baseName(replacement)),
+          scanned.stream().map(CommittedPackCatalogH2Test::baseName).toList());
+      DfsPackDescription committed = scanned.getFirst();
+      StorageOperationBreakdown beforeRead = repository.getStorageOperationBreakdown();
+      try (ReadableChannel channel = database.openFile(committed, PackExt.PACK)) {
+        assertArrayEquals(payload, readFully(channel));
+      }
+      assertEquals(
+          StorageOperationMetrics.ZERO,
+          repository
+              .getStorageOperationBreakdown()
+              .minus(beforeRead)
+              .metrics(StorageOperationKind.PACK_FILE_READ),
+          "A superseded scan must not evict the replacement's cached inline payload");
+    }
+  }
+
+  private static List<DfsPackDescription> replaceDuringScan(
+      ReadAheadHibernateObjDatabase database,
+      DfsPackDescription replaced,
+      DfsPackDescription replacement,
+      ScanPhase phase)
+      throws Exception {
+    ScanPause pause = new ScanPause(phase, new CountDownLatch(1), new CountDownLatch(1));
+    ExecutorService workers =
+        Executors.newFixedThreadPool(2, Thread.ofPlatform().daemon().factory());
+    try {
+      Future<List<DfsPackDescription>> scan =
+          workers.submit(
+              () -> {
+                CatalogScanListener.PAUSE.set(pause);
+                try {
+                  return database.listPacks();
+                } finally {
+                  CatalogScanListener.PAUSE.remove();
+                }
+              });
+      assertTrue(pause.reached().await(WAIT_SECONDS, TimeUnit.SECONDS), "Catalog scan did not pause");
+      Future<?> publication =
+          workers.submit(
+              () -> {
+                database.commitPackImpl(List.of(replacement), List.of(replaced));
+                return null;
+              });
+      // commitPackImpl returns after the publisher has released its connection.
+      try {
+        publication.get(WAIT_SECONDS, TimeUnit.SECONDS);
+      } catch (TimeoutException blocked) {
+        throw new AssertionError(
+            "Pack publication could not finish while the scan was paused", blocked);
+      }
+      pause.resume().countDown();
+      return scan.get(WAIT_SECONDS, TimeUnit.SECONDS);
+    } finally {
+      pause.resume().countDown();
+      workers.shutdown();
+      if (!workers.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)) {
+        workers.shutdownNow();
+      }
+    }
+  }
+
+  @Test
   void failedPublicationKeepsLastCompleteCatalogGeneration() throws Exception {
     String repositoryName = "catalog-failure";
     try (HibernateSessionFactoryProvider provider = provider();
@@ -428,6 +528,10 @@ class CommittedPackCatalogH2Test {
   }
 
   private static HibernateSessionFactoryProvider provider() {
+    return new HibernateSessionFactoryProvider(providerProperties());
+  }
+
+  private static Properties providerProperties() {
     Properties properties = new Properties();
     properties.put(
         "hibernate.connection.url",
@@ -439,8 +543,48 @@ class CommittedPackCatalogH2Test {
     properties.put("hibernate.generate_statistics", "true");
     properties.put("hibernate.connection.pool_size", "2");
     properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
-    return new HibernateSessionFactoryProvider(properties);
+    return properties;
   }
+
+  public static final class CatalogScanListener implements SessionEventListener {
+    private static final ThreadLocal<ScanPause> PAUSE = new ThreadLocal<>();
+
+    @Override
+    public void jdbcConnectionAcquisitionStart() {
+      pauseAt(ScanPhase.BEFORE_CHECKOUT);
+    }
+
+    @Override
+    public void transactionCompletion(boolean successful) {
+      if (successful) {
+        pauseAt(ScanPhase.AFTER_QUERY);
+      }
+    }
+
+    private static void pauseAt(ScanPhase phase) {
+      ScanPause pause = PAUSE.get();
+      if (pause == null || pause.phase() != phase) {
+        return;
+      }
+      PAUSE.remove(); // Allow the same worker to retry the scan without pausing again.
+      pause.reached().countDown();
+      try {
+        assertTrue(
+            pause.resume().await(2 * WAIT_SECONDS, TimeUnit.SECONDS),
+            "Catalog scan was not released");
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new AssertionError("Catalog scan was interrupted", interrupted);
+      }
+    }
+  }
+
+  private enum ScanPhase {
+    BEFORE_CHECKOUT,
+    AFTER_QUERY
+  }
+
+  private record ScanPause(ScanPhase phase, CountDownLatch reached, CountDownLatch resume) {}
 
   private record PersistedPack(String packName, byte[] packData, byte[] indexData) {}
 }
