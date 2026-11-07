@@ -349,6 +349,8 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       previous = null;
       removeReplacedPayloads(replaced, replaces);
       completeCatalogMutation(result);
+      // This only resets the DFS pack list. JGit notifies listeners after commitPackImpl returns
+      // and the catalogue write lock has been released.
       clearCache();
     }
 
