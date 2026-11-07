@@ -152,19 +152,19 @@ cleanup can continue after the phase deadline. The Actions job has its own
 The `sizing/` directory in `git-aware-reflog-batch-native-telemetry` contains:
 
 - `acknowledgements.csv`: one row per committed command with queue wait,
-  observed submission-to-acknowledgement time and its batch size. A batch size
-  repeats for each command in that batch.
+  observed submission-to-acknowledgement time, its batch size and, when
+  available, its transaction-local batch ID. A batch size repeats for each
+  command in that batch.
 - `pool-borrows.csv`: one Hikari acquisition duration per measured transaction,
-  with the writer thread ID local to that coordinate.
+  with the connection hold duration, batch ID and writer thread ID local to
+  that coordinate.
 - `native.json` and `native.ndjson`: exact checkout revision, Java and PostgreSQL
   versions, coordinates, elapsed measurement time, committed batch count,
   observed active stripes and PostgreSQL WAL, I/O and wait observations.
 
 Use the command rows for acknowledgement percentiles and the measured wall time
-for throughput. Connection acquisition is sampled per transaction; its
-percentiles cannot be subtracted from command latency percentiles. This local,
-closed-loop workload checks the measurement path and does not model sustained
-overload, injected RTT, large receiver records or complete pushes. It provides
-no production stripe or pool recommendation by itself. See
-[#162](https://github.com/carstenartur/jgit-storage-hibernate/issues/162) for the
-remaining tuning work.
+for throughput. The short CI workload verifies the measurement path. See
+[PostgreSQL pool sizing for durable reflog writes](reflog-pool-sizing.md)
+for the repeated local and calibrated RTT trials, the raw results and
+deployment guidance. [#162](https://github.com/carstenartur/jgit-storage-hibernate/issues/162)
+tracks the broader sizing investigation.

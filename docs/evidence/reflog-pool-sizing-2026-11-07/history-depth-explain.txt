@@ -1,0 +1,112 @@
+=== rows=128 analyzed=false ===
+Index Scan using idx_reflog_repo_ref_key_id on git_reflog r  (cost=0.18..16.37 rows=1 width=614) (actual time=0.049..0.344 rows=16 loops=1)
+  Index Cond: (((repository_name)::text = 'sizing-shared'::text) AND ((ref_name_key)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])))
+  Filter: (((ref_name)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND (id = (SubPlan 2)))
+  Rows Removed by Filter: 112
+  Buffers: shared hit=305
+  SubPlan 2
+    ->  Result  (cost=8.16..8.17 rows=1 width=8) (actual time=0.002..0.002 rows=1 loops=128)
+          Buffers: shared hit=256
+          InitPlan 1
+            ->  Limit  (cost=0.14..8.16 rows=1 width=8) (actual time=0.002..0.002 rows=1 loops=128)
+                  Buffers: shared hit=256
+                  ->  Index Scan Backward using idx_reflog_repo_ref_key_id on git_reflog candidate  (cost=0.14..8.16 rows=1 width=8) (actual time=0.002..0.002 rows=1 loops=128)
+                        Index Cond: (((repository_name)::text = (r.repository_name)::text) AND ((ref_name_key)::text = (r.ref_name_key)::text))
+                        Filter: ((ref_name)::text = (r.ref_name)::text)
+                        Buffers: shared hit=256
+Planning:
+  Buffers: shared hit=67 read=13
+Planning Time: 0.406 ms
+Execution Time: 0.365 ms
+=== rows=128 analyzed=true ===
+Seq Scan on git_reflog r  (cost=0.08..678.60 rows=1 width=63) (actual time=1.813..2.036 rows=16 loops=1)
+  Filter: (((repository_name)::text = 'sizing-shared'::text) AND ((ref_name_key)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND ((ref_name)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND (id = (SubPlan 1)))
+  Rows Removed by Filter: 112
+  Buffers: shared hit=387
+  SubPlan 1
+    ->  Aggregate  (cost=5.24..5.25 rows=1 width=8) (actual time=0.015..0.015 rows=1 loops=128)
+          Buffers: shared hit=384
+          ->  Seq Scan on git_reflog candidate  (cost=0.00..5.24 rows=1 width=8) (actual time=0.002..0.015 rows=8 loops=128)
+                Filter: (((repository_name)::text = (r.repository_name)::text) AND ((ref_name_key)::text = (r.ref_name_key)::text) AND ((ref_name)::text = (r.ref_name)::text))
+                Rows Removed by Filter: 120
+                Buffers: shared hit=384
+Planning:
+  Buffers: shared hit=42
+Planning Time: 0.232 ms
+Execution Time: 2.052 ms
+=== rows=1024 analyzed=false ===
+Seq Scan on git_reflog r  (cost=0.08..1298.28 rows=1 width=63) (actual time=5.573..5.715 rows=16 loops=1)
+  Filter: (((repository_name)::text = 'sizing-shared'::text) AND ((ref_name_key)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND ((ref_name)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND (id = (SubPlan 2)))
+  Rows Removed by Filter: 1008
+  Buffers: shared hit=3092
+  SubPlan 2
+    ->  Result  (cost=15.94..15.95 rows=1 width=8) (actual time=0.005..0.005 rows=1 loops=1024)
+          Buffers: shared hit=3072
+          InitPlan 1
+            ->  Limit  (cost=0.27..15.94 rows=1 width=8) (actual time=0.005..0.005 rows=1 loops=1024)
+                  Buffers: shared hit=3072
+                  ->  Index Scan Backward using idx_reflog_repo_ref_key_id on git_reflog candidate  (cost=0.27..15.94 rows=1 width=8) (actual time=0.005..0.005 rows=1 loops=1024)
+                        Index Cond: (((repository_name)::text = (r.repository_name)::text) AND ((ref_name_key)::text = (r.ref_name_key)::text))
+                        Filter: ((ref_name)::text = (r.ref_name)::text)
+                        Buffers: shared hit=3072
+Planning:
+  Buffers: shared hit=2
+Planning Time: 0.126 ms
+Execution Time: 5.734 ms
+=== rows=1024 analyzed=true ===
+Seq Scan on git_reflog r  (cost=0.08..11410.16 rows=5 width=63) (actual time=6.351..6.431 rows=16 loops=1)
+  Filter: (((repository_name)::text = 'sizing-shared'::text) AND ((ref_name_key)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND ((ref_name)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND (id = (SubPlan 2)))
+  Rows Removed by Filter: 1008
+  Buffers: shared hit=3092
+  SubPlan 2
+    ->  Result  (cost=11.09..11.10 rows=1 width=8) (actual time=0.006..0.006 rows=1 loops=1024)
+          Buffers: shared hit=3072
+          InitPlan 1
+            ->  Limit  (cost=0.28..11.09 rows=1 width=8) (actual time=0.005..0.005 rows=1 loops=1024)
+                  Buffers: shared hit=3072
+                  ->  Index Scan Backward using idx_reflog_repo_ref_key_id on git_reflog candidate  (cost=0.28..43.53 rows=4 width=8) (actual time=0.005..0.005 rows=1 loops=1024)
+                        Index Cond: (((repository_name)::text = (r.repository_name)::text) AND ((ref_name_key)::text = (r.ref_name_key)::text))
+                        Filter: ((ref_name)::text = (r.ref_name)::text)
+                        Buffers: shared hit=3072
+Planning:
+  Buffers: shared hit=44
+Planning Time: 0.171 ms
+Execution Time: 6.443 ms
+=== rows=2048 analyzed=false ===
+Seq Scan on git_reflog r  (cost=0.08..4464.88 rows=1 width=63) (actual time=16.582..16.702 rows=16 loops=1)
+  Filter: (((repository_name)::text = 'sizing-shared'::text) AND ((ref_name_key)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND ((ref_name)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND (id = (SubPlan 2)))
+  Rows Removed by Filter: 2032
+  Buffers: shared hit=6184
+  SubPlan 2
+    ->  Result  (cost=27.62..27.63 rows=1 width=8) (actual time=0.008..0.008 rows=1 loops=2048)
+          Buffers: shared hit=6144
+          InitPlan 1
+            ->  Limit  (cost=0.27..27.62 rows=1 width=8) (actual time=0.007..0.007 rows=1 loops=2048)
+                  Buffers: shared hit=6144
+                  ->  Index Scan Backward using idx_reflog_repo_ref_key_id on git_reflog candidate  (cost=0.27..27.62 rows=1 width=8) (actual time=0.007..0.007 rows=1 loops=2048)
+                        Index Cond: (((repository_name)::text = (r.repository_name)::text) AND ((ref_name_key)::text = (r.ref_name_key)::text))
+                        Filter: ((ref_name)::text = (r.ref_name)::text)
+                        Buffers: shared hit=6144
+Planning:
+  Buffers: shared hit=2
+Planning Time: 0.135 ms
+Execution Time: 16.716 ms
+=== rows=2048 analyzed=true ===
+Seq Scan on git_reflog r  (cost=0.08..22249.36 rows=10 width=63) (actual time=16.861..16.981 rows=16 loops=1)
+  Filter: (((repository_name)::text = 'sizing-shared'::text) AND ((ref_name_key)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND ((ref_name)::text = ANY ('{refs/heads/producer-0,refs/heads/producer-1,refs/heads/producer-2,refs/heads/producer-3,refs/heads/producer-4,refs/heads/producer-5,refs/heads/producer-6,refs/heads/producer-7,refs/heads/producer-8,refs/heads/producer-9,refs/heads/producer-10,refs/heads/producer-11,refs/heads/producer-12,refs/heads/producer-13,refs/heads/producer-14,refs/heads/producer-15}'::text[])) AND (id = (SubPlan 2)))
+  Rows Removed by Filter: 2032
+  Buffers: shared hit=6184
+  SubPlan 2
+    ->  Result  (cost=10.81..10.82 rows=1 width=8) (actual time=0.008..0.008 rows=1 loops=2048)
+          Buffers: shared hit=6144
+          InitPlan 1
+            ->  Limit  (cost=0.28..10.81 rows=1 width=8) (actual time=0.008..0.008 rows=1 loops=2048)
+                  Buffers: shared hit=6144
+                  ->  Index Scan Backward using idx_reflog_repo_ref_key_id on git_reflog candidate  (cost=0.28..84.53 rows=8 width=8) (actual time=0.007..0.007 rows=1 loops=2048)
+                        Index Cond: (((repository_name)::text = (r.repository_name)::text) AND ((ref_name_key)::text = (r.ref_name_key)::text))
+                        Filter: ((ref_name)::text = (r.ref_name)::text)
+                        Buffers: shared hit=6144
+Planning:
+  Buffers: shared hit=48
+Planning Time: 0.182 ms
+Execution Time: 16.993 ms

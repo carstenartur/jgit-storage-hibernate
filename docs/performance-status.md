@@ -32,6 +32,15 @@ The large-pack write path is now substantially better understood:
 | Automatic repack | Disabled | Warm and cold paths have different crossovers and payback. Operators can use the [measured maintenance decision](evidence/repository-aging-full-2026-11-07.md#manual-operating-decision). |
 | P6Spy in timed benchmarks | Not used | Hibernate session events expose statement and batch executions without JDBC-proxy/logging distortion. |
 
+## Durable reflog projection and Hikari
+
+The [PostgreSQL pool sizing guide](operations/reflog-pool-sizing.md) links the
+throughput, p95 phase, batch-size and repository-scaling charts and the
+[raw measurements](evidence/reflog-pool-sizing-2026-11-07/README.md).
+The recommendation applies to the append-only projection. Its workers share
+the application pool; sizing for full pushes, large chunked work and mixed
+traffic still requires measuring those paths together.
+
 ## What “theoretical maximum” means
 
 There is no hardware-independent maximum. A database-backed Git repository performs work that a temporary filesystem fixture may not perform in the same way: network transfer, transaction coordination, WAL generation, durable commit, multi-instance locking and relational metadata maintenance.
