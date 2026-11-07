@@ -43,13 +43,13 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
         self.assertIn("- concurrent-large-pack", generic)
         self.assertNotIn("- repository-aging", generic)
 
-    def test_full_aging_matrix_is_split_into_six_disjoint_shards(self) -> None:
+    def test_full_aging_matrix_has_two_shards_per_backend(self) -> None:
         shards = self.section(
             "  repository-aging-full-shard:\n",
             "  repository-aging-full-summary:\n",
         )
         for fragment in (
-            "backend:\n          - hsqldb\n          - postgresql\n          - postgresql-hikari",
+            "backend:\n          - hsqldb\n          - postgresql\n          - postgresql-hikari\n          - sqlserver",
             "cache_state:\n          - cold\n          - warm",
             "jgit.storage.benchmark.repository-aging.backend=${{ matrix.backend }}",
             "jgit.storage.benchmark.repository-aging.cache-state=${{ matrix.cache_state }}",
@@ -68,15 +68,16 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
             "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
             "pattern: performance-investigation-repository-aging-full-*",
             "merge-multiple: true",
-            "for backend in ('hsqldb', 'postgresql', 'postgresql-hikari')",
+            "for backend in ('hsqldb', 'postgresql', 'postgresql-hikari', 'sqlserver')",
             "for cache in ('cold', 'warm')",
-            "Expected six repository-aging shards",
+            "Expected {len(expected)} repository-aging shards",
             "convert-jmh-repository-aging.py",
+            "--full-matrix",
             "target/investigations/repository-aging/jmh-result.json",
         ):
             self.assertIn(fragment, summary)
         self.assertLess(
-            summary.index("Merge the six disjoint JMH result sets"),
+            summary.index("Merge the disjoint JMH result sets"),
             summary.index("Derive complete repository-aging policy evidence"),
         )
 
@@ -89,13 +90,14 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
 
     def test_java_runner_supports_validated_backend_and_cache_shards(self) -> None:
         for fragment in (
-            "jgit.storage.benchmark.repository-aging.backend",
+            "PerformanceInvestigationParameters.repositoryAgingBackends(",
             "jgit.storage.benchmark.repository-aging.cache-state",
             '.param("backend", backends)',
             '.param("cacheState", cacheStates)',
         ):
             self.assertIn(fragment, self.benchmark_it)
         for fragment in (
+            "jgit.storage.benchmark.repository-aging.backend",
             "static String[] select(",
             "return defaultValues.clone();",
             "List.of(allowedValues).contains(value)",

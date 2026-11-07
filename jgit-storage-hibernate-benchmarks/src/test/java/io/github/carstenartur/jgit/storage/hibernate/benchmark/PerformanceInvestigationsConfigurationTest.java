@@ -38,6 +38,27 @@ class PerformanceInvestigationsConfigurationTest {
   }
 
   @Test
+  void fullAgingIncludesSqlServerAndCanRunItAsOneShard() {
+    assertArrayEquals(
+        new String[] {"hsqldb", "postgresql", "postgresql-hikari", "sqlserver"},
+        PerformanceInvestigationParameters.repositoryAgingBackends(true, false, null, null));
+    assertArrayEquals(
+        new String[] {"sqlserver"},
+        PerformanceInvestigationParameters.repositoryAgingBackends(true, false, "sqlserver", null));
+  }
+
+  @Test
+  void agingSmokeKeepsItsBoundedBackendSelection() {
+    assertArrayEquals(
+        new String[] {"hsqldb"},
+        PerformanceInvestigationParameters.repositoryAgingBackends(false, false, null, null));
+    assertArrayEquals(
+        new String[] {"sqlserver"},
+        PerformanceInvestigationParameters.repositoryAgingBackends(
+            false, true, "postgresql-hikari", "sqlserver"));
+  }
+
+  @Test
   void unsupportedShardSelectionFailsBeforeJmhStarts() {
     IllegalArgumentException failure =
         assertThrows(
