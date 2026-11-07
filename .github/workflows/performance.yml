@@ -167,6 +167,14 @@ jobs:
             -Djgit.storage.benchmark.staging-jdbc.native=true \
             -Djgit.storage.benchmark.staging-jdbc.output="$GITHUB_WORKSPACE/target/jdbc-batching/staging-jdbc"
 
+      - name: Verify the bounded staging pipeline experiment on PostgreSQL
+        run: |
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlPipelineEvidence' \
+            -Djgit.storage.benchmark.staging-pipeline.enabled=true \
+            -Djgit.storage.benchmark.staging-pipeline.repeats=1 \
+            -Djgit.storage.benchmark.staging-pipeline.output="$GITHUB_WORKSPACE/target/jdbc-batching/staging-pipeline"
+
       - name: Upload focused writer results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

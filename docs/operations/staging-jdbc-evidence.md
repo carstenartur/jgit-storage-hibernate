@@ -98,6 +98,8 @@ The snapshots report the state at each capture.
 
 ## Paired staging and RTT diagnostic
 
+The subsequent two-window experiment confirms overlap during real chunk insertion and compares virtual and platform reader threads. [Bounded staging pipeline evidence](../evidence/staging-pipeline-2026-11-07/README.md)
+
 An additional local diagnostic used one writer, a 128 MiB payload, and a 16 MiB window on the
 same source revision and disposable PostgreSQL setup. The shaped variant delayed the loopback
 TCP stream by 25 ms in each direction and paced reads of the JVM's temporary JGit pack files to

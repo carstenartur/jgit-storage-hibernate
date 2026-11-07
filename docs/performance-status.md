@@ -183,6 +183,14 @@ jgit.storage.hibernate.pack.stateless_min_payload_bytes=16777216
 
 Explicit `stateful` and `stateless` modes remain available for troubleshooting or deployment-specific policy. See [JDBC batching and pack-chunk writers](operations/jdbc-batching.md).
 
+## Staged chunk transfer experiment
+
+A bounded two-window prototype overlapped file reads with the existing
+chunk writer. The paced 128 MiB trial at 51 ms RTT reduced staged publication
+from 1,993 ms to 1,181 ms with a virtual reader, with an additional 16 MiB
+payload window. This measures the staged transfer and transaction commit.
+[Raw evidence and phase charts](evidence/staging-pipeline-2026-11-07/README.md)
+
 ## Durable receiver batching
 
 The original benchmark queue only grouped scheduling; every command still executed its own transaction. That was insufficient for the receiver use case.
