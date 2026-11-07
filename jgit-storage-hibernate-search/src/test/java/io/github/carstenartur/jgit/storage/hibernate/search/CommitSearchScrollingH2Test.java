@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,6 +19,8 @@ import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitHistor
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitSearchCursor;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.CommitSearchHit;
 import io.github.carstenartur.jgit.storage.hibernate.search.service.GitHistorySearchService;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProvider;
 import org.junit.jupiter.api.Test;
 
 class CommitSearchScrollingH2Test {
@@ -111,6 +115,48 @@ class CommitSearchScrollingH2Test {
   }
 
   @Test
+  void transactionStartupFailureClosesSessionAndAllowsRetry() {
+    var connections = new FailingConnectionProvider();
+    Properties overrides = new Properties();
+    overrides.put("hibernate.connection.provider_class", connections);
+    overrides.put("hibernate.generate_statistics", "true");
+    overrides.put("hibernate.session.events.log", "false");
+    try (HibernateSessionFactoryProvider provider = provider(overrides)) {
+      persistProjections(provider, 1);
+      var factory = provider.getSessionFactory();
+      var service = new GitHistorySearchService(factory);
+      var query = CommitHistoryQuery.forRepository("scroll-repository").unbounded().build();
+      assertEquals(List.of(objectId(1)), ids(service.findChangeSummaries(query)));
+      var statistics = factory.getStatistics();
+      statistics.clear();
+      assertEquals(0, connections.borrowedConnections());
+
+      SQLException unavailable = new SQLException("Injected cursor connection failure", "08006");
+      connections.failNextAcquisition = unavailable;
+      RuntimeException failure =
+          assertThrows(RuntimeException.class, () -> service.scrollChangeSummaries(query, 1));
+      Throwable cause = failure;
+      while (cause.getCause() != null) {
+        cause = cause.getCause();
+      }
+      assertSame(unavailable, cause, "The injected JDBC failure must reach the caller");
+      assertEquals(1, statistics.getSessionOpenCount());
+      assertEquals(
+          statistics.getSessionOpenCount(),
+          statistics.getSessionCloseCount(),
+          "Transaction startup failure must close its session");
+      assertEquals(0, connections.borrowedConnections());
+
+      try (CommitSearchCursor cursor = service.scrollChangeSummaries(query, 1)) {
+        assertEquals(List.of(objectId(1)), ids(cursor.nextChunk()));
+        assertTrue(cursor.nextChunk().isEmpty());
+      }
+      assertEquals(statistics.getSessionOpenCount(), statistics.getSessionCloseCount());
+      assertEquals(0, connections.borrowedConnections());
+    }
+  }
+
+  @Test
   void deepOffsetIsRejectedAndChunkSizeIsBounded() {
     Properties overrides = new Properties();
     overrides.put(GitHistorySearchService.MAX_OFFSET_PROPERTY, "2");
@@ -185,5 +231,24 @@ class CommitSearchScrollingH2Test {
     properties.put("hibernate.search.backend.directory.type", "local-heap");
     properties.putAll(overrides);
     return new HibernateSessionFactoryProvider(properties, SearchEntities.annotatedClasses());
+  }
+
+  /** Keep real Hibernate/H2 behavior while failing one cursor's JDBC acquisition. */
+  private static final class FailingConnectionProvider extends DriverManagerConnectionProvider {
+    private SQLException failNextAcquisition;
+
+    @Override
+    public Connection getConnection() throws SQLException {
+      if (failNextAcquisition != null) {
+        SQLException failure = failNextAcquisition;
+        failNextAcquisition = null;
+        throw failure;
+      }
+      return super.getConnection();
+    }
+
+    int borrowedConnections() {
+      return getOpenConnections();
+    }
   }
 }
