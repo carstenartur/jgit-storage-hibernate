@@ -250,7 +250,7 @@ For the measured 16-MiB publication:
 
 Database row payload inflation is therefore negligible. The application-level movement is roughly three payload passes because large extensions are staged, reread and then transferred to the database. The next write-amplification opportunity is staging/copy reduction, not manual SQL or smaller database rows.
 
-These counters do not include SQL framing, WAL, page writes, replication or physical storage amplification. Database-native telemetry is still needed for the physical ceiling.
+These counters exclude SQL framing, WAL, page writes, replication and physical storage amplification. The [synchronous phase trace](operations/staging-jdbc-evidence.md#decision-for-local-postgresql) gives a ceiling of 1.53% for overlapping eligible staging reads at 512 MiB on the measured local setup. A [paired diagnostic](operations/staging-jdbc-evidence.md#paired-staging-and-rtt-diagnostic) with artificially paced staging and 51 ms RTT raises the ideal ceiling to 11.85%. Both results bracket potential improvement from overlap in the tested conditions.
 
 ## What is complete and what remains
 
