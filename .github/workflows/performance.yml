@@ -160,12 +160,19 @@ jobs:
             target/jdbc-batching/comparison.json
           cat target/jdbc-batching/comparison.json
 
+      - name: Measure synchronous pack staging and JDBC phases
+        run: |
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest='SynchronousPackPublicationEvidenceTest#retainsPostgresqlPhaseTimelineAndNativeTelemetry' \
+            -Djgit.storage.benchmark.staging-jdbc.native=true \
+            -Djgit.storage.benchmark.staging-jdbc.output="$GITHUB_WORKSPACE/target/jdbc-batching/staging-jdbc"
+
       - name: Upload focused writer results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jdbc-batch-comparison-results
-          path: target/jdbc-batching/*
+          path: target/jdbc-batching/**
           if-no-files-found: error
 
       - name: Report pack-chunk writer comparison
