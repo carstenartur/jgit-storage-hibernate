@@ -1,0 +1,39 @@
+file,phase,repeat,log_open_utc,log_last_write_utc,cpu_affinity,cpu_quota,include_in_comparison,exclusion
+routed-768k-8w-postgresql-hikari-shared-direct-1.json,retained,1,2026-11-07 21:09:44.221048026 +0000,2026-11-07 21:09:56.993999696 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-independent-direct-1.json,retained,1,2026-11-07 21:09:57.014000161 +0000,2026-11-07 21:10:06.970233035 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-shared-size-1.json,retained,1,2026-11-07 21:10:07.006233877 +0000,2026-11-07 21:10:21.498572760 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-shared-contention-aware-1.json,retained,1,2026-11-07 21:10:21.526573415 +0000,2026-11-07 21:10:33.642856792 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-independent-size-1.json,retained,1,2026-11-07 21:10:33.674857540 +0000,2026-11-07 21:10:44.275105556 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-independent-contention-aware-1.json,retained,1,2026-11-07 21:10:44.287105837 +0000,2026-11-07 21:10:54.875353611 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-independent-contention-aware-2.json,retained,2,2026-11-07 21:10:54.905136783 +0000,2026-11-07 21:11:04.955589472 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-independent-size-2.json,retained,2,2026-11-07 21:11:04.993633636 +0000,2026-11-07 21:11:15.691840871 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-shared-contention-aware-2.json,retained,2,2026-11-07 21:11:15.723841620 +0000,2026-11-07 21:11:27.220110882 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-shared-size-2.json,retained,2,2026-11-07 21:11:27.240111350 +0000,2026-11-07 21:11:39.944408664 +0000,unpinned (0-8),8,no,overlap with another benchmark in this fork or its pair
+routed-768k-8w-postgresql-hikari-shared-size-3.json,retained,3,2026-11-07 21:11:39.964409132 +0000,2026-11-07 21:11:52.456700866 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-contention-aware-3.json,retained,3,2026-11-07 21:11:52.480701427 +0000,2026-11-07 21:12:03.644962545 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-size-3.json,retained,3,2026-11-07 21:12:03.668963106 +0000,2026-11-07 21:12:13.677197289 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-contention-aware-3.json,retained,3,2026-11-07 21:12:13.725198412 +0000,2026-11-07 21:12:23.965437904 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-contention-aware-4.json,retained,4,2026-11-07 21:12:23.989438466 +0000,2026-11-07 21:12:33.761666971 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-size-4.json,retained,4,2026-11-07 21:12:33.781667439 +0000,2026-11-07 21:12:44.037907134 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-contention-aware-4.json,retained,4,2026-11-07 21:12:44.061907695 +0000,2026-11-07 21:12:56.154190294 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-size-4.json,retained,4,2026-11-07 21:12:56.182190947 +0000,2026-11-07 21:13:09.582504039 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-size-5.json,retained,5,2026-11-07 21:13:09.606504599 +0000,2026-11-07 21:13:21.926792594 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-contention-aware-5.json,retained,5,2026-11-07 21:13:21.950793156 +0000,2026-11-07 21:13:33.095053789 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-size-5.json,retained,5,2026-11-07 21:13:33.115054256 +0000,2026-11-07 21:13:43.047286385 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-contention-aware-5.json,retained,5,2026-11-07 21:13:43.083287226 +0000,2026-11-07 21:13:53.559532127 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-shared-direct-1.json,retained,1,2026-11-07 21:13:53.579532594 +0000,2026-11-07 21:14:08.119872537 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-shared-size-1.json,retained,1,2026-11-07 21:14:08.143873097 +0000,2026-11-07 21:14:22.664212559 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-shared-contention-aware-1.json,retained,1,2026-11-07 21:14:22.684213027 +0000,2026-11-07 21:14:37.664563400 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-independent-direct-1.json,retained,1,2026-11-07 21:14:37.692564055 +0000,2026-11-07 21:14:47.980804678 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-independent-size-1.json,retained,1,2026-11-07 21:14:48.000805145 +0000,2026-11-07 21:14:58.437049086 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-independent-contention-aware-1.json,retained,1,2026-11-07 21:14:58.473049927 +0000,2026-11-07 21:15:09.089298072 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-direct-2.json,replacement,2,2026-11-07 21:17:49.745012751 +0000,2026-11-07 21:18:02.201303508 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-contention-aware-6.json,replacement,6,2026-11-07 21:18:02.221303971 +0000,2026-11-07 21:18:13.929576318 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-size-6.json,replacement,6,2026-11-07 21:18:13.957576967 +0000,2026-11-07 21:18:26.997878852 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-direct-2.json,replacement,2,2026-11-07 21:18:27.017879314 +0000,2026-11-07 21:18:36.778104810 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-size-6.json,replacement,6,2026-11-07 21:18:36.802105365 +0000,2026-11-07 21:18:46.558331386 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-contention-aware-6.json,replacement,6,2026-11-07 21:18:46.582331942 +0000,2026-11-07 21:18:57.374581902 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-contention-aware-7.json,rep7,7,2026-11-07 21:19:05.910779574 +0000,2026-11-07 21:19:15.743007312 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-independent-size-7.json,rep7,7,2026-11-07 21:19:15.763007776 +0000,2026-11-07 21:19:25.475233014 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-size-7.json,rep7,7,2026-11-07 21:19:25.499233571 +0000,2026-11-07 21:19:37.903522245 +0000,unpinned (0-8),8,yes,
+routed-768k-8w-postgresql-hikari-shared-contention-aware-7.json,rep7,7,2026-11-07 21:19:37.923522709 +0000,2026-11-07 21:19:49.407790092 +0000,unpinned (0-8),8,yes,

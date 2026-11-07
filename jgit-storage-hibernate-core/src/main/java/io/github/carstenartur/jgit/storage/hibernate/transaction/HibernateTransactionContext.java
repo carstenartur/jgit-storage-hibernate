@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.LongConsumer;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -167,14 +168,41 @@ public final class HibernateTransactionContext {
    */
   public <T> T executeWithRepositoryLock(
       StorageOperationKind operation, String repositoryName, Work<T> work) throws IOException {
+    return executeWithRepositoryLock(operation, repositoryName, work, null);
+  }
+
+  /**
+   * Execute repository-locked work and optionally observe the successful lock acquisition time.
+   *
+   * @param operation stable diagnostic category for the owning top-level transaction
+   * @param repositoryName logical repository name
+   * @param work storage work
+   * @param acquisitionObserver optional observer of row-lock acquisition nanoseconds, including RTT
+   * @param <T> result type
+   * @return work result
+   * @throws IOException if the lock row is missing or storage work fails
+   */
+  public <T> T executeWithRepositoryLock(
+      StorageOperationKind operation,
+      String repositoryName,
+      Work<T> work,
+      LongConsumer acquisitionObserver)
+      throws IOException {
     Objects.requireNonNull(repositoryName, "repositoryName");
     Objects.requireNonNull(work, "work");
     return execute(
         operation,
         session -> {
-          acquireRepositoryLock(session, repositoryName);
+          acquireRepositoryLock(session, repositoryName, acquisitionObserver);
           return work.execute(session);
         });
+  }
+
+  /**
+   * @return whether this thread is already inside a transaction on this context
+   */
+  public boolean hasActiveTransaction() {
+    return activeSession.get() != null;
   }
 
   /**
@@ -189,15 +217,21 @@ public final class HibernateTransactionContext {
    * @throws IOException if the lock row does not exist
    */
   public void acquireRepositoryLock(Session session, String repositoryName) throws IOException {
+    acquireRepositoryLock(session, repositoryName, null);
+  }
+
+  private void acquireRepositoryLock(
+      Session session, String repositoryName, LongConsumer acquisitionObserver) throws IOException {
     Objects.requireNonNull(session, "session");
     Objects.requireNonNull(repositoryName, "repositoryName");
-    long started = metricsEnabled ? System.nanoTime() : 0L;
+    boolean timed = metricsEnabled || acquisitionObserver != null;
+    long started = timed ? System.nanoTime() : 0L;
     GitRepositoryLockEntity repositoryLock =
         session.find(
             GitRepositoryLockEntity.class,
             repositoryName,
             LockModeType.PESSIMISTIC_WRITE);
-    long acquiredAt = metricsEnabled ? System.nanoTime() : 0L;
+    long acquiredAt = timed ? System.nanoTime() : 0L;
     if (metricsEnabled) {
       long elapsed = acquiredAt - started;
       repositoryLockAcquisitionNanos.add(elapsed);
@@ -212,6 +246,9 @@ public final class HibernateTransactionContext {
       if (repositoryLockAcquiredAtNanos.get() == null) {
         repositoryLockAcquiredAtNanos.set(acquiredAt);
       }
+    }
+    if (acquisitionObserver != null) {
+      acquisitionObserver.accept(acquiredAt - started);
     }
   }
 

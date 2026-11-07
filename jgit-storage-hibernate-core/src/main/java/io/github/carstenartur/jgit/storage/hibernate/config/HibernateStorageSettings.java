@@ -32,6 +32,23 @@ public final class HibernateStorageSettings {
   public static final String STATELESS_MIN_PAYLOAD_BYTES =
       "jgit.storage.hibernate.pack.stateless_min_payload_bytes";
 
+  /** Logical-pack publication selector: {@code size} or {@code contention-aware}. */
+  public static final String PACK_PUBLICATION_SELECTOR =
+      "jgit.storage.hibernate.pack.publication_selector";
+
+  /** Minimum logical-pack payload for pre-persistence under the deterministic size rule. */
+  public static final String PACK_PREPERSIST_MIN_PAYLOAD_BYTES =
+      "jgit.storage.hibernate.pack.prepersist_min_payload_bytes";
+
+  /** Deterministic size rule, used by default and when contention metrics are unavailable. */
+  public static final String SIZE_PUBLICATION_SELECTOR = "size";
+
+  /** Opt in to promoting eligible chunked packs during sustained repository contention. */
+  public static final String CONTENTION_AWARE_PUBLICATION_SELECTOR = "contention-aware";
+
+  /** Default size rule: additive fully local chunked packs at or above one MiB. */
+  public static final long DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES = 1024L * 1024L;
+
   /** Automatic size-based writer selection. */
   public static final String AUTO_CHUNK_WRITER = "auto";
 
@@ -68,6 +85,32 @@ public final class HibernateStorageSettings {
   public static final long DEFAULT_STATELESS_MIN_PAYLOAD_BYTES = 16L * 1024L * 1024L;
 
   private HibernateStorageSettings() {}
+
+  /** Resolve and validate the logical-pack publication selector. */
+  public static String resolvePackPublicationSelector(Map<?, ?> properties) {
+    Object configured = properties.get(PACK_PUBLICATION_SELECTOR);
+    if (configured == null || configured.toString().isBlank()) {
+      return SIZE_PUBLICATION_SELECTOR;
+    }
+    String mode = configured.toString().trim().toLowerCase(Locale.ROOT);
+    return switch (mode) {
+      case SIZE_PUBLICATION_SELECTOR, CONTENTION_AWARE_PUBLICATION_SELECTOR -> mode;
+      default ->
+          throw new IllegalArgumentException(
+              PACK_PUBLICATION_SELECTOR
+                  + " must be 'size' or 'contention-aware' but was '"
+                  + configured
+                  + "'");
+    };
+  }
+
+  /** Resolve the fallback size threshold in bytes. */
+  public static long resolvePackPrepersistMinPayloadBytes(Map<?, ?> properties) {
+    Object configured = properties.get(PACK_PREPERSIST_MIN_PAYLOAD_BYTES);
+    return configured == null || configured.toString().isBlank()
+        ? DEFAULT_PREPERSIST_MIN_PAYLOAD_BYTES
+        : parseLong(configured.toString(), PACK_PREPERSIST_MIN_PAYLOAD_BYTES);
+  }
 
   /** Resolve and validate the pack chunk writer mode. */
   public static String resolvePackChunkWriter(Map<?, ?> properties) {

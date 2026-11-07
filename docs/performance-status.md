@@ -162,6 +162,16 @@ Deployment overrides remain useful:
 - regional 15–35 ms and sufficient heap: 32;
 - 35–60 ms, low writer concurrency: 50.
 
+## Adaptive pack publication
+
+The one-MiB size rule remains the default. An opt-in contention selector can move
+eligible sub-MiB payload writes outside the repository lock. Five paired
+PostgreSQL/Hikari forks with eight writers, 768 KiB payloads and about 5.8 ms RTT
+measured 39.9% higher shared-repository throughput (paired 95% interval +32.4% to
++47.9%). The independent-repository interval, −21.6% to +19.7%, still permits a
+material regression. The [policy comparison and raw evidence](evidence/pack-publication-2026-11-07/README.md)
+use tmpfs database storage and do not justify a default change.
+
 ## Automatic stateful/stateless threshold
 
 The focused PostgreSQL + HikariCP matrix uses the production batch window of 16 and verifies close/reopen SHA-256 integrity.
@@ -271,7 +281,7 @@ These counters exclude SQL framing, WAL, page writes, replication and physical s
 
 | Issue area | Completed | Remaining |
 |---|---|---|
-| Adaptive direct/pre-persisted publication | Size-based one-MiB selector, path/payload diagnostics, deterministic fallback and regression coverage | A contention-aware selector has not shown enough evidence to replace the deterministic policy. |
+| Adaptive direct/pre-persisted publication | One-MiB default, opt-in bounded contention selector, path/payload diagnostics, regression coverage and retained paired PostgreSQL comparison | Independent-repository non-regression, the remaining payload/writer/RTT matrix and representative-storage evidence before any default change. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
 | Repository aging/repack | Full PostgreSQL/SQL Server/HSQLDB age matrix, repeated provider-restart evidence, and manual maintenance guidance | Broader large-repository repeats and operational budgets before considering automatic scheduling. |

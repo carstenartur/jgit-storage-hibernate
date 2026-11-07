@@ -9,11 +9,14 @@
 package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
+import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationSelectionMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationBreakdown;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationMetrics;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,6 +48,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.BenchmarkParams;
 import org.openjdk.jmh.infra.ThreadParams;
 
 /**
@@ -57,10 +61,10 @@ import org.openjdk.jmh.infra.ThreadParams;
  * in-process Java lock. The different-repository variant uses one lock row per thread and therefore
  * measures how much parallelism the repository-scoped coordination model preserves.
  *
- * <p>The default 256 KiB payload remains the ordinary-publication regression guard. Focused profiles
- * override {@link #payloadMiB} with 16 or 128 and JMH's thread count with 1, 4 and 16 to compare the
- * stateful reference writer and opt-in stateless writer under real contention. Payload and physical
- * byte counters make write amplification and adaptive-publication selection visible.
+ * <p>The default 256 KiB payload remains the ordinary-publication regression guard. Focused
+ * profiles override {@link #payloadMiB} with 16 or 128 and JMH's thread count with 1, 4 and 16 to
+ * compare the stateful reference writer and opt-in stateless writer under real contention. Payload
+ * and physical byte counters make write amplification and adaptive-publication selection visible.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -73,9 +77,8 @@ public class ConcurrentPublicationBenchmark {
 
   static final String STATEFUL = "stateful";
   static final String STATELESS = "stateless";
+  static final String DIRECT = "direct";
   static final String LOCAL_TESTCONTAINERS = "local-testcontainers";
-  private static final String CHUNK_WRITER_PROPERTY =
-      "jgit.storage.hibernate.pack.chunk_writer";
   private static final int MAX_THREADS = 16;
   private static final int SMALL_PAYLOAD_SIZE = 256 * 1024 + 257;
 
@@ -94,6 +97,13 @@ public class ConcurrentPublicationBenchmark {
   @Param({"0"})
   public int payloadMiB;
 
+  /** Optional KiB override for comparing policies below the deterministic size threshold. */
+  @Param({"0"})
+  public int payloadKiB;
+
+  @Param({HibernateStorageSettings.SIZE_PUBLICATION_SELECTOR})
+  public String publicationPolicy = HibernateStorageSettings.SIZE_PUBLICATION_SELECTOR;
+
   @Param({LOCAL_TESTCONTAINERS})
   public String deployment;
 
@@ -106,11 +116,15 @@ public class ConcurrentPublicationBenchmark {
   private Path[] isolatedRepositoryDirectories;
 
   @Setup(Level.Trial)
-  public void setupTrial() throws Exception {
+  public void setupTrial(BenchmarkParams params) throws Exception {
     String trialId = Long.toHexString(System.nanoTime());
-    sharedRepositoryName = "jmh-concurrent-shared-" + trialId;
-    isolatedRepositoryNames = new String[MAX_THREADS];
-    for (int index = 0; index < MAX_THREADS; index++) {
+    if (params.getThreads() > MAX_THREADS) {
+      throw new IllegalArgumentException("Benchmark supports at most " + MAX_THREADS + " threads");
+    }
+    boolean shared = params.getBenchmark().endsWith(".publishToSameRepository");
+    sharedRepositoryName = shared ? "jmh-concurrent-shared-" + trialId : null;
+    isolatedRepositoryNames = new String[shared ? 0 : params.getThreads()];
+    for (int index = 0; index < isolatedRepositoryNames.length; index++) {
       isolatedRepositoryNames[index] = "jmh-concurrent-isolated-" + trialId + "-" + index;
     }
 
@@ -119,9 +133,12 @@ public class ConcurrentPublicationBenchmark {
       return;
     }
 
+    BenchmarkConnectionProperties.suppressConnectionMetadataLogging();
     databaseName = "jmh-concurrent-" + backend + "-" + trialId;
     schemaProvider = new HibernateSessionFactoryProvider(hibernateProperties("create-drop"));
-    createHibernateRepository(schemaProvider, sharedRepositoryName);
+    if (shared) {
+      createHibernateRepository(schemaProvider, sharedRepositoryName);
+    }
     for (String repositoryName : isolatedRepositoryNames) {
       createHibernateRepository(schemaProvider, repositoryName);
     }
@@ -155,10 +172,12 @@ public class ConcurrentPublicationBenchmark {
 
   private void setupFilesystemRepositories() throws IOException {
     filesystemRoot = Files.createTempDirectory("jgit-concurrent-benchmark-");
-    sharedRepositoryDirectory = filesystemRoot.resolve("shared.git");
-    createFilesystemRepository(sharedRepositoryDirectory);
-    isolatedRepositoryDirectories = new Path[MAX_THREADS];
-    for (int index = 0; index < MAX_THREADS; index++) {
+    if (sharedRepositoryName != null) {
+      sharedRepositoryDirectory = filesystemRoot.resolve("shared.git");
+      createFilesystemRepository(sharedRepositoryDirectory);
+    }
+    isolatedRepositoryDirectories = new Path[isolatedRepositoryNames.length];
+    for (int index = 0; index < isolatedRepositoryDirectories.length; index++) {
       Path directory = filesystemRoot.resolve("isolated-" + index + ".git");
       isolatedRepositoryDirectories[index] = directory;
       createFilesystemRepository(directory);
@@ -172,7 +191,17 @@ public class ConcurrentPublicationBenchmark {
     properties.put("hibernate.format_sql", "false");
     properties.put("hibernate.search.enabled", "false");
     properties.put(HibernateTransactionContext.METRICS_ENABLED_PROPERTY, "true");
-    properties.put(CHUNK_WRITER_PROPERTY, writeMode);
+    properties.put(HibernateStorageSettings.PACK_CHUNK_WRITER, writeMode);
+    properties.put(
+        HibernateStorageSettings.PACK_PUBLICATION_SELECTOR,
+        DIRECT.equals(publicationPolicy)
+            ? HibernateStorageSettings.SIZE_PUBLICATION_SELECTOR
+            : publicationPolicy);
+    if (DIRECT.equals(publicationPolicy)) {
+      properties.put(
+          HibernateStorageSettings.PACK_PREPERSIST_MIN_PAYLOAD_BYTES,
+          Long.toString(Long.MAX_VALUE));
+    }
 
     switch (backend) {
       case HibernateRepositoryBenchmark.HSQLDB -> {
@@ -185,13 +214,16 @@ public class ConcurrentPublicationBenchmark {
           HibernateRepositoryBenchmark.POSTGRESQL_HIKARI -> {
         properties.put(
             "hibernate.connection.url",
-            requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY));
+            BenchmarkConnectionProperties.requiredSystemProperty(
+                HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY));
         properties.put(
             "hibernate.connection.username",
-            requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY));
+            BenchmarkConnectionProperties.requiredSystemProperty(
+                HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY));
         properties.put(
             "hibernate.connection.password",
-            requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+            BenchmarkConnectionProperties.requiredSystemProperty(
+                HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
         properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
         properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
         if (HibernateRepositoryBenchmark.POSTGRESQL_HIKARI.equals(backend)) {
@@ -206,14 +238,6 @@ public class ConcurrentPublicationBenchmark {
       default -> throw new IllegalArgumentException("Unsupported concurrent backend: " + backend);
     }
     return properties;
-  }
-
-  private static String requiredSystemProperty(String name) {
-    String value = System.getProperty(name);
-    if (value == null || value.isBlank()) {
-      throw new IllegalStateException("Missing benchmark system property " + name);
-    }
-    return value;
   }
 
   private static void createHibernateRepository(
@@ -250,7 +274,9 @@ public class ConcurrentPublicationBenchmark {
     }
   }
 
-  /** Per-thread repository handles and payload state, all constructed outside measured operations. */
+  /**
+   * Per-thread repository handles and payload state, all constructed outside measured operations.
+   */
   @State(Scope.Thread)
   public static class ThreadRepositoryState {
 
@@ -265,29 +291,41 @@ public class ConcurrentPublicationBenchmark {
     public void setup(ConcurrentPublicationBenchmark benchmark, ThreadParams threadParams)
         throws Exception {
       threadIndex = threadParams.getThreadIndex();
-      if (threadIndex >= MAX_THREADS) {
-        throw new IllegalStateException("Benchmark supports at most " + MAX_THREADS + " threads");
+      if (benchmark.payloadMiB < 0
+          || benchmark.payloadKiB < 0
+          || (benchmark.payloadMiB != 0 && benchmark.payloadKiB != 0)) {
+        throw new IllegalArgumentException("Set at most one positive payloadMiB or payloadKiB");
       }
       int payloadSize =
-          benchmark.payloadMiB == 0
-              ? SMALL_PAYLOAD_SIZE
-              : Math.addExact(Math.multiplyExact(benchmark.payloadMiB, 1024 * 1024), 257);
+          benchmark.payloadKiB != 0
+              ? Math.addExact(Math.multiplyExact(benchmark.payloadKiB, 1024), 257)
+              : benchmark.payloadMiB == 0
+                  ? SMALL_PAYLOAD_SIZE
+                  : Math.addExact(Math.multiplyExact(benchmark.payloadMiB, 1024 * 1024), 257);
       payload = new byte[payloadSize];
-      new Random(0x434f4e4355525245L ^ threadIndex ^ benchmark.payloadMiB).nextBytes(payload);
+      new Random(0x434f4e4355525245L ^ threadIndex ^ benchmark.payloadMiB ^ benchmark.payloadKiB)
+          .nextBytes(payload);
 
       if (HibernateRepositoryBenchmark.FILESYSTEM.equals(benchmark.backend)) {
-        sharedRepository = openFilesystemRepository(benchmark.sharedRepositoryDirectory);
-        isolatedRepository =
-            openFilesystemRepository(benchmark.isolatedRepositoryDirectories[threadIndex]);
+        if (benchmark.sharedRepositoryName != null) {
+          sharedRepository = openFilesystemRepository(benchmark.sharedRepositoryDirectory);
+        } else {
+          isolatedRepository =
+              openFilesystemRepository(benchmark.isolatedRepositoryDirectories[threadIndex]);
+        }
         return;
       }
 
       provider = new HibernateSessionFactoryProvider(benchmark.hibernateProperties("validate"));
-      sharedRepository =
-          HibernateRepository.create(provider.getSessionFactory(), benchmark.sharedRepositoryName);
-      isolatedRepository =
-          HibernateRepository.create(
-              provider.getSessionFactory(), benchmark.isolatedRepositoryNames[threadIndex]);
+      if (benchmark.sharedRepositoryName != null) {
+        sharedRepository =
+            HibernateRepository.create(
+                provider.getSessionFactory(), benchmark.sharedRepositoryName);
+      } else {
+        isolatedRepository =
+            HibernateRepository.create(
+                provider.getSessionFactory(), benchmark.isolatedRepositoryNames[threadIndex]);
+      }
     }
 
     @TearDown(Level.Trial)
@@ -306,10 +344,11 @@ public class ConcurrentPublicationBenchmark {
         Repository repository, String scope, ConcurrentStorageCounters counters) throws Exception {
       long invocation = sequence.incrementAndGet();
       encodeInvocation(payload, invocation);
-      StorageOperationMetrics operationsBefore = operationMetrics(repository);
+      StorageOperationBreakdown operationsBefore = operationBreakdown(repository);
       StorageByteMetrics bytesBefore = byteMetrics(repository);
       StagingSpillMetrics spillsBefore = spillMetrics(repository);
       PackPublicationSelectionMetrics selectionsBefore = selectionMetrics(repository);
+      long publicationStarted = PackPublicationProfiler.start();
 
       ObjectId objectId;
       try (ObjectInserter inserter = repository.newObjectInserter()) {
@@ -319,21 +358,30 @@ public class ConcurrentPublicationBenchmark {
 
       RefUpdate update =
           repository.updateRef(
-              "refs/heads/benchmark/"
-                  + scope
-                  + "/thread-"
-                  + threadIndex
-                  + "/"
-                  + invocation);
+              "refs/heads/benchmark/" + scope + "/thread-" + threadIndex + "/" + invocation);
       update.setNewObjectId(objectId);
       update.disableRefLog();
       RefUpdate.Result result = update.update();
       if (result != RefUpdate.Result.NEW) {
         throw new IOException("Unexpected concurrent ref result " + result);
       }
+      long duration = publicationStarted == 0 ? 0 : System.nanoTime() - publicationStarted;
 
+      StorageOperationBreakdown operations = operationBreakdown(repository).minus(operationsBefore);
+      StorageOperationMetrics packPublication =
+          operations.metrics(StorageOperationKind.PACK_PUBLICATION);
+      if (publicationStarted != 0) {
+        PackPublicationProfiler.record(
+            threadIndex,
+            duration,
+            packPublication.repositoryLocksAcquired() == 1
+                ? packPublication.repositoryLockAcquisitionNanos()
+                : -1);
+      }
       counters.capture(
-          operationMetrics(repository).minus(operationsBefore),
+          operations.total(),
+          packPublication,
+          operations.metrics(StorageOperationKind.PACK_EXTENSION_WRITE),
           byteMetrics(repository).minus(bytesBefore),
           spillMetrics(repository).minus(spillsBefore),
           selectionMetrics(repository).minus(selectionsBefore),
@@ -341,10 +389,10 @@ public class ConcurrentPublicationBenchmark {
       return objectId;
     }
 
-    private static StorageOperationMetrics operationMetrics(Repository repository) {
+    private static StorageOperationBreakdown operationBreakdown(Repository repository) {
       return repository instanceof HibernateRepository hibernateRepository
-          ? hibernateRepository.getStorageOperationMetrics()
-          : StorageOperationMetrics.ZERO;
+          ? hibernateRepository.getStorageOperationBreakdown()
+          : StorageOperationBreakdown.ZERO;
     }
 
     private static StorageByteMetrics byteMetrics(Repository repository) {
@@ -382,10 +430,14 @@ public class ConcurrentPublicationBenchmark {
   @AuxCounters(AuxCounters.Type.EVENTS)
   @State(Scope.Thread)
   public static class ConcurrentStorageCounters {
+    public long publications;
     public long storageTransactions;
     public long repositoryLocks;
     public long repositoryLockAcquisitionMicros;
     public long repositoryLockHeldMicros;
+    public long packPublicationLockHeldMicros;
+    public long unlockedPackWriteTransactions;
+    public long unlockedPackWriteDurationMicros;
     public long transactionDurationMicros;
     public long logicalGitBytes;
     public long temporaryFileBytesWritten;
@@ -397,12 +449,16 @@ public class ConcurrentPublicationBenchmark {
     public long directPublicationSelections;
     public long prePersistedPublicationSelections;
 
-    @Setup(Level.Invocation)
+    @Setup(Level.Iteration)
     public void reset() {
+      publications = 0;
       storageTransactions = 0;
       repositoryLocks = 0;
       repositoryLockAcquisitionMicros = 0;
       repositoryLockHeldMicros = 0;
+      packPublicationLockHeldMicros = 0;
+      unlockedPackWriteTransactions = 0;
+      unlockedPackWriteDurationMicros = 0;
       transactionDurationMicros = 0;
       logicalGitBytes = 0;
       temporaryFileBytesWritten = 0;
@@ -417,30 +473,38 @@ public class ConcurrentPublicationBenchmark {
 
     private void capture(
         StorageOperationMetrics operations,
+        StorageOperationMetrics packPublication,
+        StorageOperationMetrics unlockedPackWrite,
         StorageByteMetrics bytes,
         StagingSpillMetrics spills,
         PackPublicationSelectionMetrics selections,
         long payloadBytes) {
-      storageTransactions = operations.transactionsStarted();
-      repositoryLocks = operations.repositoryLocksAcquired();
-      repositoryLockAcquisitionMicros =
+      publications++;
+      storageTransactions += operations.transactionsStarted();
+      repositoryLocks += operations.repositoryLocksAcquired();
+      repositoryLockAcquisitionMicros +=
           TimeUnit.NANOSECONDS.toMicros(operations.repositoryLockAcquisitionNanos());
-      repositoryLockHeldMicros =
+      repositoryLockHeldMicros +=
           TimeUnit.NANOSECONDS.toMicros(operations.repositoryLockHeldNanos());
-      transactionDurationMicros =
+      packPublicationLockHeldMicros +=
+          TimeUnit.NANOSECONDS.toMicros(packPublication.repositoryLockHeldNanos());
+      unlockedPackWriteTransactions += unlockedPackWrite.transactionsStarted();
+      unlockedPackWriteDurationMicros +=
+          TimeUnit.NANOSECONDS.toMicros(unlockedPackWrite.transactionDurationNanos());
+      transactionDurationMicros +=
           TimeUnit.NANOSECONDS.toMicros(operations.transactionDurationNanos());
-      logicalGitBytes = payloadBytes;
-      temporaryFileBytesWritten = bytes.temporaryFileBytesWritten();
-      temporaryFileBytesRead = bytes.temporaryFileBytesRead();
-      databasePayloadBytesWritten = bytes.databasePayloadBytesWritten();
-      writeAmplificationBasisPoints =
+      logicalGitBytes += payloadBytes;
+      temporaryFileBytesWritten += bytes.temporaryFileBytesWritten();
+      temporaryFileBytesRead += bytes.temporaryFileBytesRead();
+      databasePayloadBytesWritten += bytes.databasePayloadBytesWritten();
+      writeAmplificationBasisPoints +=
           payloadBytes == 0
               ? 0
-              : Math.multiplyExact(databasePayloadBytesWritten, 10_000) / payloadBytes;
-      memoryToFileSpills = spills.memoryToFileSpills();
-      spilledPrefixBytes = spills.spilledPrefixBytes();
-      directPublicationSelections = selections.directSelections();
-      prePersistedPublicationSelections = selections.prePersistedSelections();
+              : Math.multiplyExact(bytes.databasePayloadBytesWritten(), 10_000) / payloadBytes;
+      memoryToFileSpills += spills.memoryToFileSpills();
+      spilledPrefixBytes += spills.spilledPrefixBytes();
+      directPublicationSelections += selections.directSelections();
+      prePersistedPublicationSelections += selections.prePersistedSelections();
     }
   }
 }
