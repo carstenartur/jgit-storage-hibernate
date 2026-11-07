@@ -116,6 +116,35 @@ class SearchRuntimeConverterTest(unittest.TestCase):
         self.assertIn("Hibernate Search concurrent query p99 — batch-250", names)
         self.assertIn("Hibernate Search runtime burst visibility polls — reference", names)
 
+    def test_retains_post_close_index_and_heap_observations_with_acknowledgment_contract(self) -> None:
+        scenario = "sync-async-r500"
+        results = self.scenario_results(scenario)
+        for result in results:
+            result["secondaryMetrics"].update(
+                {
+                    "luceneCommitGenerations": self.counter([2, 4]),
+                    "luceneCommittedSegments": self.counter([4, 6]),
+                    "luceneCommittedBytes": self.counter([1024, 2048]),
+                    "peakHeapPoolBytes": self.counter([1_048_576, 3_145_728]),
+                }
+            )
+        by_name = {entry["name"]: entry for entry in CONVERTER.convert(results)}
+        size = by_name[f"Hibernate Search runtime burst committed index bytes — {scenario}"]
+        self.assertEqual(1536, size["value"])
+        self.assertEqual("count/op", size["unit"])
+        self.assertIn("after graceful close", size["extra"])
+        self.assertIn("neither durability nor immediate visibility", size["extra"])
+        self.assertEqual(
+            5,
+            by_name[f"Hibernate Search runtime rebuild committed segments — {scenario}"]["value"],
+        )
+        self.assertEqual(
+            2_097_152,
+            by_name[f"Hibernate Search runtime burst sum of peak heap pools in bytes — {scenario}"][
+                "value"
+            ],
+        )
+
     def test_missing_operation_is_rejected(self) -> None:
         results = [
             result

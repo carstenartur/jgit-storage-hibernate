@@ -22,9 +22,58 @@ The commits preceding the burst are indexed during setup for the burst and concu
 
 The two explicit CPU profiles pin the Maven test launcher and its JMH forks to allowed Linux CPUs and set the fork's JVM processor count to match. The PostgreSQL container uses the Docker host's normal allocation. Compare runs on the same source commit and runner type. Hold the workload and matrix fixed when comparing CPU and heap budgets, or hold resources fixed when comparing workloads.
 
-The run artifact includes `environment.properties` (commit, matrix, workload, CPU affinity, heap flags, Java and database versions), `cpu.json`, raw JMH results and grouped chart data. Only automatic smoke runs on `main` enter the public chart history. Manual artifacts support exploratory comparisons of larger fixtures and resource budgets. Persistent restart, interrupted indexing and production recommendations are tracked in [runtime tuning issue #196](https://github.com/carstenartur/jgit-storage-hibernate/issues/196).
+The run artifact includes `environment.properties` (commit, matrix, workload, CPU affinity, heap flags, Java, Hibernate Search, Lucene and database versions), `cpu.json`, raw JMH results, grouped chart data and the recovery test report. Only automatic smoke runs on `main` enter the [public chart history](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-submission-p-50). Manual artifacts support comparisons of larger fixtures and resource budgets.
 
 The smoke and full matrices collect two and three measured shots per scenario, respectively. Treat shot-based upper percentiles as exploratory. JMH allocation and GC counters include fixture setup and teardown. Concurrent query sampling ends when the producer completes. The separate visibility measurements capture the wait for the indexed burst to become searchable.
+
+## What a successful write acknowledges
+
+These tests use the pinned Hibernate Search 8.4.0.Final/Lucene 9.12.3 with the default, no-coordination indexing plan. The database transaction commits before the Lucene work; it is possible for projection rows to exist even after an index commit error. The following modes are values for `hibernate.search.indexing.plan.synchronization.strategy`:
+
+| Strategy | What the caller waits for | Can a successful return precede Lucene durability? | Does it wait for immediate search visibility? |
+| --- | --- | --- | --- |
+| `write-sync` (reference) | Apply changes and commit the index | No | No; on local Lucene with `refresh_interval=0`, the next query refreshes a changed reader |
+| `sync` | Apply, commit and refresh | No | Yes |
+| `read-sync` | Apply and refresh | Yes | Yes |
+| `async` | Submit work | Yes | No; queueing and refresh contribute to visibility lag |
+
+`hibernate.search.backend.io.refresh_interval` is in milliseconds. A positive value lets queries reuse a reader refreshed within that interval. It is not a bound on end-to-end lag, because indexing may still be queued and the reader refresh is driven by queries. `sync` and `read-sync` can force a refresh. The matrix leaves `hibernate.search.backend.io.commit_interval` at its 1,000 ms default for commits that are not forced by the synchronization strategy. See the synchronization and Lucene I/O sections of the [Hibernate Search reference](https://docs.hibernate.org/search/8.4/reference/en-US/html_single/).
+
+`hibernate.search.backend.io.writer.ram_buffer_size` sets the writer's document buffer in MiB. It is not a heap cap. `hibernate.search.backend.thread_pool.size` sets the backend worker pool size. Match a deployment's worker count and heap budget to its CPU quota and concurrent indexes. The larger worker and buffer combinations in the full matrix are stress cases. The `batch-*` scenarios set both `jgit.storage.hibernate.search.index_batch_size` and `hibernate.jdbc.batch_size`; interpret them as combined projection transaction/JDBC batch experiments.
+
+## Failure and restart behavior
+
+`SearchRuntimeRecoveryTest` uses a disposable file-backed HSQLDB database and a persistent Lucene directory. It force-terminates the writer JVM with the SessionFactory open, then reopens the same database and index. The tests check the exact projection and search hit IDs and confirm that the Git ref survives:
+
+- Successful `write-sync` and `sync` writes survive the process kill. The first query with each tested `refresh_interval=0` configuration sees all three fixture commits before termination.
+- `async` returns successfully before Lucene commits. With the commit paused at filesystem sync, the crash leaves three projection rows but only the one previously committed search hit. An incremental retry skips the two existing rows. Rebuilding from Git restores all three hits.
+- An interrupted rebuild reports its one committed batch, which survives restart. Rebuilding again replaces the partial projection and restores the entire history.
+- An injected Lucene commit I/O error is visible to the `write-sync` caller after the database rows commit. With `async`, the submitter returns and the failure arrives through the configured background handler. The benchmark fails on that handler's first error, including errors reported during teardown.
+
+Use `async` only with a tested `hibernate.search.background_failure_handler` that alerts on failures and an operational plan to reconcile the index with Git. A successful submit is not a durable or immediately searchable write. If drift is suspected, stop competing writers, rebuild the affected repository's projection and verify the expected search results before relying on it. A process kill can drop queued changes without invoking a failure handler; alerting does not replace restart reconciliation.
+
+Keep the existing `write-sync` reference and raw Hibernate Search settings. For applications that require a durable write to be searchable immediately, `sync` is an explicit setting to validate with their workload. These measurements do not support adding named production profiles or weakening the default acknowledgment contract.
+
+The [retained 1,000-commit comparison](../evidence/search-runtime-2026-11-07/README.md) uses a 500-commit burst and both explicit resource profiles. It includes raw JMH shots, a throughput versus visibility chart, concurrent query percentiles, and the committed index and heap observations. Async acknowledged work faster under both budgets, with a much longer visibility wait after acknowledgment. Treat this as local evidence; larger hosted matrices are still needed to compare the other runtime settings.
+
+## Hosted evidence branch
+
+A push to `benchmark/search-runtime-full-196-*` can run the following hosted comparison. Include a change to `.github/benchmark-triggers/issue196-runtime-evidence.json` in the push if the branch has no changes to the workflow or other paths that already trigger it. Use the marker to record the source revision and purpose of the run.
+
+| Workload | Resource profile | Settings |
+| --- | --- | --- |
+| `1000-500` | `normal` | Full |
+| `10000-50` | `normal` | Smoke |
+| `10000-500` | `normal` | Smoke |
+| `10000-500` | `constrained` | Smoke |
+
+The 1,000-commit run covers all synchronization and refresh values, writer buffers and thread counts, and transaction batch sizes in the full settings matrix. The three 10,000-commit jobs use the same seven smoke scenarios so that burst size and resource profile can be compared separately. The workflow runs at most two jobs at once and stores each result as `hibernate-search-runtime-results-<workload>-<resources>-<settings>`.
+
+## Reading the measurements
+
+Burst submission and ready time are in `ms/op` per burst. To express throughput as commits per second, divide the number of commits in a burst or rebuild by its elapsed time in seconds. Compare submission throughput with the visibility wait and concurrent query p50/p95/p99, since submission alone can move work off the application thread. One `GitCommitIndex` document represents one fixture commit. Rebuild ready checks all expected hits, so newer results are stricter than the older runs that checked only the burst suffix.
+
+The commit generation advance is the difference from fixture setup to graceful close. Segment count, document count and referenced bytes describe the final committed Lucene index after close. An async result reaching this state does not make its earlier acknowledgment durable. The heap measurement sums peak usage from individual JVM heap pools from the end of setup until just before close; because the pool peaks may occur at different times, it is an upper bound, not a time-aligned sample. These measurements do not count individual refreshes or merges. Lucene writer tracing changes timing and should be collected separately when exact activity counts are needed.
 
 ## Run locally
 
@@ -34,7 +83,7 @@ With JDK 21 or newer, Maven and Docker available, run from the repository root. 
 mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
 cpu="$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')"
 taskset --cpu-list "$cpu" mvn -B -pl jgit-storage-hibernate-benchmarks test \
-  -Dtest=HibernateSearchRuntimeTuningBenchmarkIT \
+  -Dtest=SearchRuntimeRecoveryTest,HibernateSearchRuntimeTuningBenchmarkIT \
   -Dsearch.runtime.workload=10000-500 \
   -Dsearch.runtime.resources=constrained \
   -Dbenchmark.commit="$(git rev-parse HEAD)" \
@@ -42,3 +91,10 @@ taskset --cpu-list "$cpu" mvn -B -pl jgit-storage-hibernate-benchmarks test \
 ```
 
 For `normal`, supply four allowed CPUs to `taskset`. For `host`, omit `taskset`. The local runner defaults to smoke settings; use `-Dsearch.runtime.full=true` for an eligible workload.
+
+To run only the persistent recovery tests without Docker:
+
+```bash
+mvn -B -pl jgit-storage-hibernate-benchmarks -am test \
+  -Dtest=SearchRuntimeRecoveryTest -Dsurefire.failIfNoSpecifiedTests=false
+```
