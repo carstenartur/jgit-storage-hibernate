@@ -22,6 +22,14 @@ The plotted coordinate is `reopenAndLookupOldest` after ten pushes with a cold J
 
 The same SQL Server read coordinate recorded 11 ms of `WRITELOG` during fixture build for either repack mode. Compact-only repack recorded 1 ms of `WRITELOG`, while the read-optimized repack recorded 7 ms of `WRITELOG` and 2 ms of page I/O wait. These deltas describe the isolated server over each window. Sessions can overlap and waits are one proxy for elapsed time. The [aging and maintenance evidence](../operations/repack-and-gc.md#resulting-operational-guidance) gives the separate read latency and repack payback across repository ages.
 
+### Read plans and time windows
+
+![PostgreSQL and SQL Server focused plan reads, server time and aging phase windows](database-native-evidence-2026-11-07-reads-and-time.svg)
+
+The focused fixture returned four rows on each engine. PostgreSQL 17.10 used an index scan with three shared-buffer hits, zero shared blocks read and zero WAL bytes. SQL Server 2022 used an index seek with two logical reads, zero physical reads and zero spill warnings. PostgreSQL reported 0.082 ms execution time. SQL Server reported zero for CPU and execution time at the plan's millisecond resolution. The engines define their page counters and time resolution independently. These are two warm indexed reads of a small fixture, separate from the JMH run. [Focused probe scope](../operations/database-native-telemetry.md#focused-pack-chunk-read-diagnostics)
+
+The lower panels show elapsed windows for the earlier cold JGit reopen and compact-only maintenance coordinate. The timestamps bracket each phase and exclude the before/after snapshot calls. They include the work done by the benchmark harness, so use the log counters and waits as separate observations within the corresponding phase.
+
 ## Other retained workload boundaries
 
 | Workload | Observation | Interpretation |
@@ -38,5 +46,6 @@ The same SQL Server read coordinate recorded 11 ms of `WRITELOG` during fixture 
 | Repository aging and repack | `a906cf0184ef166e4a8b9774e8dc8f47fbce6211` | [PostgreSQL](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42398622821/artifacts/13584975228), [SQL Server](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42398622821/artifacts/13584284059) |
 | Atomic reflog batches | `a60fb7fd28c8ec051efb480e5db38b03e9bbaf6a` | [PostgreSQL and SQL Server](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/32636555092/artifacts/9492479713) |
 | Hibernate Search | `62fc007e2fcc5f183cc4d40e1593392912305faa` | [PostgreSQL JMH and native JSON](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42397612037/artifacts/13583963275) |
+| Focused pack-chunk read plan | `7f4b436ccc163dd50a910d4d36d2ce914e1c0f67` | [PostgreSQL](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42406203576/artifacts/13587104194), [SQL Server](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42406203576/artifacts/13588065014) |
 
 The CSV retains the selected observations after hosted artifacts expire. The larger repository-aging series and pack-layout benchmark have their own workload and evidence boundaries. Use these charts for the plotted coordinates and repeat a representative workload when sizing a deployment.

@@ -179,11 +179,11 @@ read, outside JMH and after the aging evidence has been uploaded.
   the count is a warning indicator and does not estimate spill volume. SQL
   Server requires `SHOWPLAN` on the fixture database.
 
-Both engines use lock, JDBC query and socket timeouts; PostgreSQL also enforces
-a server statement timeout. The workflow retains only
-`focused-read-plan-<backend>.json`. The plan XML never leaves memory: only a
-fixed operator category, normalized server version and allowlisted numeric
-fields are serialized. The probe does not require any extensions. Missing
+Both engines use lock, JDBC query and socket timeouts. PostgreSQL also enforces
+a server statement timeout. The workflow retains `focused-read-plan-<backend>.json`
+with the fixed probe settings and the empty list of required extensions. It keeps
+plan XML in memory and serializes a fixed operator category, normalized server
+version and allowlisted numeric fields. Missing
 counters are omitted; unsupported results use fixed categories, including
 `permission-denied` and `timeout`. CI requires a supported result on its
 disposable databases. A failed diagnostic does not affect JMH or remove the
@@ -194,7 +194,7 @@ fixture. It does not measure production pack size, cold-cache reads, application
 latency or the effect of changing a storage default. This indexed range does
 not exercise SQL Server tempdb spills. PostgreSQL shared buffers
 and SQL Server logical reads are engine-specific signals, not directly
-interchangeable counts.
+interchangeable counts. [Read plan charts and evidence](../evidence/database-native-evidence-2026-11-07.md#read-plans-and-time-windows)
 
 To run the focused probe with Testcontainers, first build the benchmark module
 with `mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests`.

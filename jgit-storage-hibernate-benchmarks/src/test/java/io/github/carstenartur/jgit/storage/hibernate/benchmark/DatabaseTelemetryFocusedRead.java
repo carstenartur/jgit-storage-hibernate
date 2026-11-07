@@ -38,6 +38,8 @@ final class DatabaseTelemetryFocusedRead {
   static final String FIXTURE_TABLE = "focused_pack_chunk_fixture";
 
   private static final int STATEMENT_TIMEOUT_SECONDS = 4;
+  private static final int POSTGRESQL_STATEMENT_TIMEOUT_MILLIS = 3_000;
+  private static final int LOCK_TIMEOUT_MILLIS = 2_000;
   private static final int MAX_PLAN_CHARACTERS = 64 * 1024;
   private static final Pattern NON_NEGATIVE_NUMBER =
       Pattern.compile("[0-9]{1,16}(?:\\.[0-9]{1,6})?");
@@ -91,10 +93,10 @@ final class DatabaseTelemetryFocusedRead {
       if (backend == Backend.POSTGRESQL) {
         connection.setAutoCommit(false);
         session.execute("SET TRANSACTION READ ONLY");
-        session.execute("SET LOCAL statement_timeout = '3000ms'");
-        session.execute("SET LOCAL lock_timeout = '2000ms'");
+        session.execute("SET LOCAL statement_timeout = " + POSTGRESQL_STATEMENT_TIMEOUT_MILLIS);
+        session.execute("SET LOCAL lock_timeout = " + LOCK_TIMEOUT_MILLIS);
       } else {
-        session.execute("SET LOCK_TIMEOUT 2000");
+        session.execute("SET LOCK_TIMEOUT " + LOCK_TIMEOUT_MILLIS);
         session.execute("SET STATISTICS XML ON");
       }
 
@@ -332,6 +334,15 @@ final class DatabaseTelemetryFocusedRead {
           + "\",\"serverVersion\":\""
           + serverVersion
           + "\",\"probe\":\"pack-chunk-window\",\"profile\":\"indexed-fixture-v1\","
+          + "\"settings\":{\"queryTimeoutSeconds\":"
+          + STATEMENT_TIMEOUT_SECONDS
+          + ",\"lockTimeoutMillis\":"
+          + LOCK_TIMEOUT_MILLIS
+          + (backend == Backend.POSTGRESQL
+              ? ",\"readOnlyTransaction\":true,\"serverStatementTimeoutMillis\":"
+                  + POSTGRESQL_STATEMENT_TIMEOUT_MILLIS
+              : ",\"statisticsXml\":true")
+          + "},\"requiredExtensions\":[],"
           + (unsupported == null
               ? "\"operator\":\"" + operator + "\",\"metrics\":" + values
               : "\"unsupported\":\"" + unsupported + "\"")
