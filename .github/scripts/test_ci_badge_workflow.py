@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).parents[2]
 CI = ROOT / ".github/workflows/maven.yml"
 PUBLISH = ROOT / ".github/workflows/publish-build-badges.yml"
+PAGES = ROOT / ".github/workflows/pages.yml"
 README = ROOT / "README.md"
 FULL_SHA_ACTION = re.compile(
     r"uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([0-9a-f]{40})(?:\s+#.*)?$",
@@ -85,6 +86,17 @@ class CiBadgeWorkflowTest(unittest.TestCase):
             "actions/workflows/publish-build-badges.yml/badge.svg",
             self.readme,
         )
+
+    def test_pages_retry_upload_and_deploy_use_the_same_attempt_artifact(self) -> None:
+        pages = PAGES.read_text(encoding="utf-8")
+        self.assertIn("PAGES_ARTIFACT_NAME: github-pages-${{ github.run_attempt }}", pages)
+        for action, input_name in (
+            ("upload-pages-artifact", "name"),
+            ("deploy-pages", "artifact_name"),
+        ):
+            with self.subTest(action=action):
+                step = pages.split(f"uses: actions/{action}@", 1)[1].split("\n      -", 1)[0]
+                self.assertIn(f"{input_name}: ${{{{ env.PAGES_ARTIFACT_NAME }}}}", step)
 
 
 if __name__ == "__main__":
