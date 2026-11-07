@@ -30,6 +30,7 @@ The integrated runners retain companion files beside raw JMH evidence:
 ```text
 pack-storage-layout-database-telemetry.json
 write-queue-database-telemetry.json
+read-ahead-database-telemetry.json
 repository-aging-database-telemetry.json
 reflog-batch-database-telemetry.json
 search-database-telemetry.json
@@ -101,6 +102,23 @@ The first integration is the real pack-layout benchmark because it already provi
 - whether WAL/log flushing, page I/O or another wait category dominates a retained measurement.
 
 The counters are observational. Cluster-wide PostgreSQL WAL/I/O and server-wide SQL Server waits can include background work. Production decisions still require repeated measurements and the existing cross-database correctness and regression budgets.
+
+## Read-ahead policy interpretation
+
+`ReadAheadPolicyBenchmark` exercises the production pack channel with sequential, random and short
+reads at one, four and sixteen chunks. The Performance Investigations workflow collects a native
+PostgreSQL window for each measured invocation, keyed by method, backend, window size and
+measurement invocation. Fixture publication, warmup reads and schema cleanup are outside the
+window. The smoke profile retains nine PostgreSQL observations; the full profile retains 54 across
+the two PostgreSQL parameter variants and keeps HSQLDB as a JMH-only control.
+
+Compare native database block reads and buffer hits with JMH's fetched bytes, consumed bytes and
+query count. A larger window can reduce SQL calls for sequential streaming while fetching more
+bytes for sparse or short reads. PostgreSQL database block reads are buffer misses, not proof of
+physical disk access: the operating system can still serve them from cache. Statistics publication
+can lag these short windows and collector queries can contribute to database-wide counters, so a zero
+delta is not evidence of zero I/O. The workflow checks that JMH and the native companions match and
+scans the artifact before upload. The runner still supports a telemetry-disabled HSQLDB smoke.
 
 ## Concurrent write-queue interpretation
 

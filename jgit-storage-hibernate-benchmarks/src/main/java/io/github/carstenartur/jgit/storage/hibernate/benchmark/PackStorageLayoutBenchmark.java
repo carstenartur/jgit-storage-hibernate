@@ -8,14 +8,15 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.BenchmarkConnectionProperties.requiredSystemProperty;
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.BenchmarkConnectionProperties.suppressConnectionMetadataLogging;
+
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitRepositoryLifecycleEntity;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
@@ -24,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -78,7 +78,7 @@ public class PackStorageLayoutBenchmark {
   public static final String SQL_SERVER_PASSWORD_PROPERTY =
       "jgit.storage.benchmark.sqlserver.password";
   static final String CONNECTION_PROPERTIES_FILE_PROPERTY =
-      "jgit.storage.benchmark.connection-properties-file";
+      BenchmarkConnectionProperties.CONNECTION_PROPERTIES_FILE_PROPERTY;
 
   private static final int SHORT_READ_BYTES = 64 * 1024;
   private static final int RANDOM_READ_BYTES = 4 * 1024;
@@ -447,41 +447,6 @@ public class PackStorageLayoutBenchmark {
         && !RANDOM_READ.equals(value)) {
       throw new IllegalArgumentException("Unsupported layout operation " + value);
     }
-  }
-
-  private static String requiredSystemProperty(String name) {
-    String value = System.getProperty(name);
-    if (value != null && !value.isBlank()) {
-      return value;
-    }
-
-    String connectionPropertiesFile =
-        System.getProperty(CONNECTION_PROPERTIES_FILE_PROPERTY);
-    if (connectionPropertiesFile != null && !connectionPropertiesFile.isBlank()) {
-      Properties connectionProperties = new Properties();
-      try (InputStream input =
-          Files.newInputStream(Path.of(connectionPropertiesFile))) {
-        connectionProperties.load(input);
-      } catch (IOException failure) {
-        throw new IllegalStateException(
-            "Cannot read temporary benchmark connection properties", failure);
-      }
-      value = connectionProperties.getProperty(name);
-    }
-    if (value == null || value.isBlank()) {
-      throw new IllegalStateException("Missing benchmark system property " + name);
-    }
-    return value;
-  }
-
-  private static void suppressConnectionMetadataLogging() {
-    java.util.logging.Level warning = java.util.logging.Level.WARNING;
-    Logger.getLogger("").setLevel(warning);
-    Logger.getLogger("org.hibernate").setLevel(warning);
-    Logger.getLogger("org.hibernate.orm.connections.pooling").setLevel(warning);
-    Logger.getLogger(
-            "org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
-        .setLevel(warning);
   }
 
   private static byte[] deterministicPattern() {

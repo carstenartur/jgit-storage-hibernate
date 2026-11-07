@@ -8,10 +8,15 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.BenchmarkConnectionProperties.requiredSystemProperty;
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.BenchmarkConnectionProperties.suppressConnectionMetadataLogging;
+
+import io.github.carstenartur.jgit.storage.hibernate.benchmark.ReadAheadDatabaseTelemetry;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.HibernateTransactionContext;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
@@ -35,6 +40,8 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.BenchmarkParams;
+import org.openjdk.jmh.infra.IterationParams;
 
 /**
  * Measures sequential, random and short pack-channel reads with one, four and sixteen chunks of
@@ -78,13 +85,17 @@ public class ReadAheadPolicyBenchmark {
   private HibernateRepository repository;
   private StorageByteCounters counters;
   private Statistics statistics;
+  private ReadAheadDatabaseTelemetry telemetry;
   private long packId;
   private long packSize;
 
   @Setup(Level.Trial)
-  public void setupTrial() throws Exception {
+  public void setupTrial(BenchmarkParams benchmarkParams) throws Exception {
+    suppressConnectionMetadataLogging();
     String name = "jmh-read-ahead-" + backend + "-" + Long.toHexString(System.nanoTime());
-    provider = new HibernateSessionFactoryProvider(properties(name));
+    Properties properties = properties(name);
+    telemetry = ReadAheadDatabaseTelemetry.create(benchmarkParams, properties);
+    provider = new HibernateSessionFactoryProvider(properties);
     repository = HibernateRepository.create(provider.getSessionFactory(), name);
     repository.create(true);
     byte[] payload = new byte[PAYLOAD_BYTES];
@@ -114,8 +125,26 @@ public class ReadAheadPolicyBenchmark {
     statistics = provider.getSessionFactory().getStatistics();
   }
 
+  @Setup(Level.Invocation)
+  public void setupInvocation(IterationParams iteration) {
+    if (telemetry != null) {
+      telemetry.start(iteration);
+    }
+  }
+
+  @TearDown(Level.Invocation)
+  public void tearDownInvocation() throws IOException {
+    if (telemetry != null) {
+      telemetry.finish();
+    }
+  }
+
   @TearDown(Level.Trial)
   public void tearDownTrial() {
+    if (telemetry != null) {
+      telemetry.close();
+      telemetry = null;
+    }
     if (repository != null) {
       repository.close();
       repository = null;
@@ -208,9 +237,9 @@ public class ReadAheadPolicyBenchmark {
         properties.put("hibernate.connection.pool_size", "4");
       }
       case POSTGRESQL, POSTGRESQL_HIKARI -> {
-        properties.put("hibernate.connection.url", requiredProperty(POSTGRESQL_URL_PROPERTY));
-        properties.put("hibernate.connection.username", requiredProperty(POSTGRESQL_USER_PROPERTY));
-        properties.put("hibernate.connection.password", requiredProperty(POSTGRESQL_PASSWORD_PROPERTY));
+        properties.put("hibernate.connection.url", requiredSystemProperty(POSTGRESQL_URL_PROPERTY));
+        properties.put("hibernate.connection.username", requiredSystemProperty(POSTGRESQL_USER_PROPERTY));
+        properties.put("hibernate.connection.password", requiredSystemProperty(POSTGRESQL_PASSWORD_PROPERTY));
         properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
         properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
         if (POSTGRESQL_HIKARI.equals(backend)) {
@@ -225,14 +254,6 @@ public class ReadAheadPolicyBenchmark {
       default -> throw new IllegalArgumentException("Unsupported backend: " + backend);
     }
     return properties;
-  }
-
-  private static String requiredProperty(String name) {
-    String value = System.getProperty(name);
-    if (value == null || value.isBlank()) {
-      throw new IllegalStateException("Missing benchmark system property " + name);
-    }
-    return value;
   }
 
   /** Physical-byte and query attribution for one measured read pattern. */

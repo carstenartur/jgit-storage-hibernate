@@ -79,6 +79,7 @@ class PerformanceInvestigationsBenchmarkIT {
 
     OptionsBuilder builder = baseOptions(resultFile, outputFile, full);
     boolean writeQueue = "write-queue".equals(investigation);
+    boolean readAhead = "read-ahead".equals(investigation);
     boolean repositoryAging = "repository-aging".equals(investigation);
     boolean repositoryAgingNativeSmoke =
         repositoryAging
@@ -94,18 +95,18 @@ class PerformanceInvestigationsBenchmarkIT {
                     PerformanceInvestigationParameters.REPOSITORY_AGING_DATABASE_BACKEND_PROPERTY))
             : new String[0];
     List<String> selectedAgingBackends = List.of(repositoryAgingBackends);
+    boolean telemetryEnabled =
+        (writeQueue || repositoryAging || readAhead)
+            && Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
     boolean needsPostgres =
         writeQueue
+            || (readAhead && (full || telemetryEnabled))
             || selectedAgingBackends.contains(HibernateRepositoryBenchmark.POSTGRESQL)
             || selectedAgingBackends.contains(HibernateRepositoryBenchmark.POSTGRESQL_HIKARI);
-    boolean telemetryEnabled =
-        (writeQueue || repositoryAging)
-            && Boolean.getBoolean(DatabaseTelemetryCollectors.ENABLED_PROPERTY);
-    String telemetryPrefix = writeQueue ? "write-queue" : "repository-aging";
     Path telemetryNdjson =
-        resultFile.resolveSibling(telemetryPrefix + "-database-telemetry.ndjson");
+        resultFile.resolveSibling(investigation + "-database-telemetry.ndjson");
     Path telemetryJson =
-        resultFile.resolveSibling(telemetryPrefix + "-database-telemetry.json");
+        resultFile.resolveSibling(investigation + "-database-telemetry.json");
     Path connectionPropertiesFile = null;
     MSSQLServerContainer sqlServer = null;
     Collection<RunResult> results;
@@ -127,7 +128,7 @@ class PerformanceInvestigationsBenchmarkIT {
             RepositoryBackendBenchmarkIT.systemProperty(
                 PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY,
                 connectionPropertiesFile.toString()));
-      } else if (!repositoryAging) {
+      } else if (!repositoryAging && !readAhead) {
         jvmArguments.add(
             RepositoryBackendBenchmarkIT.systemProperty(
                 HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY,
@@ -161,6 +162,7 @@ class PerformanceInvestigationsBenchmarkIT {
           deployment,
           threads,
           repositoryAgingNativeSmoke,
+          telemetryEnabled,
           repositoryAgingBackends);
       results = new Runner(builder.build()).run();
     } finally {
@@ -185,7 +187,7 @@ class PerformanceInvestigationsBenchmarkIT {
     assertTrue(Files.isRegularFile(resultFile), "JMH JSON result was not written");
     assertTrue(Files.size(resultFile) > 2, "JMH JSON result is empty");
     assertTrue(Files.isRegularFile(outputFile), "JMH text output was not written");
-    if (writeQueue || repositoryAging) {
+    if (writeQueue || repositoryAging || readAhead) {
       List<Path> retainedEvidence = new ArrayList<>();
       retainedEvidence.add(resultFile);
       retainedEvidence.add(outputFile);
@@ -290,6 +292,7 @@ class PerformanceInvestigationsBenchmarkIT {
       String deployment,
       int threads,
       boolean repositoryAgingNativeSmoke,
+      boolean telemetryEnabled,
       String[] backends) {
     switch (investigation) {
       case "write-queue" ->
@@ -315,7 +318,7 @@ class PerformanceInvestigationsBenchmarkIT {
                   "backend",
                   full
                       ? new String[] {"hsqldb", "postgresql", "postgresql-hikari"}
-                      : new String[] {"hsqldb"})
+                      : telemetryEnabled ? new String[] {"postgresql"} : new String[] {"hsqldb"})
               .param("readAheadChunks", "1", "4", "16");
       case "repository-aging" -> {
         String[] fullCacheStates = {
