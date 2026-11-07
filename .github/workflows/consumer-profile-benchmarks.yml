@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/consumer-profile-benchmarks.yml'
+      - '.github/scripts/*consumer*evidence*.py'
+      - 'docs/evidence/consumer-shaped*'
+      - 'docs/evidence/consumer-shaped-2026-11-07/**'
       - 'jgit-storage-hibernate-benchmarks/src/**/Consumer*Benchmark*.java'
       - 'pom.xml'
       - 'jgit-storage-hibernate-benchmarks/pom.xml'
@@ -49,6 +52,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify retained original consumer evidence
+        run: |
+          python3 .github/scripts/test_verify_consumer_benchmark_evidence.py
+          python3 .github/scripts/verify-consumer-benchmark-evidence.py \
+            docs/evidence/consumer-shaped-2026-11-07/manifest.json
       - name: Checkout canonical comparison history
         if: env.LIBRARY_REF != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -35,6 +35,69 @@ names. The jobs do not append consumer samples to generic benchmark history.
 | Taxonomy | Two workspaces, 50 commits each | 1k, 10k and 100k total commits over ten workspaces | `taxonomyExactPathSummary` combines author, time and exact path. `taxonomyTextSummary` and `taxonomyTextEntity` use the same full-text term and limit, with one Git object verification per result. Setup checks the two text result lists match. |
 | sandbox | Ten generated classes plus the caller across five commits | 250 or 1,000 classes plus the caller across five commits | `sandboxAnalyzeBodyEdit` uses binding-aware JDT on the one file changed in the last commit. `sandboxRebuildSnapshot` rebuilds the binding-aware analysis of the same complete head snapshot. |
 
+### PostgreSQL history, recovery and network conditions
+
+[Taxonomy-shaped PostgreSQL Benchmarks](../.github/workflows/consumer-taxonomy-postgres.yml)
+uses a disposable PostgreSQL 17.10 database and a filesystem Lucene index. Each
+trial owns a randomly named schema. Closing the measured provider preserves both
+stores; final cleanup drops only that trial's schema and index directory.
+
+| Matrix | Total commits over ten workspaces | Database path | Operations |
+|---|---:|---|---|
+| Pull request smoke | 1,000 | Calibrated 0 and 20 ms RTT | Exact-path Lucene summary, literal-path SQL summary, text summary, hydrated text entities, bounded purge and full projection rebuild |
+| Manual standard | 1,000 and 10,000 | Calibrated 0 and 20 ms RTT | The same five operations |
+| Manual large | 1,000, 10,000 and 100,000 | Calibrated 0 and 20 ms RTT | The same five operations, with a 3 GiB heap |
+
+The SQL and Lucene path operations use the same full fixture path, author and
+time constraints. Setup compares their complete result membership, since SQL
+literal-substring and Lucene exact-path semantics are not generally identical.
+Every measured hit is then resolved through the authoritative Git repository.
+The generic smoke operations and their chart anchors remain unchanged.
+
+History construction uses a direct connection outside measurement. The measured
+provider reopens through Toxiproxy, and a retained 20-sample `SELECT 1` calibration
+must demonstrate the requested delay before JMH starts. `reopened` clears the
+JGit block cache after reopening; `warm` walks the prepared Git history and reads
+the text-query results first. Both conditions retain warm operating-system and
+database caches. These labels do not claim a cold host or a restarted database
+server. Select the cache condition in the manual workflow.
+
+The lifecycle contract interrupts indexing after the first committed 50-item
+batch, closes the provider, and verifies that the partial projection survives
+reopening. It then purges that partial projection, rebuilds the 100-commit
+workspace, reopens again, and compares all original text hits and the Git ref.
+The neighboring workspace must retain all 100 projections. The same lifecycle
+tests run locally with HSQLDB and filesystem Lucene; only the PostgreSQL workflow
+establishes native PostgreSQL behavior.
+
+Each artifact retains JMH JSON and logs, allocation/GC and ORM/JDBC counters,
+database-native telemetry for each measured operation, filesystem index bytes,
+RTT samples, the recovery record, and a `fixture.json` with the exact checkout
+SHA and file hashes. Native counters describe the dedicated database/instance;
+unsupported capabilities are recorded explicitly. Single-shot smoke values
+establish complete operation and evidence coverage, not stable latency rankings.
+
+To run against a disposable PostgreSQL schema locally, put the URL, user and
+password properties in an owner-readable connection file as described by the
+workflow, then use `-Dconsumer.profiles.matrix=postgres-taxonomy-smoke` (or
+`postgres-taxonomy` / `postgres-taxonomy-large`) with
+`-Djgit.storage.benchmark.connection-properties-file=/absolute/path/to/connection.properties`.
+`jgit.storage.benchmark.postgresql.measurement-url` may route the measured provider
+through a proxy while setup uses the direct URL. Set
+`-Dconsumer.profiles.taxonomy.rttMillis=20` only when that proxy is configured;
+calibration rejects an unapplied delay. The indexing and purge batch controls are
+`consumer.profiles.taxonomy.indexBatch` and `consumer.profiles.taxonomy.purgeBatch`,
+defaulting to 50 and 250. Raw JMH parameters retain both values.
+
+For a workspace containing `C` commits, projection replacement requires at least
+`ceil(C / purgeBatch) + ceil(C / indexBatch)` modifying transactions. Additional
+existence, final-page and verification queries increase that floor. SQL summary
+queries require at least one database request per queried workspace, while
+Lucene summaries can avoid ORM hydration; authoritative Git verification may
+still read the database when its object cache is empty. A networked transaction
+also has to reach the server to commit. These lower bounds explain why batch and
+cache conditions belong with each measurement.
+
 To run the smoke suite locally from the repository root with Java 21 or newer:
 
 ```bash
@@ -92,12 +155,10 @@ series does not establish JDBC batch or network round-trip lower bounds.
 Embedded HSQLDB has no separately sampled database log or measured network RTT.
 For PostgreSQL and SQL Server transaction-log, batching and pack throughput
 evidence see [database-native telemetry](operations/database-native-telemetry.md).
-Concurrent audio repositories, alternate physical chunk sizes, Taxonomy
-PostgreSQL/RTT and rebuild/restart/purge, and sandbox persisted index size
-are separate experiments. The Taxonomy follow-up needs a disposable
-PostgreSQL schema and filesystem Lucene directory, with matched local and
-proxied RTT coordinates, so it can close and reopen both systems while
-retaining the same Git history and projection.
+Concurrent audio repositories, alternate physical chunk sizes, and sandbox
+persisted index size remain separate experiments. The PostgreSQL lifecycle and
+RTT workflow above covers the Taxonomy provider/index restart and purge path;
+it does not claim a full database-server restart or production concurrency.
 
 Use `fixture.json` to match a run to [Real Consumer
 Compatibility](../.github/workflows/consumer-compatibility.yml) for the same

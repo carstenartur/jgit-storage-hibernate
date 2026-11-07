@@ -24,6 +24,16 @@ Audio used Core with Search disabled and one optional worker retaining 32 MiB. T
 embedded HSQLDB and in-memory Lucene. Sandbox analyzed a filesystem Git snapshot with binding-aware JDT.
 
 The CSV keeps per-iteration counts. Blank fields identify metrics absent from that harness revision.
+The original [raw JMH JSON and logs](consumer-shaped-2026-11-07/manifest.json)
+are retained as gzip files, together with both historical harness source snapshots.
+The manifest records SHA-256 hashes of the uncompressed originals. Verify all 46
+normalized observations, allocation/GC data, and source hashes with:
+
+```bash
+python3 .github/scripts/verify-consumer-benchmark-evidence.py \
+  docs/evidence/consumer-shaped-2026-11-07/manifest.json
+```
+
 These runs establish operation and counter behavior. They do not establish comparative latency,
 production database log or network costs, or application compatibility. Compare exact-revision
 [real-consumer contract](../../.github/workflows/consumer-compatibility.yml) evidence before promoting
