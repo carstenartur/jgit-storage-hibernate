@@ -123,3 +123,48 @@ The semantic contract tests prove:
 The dedicated native-telemetry workflow runs batch sizes 1, 10 and 50 on PostgreSQL and SQL Server. For each size it records separate `first-apply` and `idempotent-replay` windows and retains strict JSON containing WAL/log, database I/O, index and wait evidence. First application must produce a positive PostgreSQL WAL insert-position delta or SQL Server transaction-log file-write delta. Replays must leave the persisted row count unchanged.
 
 This evidence answers the physical cost of the first safe Git-semantic batch. It does not justify batching arbitrary ref updates or complete pushes; those require a separate whole-operation validation and rollback design.
+
+### Shared Hikari pool sizing
+
+The [Git-aware Reflog Batch workflow](../../.github/workflows/git-aware-reflog-batch.yml)
+also runs the production `DurableReflogWriter` against one PostgreSQL 17
+database and one warmed, bounded Hikari pool per coordinate. All stripes share
+the same pool. Each producer appends a valid chain on its own ref and waits for
+commit before submitting its next record. In the shared layout the chains use
+one repository; in the independent layout each producer has its own repository.
+
+The smoke profile crosses 1 and 4 stripes, 2 and 4 pool slots, and both layouts
+with four producers and 24 measured commands per producer. To run one longer
+coordinate, dispatch the workflow with `sizing_coordinate` set to
+`stripes,pool,producers,scope` (for example, `8,4,16,independent`). The supported
+stripes are 1, 2, 4 and 8; pool slots are 2, 4, 8 and 16; producer counts are 1,
+4, 8 and 16; and scopes are `shared` and `independent`. A selected coordinate
+measures 128 commands per producer. Both profiles exclude an eight-command
+warmup per producer.
+
+Each warmup and measurement phase gives all producers a shared 60-second
+deadline. The fixture cancels outstanding producers and rejects queued work
+when a producer fails or the deadline expires. PostgreSQL applies separate
+limits to connection setup, socket reads, lock waits and statements. JDBC
+cleanup can continue after the phase deadline. The Actions job has its own
+180-minute hard limit.
+
+The `sizing/` directory in `git-aware-reflog-batch-native-telemetry` contains:
+
+- `acknowledgements.csv`: one row per committed command with queue wait,
+  observed submission-to-acknowledgement time and its batch size. A batch size
+  repeats for each command in that batch.
+- `pool-borrows.csv`: one Hikari acquisition duration per measured transaction,
+  with the writer thread ID local to that coordinate.
+- `native.json` and `native.ndjson`: exact checkout revision, Java and PostgreSQL
+  versions, coordinates, elapsed measurement time, committed batch count,
+  observed active stripes and PostgreSQL WAL, I/O and wait observations.
+
+Use the command rows for acknowledgement percentiles and the measured wall time
+for throughput. Connection acquisition is sampled per transaction; its
+percentiles cannot be subtracted from command latency percentiles. This local,
+closed-loop workload checks the measurement path and does not model sustained
+overload, injected RTT, large receiver records or complete pushes. It provides
+no production stripe or pool recommendation by itself. See
+[#162](https://github.com/carstenartur/jgit-storage-hibernate/issues/162) for the
+remaining tuning work.
