@@ -32,7 +32,7 @@ The read-optimized preset requests:
 
 Use `PackRepackOptions.compactOnly()` when the deployment wants fewer packs without paying the maintenance-time and storage cost of auxiliary read indexes. A custom immutable `PackRepackOptions` can select each feature independently; Bloom filters require commit-graph generation.
 
-JGit's current DFS garbage collector does not emit a persisted reverse-index extension. Every supported JGit compatibility job now retains `jgit-dfs-midx-capability.json`, listing the exact selected version and exposed pack extensions. The maintenance API does not advertise a Multi-Pack-Index shortcut unless that version exposes a persistable DFS extension that this backend can store.
+JGit's DFS garbage collector does not emit a persisted reverse-index extension for these presets. Multi-Pack-Index support is separate: all supported upstream JGit versions can write and read a DFS MIDX, but the Hibernate catalog cannot yet reconstruct its covered-pack relationships after a reopen. See the [version-specific MIDX evidence](repository-aging-policy-evidence.md#multi-pack-index-capability). The maintenance API does not expose a MIDX option.
 
 ## Transaction and concurrency model
 
@@ -65,7 +65,7 @@ Maintenance for different logical repositories uses different lock rows and can 
 
 The deterministic smoke fixture creates one fresh pack per incremental push, closes and reopens the repository, verifies persisted `committedAt` ordering and then compares no maintenance, compact-only maintenance and the read-optimized preset.
 
-The smoke profile intentionally covers 1 and 10 pushes. The full age profile is configured for 1, 10, 32, 100, 300 and 1,000 pushes, cold and warm JGit cache states, HSQLDB as a reference, and PostgreSQL through both the built-in pool and HikariCP. Its raw JMH JSON is converted into structural comparison and break-even evidence; a successful larger-scale production-database run must still be retained before changing the automatic-maintenance default.
+The smoke profile covers 1 and 10 pushes. The scheduled and manually dispatched full profile covers 1, 10, 32, 100, 300 and 1,000 pushes, cold and warm JGit cache states, HSQLDB as a reference, PostgreSQL through both the built-in pool and HikariCP, and SQL Server. Its raw JMH JSON is converted into structural comparison and break-even evidence only after all coordinates are validated. The [retained full-age evidence](../evidence/repository-aging-full-2026-09-04.md) covers HSQLDB and both PostgreSQL pool variants; the full SQL Server result remains outstanding.
 
 A separate protected-main profile closes and rebuilds the complete Hibernate `SessionFactory` and connection pool before measurement. Its first complete retained run covers PostgreSQL and SQL Server, cold and warm cache states and three independent repeats at ten pushes. It answers the restart/lifecycle question but does not replace the larger age axis.
 
@@ -124,7 +124,7 @@ For the retained `reopenAndLookupOldest` path, every maintenance result is paire
 
 Thus the cold ten-pack maintenance cost is repaid by roughly six equivalent reopens for compact-only and roughly seven to eight for read-optimized maintenance. The warm path never repays the maintenance in this fixture. The [payback decision record](../evidence/repository-aging-restart-payback-2026-09-04.md) retains the method and every paired input.
 
-The result therefore does **not** justify a universal automatic threshold. It shows that the useful decision is lifecycle- and workload-dependent: maintenance can materially help cold reconstruction while regressing a warm path at the same pack count. The remaining 32/100/300/1,000-push production-database matrix, payback across those ages and latency during active maintenance are required before enabling a default automatic policy.
+The result therefore does **not** justify a universal automatic threshold. Maintenance can materially help cold reconstruction while regressing a warm path at the same pack count. The full SQL Server age results, independent larger-age repeats, and reader latency during active maintenance are still required before choosing an automatic policy.
 
 ## Generated policy evidence
 

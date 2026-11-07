@@ -11,9 +11,9 @@ from pathlib import Path
 WRITES = {"incrementalIndexing", "projectionRebuild"}
 WAL_BYTES = "postgresql.wal.insert_lsn_bytes"
 FORBIDDEN = (
-    b"jgit.storage.benchmark.postgresql.url=",
-    b"jgit.storage.benchmark.postgresql.user=",
-    b"jgit.storage.benchmark.postgresql.password=",
+    b"jgit.storage.benchmark.postgresql.url",
+    b"jgit.storage.benchmark.postgresql.user",
+    b"jgit.storage.benchmark.postgresql.password",
     b"jdbc:postgresql://",
     b"Database JDBC URL",
     b"Default catalog/schema",

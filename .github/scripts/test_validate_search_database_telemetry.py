@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from validate_search_database_telemetry import validate
+from validate_search_database_telemetry import scan_privacy, validate
 
 
 def result(method: str) -> dict:
@@ -84,6 +84,21 @@ class SearchDatabaseTelemetryTest(unittest.TestCase):
         (self.artifacts / "report.bin").write_bytes(b"\xffjdbc:postgresql://fixture/db")
         with self.assertRaisesRegex(ValueError, "Connection detail in"):
             self.verify()
+
+    def test_rejects_connection_overrides_in_failsafe_xml(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "TEST-search.xml"
+            for field in ("url", "user", "password"):
+                with self.subTest(field=field):
+                    report.write_text(
+                        "<testsuite><properties>"
+                        f'<property name="jgit.storage.benchmark.postgresql.{field}" '
+                        'value="synthetic-override"/>'
+                        "</properties></testsuite>",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(ValueError, "Connection detail in"):
+                        scan_privacy(self.artifacts, report.parent)
 
 
 if __name__ == "__main__":

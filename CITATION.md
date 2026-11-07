@@ -17,4 +17,4 @@ If you use **jgit-storage-hibernate**, please cite it as:
 }
 ```
 
-For archived releases, see the [project archive on Zenodo](https://doi.org/10.5281/zenodo.21210132).
+For archived releases, see the [project archive on Zenodo](https://doi.org/10.5281/zenodo.21210131).
