@@ -37,6 +37,8 @@ import jdk.jfr.Name;
 import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
+import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
+import org.eclipse.jgit.internal.storage.dfs.DfsBlockCacheConfig;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -257,14 +259,26 @@ public class SynchronousPackPublicationEvidenceTest {
   private static void verifyReopenedPayload(
       HibernateSessionFactoryProvider provider, ObjectId objectId, byte[] payload)
       throws Exception {
+    // JGit shares the DFS cache across repository handles and caches pack blocks on insert.
+    DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
     MessageDigest digest = MessageDigest.getInstance("SHA-256");
     try (HibernateRepository reopened =
         HibernateRepository.create(provider.getSessionFactory(), REPOSITORY)) {
+      long databaseBytesBefore = reopened.getStorageByteMetrics().databasePayloadBytesRead();
       var loader = reopened.open(objectId);
       assertEquals(Constants.OBJ_BLOB, loader.getType());
       try (InputStream stream = new DigestInputStream(loader.openStream(), digest)) {
         assertEquals(payload.length, stream.transferTo(OutputStream.nullOutputStream()));
       }
+      long databaseBytesRead =
+          reopened.getStorageByteMetrics().databasePayloadBytesRead() - databaseBytesBefore;
+      assertTrue(
+          databaseBytesRead >= payload.length,
+          () ->
+              "reopen read "
+                  + databaseBytesRead
+                  + " database payload bytes, expected at least "
+                  + payload.length);
     }
     assertArrayEquals(MessageDigest.getInstance("SHA-256").digest(payload), digest.digest());
   }

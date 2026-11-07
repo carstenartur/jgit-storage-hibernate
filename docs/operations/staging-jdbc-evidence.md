@@ -2,9 +2,10 @@
 
 The [JMH Benchmarks workflow](../../.github/workflows/performance.yml) includes a
 PostgreSQL 17 smoke test that publishes a 16 MiB incompressible JGit object three
-times through the synchronous writer with its 16 MiB window. The test verifies
-the SHA-256 digest after closing and reopening the repository. PostgreSQL runs
-with `fsync`, synchronous commit and I/O timing enabled.
+times through the synchronous writer with its 16 MiB window. The test closes
+the repository, clears the JGit DFS cache and reopens it to verify the SHA-256
+digest of the stored payload. PostgreSQL runs with `fsync`, synchronous commit
+and I/O timing enabled.
 
 The `jdbc-batch-comparison-results` artifact includes a `staging-jdbc/` directory:
 
