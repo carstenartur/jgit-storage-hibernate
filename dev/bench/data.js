@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794066662335,
+  "lastUpdate": 1794066743516,
   "repoUrl": "https://github.com/carstenartur/jgit-storage-hibernate",
   "entries": {
     "Repository backend comparison": [
@@ -474811,86 +474811,6 @@ window.BENCHMARK_DATA = {
             "username": "carstenartur"
           },
           "distinct": true,
-          "id": "50ab34caf13bb36418cf1f50da0ae4817ef4daec",
-          "message": "Merge PR #218: measured Search indexing profiles\n\nIntroduce measured Search indexing profiles and bounded content policies",
-          "timestamp": "2026-08-08T22:15:01+02:00",
-          "tree_id": "4754433e9e3a7330bf8e339c75d961f6b3238913",
-          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/50ab34caf13bb36418cf1f50da0ae4817ef4daec"
-        },
-        "date": 1786220221132,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Reflog last 100 entries — PostgreSQL legacy repository/id index",
-            "unit": "ms/op",
-            "value": 14.877202800000001,
-            "range": 4.084103406018991,
-            "extra": "Database: PostgreSQL\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          },
-          {
-            "name": "Reflog last 100 entries — PostgreSQL repository/ref-key/id index",
-            "unit": "ms/op",
-            "value": 12.913825800000001,
-            "range": 8.7389049501232,
-            "extra": "Database: PostgreSQL\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          },
-          {
-            "name": "Reflog last 100 entries — SQL Server legacy repository/id index",
-            "unit": "ms/op",
-            "value": 19.8169642,
-            "range": 10.78439803760594,
-            "extra": "Database: SQL Server\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          },
-          {
-            "name": "Reflog last 100 entries — SQL Server repository/ref-key/id index",
-            "unit": "ms/op",
-            "value": 20.3389322,
-            "range": 13.769224384386991,
-            "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          },
-          {
-            "name": "Reflog latest entry — PostgreSQL legacy repository/id index",
-            "unit": "ms/op",
-            "value": 4.8742926,
-            "range": 7.405904590513315,
-            "extra": "Database: PostgreSQL\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          },
-          {
-            "name": "Reflog latest entry — PostgreSQL repository/ref-key/id index",
-            "unit": "ms/op",
-            "value": 2.3599028,
-            "range": 2.2028216632461333,
-            "extra": "Database: PostgreSQL\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          },
-          {
-            "name": "Reflog latest entry — SQL Server legacy repository/id index",
-            "unit": "ms/op",
-            "value": 4.5332897999999995,
-            "range": 5.132278916207471,
-            "extra": "Database: SQL Server\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          },
-          {
-            "name": "Reflog latest entry — SQL Server repository/ref-key/id index",
-            "unit": "ms/op",
-            "value": 4.2287222,
-            "range": 2.7707597315113324,
-            "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.11\nMode: ss"
-          }
-        ]
-      },
-      {
-        "commit": {
-          "author": {
-            "email": "carsten.hammer@t-online.de",
-            "name": "Carsten Hammer",
-            "username": "carstenartur"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "carstenartur"
-          },
-          "distinct": true,
           "id": "abe9722edcbd910df4ab095d27be097203620cc6",
           "message": "Merge PR #219: Hibernate Search runtime tuning benchmarks\n\nAdd measured Hibernate Search/Lucene runtime coordination benchmarks and enforce repository-wide smaller-is-better performance chart semantics.",
           "timestamp": "2026-08-09T02:13:27+02:00",
@@ -518263,6 +518183,482 @@ window.BENCHMARK_DATA = {
             "unit": "ms/op",
             "value": 5.3865594,
             "range": 3.866005389236208,
+            "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          }
+        ],
+        "consumerEvidence": {
+          "audio-analyzer": {
+            "displayName": "audio-analyzer",
+            "repository": "carstenartur/audio-analyzer",
+            "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+            "defaultBranch": "master",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          },
+          "sandbox": {
+            "displayName": "sandbox",
+            "repository": "carstenartur/sandbox",
+            "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+            "defaultBranch": "main",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-java-analysis",
+              "jgit-storage-hibernate-search"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          },
+          "taxonomy": {
+            "displayName": "Taxonomy",
+            "repository": "carstenartur/Taxonomy",
+            "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+            "defaultBranch": "main",
+            "modules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-smart-http"
+            ],
+            "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+          }
+        }
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "carstenartur"
+          },
+          "distinct": true,
+          "id": "d2b3a09004dd8400ae6c927e00489158e6dcddef",
+          "message": "Merge pull request #448 from carstenartur/perf/reflog-shared-pool-sizing",
+          "timestamp": "2026-11-07T16:47:01+01:00",
+          "tree_id": "36fb4c6474558240cae2f7990dc6f9808e601216",
+          "url": "https://github.com/carstenartur/jgit-storage-hibernate/commit/d2b3a09004dd8400ae6c927e00489158e6dcddef"
+        },
+        "date": 1794066743516,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Reflog last 100 entries — PostgreSQL legacy repository/id index",
+            "unit": "ms/op",
+            "value": 16.048751799999998,
+            "range": 5.69331794265318,
+            "extra": "Database: PostgreSQL\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Reflog last 100 entries — PostgreSQL repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 13.604967400000001,
+            "range": 9.530482076520142,
+            "extra": "Database: PostgreSQL\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Reflog last 100 entries — SQL Server legacy repository/id index",
+            "unit": "ms/op",
+            "value": 21.2856354,
+            "range": 10.459382363603263,
+            "extra": "Database: SQL Server\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Reflog last 100 entries — SQL Server repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 21.3982726,
+            "range": 9.554765803578825,
+            "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Reflog latest entry — PostgreSQL legacy repository/id index",
+            "unit": "ms/op",
+            "value": 5.2493256,
+            "range": 2.671943316364163,
+            "extra": "Database: PostgreSQL\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Reflog latest entry — PostgreSQL repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 2.7753010000000002,
+            "range": 3.554462693611014,
+            "extra": "Database: PostgreSQL\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Reflog latest entry — SQL Server legacy repository/id index",
+            "unit": "ms/op",
+            "value": 6.603249,
+            "range": 3.978546698211068,
+            "extra": "Database: SQL Server\nIndex: legacy repository/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
+            "consumers": [
+              "audio-analyzer",
+              "sandbox",
+              "taxonomy"
+            ],
+            "contract": "core-reflog-read-path",
+            "requiredModules": [
+              "jgit-storage-hibernate-core"
+            ],
+            "consumerEvidence": {
+              "audio-analyzer": {
+                "displayName": "audio-analyzer",
+                "repository": "carstenartur/audio-analyzer",
+                "ref": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+                "defaultBranch": "master",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "sandbox": {
+                "displayName": "sandbox",
+                "repository": "carstenartur/sandbox",
+                "ref": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-java-analysis",
+                  "jgit-storage-hibernate-search"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              },
+              "taxonomy": {
+                "displayName": "Taxonomy",
+                "repository": "carstenartur/Taxonomy",
+                "ref": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+                "defaultBranch": "main",
+                "modules": [
+                  "jgit-storage-hibernate-core",
+                  "jgit-storage-hibernate-smart-http"
+                ],
+                "contractScript": ".github/jgit-storage-hibernate-contract.sh"
+              }
+            }
+          },
+          {
+            "name": "Reflog latest entry — SQL Server repository/ref-key/id index",
+            "unit": "ms/op",
+            "value": 5.325272200000001,
+            "range": 11.430092453882994,
             "extra": "Database: SQL Server\nIndex: repository/ref-key/id index\nRows: 10000\nRefs: 100\nJDK: 21.0.13\nMode: ss",
             "consumers": [
               "audio-analyzer",
