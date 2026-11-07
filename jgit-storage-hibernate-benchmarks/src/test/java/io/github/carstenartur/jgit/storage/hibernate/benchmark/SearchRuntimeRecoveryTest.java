@@ -38,7 +38,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -65,6 +67,42 @@ class SearchRuntimeRecoveryTest {
   private static final int TIMEOUT_SECONDS = 30;
 
   @TempDir Path root;
+
+  @Test
+  void recoveryBootstrapDoesNotExposeConnectionMetadata() throws Exception {
+    Logger connections = Logger.getLogger("org.hibernate.orm.connections.pooling");
+    Level previousLevel = connections.getLevel();
+    List<String> messages = new ArrayList<>();
+    Handler capture =
+        new Handler() {
+          @Override
+          public void publish(LogRecord record) {
+            messages.add(record.getMessage());
+          }
+
+          @Override
+          public void flush() {}
+
+          @Override
+          public void close() {}
+        };
+    connections.addHandler(capture);
+    connections.setLevel(Level.INFO);
+    try (Fixture fixture =
+        open(root, "reference", true, null, new RuntimeBenchmarkFailureHandler())) {
+      assertTrue(fixture.provider().getSessionFactory().isOpen());
+      assertTrue(
+          messages.stream()
+              .noneMatch(
+                  message ->
+                      message.contains("Database JDBC URL")
+                          || message.contains("Default catalog/schema")),
+          "Recovery output must pass the retained-artifact connection privacy check");
+    } finally {
+      connections.removeHandler(capture);
+      connections.setLevel(previousLevel);
+    }
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"reference", "sync-sync-r0"})
@@ -288,8 +326,7 @@ class SearchRuntimeRecoveryTest {
           "hibernate.search.backend.directory.type",
           BeanReference.ofInstance(barrier.provider(index)));
     }
-    Logger logger =
-        Logger.getLogger("org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator");
+    Logger logger = Logger.getLogger("org.hibernate.orm.connections.pooling");
     Level previousLevel = logger.getLevel();
     HibernateSessionFactoryProvider provider;
     try {
