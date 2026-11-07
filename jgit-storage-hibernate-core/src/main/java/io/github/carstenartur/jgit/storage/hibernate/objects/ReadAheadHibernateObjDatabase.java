@@ -16,6 +16,7 @@ import io.github.carstenartur.jgit.storage.hibernate.transaction.PackFileReadMet
 import io.github.carstenartur.jgit.storage.hibernate.transaction.PackPublicationSelectionMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StagingSpillMetrics;
 import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageByteMetrics;
+import io.github.carstenartur.jgit.storage.hibernate.transaction.StorageOperationKind;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -64,9 +65,9 @@ import org.hibernate.SessionFactory;
  * identifiers, sizes, storage modes and logical JGit pack metadata. Publication uses an atomic
  * generation check, so a scan that started before a successful pack mutation cannot overwrite the
  * subsequent invalidation or return a stale list after that mutation. A fair repository-instance-
- * local read/write lock prevents scans from reading the database while this instance has an
- * uncommitted pack replacement in progress. Chunked files can then open without repeating the
- * metadata query.
+ * local read/write lock guards the snapshot and revalidation around each scan. The query itself
+ * runs outside the read lock so connection checkout cannot block a publisher that needs the write
+ * lock. Chunked files can then open without repeating the metadata query.
  *
  * <p>Inline payload bytes remain outside the generation catalog. Only newly staged inline PACK and
  * Reftable bytes may enter a hard-bounded 512-KiB repository-instance handoff after their database
@@ -123,10 +124,11 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   @Override
   protected List<DfsPackDescription> listPacks() throws IOException {
     Lock readLock = catalogLifecycleLock.readLock();
-    readLock.lock();
-    try {
-      while (true) {
-        CatalogState observedCatalog = committedExtensionCatalog.get();
+    while (true) {
+      CatalogState observedCatalog;
+      readLock.lock();
+      try {
+        observedCatalog = committedExtensionCatalog.get();
         if (observedCatalog.localScanAvailable()) {
           CatalogState consumed = observedCatalog.consumeLocalScan();
           if (committedExtensionCatalog.compareAndSet(observedCatalog, consumed)) {
@@ -134,70 +136,70 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
           }
           continue;
         }
+      } finally {
+        readLock.unlock();
+      }
 
-        PackCatalog loaded = loadPackCatalog();
+      PackCatalog loaded = loadPackCatalog();
+      readLock.lock();
+      try {
+        if (committedExtensionCatalog.get().generation() != observedCatalog.generation()) {
+          // A mutation crossed the query. Discard both the pack list and its payload identities.
+          continue;
+        }
         CatalogState loadedCatalog =
             new CatalogState(observedCatalog.generation(), true, false, loaded.extensions());
-        if (committedExtensionCatalog.compareAndSet(observedCatalog, loadedCatalog)) {
-          return loaded.descriptions();
-        }
-        if (committedExtensionCatalog.get().generation() == observedCatalog.generation()) {
-          // Another scan published the same committed generation first. Both query results describe
-          // the same mutation-free generation, so this result is equally valid for JGit's pack list.
-          return loaded.descriptions();
-        }
-        // A pack mutation crossed this scan. Re-read so neither the optimization catalog nor JGit's
-        // pack-list cache can be populated from the older committed generation.
+        // A concurrent scan of the same generation may already have filled the catalog.
+        committedExtensionCatalog.compareAndSet(observedCatalog, loadedCatalog);
+        inlinePayloadCache.retainOnly(cacheableIdentities(loaded.extensions()));
+        return loaded.descriptions();
+      } finally {
+        readLock.unlock();
       }
-    } finally {
-      readLock.unlock();
     }
   }
 
   private PackCatalog loadPackCatalog() throws IOException {
-    PackCatalog catalog =
-        transactionContext.execute(
-            session -> {
-              List<Object[]> rows =
-                  session
-                      .createQuery(
-                          "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
-                              + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END, "
-                              + "p.packSource, p.lastModified, p.objectCount, p.deltaCount, "
-                              + "p.indexVersion, p.minUpdateIndex, p.maxUpdateIndex, "
-                              + "p.committedAt, p.createdAt "
-                              + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
-                              + "AND p.committed = true",
-                          Object[].class)
-                      .setParameter("repo", repositoryName)
-                      .getResultList();
-              LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
-              for (Object[] row : rows) {
-                Long packId = (Long) row[0];
-                String packName = (String) row[1];
-                String extension = (String) row[2];
-                long fileSize = ((Number) row[3]).longValue();
-                boolean inline = ((Number) row[4]).intValue() != 0;
-                PackDescriptionMetadata metadata =
-                    PackDescriptionMetadata.fromStoredValues(
-                        (String) row[5],
-                        longValue(row[6]),
-                        longValue(row[7]),
-                        longValue(row[8]),
-                        integerValue(row[9]),
-                        longValue(row[10]),
-                        longValue(row[11]),
-                        (Instant) row[12],
-                        (Instant) row[13]);
-                extensions.put(
-                    new ExtensionKey(packName, extension),
-                    new ExtensionSnapshot(packId, fileSize, inline, metadata));
-              }
-              Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
-              return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
-            });
-    inlinePayloadCache.retainOnly(cacheableIdentities(catalog.extensions()));
-    return catalog;
+    return transactionContext.execute(
+        session -> {
+          List<Object[]> rows =
+              session
+                  .createQuery(
+                      "SELECT p.id, p.packName, p.packExtension, p.fileSize, "
+                          + "CASE WHEN p.data IS NULL THEN 0 ELSE 1 END, "
+                          + "p.packSource, p.lastModified, p.objectCount, p.deltaCount, "
+                          + "p.indexVersion, p.minUpdateIndex, p.maxUpdateIndex, "
+                          + "p.committedAt, p.createdAt "
+                          + "FROM GitPackEntity p WHERE p.repositoryName = :repo "
+                          + "AND p.committed = true",
+                      Object[].class)
+                  .setParameter("repo", repositoryName)
+                  .getResultList();
+          LinkedHashMap<ExtensionKey, ExtensionSnapshot> extensions = new LinkedHashMap<>();
+          for (Object[] row : rows) {
+            Long packId = (Long) row[0];
+            String packName = (String) row[1];
+            String extension = (String) row[2];
+            long fileSize = ((Number) row[3]).longValue();
+            boolean inline = ((Number) row[4]).intValue() != 0;
+            PackDescriptionMetadata metadata =
+                PackDescriptionMetadata.fromStoredValues(
+                    (String) row[5],
+                    longValue(row[6]),
+                    longValue(row[7]),
+                    longValue(row[8]),
+                    integerValue(row[9]),
+                    longValue(row[10]),
+                    longValue(row[11]),
+                    (Instant) row[12],
+                    (Instant) row[13]);
+            extensions.put(
+                new ExtensionKey(packName, extension),
+                new ExtensionSnapshot(packId, fileSize, inline, metadata));
+          }
+          Map<ExtensionKey, ExtensionSnapshot> immutableExtensions = Map.copyOf(extensions);
+          return new PackCatalog(descriptionsFrom(immutableExtensions), immutableExtensions);
+        });
   }
 
   private List<DfsPackDescription> descriptionsFrom(
@@ -295,26 +297,74 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   protected void commitPackImpl(
       Collection<DfsPackDescription> descriptions, Collection<DfsPackDescription> replaces)
       throws IOException {
-    Lock writeLock = catalogLifecycleLock.writeLock();
-    writeLock.lock();
     try {
-      CatalogState previousCatalog = beginCatalogMutation(replaces);
-      CommitResult commitResult;
-      try {
-        commitResult = stagedExtensions.commit(descriptions, replaces);
-      } catch (IOException | RuntimeException publicationFailure) {
-        // DfsPackParser invokes rollbackPack after a publication error, but other supported JGit
-        // paths such as Reftable publication may propagate commitPack failure directly. Clean local
-        // staging here as well; rollback() is idempotent and retains the legacy database fallback.
-        stagedExtensions.rollback(descriptions);
-        restoreCatalogAfterFailedMutation(previousCatalog);
-        throw publicationFailure;
-      }
-      removeReplacedPayloads(previousCatalog, replaces);
-      completeCatalogMutation(commitResult);
+      stagedExtensions.commit(
+          descriptions, replaces, work -> publishWithCatalogLock(replaces, work));
+    } catch (IOException | RuntimeException publicationFailure) {
+      // Some JGit paths propagate commitPack failure without calling rollbackPack.
+      // The catalog lock has been released before rollback can acquire the database lock again.
+      stagedExtensions.rollback(descriptions);
+      throw publicationFailure;
+    }
+  }
+
+  private CommitResult publishWithCatalogLock(
+      Collection<DfsPackDescription> replaces,
+      HibernateTransactionContext.Work<CommitResult> work)
+      throws IOException {
+    try (CatalogPublication publication = new CatalogPublication(replaces)) {
+      CommitResult result =
+          transactionContext.executeWithRepositoryLock(
+              StorageOperationKind.PACK_PUBLICATION,
+              repositoryName,
+              session -> {
+                // Ref transactions already own the database lock when they scan the catalog.
+                // Take the catalog write lock in the same order, only for final publication.
+                publication.begin();
+                return work.execute(session);
+              });
+      publication.complete(result);
+      return result;
+    }
+  }
+
+  private final class CatalogPublication implements AutoCloseable {
+    private final Collection<DfsPackDescription> replaces;
+    private final Lock writeLock = catalogLifecycleLock.writeLock();
+    private CatalogState previous;
+    private boolean locked;
+
+    private CatalogPublication(Collection<DfsPackDescription> replaces) {
+      this.replaces = replaces;
+    }
+
+    private void begin() {
+      writeLock.lock();
+      locked = true;
+      previous = beginCatalogMutation(replaces);
+    }
+
+    private void complete(CommitResult result) {
+      CatalogState replaced = previous;
+      previous = null;
+      removeReplacedPayloads(replaced, replaces);
+      completeCatalogMutation(result);
+      // This only resets the DFS pack list. JGit notifies listeners after commitPackImpl returns
+      // and the catalogue write lock has been released.
       clearCache();
-    } finally {
-      writeLock.unlock();
+    }
+
+    @Override
+    public void close() {
+      if (locked) {
+        try {
+          if (previous != null) {
+            restoreCatalogAfterFailedMutation(previous);
+          }
+        } finally {
+          writeLock.unlock();
+        }
+      }
     }
   }
 

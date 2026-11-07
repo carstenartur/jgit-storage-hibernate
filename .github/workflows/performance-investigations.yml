@@ -356,6 +356,7 @@ jobs:
           - hsqldb
           - postgresql
           - postgresql-hikari
+          - sqlserver
         cache_state:
           - cold
           - warm
@@ -446,7 +447,7 @@ jobs:
           path: target/repository-aging-shards
           merge-multiple: true
 
-      - name: Merge the six disjoint JMH result sets
+      - name: Merge the disjoint JMH result sets
         shell: bash
         run: |
           python3 - <<'PY'
@@ -456,7 +457,7 @@ jobs:
           root = Path('target/repository-aging-shards')
           expected = {
               f'{backend}-{cache}'
-              for backend in ('hsqldb', 'postgresql', 'postgresql-hikari')
+              for backend in ('hsqldb', 'postgresql', 'postgresql-hikari', 'sqlserver')
               for cache in ('cold', 'warm')
           }
           located = {}
@@ -470,7 +471,7 @@ jobs:
               located[shard] = path
           if set(located) != expected:
               raise SystemExit(
-                  f'Expected six repository-aging shards; missing={sorted(expected - set(located))}, '
+                  f'Expected {len(expected)} repository-aging shards; missing={sorted(expected - set(located))}, '
                   f'unexpected={sorted(set(located) - expected)}'
               )
 
@@ -481,6 +482,10 @@ jobs:
               payload = json.loads(path.read_text(encoding='utf-8'))
               if not isinstance(payload, list) or not payload:
                   raise SystemExit(f'Shard {shard} has no JMH result entries: {path}')
+              for row in payload:
+                  params = row['params']
+                  if f"{params['backend']}-{params['cacheState']}" != shard:
+                      raise SystemExit(f'Shard {shard} contains a result from another backend/cache state: {path}')
               merged.extend(payload)
               manifest[shard] = {'path': str(path), 'entries': len(payload)}
 
@@ -498,6 +503,7 @@ jobs:
       - name: Derive complete repository-aging policy evidence
         run: |
           python3 .github/scripts/convert-jmh-repository-aging.py \
+            --full-matrix \
             target/investigations/repository-aging/jmh-result.json \
             target/investigations/repository-aging/evidence
           cat target/investigations/repository-aging/evidence/repository-aging-policy-evidence.md \
