@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import math
 import statistics
 from collections import defaultdict
 from pathlib import Path
@@ -18,6 +19,19 @@ SCENARIOS = {
     "empty": "search",
 }
 LATENCIES = ("offset_page_ns", "scroll_chunk_ns", "scroll_prefix_ns")
+EXPORT_COLUMNS = (
+    "engine,scenario,cache,documents,chunk_size,repeat,rows,chunks,first_chunk_ns,api_total_ns,"
+    "wall_total_ns,rows_per_second,chunk_p50_upper_ns,chunk_p95_upper_ns,chunk_p99_upper_ns,"
+    "gc_count,gc_ms,heap_before_gc_bytes,heap_observed_max_bytes,heap_after_bytes,"
+    "heap_after_gc_bytes,max_chunk_rows,sessions_before,sessions_during,sessions_after,"
+    "jdbc_before,jdbc_during,jdbc_after,transactions_before,transactions_during,"
+    "transactions_after,transactions_completed"
+).split(",")
+OFFSET_COLUMNS = (
+    "engine,scenario,cache,documents,chunk_size,repeat,offset,rows,scroll_chunk_ns,"
+    "scroll_prefix_ns,offset_page_ns,first_object_id,last_object_id"
+).split(",")
+TEXT_COLUMNS = {"engine", "scenario", "cache", "first_object_id", "last_object_id"}
 
 
 def require(condition, message):
@@ -25,9 +39,44 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def rows(path):
+def rows(path, columns=None):
     with path.open(newline="", encoding="utf-8") as stream:
-        return list(csv.DictReader(stream))
+        reader = csv.DictReader(stream, strict=True)
+        try:
+            header = reader.fieldnames
+            require(header and all(header) and len(header) == len(set(header)),
+                    f"Invalid CSV header in {path.name}")
+            if columns is not None:
+                missing, extra = set(columns) - set(header), set(header) - set(columns)
+                require(not missing and not extra,
+                        f"Invalid CSV columns in {path.name}: missing {sorted(missing)}, "
+                        f"unexpected {sorted(extra)}")
+            result = []
+            for row in reader:
+                require(None not in row and all(value is not None for value in row.values()),
+                        f"Malformed CSV row {reader.line_num} in {path.name}")
+                result.append(row)
+            return result
+        except csv.Error as error:
+            raise ValueError(f"Invalid CSV in {path.name}: {error}") from error
+
+
+def measurements(path, columns):
+    result = rows(path, columns)
+    for number, row in enumerate(result, 2):
+        for column in columns:
+            if column in TEXT_COLUMNS:
+                continue
+            parse = float if column == "rows_per_second" else int
+            check = f"{column} in {path.name} row {number}"
+            try:
+                value = parse(row[column])
+            except ValueError as error:
+                raise ValueError(f"Invalid numeric measurement {check}") from error
+            require(value >= 0 and (parse is int or math.isfinite(value)),
+                    f"Invalid numeric measurement {check}")
+            row[column] = value
+    return result
 
 
 def coordinate(row):
@@ -49,11 +98,12 @@ def sample_offsets(result_rows, chunk):
 def validate(root, documents, chunks, repetitions):
     warm = {}
     reopened = {}
-    for row in rows(root / "exports.csv"):
+    for row in measurements(root / "exports.csv", EXPORT_COLUMNS):
         scenario, chunk, repeat = coordinate(row)
         count = int(row["rows"])
         check = f"{scenario}/{chunk}/{repeat}/{row['cache']}"
-        require(int(row["documents"]) == documents and SCENARIOS.get(scenario) == row["engine"],
+        require(int(row["documents"]) == documents and SCENARIOS.get(scenario) == row["engine"]
+                and chunk in chunks and chunk > 0 and 1 <= repeat <= repetitions,
                 f"Wrong export fixture at {check}")
         require(0 <= count <= documents and (count == 0) == (scenario == "empty"),
                 f"Unexpected result count at {check}")
@@ -63,14 +113,26 @@ def validate(root, documents, chunks, repetitions):
                 and int(row["max_chunk_rows"]) == min(chunk, count),
                 f"Chunk budget exceeded at {check}")
         quantiles = [int(row[f"chunk_p{p}_upper_ns"]) for p in (50, 95, 99)]
-        require(quantiles == sorted(quantiles) and (quantiles[0] > 0) == (count > 0),
+        require(quantiles == sorted(quantiles)
+                and (quantiles[0] > 0 if count else quantiles == [0, 0, 0]),
                 f"Invalid chunk latencies at {check}")
+        first, api, wall = (row[name] for name in ("first_chunk_ns", "api_total_ns", "wall_total_ns"))
+        require(first <= api <= wall and api > 0 and (first > 0) == (count > 0),
+                f"Invalid export latencies at {check}")
+        require(math.isclose(row["rows_per_second"], count * 1_000_000_000.0 / wall,
+                             rel_tol=1e-9), f"Invalid export throughput at {check}")
+        require(row["heap_observed_max_bytes"]
+                >= max(row["heap_before_gc_bytes"], row["heap_after_bytes"]),
+                f"Invalid observed heap at {check}")
         jdbc = int(row["engine"] == "orm")
         require([int(row[f"sessions_{phase}"]) for phase in ("before", "during", "after")]
                 == [0, 1, 0] and
                 [int(row[f"jdbc_{phase}"]) for phase in ("before", "during", "after")]
                 == [0, jdbc, 0] and int(row["transactions_completed"]) == jdbc,
                 f"Resource budget exceeded at {check}")
+        require(row["transactions_during"] == row["transactions_before"]
+                and row["transactions_after"] - row["transactions_before"]
+                == row["transactions_completed"], f"Invalid transaction counters at {check}")
         require(row["cache"] in ("warm", "reopened"), f"Unexpected cache state at {check}")
         group = warm if row["cache"] == "warm" else reopened
         key = (scenario, chunk, repeat)
@@ -95,7 +157,7 @@ def validate(root, documents, chunks, repetitions):
 
     observed = defaultdict(set)
     windows = defaultdict(list)
-    for row in rows(root / "offsets.csv"):
+    for row in measurements(root / "offsets.csv", OFFSET_COLUMNS):
         key = coordinate(row)
         offset = int(row["offset"])
         count = int(row["rows"])

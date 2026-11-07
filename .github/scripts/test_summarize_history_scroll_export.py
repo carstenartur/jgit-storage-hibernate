@@ -56,6 +56,16 @@ def fixture(repetitions):
                 chunk_p50_upper_ns=1 if count else 0,
                 chunk_p95_upper_ns=2 if count else 0,
                 chunk_p99_upper_ns=3 if count else 0,
+                first_chunk_ns=1_000_000 if count else 0,
+                api_total_ns=800_000_000,
+                wall_total_ns=1_000_000_000,
+                rows_per_second=float(count),
+                gc_count=2,
+                gc_ms=4,
+                heap_before_gc_bytes=32_000_000,
+                heap_observed_max_bytes=64_000_000,
+                heap_after_bytes=48_000_000,
+                heap_after_gc_bytes=32_000_000,
                 sessions_before=0,
                 sessions_during=1,
                 sessions_after=0,
@@ -63,6 +73,9 @@ def fixture(repetitions):
                 jdbc_during=jdbc,
                 jdbc_after=0,
                 transactions_completed=jdbc,
+                transactions_before=100 + repeat,
+                transactions_during=100 + repeat,
+                transactions_after=100 + repeat + jdbc,
             )
             exports.append(export)
             if repeat == 1 and scenario in ("repository", "indexed-export"):
@@ -106,6 +119,98 @@ class HistoryScrollEvidenceTest(unittest.TestCase):
                     if r["scenario"] == "repository" and r["offset"] == 10_100
                 )
                 self.assertEqual(median + 10_100, deep["median_offset_page_ns"])
+
+    def test_missing_export_measurements_are_rejected(self):
+        for field in (
+            "first_chunk_ns", "api_total_ns", "wall_total_ns", "rows_per_second",
+            "gc_count", "gc_ms", "heap_before_gc_bytes", "heap_observed_max_bytes",
+            "heap_after_bytes", "heap_after_gc_bytes", "transactions_before",
+            "transactions_during", "transactions_after",
+        ):
+            with self.subTest(field=field):
+                exports, offsets = fixture(1)
+                for row in exports:
+                    row.pop(field)
+                with self.assertRaisesRegex(ValueError, "exports.csv"):
+                    self.validate(exports, offsets)
+
+    def test_malformed_csv_shape_is_rejected(self):
+        for filename in ("exports.csv", "offsets.csv"):
+            for defect in ("duplicate_header", "unexpected_header", "extra_cell", "missing_cell"):
+                with self.subTest(filename=filename, defect=defect):
+                    self.validate(*fixture(1))
+                    path = self.root / filename
+                    with path.open(newline="", encoding="utf-8") as stream:
+                        content = list(csv.reader(stream))
+                    if defect in ("duplicate_header", "unexpected_header"):
+                        content[0].append(content[0][0] if defect == "duplicate_header" else "unexpected")
+                        for row in content[1:]:
+                            row.append(row[0])
+                    elif defect == "extra_cell":
+                        content[1].append("unexpected")
+                    else:
+                        content[1].pop()
+                    with path.open("w", newline="", encoding="utf-8") as stream:
+                        csv.writer(stream).writerows(content)
+                    with self.assertRaisesRegex(ValueError, filename):
+                        TOOL.validate(self.root, DOCUMENTS, [CHUNK], 1)
+
+    def test_invalid_export_measurements_are_rejected(self):
+        for field, value in (
+            ("first_chunk_ns", -1), ("api_total_ns", -1), ("api_total_ns", 0),
+            ("wall_total_ns", -1), ("wall_total_ns", 0),
+            ("rows_per_second", -1), ("rows_per_second", "nan"),
+            ("rows_per_second", "inf"), ("rows_per_second", "-inf"),
+            ("rows_per_second", "not-a-number"),
+            ("gc_count", -1), ("gc_ms", -1), ("gc_ms", "1.5"),
+            ("heap_before_gc_bytes", -1), ("heap_observed_max_bytes", -1),
+            ("heap_after_bytes", -1), ("heap_after_gc_bytes", -1),
+            ("heap_after_gc_bytes", "not-an-integer"),
+        ):
+            with self.subTest(field=field, value=value):
+                exports, offsets = fixture(1)
+                exports[0][field] = value
+                with self.assertRaises(ValueError):
+                    self.validate(exports, offsets)
+
+    def test_inconsistent_export_measurements_are_rejected(self):
+        for changes in (
+            {"first_chunk_ns": 800_000_001},
+            {"api_total_ns": 1_000_000_001},
+            {"rows_per_second": 100},
+            {"heap_before_gc_bytes": 64_000_001},
+            {"heap_after_bytes": 64_000_001},
+        ):
+            with self.subTest(changes=changes):
+                exports, offsets = fixture(1)
+                exports[0].update(changes)
+                with self.assertRaises(ValueError):
+                    self.validate(exports, offsets)
+
+    def test_empty_results_have_no_nonempty_chunk_measurements(self):
+        for changes in (
+            {"first_chunk_ns": 1},
+            {"rows_per_second": 1},
+            {"chunk_p95_upper_ns": 1, "chunk_p99_upper_ns": 1},
+        ):
+            with self.subTest(changes=changes):
+                exports, offsets = fixture(1)
+                next(row for row in exports if row["scenario"] == "empty").update(changes)
+                with self.assertRaises(ValueError):
+                    self.validate(exports, offsets)
+
+    def test_transaction_counters_describe_the_cursor_lifetime(self):
+        for changes in (
+            {"transactions_before": -1},
+            {"transactions_during": 102},
+            {"transactions_after": 101},
+            {"transactions_after": 103},
+        ):
+            with self.subTest(changes=changes):
+                exports, offsets = fixture(1)
+                exports[0].update(changes)
+                with self.assertRaises(ValueError):
+                    self.validate(exports, offsets)
 
     def test_leaked_resources_are_rejected(self):
         for field in ("sessions_after", "jdbc_after"):
