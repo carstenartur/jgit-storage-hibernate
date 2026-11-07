@@ -1,0 +1,65 @@
+name: Taxonomy-shaped PostgreSQL Rebuild
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/consumer-taxonomy-postgres-evidence]
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.10-alpine
+        env:
+          POSTGRES_DB: taxonomy_benchmark
+          POSTGRES_USER: taxonomy_benchmark
+          POSTGRES_PASSWORD: fixture-only
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U taxonomy_benchmark -d taxonomy_benchmark"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Measure rebuild at 1,000 and 10,000 commits
+        env:
+          POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          set -euo pipefail
+          umask 077
+          connection="$(mktemp)"
+          trap 'rm -f "$connection"' EXIT
+          printf '%s\n' \
+            "jgit.storage.benchmark.postgresql.url=jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/taxonomy_benchmark" \
+            'jgit.storage.benchmark.postgresql.user=taxonomy_benchmark' \
+            'jgit.storage.benchmark.postgresql.password=fixture-only' > "$connection"
+          mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am test \
+            -Dtest=ConsumerProfileBenchmarkTest -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dconsumer.profiles.run=true -Dconsumer.profiles.matrix=postgres-taxonomy \
+            -Djgit.storage.benchmark.connection-properties-file="$connection" \
+            -Dconsumer.profiles.output="$GITHUB_WORKSPACE/target/taxonomy-postgres"
+          if grep -Eq 'jdbc:postgresql|fixture-only' target/taxonomy-postgres/taxonomy.{json,log}; then
+            echo "Unexpected connection data in retained evidence" >&2
+            exit 1
+          fi
+          git rev-parse HEAD > target/taxonomy-postgres/checkout-sha.txt
+      - name: Upload Taxonomy rebuild evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-shaped-taxonomy-postgres-rebuild
+          path: target/taxonomy-postgres/
+          if-no-files-found: error
