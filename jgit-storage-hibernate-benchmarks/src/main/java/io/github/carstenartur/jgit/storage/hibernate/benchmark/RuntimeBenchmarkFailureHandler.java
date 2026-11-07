@@ -23,28 +23,25 @@ import org.hibernate.search.engine.reporting.FailureHandler;
  */
 public final class RuntimeBenchmarkFailureHandler implements FailureHandler {
 
-  private static final AtomicReference<Throwable> FIRST_FAILURE = new AtomicReference<>();
+  private final AtomicReference<Throwable> firstFailure = new AtomicReference<>();
 
   public RuntimeBenchmarkFailureHandler() {}
 
-  static void reset() {
-    FIRST_FAILURE.set(null);
-  }
-
-  static void assertNoFailure() {
-    Throwable failure = FIRST_FAILURE.get();
+  void assertNoFailure() {
+    Throwable failure = firstFailure.get();
     if (failure != null) {
-      throw new IllegalStateException("Hibernate Search background benchmark operation failed", failure);
+      throw new IllegalStateException(
+          "Hibernate Search background benchmark operation failed", failure);
     }
   }
 
   @Override
   public void handle(FailureContext context) {
-    FIRST_FAILURE.compareAndSet(null, context.throwable());
+    firstFailure.compareAndSet(null, context.throwable());
   }
 
   @Override
   public void handle(EntityIndexingFailureContext context) {
-    FIRST_FAILURE.compareAndSet(null, context.throwable());
+    firstFailure.compareAndSet(null, context.throwable());
   }
 }

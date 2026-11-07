@@ -20,6 +20,18 @@ OPERATIONS = {
 }
 
 PERCENTILES = {"p50": 0.50, "p95": 0.95, "p99": 0.99}
+ACKNOWLEDGMENT = {
+    "async": "Index work is submitted; neither durability nor immediate visibility is guaranteed.",
+    "write-sync": "Index commit completed; visibility follows the reader refresh setting.",
+    "read-sync": "Index refresh completed; the visible write may still be uncommitted.",
+    "sync": "Index commit and refresh completed; an immediate query can see the durable write.",
+}
+INDEX_AND_HEAP = {
+    "luceneCommitGenerations": ("Lucene commit generation advance", "Generation delta, not an event count."),
+    "luceneCommittedSegments": ("committed segments", "Segments after graceful close."),
+    "luceneCommittedBytes": ("committed index bytes", "Bytes referenced by the commit after graceful close."),
+    "peakHeapPoolBytes": ("sum of peak heap pools in bytes", "Upper bound from JVM heap pool peaks before close."),
+}
 
 
 def _flatten_raw(metric: dict[str, Any], name: str) -> list[float]:
@@ -79,6 +91,8 @@ def _scenario_details(scenario: str) -> str:
         if separator <= len("sync-"):
             raise ValueError(f"Invalid synchronization scenario {scenario!r}")
         strategy = scenario[len("sync-") : separator]
+        if strategy not in ACKNOWLEDGMENT:
+            raise ValueError(f"Unknown synchronization strategy {strategy!r}")
         refresh = scenario[separator + 2 :]
         return (
             f"sync={strategy}; refresh={refresh}ms; writerRAM=Lucene-default; "
@@ -102,16 +116,18 @@ def _scenario_details(scenario: str) -> str:
 
 def _extra(result: dict[str, Any], scenario: str) -> str:
     params = result.get("params", {})
+    strategy = scenario[len("sync-") : scenario.rfind("-r")] if scenario.startswith("sync-") else "write-sync"
     return "\n".join(
         [
             f"Scenario: {scenario}",
             _scenario_details(scenario),
+            f"Acknowledgment: {ACKNOWLEDGMENT[strategy]}",
             f"Commits: {params.get('commitCount', 'unknown')}",
             f"Burst commits: {params.get('burstCount', 'unknown')}",
             f"JDK: {result.get('jdkVersion', 'unknown')}",
             f"Mode: {result.get('mode', 'unknown')}",
             f"Forks: {result.get('forks', 'unknown')}",
-            "Chart direction: lower is better; higher is slower or more expensive.",
+            "Chart direction: lower is better for elapsed time and resource use; segment and generation counts describe activity.",
         ]
     )
 
@@ -257,6 +273,21 @@ def convert(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     0.001,
                 )
             )
+
+        for result, window in ((ready, "burst"), (rebuild, "rebuild")):
+            # Historical JMH artifacts predate these counters and retain their existing series.
+            fields = {name.rsplit(".", 1)[-1] for name in result.get("secondaryMetrics", {})}
+            if fields.intersection(INDEX_AND_HEAP):
+                for field, (label, semantics) in INDEX_AND_HEAP.items():
+                    entry = _mean_counter_entry(
+                        result,
+                        field,
+                        f"Hibernate Search runtime {window} {label}",
+                        scenario,
+                        "count/op",
+                    )
+                    entry["extra"] += f"\nObservation: {semantics}"
+                    extra_entries.append(entry)
 
         for entry in extra_entries:
             if entry["name"] in seen_names:

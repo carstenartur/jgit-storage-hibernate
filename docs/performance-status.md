@@ -267,6 +267,21 @@ Database row payload inflation is therefore negligible. The application-level mo
 
 These counters exclude SQL framing, WAL, page writes, replication and physical storage amplification. The [synchronous phase trace](operations/staging-jdbc-evidence.md#decision-for-local-postgresql) gives a ceiling of 1.53% for overlapping eligible staging reads at 512 MiB on the measured local setup. A [paired diagnostic](operations/staging-jdbc-evidence.md#paired-staging-and-rtt-diagnostic) with artificially paced staging and 51 ms RTT raises the ideal ceiling to 11.85%. Both results bracket potential improvement from overlap in the tested conditions.
 
+## Search runtime coordination and recovery
+
+The [runtime coordination comparison](evidence/search-runtime-2026-11-07/README.md)
+retains raw JMH results and a throughput, visibility-lag and concurrent-query chart
+for a 500-commit burst under one- and four-CPU budgets. It also records committed
+index size, segment snapshots and heap observations. Submission throughput must
+be interpreted with the mode's durability and visibility contract.
+
+The [runtime tuning guide](operations/search-runtime-tuning.md) documents the
+persistent-index crash, interruption and injected I/O-failure tests, and the
+hosted matrix for refresh intervals, writer buffers, backend threads and batching.
+The tests distinguish acknowledged durable writes from queued asynchronous work
+and verify rebuilding the index from Git after a crash leaves it behind the
+relational projection.
+
 ## What is complete and what remains
 
 | Issue area | Completed | Remaining |
