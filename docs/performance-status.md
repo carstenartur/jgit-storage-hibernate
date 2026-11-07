@@ -73,6 +73,10 @@ This page therefore distinguishes:
 
 ## End-to-end position against `FileRepository`
 
+The consumer-shaped benchmark series tracks audio publication, Taxonomy
+history queries and sandbox Java analysis as separate synthetic workloads.
+[Consumer fixtures and results](benchmark-consumer-profiles.md)
+
 The table uses the existing complete protocol point estimates. “Reference efficiency” is `filesystem time / PostgreSQL time`; values above 100% mean only that PostgreSQL had the lower point estimate in that controlled run. Single-shot confidence intervals are wide.
 
 | Workload | Filesystem | PostgreSQL | PostgreSQL vs filesystem | Reference efficiency | Chart |
