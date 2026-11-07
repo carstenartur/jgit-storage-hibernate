@@ -94,6 +94,8 @@ SQL Server wait statistics are server-scoped. They are useful on the isolated Te
 
 ## Current integration and interpretation
 
+The [native evidence charts and selected raw values](../evidence/database-native-evidence-2026-11-07.md#charts) compare pack WAL, read-ahead payload, phase-specific log activity and SQL Server waits.
+
 The first integration is the real pack-layout benchmark because it already provides exact PostgreSQL and SQL Server write, sequential-read, short-read and random-read coordinates. This can answer questions such as:
 
 - whether fewer chunk rows reduce transaction-log bytes as well as JDBC calls;
@@ -155,14 +157,61 @@ The Search benchmark remains usable with telemetry disabled. The retained workfl
 and verifies that JSON and NDJSON contain one observation per measured invocation. Its fork receives
 credentials through a temporary owner-readable file, and artifact upload is gated on a privacy scan.
 
-## Remaining issue #187 work
+## Focused pack-chunk read diagnostics
 
-This foundation does not close #187. Follow-up integrations must apply the same contract to:
+The native telemetry workflow also runs one separate, opt-in read probe on both
+engines. It reproduces the ordered pack-chunk range lookup on a disposable
+fixture with the same composite key shape (32 packs with 16 small chunks each;
+one four-chunk window). Fixture creation, statistics refresh and teardown run
+on a separate connection. The diagnostic executes only a fixed, parameterized
+read, outside JMH and after the aging evidence has been uploaded.
 
-1. full-scale repository aging/MIDX/repack;
-2. receiver workloads beyond the retained append-only reflog batch contract;
-3. broader canonical history-query and Search-runtime tuning profiles;
-4. safe focused plan capture without copying sensitive parameters or arbitrary SQL into artifacts;
-5. dashboard charts for WAL/log bytes per logical MiB, logical/physical reads and wait categories.
+- PostgreSQL executes [`EXPLAIN (ANALYZE, BUFFERS, WAL, FORMAT XML)`](https://www.postgresql.org/docs/17/sql-explain.html)
+  in a read-only transaction. Its root operator reports shared-buffer hits and
+  block reads, actual rows and loops, and WAL records, full-page images and
+  bytes when reported. An execution time in milliseconds comes from the query
+  summary. A shared-buffer miss may be served by the OS cache.
+- SQL Server uses [`SET STATISTICS XML ON`](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-statistics-xml-transact-sql)
+  on a dedicated connection that closes after the fixed read. The artifact
+  retains root operator rows, executions and logical/physical reads, summed
+  across threads when reported. Query CPU and elapsed milliseconds are included
+  when available. The probe also counts actual-plan `SpillToTempDb` warnings;
+  the count is a warning indicator and does not estimate spill volume. SQL
+  Server requires `SHOWPLAN` on the fixture database.
 
-Each additional integration must preserve zero telemetry queries when disabled and retain an exact benchmark coordinate in the companion artifact.
+Both engines use lock, JDBC query and socket timeouts. PostgreSQL also enforces
+a server statement timeout. The workflow retains `focused-read-plan-<backend>.json`
+with the fixed probe settings and the empty list of required extensions. It keeps
+plan XML in memory and serializes a fixed operator category, normalized server
+version and allowlisted numeric fields. Missing
+counters are omitted; unsupported results use fixed categories, including
+`permission-denied` and `timeout`. CI requires a supported result on its
+disposable databases. A failed diagnostic does not affect JMH or remove the
+already uploaded aging evidence.
+
+The probe tests plan capture and shows how each engine accesses the indexed
+fixture. It does not measure production pack size, cold-cache reads, application
+latency or the effect of changing a storage default. This indexed range does
+not exercise SQL Server tempdb spills. PostgreSQL shared buffers
+and SQL Server logical reads are engine-specific signals, not directly
+interchangeable counts. [Read plan charts and evidence](../evidence/database-native-evidence-2026-11-07.md#read-plans-and-time-windows)
+
+To run the focused probe with Testcontainers, first build the benchmark module
+with `mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests`.
+Then select `postgresql` or `sqlserver`:
+
+```bash
+mvn -B -pl jgit-storage-hibernate-benchmarks test \
+  -Dtest=DatabaseTelemetryFocusedReadTest,DatabaseTelemetryFocusedReadIntegrationTest \
+  -Djgit.storage.benchmark.database-telemetry.focused-read.enabled=true \
+  -Djgit.storage.benchmark.database-telemetry.focused-read.backend=postgresql \
+  -Djgit.storage.benchmark.database-telemetry.focused-read.output=/tmp/focused-read-plan.json
+```
+
+## Coverage boundaries
+
+The retained native evidence covers bounded repository aging and the append-only
+reflog batch contract. The full-scale MIDX and repack series, additional receiver
+workloads and larger Search workloads each need separate native observations for
+capacity planning. Any additional integration should preserve zero telemetry
+queries when disabled and retain an exact benchmark coordinate in its artifact.

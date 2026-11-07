@@ -387,3 +387,19 @@ jobs:
           echo '- Native log, strict JSON and credential-free artifact contracts passed.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Raw warm read latency and p50/p95/p99 during compact repack validated for three fresh 300-push histories.' >> "$GITHUB_STEP_SUMMARY"
           echo '- This workflow does not change an automatic maintenance threshold.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run focused native read diagnostics
+        timeout-minutes: 8
+        run: |
+          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=DatabaseTelemetryFocusedReadTest,DatabaseTelemetryFocusedReadIntegrationTest \
+            -Djgit.storage.benchmark.database-telemetry.focused-read.enabled=true \
+            -Djgit.storage.benchmark.database-telemetry.focused-read.backend="$BACKEND" \
+            -Djgit.storage.benchmark.database-telemetry.focused-read.output="$GITHUB_WORKSPACE/target/focused-read-plan-$BACKEND.json"
+
+      - name: Upload sanitized native read diagnostics
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: focused-read-plan-${{ matrix.backend }}
+          path: target/focused-read-plan-${{ matrix.backend }}.json
+          if-no-files-found: error

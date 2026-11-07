@@ -51,6 +51,8 @@ Maintenance for different logical repositories uses different lock rows and can 
 
 ## Result interpretation
 
+The [native maintenance charts](../evidence/database-native-evidence-2026-11-07.md#repack-and-subsequent-reads) separate fixture, repack and read log activity, with SQL Server wait categories for both maintenance modes.
+
 `PackRepackResult` records:
 
 - active PACK and Reftable counts before and after;

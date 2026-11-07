@@ -1,0 +1,193 @@
+dataset,backend,coordinate,metric,unit,value
+staging-jdbc,postgresql,16 MiB hosted sample 1,logical_payload,bytes,16777216
+staging-jdbc,postgresql,16 MiB hosted sample 1,wal_insert_lsn_delta,bytes,17971088
+staging-jdbc,postgresql,16 MiB hosted sample 2,logical_payload,bytes,16777216
+staging-jdbc,postgresql,16 MiB hosted sample 2,wal_insert_lsn_delta,bytes,17971112
+staging-jdbc,postgresql,16 MiB hosted sample 3,logical_payload,bytes,16777216
+staging-jdbc,postgresql,16 MiB hosted sample 3,wal_insert_lsn_delta,bytes,17971112
+staging-jdbc,postgresql,128 MiB local sample 1,logical_payload,bytes,134217728
+staging-jdbc,postgresql,128 MiB local sample 1,wal_insert_lsn_delta,bytes,143755400
+staging-jdbc,postgresql,128 MiB local sample 2,logical_payload,bytes,134217728
+staging-jdbc,postgresql,128 MiB local sample 2,wal_insert_lsn_delta,bytes,143749112
+staging-jdbc,postgresql,128 MiB local sample 3,logical_payload,bytes,134217728
+staging-jdbc,postgresql,128 MiB local sample 3,wal_insert_lsn_delta,bytes,143764064
+staging-jdbc,postgresql,512 MiB local sample 1,logical_payload,bytes,536870912
+staging-jdbc,postgresql,512 MiB local sample 1,wal_insert_lsn_delta,bytes,575002632
+staging-jdbc,postgresql,512 MiB local sample 2,logical_payload,bytes,536870912
+staging-jdbc,postgresql,512 MiB local sample 2,wal_insert_lsn_delta,bytes,575203624
+staging-jdbc,postgresql,512 MiB local sample 3,logical_payload,bytes,536870912
+staging-jdbc,postgresql,512 MiB local sample 3,wal_insert_lsn_delta,bytes,575027584
+read-ahead,postgresql,randomReads window 1,logical_read,bytes,131072
+read-ahead,postgresql,randomReads window 1,database_payload_read,bytes,31457280
+read-ahead,postgresql,randomReads window 1,database_queries,count,30
+read-ahead,postgresql,randomReads window 1,pg_database_buffer_hits,blocks,722
+read-ahead,postgresql,randomReads window 1,pg_database_blocks_read,blocks,39
+read-ahead,postgresql,randomReads window 4,logical_read,bytes,131072
+read-ahead,postgresql,randomReads window 4,database_payload_read,bytes,100696791
+read-ahead,postgresql,randomReads window 4,database_queries,count,26
+read-ahead,postgresql,randomReads window 4,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,randomReads window 4,pg_database_blocks_read,blocks,0
+read-ahead,postgresql,randomReads window 16,logical_read,bytes,131072
+read-ahead,postgresql,randomReads window 16,database_payload_read,bytes,191963097
+read-ahead,postgresql,randomReads window 16,database_queries,count,18
+read-ahead,postgresql,randomReads window 16,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,randomReads window 16,pg_database_blocks_read,blocks,0
+read-ahead,postgresql,sequentialRead window 1,logical_read,bytes,20978219
+read-ahead,postgresql,sequentialRead window 1,database_payload_read,bytes,20978219
+read-ahead,postgresql,sequentialRead window 1,database_queries,count,21
+read-ahead,postgresql,sequentialRead window 1,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,sequentialRead window 1,pg_database_blocks_read,blocks,0
+read-ahead,postgresql,sequentialRead window 4,logical_read,bytes,20978219
+read-ahead,postgresql,sequentialRead window 4,database_payload_read,bytes,20978219
+read-ahead,postgresql,sequentialRead window 4,database_queries,count,6
+read-ahead,postgresql,sequentialRead window 4,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,sequentialRead window 4,pg_database_blocks_read,blocks,0
+read-ahead,postgresql,sequentialRead window 16,logical_read,bytes,20978219
+read-ahead,postgresql,sequentialRead window 16,database_payload_read,bytes,20978219
+read-ahead,postgresql,sequentialRead window 16,database_queries,count,2
+read-ahead,postgresql,sequentialRead window 16,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,sequentialRead window 16,pg_database_blocks_read,blocks,0
+read-ahead,postgresql,shortRead window 1,logical_read,bytes,65536
+read-ahead,postgresql,shortRead window 1,database_payload_read,bytes,1048576
+read-ahead,postgresql,shortRead window 1,database_queries,count,1
+read-ahead,postgresql,shortRead window 1,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,shortRead window 1,pg_database_blocks_read,blocks,0
+read-ahead,postgresql,shortRead window 4,logical_read,bytes,65536
+read-ahead,postgresql,shortRead window 4,database_payload_read,bytes,4194304
+read-ahead,postgresql,shortRead window 4,database_queries,count,1
+read-ahead,postgresql,shortRead window 4,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,shortRead window 4,pg_database_blocks_read,blocks,0
+read-ahead,postgresql,shortRead window 16,logical_read,bytes,65536
+read-ahead,postgresql,shortRead window 16,database_payload_read,bytes,16777216
+read-ahead,postgresql,shortRead window 16,database_queries,count,1
+read-ahead,postgresql,shortRead window 16,pg_database_buffer_hits,blocks,761
+read-ahead,postgresql,shortRead window 16,pg_database_blocks_read,blocks,0
+aging-reopen,postgresql,none / fixture-build,window_elapsed,ms,211.781
+aging-reopen,postgresql,none / fixture-build,postgresql.wal.insert_lsn_bytes,bytes,144016
+aging-reopen,postgresql,none / maintenance,window_elapsed,ms,0.122
+aging-reopen,postgresql,none / maintenance,postgresql.wal.insert_lsn_bytes,bytes,0
+aging-reopen,postgresql,none / measurement,window_elapsed,ms,212.744
+aging-reopen,postgresql,none / measurement,postgresql.wal.insert_lsn_bytes,bytes,0
+aging-reopen,postgresql,compact-only / fixture-build,window_elapsed,ms,221.98499999999999
+aging-reopen,postgresql,compact-only / fixture-build,postgresql.wal.insert_lsn_bytes,bytes,144976
+aging-reopen,postgresql,compact-only / maintenance,window_elapsed,ms,60.132999999999996
+aging-reopen,postgresql,compact-only / maintenance,postgresql.wal.insert_lsn_bytes,bytes,113056
+aging-reopen,postgresql,compact-only / measurement,window_elapsed,ms,204.789
+aging-reopen,postgresql,compact-only / measurement,postgresql.wal.insert_lsn_bytes,bytes,0
+aging-reopen,postgresql,read-optimized / fixture-build,window_elapsed,ms,211.44299999999998
+aging-reopen,postgresql,read-optimized / fixture-build,postgresql.wal.insert_lsn_bytes,bytes,145072
+aging-reopen,postgresql,read-optimized / maintenance,window_elapsed,ms,77.71300000000001
+aging-reopen,postgresql,read-optimized / maintenance,postgresql.wal.insert_lsn_bytes,bytes,116968
+aging-reopen,postgresql,read-optimized / measurement,window_elapsed,ms,204.783
+aging-reopen,postgresql,read-optimized / measurement,postgresql.wal.insert_lsn_bytes,bytes,0
+aging-reopen,sqlserver,none / fixture-build,window_elapsed,ms,337.723
+aging-reopen,sqlserver,none / fixture-build,sqlserver.io.log.bytes_written,bytes,262144
+aging-reopen,sqlserver,none / fixture-build,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,none / fixture-build,sqlserver.wait.writelog.time_ms,ms,22
+aging-reopen,sqlserver,none / fixture-build,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,none / fixture-build,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,none / fixture-build,sqlserver.wait.network.time_ms,ms,0
+aging-reopen,sqlserver,none / maintenance,window_elapsed,ms,0.08399999999999999
+aging-reopen,sqlserver,none / maintenance,sqlserver.io.log.bytes_written,bytes,0
+aging-reopen,sqlserver,none / maintenance,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,none / maintenance,sqlserver.wait.writelog.time_ms,ms,0
+aging-reopen,sqlserver,none / maintenance,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,none / maintenance,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,none / maintenance,sqlserver.wait.network.time_ms,ms,0
+aging-reopen,sqlserver,none / measurement,window_elapsed,ms,224.809
+aging-reopen,sqlserver,none / measurement,sqlserver.io.log.bytes_written,bytes,0
+aging-reopen,sqlserver,none / measurement,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,none / measurement,sqlserver.wait.writelog.time_ms,ms,0
+aging-reopen,sqlserver,none / measurement,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,none / measurement,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,none / measurement,sqlserver.wait.network.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / fixture-build,window_elapsed,ms,322.529
+aging-reopen,sqlserver,compact-only / fixture-build,sqlserver.io.log.bytes_written,bytes,307200
+aging-reopen,sqlserver,compact-only / fixture-build,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,compact-only / fixture-build,sqlserver.wait.writelog.time_ms,ms,11
+aging-reopen,sqlserver,compact-only / fixture-build,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / fixture-build,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / fixture-build,sqlserver.wait.network.time_ms,ms,1
+aging-reopen,sqlserver,compact-only / maintenance,window_elapsed,ms,80.995
+aging-reopen,sqlserver,compact-only / maintenance,sqlserver.io.log.bytes_written,bytes,282624
+aging-reopen,sqlserver,compact-only / maintenance,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,compact-only / maintenance,sqlserver.wait.writelog.time_ms,ms,1
+aging-reopen,sqlserver,compact-only / maintenance,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / maintenance,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / maintenance,sqlserver.wait.network.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / measurement,window_elapsed,ms,205.755
+aging-reopen,sqlserver,compact-only / measurement,sqlserver.io.log.bytes_written,bytes,0
+aging-reopen,sqlserver,compact-only / measurement,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,compact-only / measurement,sqlserver.wait.writelog.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / measurement,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / measurement,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,compact-only / measurement,sqlserver.wait.network.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / fixture-build,window_elapsed,ms,369.371
+aging-reopen,sqlserver,read-optimized / fixture-build,sqlserver.io.log.bytes_written,bytes,258048
+aging-reopen,sqlserver,read-optimized / fixture-build,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,read-optimized / fixture-build,sqlserver.wait.writelog.time_ms,ms,11
+aging-reopen,sqlserver,read-optimized / fixture-build,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / fixture-build,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / fixture-build,sqlserver.wait.network.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / maintenance,window_elapsed,ms,114.528
+aging-reopen,sqlserver,read-optimized / maintenance,sqlserver.io.log.bytes_written,bytes,352256
+aging-reopen,sqlserver,read-optimized / maintenance,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,read-optimized / maintenance,sqlserver.wait.writelog.time_ms,ms,7
+aging-reopen,sqlserver,read-optimized / maintenance,sqlserver.wait.page_io.time_ms,ms,2
+aging-reopen,sqlserver,read-optimized / maintenance,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / maintenance,sqlserver.wait.network.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / measurement,window_elapsed,ms,204.68900000000002
+aging-reopen,sqlserver,read-optimized / measurement,sqlserver.io.log.bytes_written,bytes,0
+aging-reopen,sqlserver,read-optimized / measurement,sqlserver.io.data.bytes_read,bytes,0
+aging-reopen,sqlserver,read-optimized / measurement,sqlserver.wait.writelog.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / measurement,sqlserver.wait.page_io.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / measurement,sqlserver.wait.lock.time_ms,ms,0
+aging-reopen,sqlserver,read-optimized / measurement,sqlserver.wait.network.time_ms,ms,0
+reflog-batch,postgresql,1 / first-apply,postgresql.wal.insert_lsn_bytes,bytes,744
+reflog-batch,postgresql,1 / idempotent-replay,postgresql.wal.insert_lsn_bytes,bytes,96
+reflog-batch,postgresql,10 / first-apply,postgresql.wal.insert_lsn_bytes,bytes,6120
+reflog-batch,postgresql,10 / idempotent-replay,postgresql.wal.insert_lsn_bytes,bytes,96
+reflog-batch,postgresql,50 / first-apply,postgresql.wal.insert_lsn_bytes,bytes,30296
+reflog-batch,postgresql,50 / idempotent-replay,postgresql.wal.insert_lsn_bytes,bytes,96
+reflog-batch,sqlserver,1 / first-apply,sqlserver.io.log.bytes_written,bytes,28672
+reflog-batch,sqlserver,1 / idempotent-replay,sqlserver.io.log.bytes_written,bytes,0
+reflog-batch,sqlserver,10 / first-apply,sqlserver.io.log.bytes_written,bytes,12288
+reflog-batch,sqlserver,10 / idempotent-replay,sqlserver.io.log.bytes_written,bytes,0
+reflog-batch,sqlserver,50 / first-apply,sqlserver.io.log.bytes_written,bytes,57344
+reflog-batch,sqlserver,50 / idempotent-replay,sqlserver.io.log.bytes_written,bytes,0
+search,postgresql,contentOnlySummaryHits / 1,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,contentOnlySummaryHits / 2,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,contentOnlySummaryHits / 3,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,fullTextEntityHits / 1,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,fullTextEntityHits / 2,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,fullTextEntityHits / 3,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,fullTextSummaryHits / 1,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,fullTextSummaryHits / 2,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,fullTextSummaryHits / 3,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,incrementalIndexing / 1,postgresql.wal.insert_lsn_bytes,bytes,1032504
+search,postgresql,incrementalIndexing / 2,postgresql.wal.insert_lsn_bytes,bytes,1032504
+search,postgresql,incrementalIndexing / 3,postgresql.wal.insert_lsn_bytes,bytes,1032504
+search,postgresql,pathLiteralSql / 1,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,pathLiteralSql / 2,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,pathLiteralSql / 3,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,pathTermsLucene / 1,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,pathTermsLucene / 2,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,pathTermsLucene / 3,postgresql.wal.insert_lsn_bytes,bytes,0
+search,postgresql,projectionRebuild / 1,postgresql.wal.insert_lsn_bytes,bytes,1078792
+search,postgresql,projectionRebuild / 2,postgresql.wal.insert_lsn_bytes,bytes,1078768
+search,postgresql,projectionRebuild / 3,postgresql.wal.insert_lsn_bytes,bytes,1078792
+focused-read-plan,postgresql,index-scan,actualLoops,count,1
+focused-read-plan,postgresql,index-scan,actualRows,count,4
+focused-read-plan,postgresql,index-scan,executionMillis,ms,0.082
+focused-read-plan,postgresql,index-scan,sharedHitBlocks,blocks,3
+focused-read-plan,postgresql,index-scan,sharedReadBlocks,blocks,0
+focused-read-plan,postgresql,index-scan,walBytes,bytes,0
+focused-read-plan,postgresql,index-scan,walFullPageImages,count,0
+focused-read-plan,postgresql,index-scan,walRecords,count,0
+focused-read-plan,sqlserver,index-seek,actualExecutions,count,1
+focused-read-plan,sqlserver,index-seek,actualRows,count,4
+focused-read-plan,sqlserver,index-seek,cpuMillis,ms,0
+focused-read-plan,sqlserver,index-seek,executionMillis,ms,0
+focused-read-plan,sqlserver,index-seek,logicalReads,pages,2
+focused-read-plan,sqlserver,index-seek,physicalReads,pages,0
+focused-read-plan,sqlserver,index-seek,spillWarnings,count,0

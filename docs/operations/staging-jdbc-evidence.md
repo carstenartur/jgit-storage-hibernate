@@ -1,5 +1,7 @@
 # Measuring synchronous pack staging and JDBC writes
 
+The [native pack WAL chart](../evidence/database-native-evidence-2026-11-07.md#pack-wal-per-logical-mib) shows the WAL generated per logical MiB for the hosted and local staging samples.
+
 The [JMH Benchmarks workflow](../../.github/workflows/performance.yml) includes a
 PostgreSQL 17 smoke test that publishes a 16 MiB incompressible JGit object three
 times through the synchronous writer with its 16 MiB window. The test closes
