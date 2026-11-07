@@ -4,13 +4,31 @@ on:
   workflow_dispatch:
     inputs:
       matrix:
-        description: Runtime matrix size
+        description: Runtime settings matrix (use smoke for 10,000 commits)
         required: false
         default: smoke
         type: choice
         options:
           - smoke
           - full
+      workload:
+        description: Total commits and burst commits
+        default: '100-50'
+        type: choice
+        options:
+          - '100-50'
+          - '1000-50'
+          - '1000-500'
+          - '10000-50'
+          - '10000-500'
+      resources:
+        description: Benchmark JVM CPU and heap budget
+        default: host
+        type: choice
+        options:
+          - host
+          - constrained
+          - normal
   schedule:
     - cron: '23 5 * * 4'
   pull_request:
@@ -21,6 +39,7 @@ on:
       - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-runtime.py'
       - '.github/scripts/test_convert_jmh_search_runtime.py'
+      - '.github/scripts/validate_search_database_telemetry.py'
       - '.github/scripts/publish-benchmark-history.py'
       - '.github/benchmark-dashboard/**'
       - 'pom.xml'
@@ -35,6 +54,7 @@ on:
       - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-runtime.py'
       - '.github/scripts/test_convert_jmh_search_runtime.py'
+      - '.github/scripts/validate_search_database_telemetry.py'
       - '.github/scripts/publish-benchmark-history.py'
       - '.github/benchmark-dashboard/**'
       - 'pom.xml'
@@ -43,7 +63,7 @@ on:
       - 'jgit-storage-hibernate-benchmarks/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -54,6 +74,9 @@ jobs:
     name: PostgreSQL + Lucene runtime coordination matrix
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    env:
+      RUNTIME_WORKLOAD: ${{ inputs.workload || '100-50' }}
+      RUNTIME_RESOURCES: ${{ inputs.resources || 'host' }}
 
     steps:
       - name: Checkout
@@ -69,13 +92,19 @@ jobs:
       - name: Select runtime matrix
         id: matrix
         shell: bash
+        env:
+          RUNTIME_MATRIX: ${{ inputs.matrix || 'smoke' }}
         run: |
           full=false
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event.inputs.matrix }}" == "full" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" || "$RUNTIME_MATRIX" == "full" ]]; then
             full=true
           fi
+          if [[ "$full" == "true" && "$RUNTIME_WORKLOAD" == 10000-* ]]; then
+            echo 'Use the smoke settings matrix for 10,000 commits.' >&2
+            exit 1
+          fi
           echo "full=$full" >> "$GITHUB_OUTPUT"
-          echo "Selected full matrix: $full"
+          echo "Full matrix: $full; workload: $RUNTIME_WORKLOAD; resources: $RUNTIME_RESOURCES"
 
       - name: Test runtime chart conversion and units
         run: |
@@ -92,14 +121,42 @@ jobs:
 
       - name: Run PostgreSQL and Lucene runtime matrix
         shell: bash
+        env:
+          RUNTIME_FULL: ${{ steps.matrix.outputs.full }}
         run: |
           set -o pipefail
-          mvn -B -pl jgit-storage-hibernate-benchmarks test \
-            -Dtest=HibernateSearchRuntimeTuningBenchmarkIT \
-            -Dsurefire.failIfNoSpecifiedTests=false \
-            -Dsearch.runtime.full=${{ steps.matrix.outputs.full }} \
-            -Dbenchmark.resultFile="$GITHUB_WORKSPACE/target/search-runtime/jmh-result.json" 2>&1 \
-            | tee target/search-runtime/maven-benchmark.log
+          lscpu --json > target/search-runtime/cpu.json
+          command=(mvn -B -pl jgit-storage-hibernate-benchmarks test
+            -Dtest=HibernateSearchRuntimeTuningBenchmarkIT
+            -Dsurefire.failIfNoSpecifiedTests=false
+            "-Dsearch.runtime.full=$RUNTIME_FULL"
+            "-Dsearch.runtime.workload=$RUNTIME_WORKLOAD"
+            "-Dsearch.runtime.resources=$RUNTIME_RESOURCES"
+            "-Dbenchmark.commit=$GITHUB_SHA"
+            "-Dbenchmark.resultFile=$GITHUB_WORKSPACE/target/search-runtime/jmh-result.json")
+
+          case "$RUNTIME_RESOURCES" in
+            host) cpu_count=0 ;;
+            constrained) cpu_count=1 ;;
+            normal) cpu_count=4 ;;
+            *) echo 'Unknown Search runtime resource profile.' >&2; exit 1 ;;
+          esac
+          if (( cpu_count > 0 )); then
+            cpus="$(python3 - "$cpu_count" <<'PY'
+          import os
+          import sys
+
+          count = int(sys.argv[1])
+          available = sorted(os.sched_getaffinity(0))
+          if len(available) < count:
+              raise SystemExit(f'Resource profile needs {count} allowed CPUs, found {len(available)}')
+          print(','.join(map(str, available[:count])))
+          PY
+            )"
+            command=(taskset --cpu-list "$cpus" "${command[@]}")
+          fi
+          "${command[@]}" 2>&1 | tee target/search-runtime/maven-benchmark.log
+          test -s target/search-runtime/environment.properties
 
       - name: Convert runtime results for grouped charts
         run: |
@@ -120,8 +177,15 @@ jobs:
           grep -F 'Hibernate Search runtime burst visibility polls' target/search-runtime/comparison.json
           grep -F 'Hibernate Search runtime burst prepared statements' target/search-runtime/comparison.json
 
-      - name: Upload Search runtime evidence
+      - name: Check Search runtime evidence for connection details
+        id: evidence-privacy
         if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/search-runtime jgit-storage-hibernate-benchmarks/target/surefire-reports
+
+      - name: Upload Search runtime evidence
+        if: always() && steps.evidence-privacy.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hibernate-search-runtime-results
@@ -136,8 +200,11 @@ jobs:
           echo '### Hibernate Search runtime tuning' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo "Full matrix: ${{ steps.matrix.outputs.full }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Total commits and burst commits: $RUNTIME_WORKLOAD; resources: $RUNTIME_RESOURCES" >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo 'The matrix keeps the semantic Search profile fixed at content-v1 and varies runtime coordination, refresh, Lucene writer RAM/backend threads, and projection batching in controlled families.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The run artifact contains its exact workload, host, Java, and database metadata. Only default runs on main enter the chart history below.' >> "$GITHUB_STEP_SUMMARY"
+          echo "[Runtime benchmark reproduction guide](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/operations/search-runtime-tuning.md)" >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Burst submission p50](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-submission-p-50)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Burst ready p95](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-ready-p-95)' >> "$GITHUB_STEP_SUMMARY"
