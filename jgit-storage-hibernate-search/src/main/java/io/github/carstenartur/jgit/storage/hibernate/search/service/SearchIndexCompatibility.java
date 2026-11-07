@@ -8,8 +8,10 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.search.service;
 
+import io.github.carstenartur.jgit.storage.hibernate.search.RepositoryRoutingMappingConfigurer;
 import io.github.carstenartur.jgit.storage.hibernate.search.entity.GitCommitIndex;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -18,7 +20,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.search.mapper.orm.Search;
 import org.hibernate.search.mapper.orm.session.SearchSession;
 
-/** One-time compatibility guard for persistent Hibernate Search commit indexes. */
+/** One-time guards for persistent document identifiers and opt-in repository routing. */
 final class SearchIndexCompatibility {
 
   private static final String DIRECTORY_TYPE_PROPERTY = "hibernate.search.backend.directory.type";
@@ -51,7 +53,8 @@ final class SearchIndexCompatibility {
    */
   static void ensureCurrentDocumentIdentifiers(SessionFactory sessionFactory) {
     Objects.requireNonNull(sessionFactory, "sessionFactory");
-    if (!usesPersistentLocalFilesystem(sessionFactory)) {
+    if (!usesPersistentLocalFilesystem(sessionFactory)
+        || RepositoryRoutingMappingConfigurer.isEnabled(sessionFactory)) {
       return;
     }
     synchronized (VERIFIED_FACTORIES) {
@@ -64,6 +67,63 @@ final class SearchIndexCompatibility {
       VERIFIED_FACTORIES.add(sessionFactory);
     }
   }
+
+  /**
+   * Check the opt-in index before serving reads. Routing and shard layout changes require an offline
+   * reindex; an ordinary match-all count alone cannot detect documents on the wrong shard.
+   */
+  static void requireCurrentRepositoryRouting(SessionFactory sessionFactory) {
+    synchronized (VERIFIED_FACTORIES) {
+      if (VERIFIED_FACTORIES.contains(sessionFactory)) {
+        return;
+      }
+      try (Session session = sessionFactory.openSession()) {
+        List<RepositoryCount> rows =
+            session
+                .createSelectionQuery(
+                    "SELECT c.repositoryName, COUNT(c) FROM GitCommitIndex c GROUP BY c.repositoryName",
+                    RepositoryCount.class)
+                .getResultList();
+        SearchSession search = Search.session(session);
+        search.workspace(GitCommitIndex.class).refresh();
+        long expectedTotal = rows.stream().mapToLong(RepositoryCount::count).sum();
+        long actualTotal =
+            search.search(GitCommitIndex.class).where(f -> f.matchAll()).fetchTotalHitCount();
+        if (actualTotal != expectedTotal) {
+          throw routingMismatch(
+              "index contains " + actualTotal + " documents; expected " + expectedTotal);
+        }
+        for (RepositoryCount row : rows) {
+          long routed =
+              search
+                  .search(GitCommitIndex.class)
+                  .where(f -> f.match().field("repositoryName").matching(row.repository()))
+                  .routing(row.repository())
+                  .fetchTotalHitCount();
+          if (routed != row.count()) {
+            throw routingMismatch(
+                "repository '"
+                    + row.repository()
+                    + "' has "
+                    + routed
+                    + " of "
+                    + row.count()
+                    + " expected routed documents");
+          }
+        }
+      }
+      VERIFIED_FACTORIES.add(sessionFactory);
+    }
+  }
+
+  private static IllegalStateException routingMismatch(String mismatch) {
+    return new IllegalStateException(
+        "Repository-routed commit Search index is not ready: " + mismatch
+            + ". Stop projection writers, use the configured shard layout in a fresh index root, "
+            + "and run the GitCommitIndex Hibernate Search MassIndexer before serving reads.");
+  }
+
+  private record RepositoryCount(String repository, long count) {}
 
   private static boolean usesPersistentLocalFilesystem(SessionFactory sessionFactory) {
     Object configured = sessionFactory.getProperties().get(DIRECTORY_TYPE_PROPERTY);

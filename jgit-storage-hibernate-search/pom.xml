@@ -18,6 +18,7 @@
   </description>
 
   <properties>
+    <hibernate-search.lucene-backend-artifact>hibernate-search-backend-lucene</hibernate-search.lucene-backend-artifact>
     <jacoco.minimum.line>0.85</jacoco.minimum.line>
     <jacoco.minimum.branch>0.75</jacoco.minimum.branch>
   </properties>
@@ -36,7 +37,7 @@
 
     <dependency>
       <groupId>org.hibernate.search</groupId>
-      <artifactId>hibernate-search-backend-lucene</artifactId>
+      <artifactId>${hibernate-search.lucene-backend-artifact}</artifactId>
       <version>${hibernate-search.version}</version>
     </dependency>
 
@@ -151,4 +152,24 @@
       <plugin><artifactId>maven-javadoc-plugin</artifactId></plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>search-remote-outbox</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.hibernate.search</groupId>
+          <artifactId>hibernate-search-backend-elasticsearch</artifactId>
+          <version>${hibernate-search.version}</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.hibernate.search</groupId>
+          <artifactId>hibernate-search-mapper-orm-outbox-polling</artifactId>
+          <version>${hibernate-search.version}</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 </project>

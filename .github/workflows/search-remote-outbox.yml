@@ -1,0 +1,87 @@
+name: Shared Search Backend and Outbox Experiment
+
+on:
+  push:
+    branches:
+      - 'benchmark/search-outbox-198-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: search-remote-outbox-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    name: ${{ matrix.instances }} application JVMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        instances: [1, 2, 4]
+    env:
+      SEARCH_OUTBOX_INSTANCES: ${{ matrix.instances }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Measure remote indexing and outbox replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$GITHUB_WORKSPACE/target/search-remote-outbox"
+          mkdir -p "$output"
+          lscpu --json > "$output/cpu.json"
+          mvn -B -pl jgit-storage-hibernate-search -am test -Psearch-remote-outbox \
+            -Dtest=SearchRemoteOutboxIT -Dsurefire.failIfNoSpecifiedTests=false \
+            -Djacoco.skip=true '-DargLine=-Xmx512m -XX:ActiveProcessorCount=2' \
+            -Dsearch.outbox.run=true "-Dsearch.outbox.instances=$SEARCH_OUTBOX_INSTANCES" \
+            "-Dsearch.outbox.source=$GITHUB_SHA" "-Dsearch.outbox.output=$output" \
+            2>&1 | tee "$output/maven.log"
+      - name: Validate and summarize measured observations
+        run: |
+          python3 - <<'PY'
+          import csv
+          import os
+          import statistics
+          from pathlib import Path
+
+          rows = list(csv.DictReader(Path('target/search-remote-outbox/outbox.csv').open()))
+          instances = int(os.environ['SEARCH_OUTBOX_INSTANCES'])
+          assert len(rows) == 14, rows
+          assert all(int(row['instances']) == instances for row in rows)
+          assert all(int(row['queued_after_visible']) == 0 for row in rows)
+          summary = [
+              '| Mode | Burst | Median acknowledgement (ms) | Median acknowledgement to visibility (ms) |',
+              '| --- | ---: | ---: | ---: |',
+          ]
+          for mode, backlog in [('remote-direct-write-sync', 0), ('remote-outbox-eventual', 50)]:
+              selected = [row for row in rows if row['mode'] == mode]
+              restart, = (row for row in selected if row['phase'] == 'restart')
+              assert int(restart['queued_before_restart']) == backlog
+              assert int(restart['indexed_documents']) == 1650 + backlog
+              assert float(restart['boot_to_visible_ms']) > 0
+              for documents in (50, 500):
+                  burst = [row for row in selected if row['phase'] == 'burst' and int(row['documents']) == documents]
+                  assert len(burst) == 3, burst
+                  assert all(int(row['postgres_network_bytes']) > 0 for row in burst)
+                  assert all(int(row['search_network_bytes']) > 0 for row in burst)
+                  ack = statistics.median(float(row['ack_ms']) for row in burst)
+                  visibility = statistics.median(float(row['ack_to_visible_ms']) for row in burst)
+                  summary.append(f'| {mode} | {documents} | {ack:.2f} | {visibility:.2f} |')
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as output:
+              output.write(f'### {instances} application JVMs\n\n' + '\n'.join(summary) + '\n')
+          PY
+      - name: Upload observations and process logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: search-outbox-${{ matrix.instances }}-jvms
+          path: target/search-remote-outbox/
+          if-no-files-found: error

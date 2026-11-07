@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1078" height="316" viewBox="0 0 1078 316" role="img" aria-label="Repository text query latency (p95)">
+<rect width="1078" height="316" rx="12" fill="#f7f9fc"/>
+<g font-family="system-ui, sans-serif">
+<text x="22.0" y="30.0" text-anchor="start" font-size="20" font-weight="700" fill="#24324b">Repository text query latency (p95)</text>
+<text x="22.0" y="52.0" text-anchor="start" font-size="13" font-weight="400" fill="#24324b">H2 + local Lucene 9.12.3 · 1,000,000 initial documents · one JVM / 1 GiB</text>
+<text x="22.0" y="90.0" text-anchor="start" font-size="14" font-weight="700" fill="#24324b">One repository</text>
+<text x="353.0" y="103.0" text-anchor="end" font-size="11" font-weight="400" fill="#24324b">µs</text>
+<line x1="76.0" x2="353.0" y1="253.0" y2="253.0" stroke="#d6deec"/>
+<text x="70.0" y="257.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">0</text>
+<line x1="76.0" x2="353.0" y1="205.3" y2="205.3" stroke="#d6deec"/>
+<text x="70.0" y="209.3" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">30,000</text>
+<line x1="76.0" x2="353.0" y1="157.7" y2="157.7" stroke="#d6deec"/>
+<text x="70.0" y="161.7" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">60,000</text>
+<line x1="76.0" x2="353.0" y1="110.0" y2="110.0" stroke="#d6deec"/>
+<text x="70.0" y="114.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">90,000</text>
+<text x="145.2" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">1</text>
+<rect x="117.2" y="118.6" width="26.0" height="134.4" rx="2" fill="#007c83"><title>84,590.4 µs</title></rect>
+<rect x="145.2" y="120.4" width="26.0" height="132.6" rx="2" fill="#9b381f"><title>83,438.0 µs</title></rect>
+<text x="283.8" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">8</text>
+<rect x="255.8" y="117.4" width="26.0" height="135.6" rx="2" fill="#007c83"><title>85,322.8 µs</title></rect>
+<rect x="283.8" y="117.6" width="26.0" height="135.4" rx="2" fill="#9b381f"><title>85,209.4 µs</title></rect>
+<text x="214.5" y="289.0" text-anchor="middle" font-size="11" font-weight="400" fill="#24324b">Lucene shards</text>
+<text x="368.0" y="90.0" text-anchor="start" font-size="14" font-weight="700" fill="#24324b">Uniform</text>
+<text x="699.0" y="103.0" text-anchor="end" font-size="11" font-weight="400" fill="#24324b">µs</text>
+<line x1="422.0" x2="699.0" y1="253.0" y2="253.0" stroke="#d6deec"/>
+<text x="416.0" y="257.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">0</text>
+<line x1="422.0" x2="699.0" y1="205.3" y2="205.3" stroke="#d6deec"/>
+<text x="416.0" y="209.3" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">2,000</text>
+<line x1="422.0" x2="699.0" y1="157.7" y2="157.7" stroke="#d6deec"/>
+<text x="416.0" y="161.7" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">4,000</text>
+<line x1="422.0" x2="699.0" y1="110.0" y2="110.0" stroke="#d6deec"/>
+<text x="416.0" y="114.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">6,000</text>
+<text x="491.2" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">1</text>
+<rect x="463.2" y="110.7" width="26.0" height="142.3" rx="2" fill="#007c83"><title>5,969.6 µs</title></rect>
+<rect x="491.2" y="114.2" width="26.0" height="138.8" rx="2" fill="#9b381f"><title>5,822.1 µs</title></rect>
+<text x="629.8" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">8</text>
+<rect x="601.8" y="147.7" width="26.0" height="105.3" rx="2" fill="#007c83"><title>4,417.8 µs</title></rect>
+<rect x="629.8" y="128.9" width="26.0" height="124.1" rx="2" fill="#9b381f"><title>5,206.4 µs</title></rect>
+<text x="560.5" y="289.0" text-anchor="middle" font-size="11" font-weight="400" fill="#24324b">Lucene shards</text>
+<text x="714.0" y="90.0" text-anchor="start" font-size="14" font-weight="700" fill="#24324b">80% in one repository</text>
+<text x="1045.0" y="103.0" text-anchor="end" font-size="11" font-weight="400" fill="#24324b">µs</text>
+<line x1="768.0" x2="1045.0" y1="253.0" y2="253.0" stroke="#d6deec"/>
+<text x="762.0" y="257.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">0</text>
+<line x1="768.0" x2="1045.0" y1="205.3" y2="205.3" stroke="#d6deec"/>
+<text x="762.0" y="209.3" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">33,333</text>
+<line x1="768.0" x2="1045.0" y1="157.7" y2="157.7" stroke="#d6deec"/>
+<text x="762.0" y="161.7" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">66,667</text>
+<line x1="768.0" x2="1045.0" y1="110.0" y2="110.0" stroke="#d6deec"/>
+<text x="762.0" y="114.0" text-anchor="end" font-size="10" font-weight="400" fill="#24324b">100,000</text>
+<text x="837.2" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">1</text>
+<rect x="809.2" y="114.0" width="26.0" height="139.0" rx="2" fill="#007c83"><title>97,193.0 µs</title></rect>
+<rect x="837.2" y="114.8" width="26.0" height="138.2" rx="2" fill="#9b381f"><title>96,630.9 µs</title></rect>
+<text x="975.8" y="270.0" text-anchor="middle" font-size="12" font-weight="400" fill="#24324b">8</text>
+<rect x="947.8" y="116.8" width="26.0" height="136.2" rx="2" fill="#007c83"><title>95,252.5 µs</title></rect>
+<rect x="975.8" y="115.8" width="26.0" height="137.2" rx="2" fill="#9b381f"><title>95,910.4 µs</title></rect>
+<text x="906.5" y="289.0" text-anchor="middle" font-size="11" font-weight="400" fill="#24324b">Lucene shards</text>
+<rect x="22" y="297" width="11" height="11" rx="2" fill="#007c83"/>
+<text x="39.0" y="307.0" text-anchor="start" font-size="12" font-weight="400" fill="#24324b">Routed</text>
+<rect x="197" y="297" width="11" height="11" rx="2" fill="#9b381f"/>
+<text x="214.0" y="307.0" text-anchor="start" font-size="12" font-weight="400" fill="#24324b">Fan-out</text>
+</g>
+</svg>

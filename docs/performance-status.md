@@ -30,6 +30,7 @@ The large-pack write path is now substantially better understood:
 | Receiver batching | 50 records or 64 MiB, two-millisecond default wait, four stripes | Allows one transaction/JDBC batch for a burst while bounding sparse-stream delay and heap. |
 | Read-ahead | Honor JGit hint, one-MiB chunks, cap at 16 | Sequential access benefits from 16; sparse random and short reads strongly prefer 1. |
 | Automatic repack | Disabled | Warm and cold paths have different crossovers and payback. Operators can use the [measured maintenance decision](evidence/repository-aging-full-2026-11-07.md#manual-operating-decision). |
+| Search repository routing | Unrouted single-shard Lucene remains the default; repository routing is opt-in | The [48-observation local matrix](evidence/search-routing-large-2026-11-07/README.md) shows workload-dependent query savings, added indexing/file costs and contrary `lucene-next` results. |
 | P6Spy in timed benchmarks | Not used | Hibernate session events expose statement and batch executions without JDBC-proxy/logging distortion. |
 
 ## Durable reflog projection and Hikari
@@ -42,6 +43,15 @@ The [shared-pool study](evidence/reflog-pack-pool-2026-11-07/README.md) adds
 publication. Independent repositories benefited from additional pool slots
 at 20 ms RTT. On the same repository, server observations also confirmed
 waits on the repository lock.
+
+## Shared Search backend and outbox
+
+The [native PostgreSQL/OpenSearch experiment](evidence/search-outbox-2026-11-07/README.md)
+retains 42 burst/restart observations from one, two and four application JVMs. Each topology
+replayed 50 durable events after producer termination and drained its outbox. Acknowledgement
+and visibility are reported separately because direct `write-sync` and eventual outbox commits
+offer different guarantees. This establishes the small shared-backend fixture and recovery path;
+large remote indexes, processor/backend failures and production crossover remain open.
 
 ## What “theoretical maximum” means
 
@@ -274,6 +284,29 @@ Database row payload inflation is therefore negligible. The application-level mo
 
 These counters exclude SQL framing, WAL, page writes, replication and physical storage amplification. The [synchronous phase trace](operations/staging-jdbc-evidence.md#decision-for-local-postgresql) gives a ceiling of 1.53% for overlapping eligible staging reads at 512 MiB on the measured local setup. A [paired diagnostic](operations/staging-jdbc-evidence.md#paired-staging-and-rtt-diagnostic) with artificially paced staging and 51 ms RTT raises the ideal ceiling to 11.85%. Both results bracket potential improvement from overlap in the tested conditions.
 
+## Local Search repository routing
+
+The [routing guide](operations/search-routing-and-topology.md) documents the opt-in mapping,
+offline index migration, repository-isolated purge/rebuild, and the single-writer boundary.
+The [large retained matrix](evidence/search-routing-large-2026-11-07/README.md) contains 48
+observations from six successful hosted jobs: 100,000 projections with baseline/1/2/4/8 shards
+and one million with baseline/1/8, each with stable Lucene and `lucene-next`. It covers one
+repository, 100 uniform repositories and 1,000 repositories with 80% of documents in one.
+
+On stable Lucene, the uniform million-document fixture had routed text p95 of 4.418 ms versus
+5.206 ms for same-filter fan-out at eight shards. Increasing from one routed shard to eight
+also reduced initial indexing from 4,176 to 2,852 projections/s and raised the committed file
+count from 89 to 883. A hot repository still occupies one shard. The `lucene-next` uniform
+million-document fixture had a contrary result: routed text p95 of 6.426 ms versus 4.753 ms
+for fan-out at eight shards. These point estimates support a deployment-specific comparison,
+not a default change. [Generated comparison tables](evidence/search-routing-large-2026-11-07/derived/tables.md)
+
+This evidence uses one JVM, H2 files, local Lucene, a 1 GiB heap and warmed synthetic queries.
+The six jobs used different CPU models, and the backend variants ran sequentially. Reported
+restart latency is factory/H2 reopen in the same JVM including readiness checks, not a cold
+database or process restart. The matrix does not establish PostgreSQL or multi-instance
+scalability. [Measurement boundaries and reproducibility](evidence/search-routing-large-2026-11-07/README.md#what-the-fixture-verifies-and-measures)
+
 ## What is complete and what remains
 
 | Issue area | Completed | Remaining |
@@ -283,6 +316,7 @@ These counters exclude SQL framing, WAL, page writes, replication and physical s
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
 | Repository aging/repack | Full PostgreSQL/SQL Server/HSQLDB age matrix, repeated provider-restart evidence, and manual maintenance guidance | Broader large-repository repeats and operational budgets before considering automatic scheduling. |
 | Stateful/stateless writer | 16/128/512 matrix, automatic 16-MiB threshold, explicit overrides and integrity tests | Networked concurrent 128/512-MiB validation may refine but is not required for the current safe fallback policy. |
+| Local Search routing | Opt-in mapping, routed queries, readiness guard, isolated purge/replay, local writer-lock recovery test and 48 large local observations | Repeated workload-specific crossover; million-document 2/4-shard cells and networked/multi-instance comparisons are outside this local matrix. |
 
 ## Current distance to the useful ceiling
 

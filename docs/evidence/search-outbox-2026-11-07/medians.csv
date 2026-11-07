@@ -1,0 +1,13 @@
+instances,mode,documents,observations,median_ack_ms,median_ack_to_visible_ms
+1,remote-direct-write-sync,50,3,102.833,733.943
+1,remote-direct-write-sync,500,3,178.082,733.915
+1,remote-outbox-eventual,50,3,20.337,854.645
+1,remote-outbox-eventual,500,3,60.707,762.419
+2,remote-direct-write-sync,50,3,63.018,793.758
+2,remote-direct-write-sync,500,3,206.604,703.349
+2,remote-outbox-eventual,50,3,21.105,793.349
+2,remote-outbox-eventual,500,3,73.841,778.137
+4,remote-direct-write-sync,50,3,90.130,792.979
+4,remote-direct-write-sync,500,3,242.413,673.055
+4,remote-outbox-eventual,50,3,24.454,873.237
+4,remote-outbox-eventual,500,3,87.959,797.899
