@@ -35,6 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -69,7 +70,7 @@ import org.openjdk.jmh.infra.BenchmarkParams;
  * size. This keeps results attributable instead of creating an opaque five-dimensional Cartesian
  * product.
  *
- * <p>Three workloads are retained:
+ * <p>Four operations are retained:
  *
  * <ul>
  *   <li>burst submission latency, with eventual visibility validated outside measured time;
@@ -120,6 +121,7 @@ public class HibernateSearchRuntimeTuningBenchmark {
     if (burstCount <= 0 || burstCount >= commitCount) {
       throw new IllegalArgumentException("burstCount must be between 1 and commitCount - 1");
     }
+    suppressConnectionMetadataLogging();
     RuntimeBenchmarkFailureHandler.reset();
     scenario = SearchRuntimeScenario.fromId(runtimeScenario);
     operation = params.getBenchmark().substring(params.getBenchmark().lastIndexOf('.') + 1);
@@ -201,7 +203,7 @@ public class HibernateSearchRuntimeTuningBenchmark {
     return indexed;
   }
 
-  /** Query latency distribution while the second half of the history is being indexed. */
+  /** Query latency distribution while the selected burst is being indexed. */
   @Benchmark
   public int steadyQueriesDuringBurst(RuntimeCounters counters) throws Exception {
     List<Long> queryMicros = new ArrayList<>();
@@ -357,17 +359,18 @@ public class HibernateSearchRuntimeTuningBenchmark {
     return content.toString().getBytes(StandardCharsets.UTF_8);
   }
 
-  private Properties properties() {
+  private Properties properties() throws IOException {
+    Properties connection = loadConnectionProperties();
     Properties properties = new Properties();
     properties.put(
         "hibernate.connection.url",
-        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY));
+        requiredConnectionProperty(HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY, connection));
     properties.put(
         "hibernate.connection.username",
-        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY));
+        requiredConnectionProperty(HibernateRepositoryBenchmark.POSTGRESQL_USER_PROPERTY, connection));
     properties.put(
         "hibernate.connection.password",
-        requiredSystemProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY));
+        requiredConnectionProperty(HibernateRepositoryBenchmark.POSTGRESQL_PASSWORD_PROPERTY, connection));
     properties.put("hibernate.connection.driver_class", "org.postgresql.Driver");
     properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
     properties.put("hibernate.hbm2ddl.auto", "create-drop");
@@ -391,12 +394,35 @@ public class HibernateSearchRuntimeTuningBenchmark {
     return future.get(15, TimeUnit.SECONDS);
   }
 
-  private static String requiredSystemProperty(String name) {
+  private static Properties loadConnectionProperties() throws IOException {
+    Properties connection = new Properties();
+    String path = System.getProperty(PackStorageLayoutBenchmark.CONNECTION_PROPERTIES_FILE_PROPERTY);
+    if (path != null && !path.isBlank()) {
+      try (var reader = Files.newBufferedReader(Path.of(path))) {
+        connection.load(reader);
+      }
+    }
+    return connection;
+  }
+
+  private static String requiredConnectionProperty(String name, Properties connection) {
     String value = System.getProperty(name);
+    if (value == null || value.isBlank()) {
+      value = connection.getProperty(name);
+    }
     if (value == null || value.isBlank()) {
       throw new IllegalStateException("Missing Search runtime benchmark system property " + name);
     }
     return value;
+  }
+
+  private static void suppressConnectionMetadataLogging() {
+    java.util.logging.Level warning = java.util.logging.Level.WARNING;
+    Logger.getLogger("").setLevel(warning);
+    Logger.getLogger("org.hibernate").setLevel(warning);
+    Logger.getLogger("org.hibernate.orm.connections.pooling").setLevel(warning);
+    Logger.getLogger("org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator")
+        .setLevel(warning);
   }
 
   private static void deleteRecursively(Path root) throws IOException {
