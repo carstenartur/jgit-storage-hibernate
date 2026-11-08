@@ -50,6 +50,23 @@ original-byte digests are recorded. Full Maven/JMH logs and XML reports remain i
 artifacts. Each retained job passed the connection-metadata privacy gate, seven persistent recovery
 tests and the native PostgreSQL benchmark integration test.
 
+### Historical PostgreSQL durability configuration
+
+A source audit on 2026-11-08 confirmed that this original run inherited
+Testcontainers 2.0.5's `postgres -c fsync=off` command. The exact retained runner
+blob `e19b7820f01adaffeccf1cd9aa461c0fef0f83df` creates `PostgreSQLContainer`
+without a command override, and the retained parent POM pins Testcontainers
+2.0.5. The [pinned upstream constructor](https://github.com/testcontainers/testcontainers-java/blob/2.0.5/modules/postgresql/src/main/java/org/testcontainers/containers/PostgreSQLContainer.java)
+and the installed 2.0.5 class bytecode both specify that command. This is an
+explicitly source-derived qualification; the historical artifact did not retain
+a `SHOW fsync` observation.
+
+These timings do not qualify PostgreSQL host/database-crash durability and must
+not be presented as measurements with the new diagnostic's explicitly verified
+durability settings. The separate file-backed HSQLDB process-kill tests retain
+their original scope. All historical raw files, digests and source identities
+remain unchanged.
+
 ## Measurements that change the interpretation
 
 ### Submission throughput does not measure durability or visibility

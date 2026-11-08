@@ -306,7 +306,7 @@ def write_summary(output, summary, events):
              f"{summary['transaction_count']} incremental transactions and {summary['query_count']} stable-query samples.", "",
              "| Observation | Value |", "| --- | ---: |",
              f"| Sustained achieved commits/s | {summary['sustained_commits_per_second']:.3f} |",
-             f"| Sampled maximum live heap (MiB) | {summary['sampled_heap_max_bytes'] / 1024**2:.3f} |",
+             f"| Sampled maximum heap used (MiB) | {summary['sampled_heap_max_bytes'] / 1024**2:.3f} |",
              f"| Configured JVM heap limit (MiB) | {summary['heap_limit_bytes'] / 1024**2:.0f} |",
              f"| Injected output gate held (ms) | {summary['gate_held_ms']:.3f} |",
              f"| Sustained visibility drain (ms) | {summary['sustained_drain_ms']:.3f} |",

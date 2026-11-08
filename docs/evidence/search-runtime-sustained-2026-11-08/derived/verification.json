@@ -1,0 +1,21 @@
+{
+  "archives_sha256_verified": {
+    "search-runtime-sustained-reference-constrained": "5c2f80f8fb27401d5e4bf325517041fa4f8040dad428f8aae46ec87f9ae508c1",
+    "search-runtime-sustained-reference-normal": "4e73ee4b55d33a55cd26e6105d73d89596c93bef2155aa494421ec6a5a3f9038",
+    "search-runtime-sustained-sync-async-r500-constrained": "67f61c190b93a1e8f771e6bf4f7d6de805f739336927dc093569eaabac1bf49e",
+    "search-runtime-sustained-sync-async-r500-normal": "693ece422d114dd99fcfb0182f00dcf36ae17b5cfc6485cbe6ea0743d1e0ccc5"
+  },
+  "complete_passes": 8,
+  "exact_ordered_git_identity_fixture_equal_across_passes": true,
+  "extracted_raw_logs_and_junit_privacy_scan": "passed",
+  "git_identities_per_pass": 2500,
+  "heap_label": "Sampled maximum heap used; not live retained memory",
+  "junit_tests_failed_or_skipped": 0,
+  "junit_tests_passed": 28,
+  "original_derived_files_replayed_byte_identically": 24,
+  "run_id": 42431132661,
+  "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+  "source_files_verified": 16,
+  "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+  "untraced_activity_counts": "null, not zero"
+}

@@ -1,0 +1,731 @@
+{
+  "repository": "carstenartur/jgit-storage-hibernate",
+  "pullRequest": 463,
+  "headSha": "ae54925c02b186162c15c23d155ffef6cfa663b5",
+  "baseSha": "c33cc13212a8397e5dc045ae1ea0675d50e7df31",
+  "checkoutSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+  "checkoutTree": "974c3c0589f0067f0135dbd65e3e6f205591902b",
+  "runs": [
+    {
+      "id": 42425979945,
+      "name": "Consumer-shaped Benchmarks",
+      "head_sha": "ae54925c02b186162c15c23d155ffef6cfa663b5",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42425979945"
+    },
+    {
+      "id": 42425979894,
+      "name": "Taxonomy-shaped PostgreSQL Benchmarks",
+      "head_sha": "ae54925c02b186162c15c23d155ffef6cfa663b5",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42425979894"
+    },
+    {
+      "id": 42425979963,
+      "name": "Real Consumer Compatibility",
+      "head_sha": "ae54925c02b186162c15c23d155ffef6cfa663b5",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42425979963"
+    }
+  ],
+  "jobs": {
+    "smoke": [
+      {
+        "id": 128564223466,
+        "name": "audio synthetic fixture",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564223674,
+        "name": "taxonomy synthetic fixture",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564223688,
+        "name": "sandbox semantic projection",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564223722,
+        "name": "sandbox synthetic fixture",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "native": [
+      {
+        "id": 128564223600,
+        "name": "Taxonomy PostgreSQL at 0 ms RTT",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564223744,
+        "name": "Taxonomy PostgreSQL at 20 ms RTT",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "contracts": [
+      {
+        "id": 128564223675,
+        "name": "Build isolated library candidate",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564223780,
+        "name": "Prepare consumer baseline matrix",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564250813,
+        "name": "Baseline \u2014 audio-analyzer",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564250842,
+        "name": "Baseline \u2014 sandbox",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564250845,
+        "name": "Baseline \u2014 taxonomy",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564779903,
+        "name": "Candidate \u2014 taxonomy",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564779940,
+        "name": "Candidate \u2014 sandbox",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128564779975,
+        "name": "Candidate \u2014 audio-analyzer",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 128566245030,
+        "name": "Summarize real-consumer evidence",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "candidateArtifact": {
+    "id": 13595750785,
+    "name": "jgit-storage-hibernate-consumer-candidate",
+    "digest": "sha256:de851848eae11a3ec70a799313f0455f97c5c89e3d2d63184d3d727922308d82",
+    "runId": 42425979963,
+    "locallyDownloaded": false,
+    "digestVerifiedByConsumerJobLogs": [
+      128564779975,
+      128564779903,
+      128564779940
+    ]
+  },
+  "artifacts": [
+    {
+      "key": "smoke_audio",
+      "id": 13595084634,
+      "digest": "sha256:ed4b0f5122f851adda1482c5f452e6fb89ad784db4d37a0d9247fc204ac44d21",
+      "name": "consumer-shaped-audio-smoke",
+      "run_id": 42425979945,
+      "localFile": "smoke_audio.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "smoke_taxonomy",
+      "id": 13595666139,
+      "digest": "sha256:742552533e86f71b5b74a4b5f51b9c3bde3174263acaeb29accfbabfe39f8fb5",
+      "name": "consumer-shaped-taxonomy-smoke",
+      "run_id": 42425979945,
+      "localFile": "smoke_taxonomy.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "smoke_sandbox",
+      "id": 13594459463,
+      "digest": "sha256:a0c12e4bdcdfe7403a08941251f2ec7e871b9ee902744885ea3d7c0ac158addd",
+      "name": "consumer-shaped-sandbox-smoke",
+      "run_id": 42425979945,
+      "localFile": "smoke_sandbox.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "smoke_sandbox_index",
+      "id": 13595119659,
+      "digest": "sha256:a1bc237331cc439776f2b4b5b5a89b5c48dda789a3c28fc408540a8f9a3e249d",
+      "name": "consumer-shaped-sandbox-index-smoke",
+      "run_id": 42425979945,
+      "localFile": "smoke_sandbox_index.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "native_0ms",
+      "id": 13595795645,
+      "digest": "sha256:5900204f0ae08368cb144d921cf8edd376ee4330fd649d6fbf4f0d06a4fc1555",
+      "name": "consumer-shaped-taxonomy-postgres-smoke-0ms-reopened",
+      "run_id": 42425979894,
+      "localFile": "native_0ms.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "native_20ms",
+      "id": 13595094718,
+      "digest": "sha256:948e9356f402442a6e71df4d56fbad5f5b11aea4816e66798113afff5a5f203e",
+      "name": "consumer-shaped-taxonomy-postgres-smoke-20ms-reopened",
+      "run_id": 42425979894,
+      "localFile": "native_20ms.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "consumer_baseline_taxonomy",
+      "id": 13595835773,
+      "digest": "sha256:fc399fb416bb65d57c267a4227b48f2e0c528b8b78cfbbaedee29a1a6d1596a0",
+      "name": "consumer-baseline-taxonomy",
+      "run_id": 42425979963,
+      "localFile": "consumer_baseline_taxonomy.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "consumer_candidate_sandbox",
+      "id": 13595443734,
+      "digest": "sha256:d078d39cb171779262644bfc3aedb5b639975c0fbbd4ead67756b2c5401201be",
+      "name": "consumer-candidate-sandbox",
+      "run_id": 42425979963,
+      "localFile": "consumer_candidate_sandbox.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "consumer_baseline_audio_analyzer",
+      "id": 13595184611,
+      "digest": "sha256:b1ce0a1665d24752b002fe4fe4756970c340a7255ab0b1e01b015302984d1ebb",
+      "name": "consumer-baseline-audio-analyzer",
+      "run_id": 42425979963,
+      "localFile": "consumer_baseline_audio_analyzer.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "consumer_baseline_sandbox",
+      "id": 13595104818,
+      "digest": "sha256:f85b47337d99166a66e24769bc8a3cc0c899941a3152c86ba141388266d5759a",
+      "name": "consumer-baseline-sandbox",
+      "run_id": 42425979963,
+      "localFile": "consumer_baseline_sandbox.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "consumer_candidate_audio_analyzer",
+      "id": 13595497278,
+      "name": "consumer-candidate-audio-analyzer",
+      "run_id": 42425979963,
+      "digest": "sha256:80216a53891261ca067d167a4f341df5760e8828891cc72102d60d82abb8cbe1",
+      "localFile": "consumer_candidate_audio_analyzer.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "consumer_compatibility_summary",
+      "id": 13596085914,
+      "name": "consumer-compatibility-summary",
+      "run_id": 42425979963,
+      "digest": "sha256:1e4ff9350a79240f943b457628d3583b5817f025c6bf44ba9ae90d6821a2837a",
+      "localFile": "consumer_compatibility_summary.zip",
+      "archiveSha256Verified": true
+    },
+    {
+      "key": "consumer_candidate_taxonomy",
+      "id": 13595956120,
+      "name": "consumer-candidate-taxonomy",
+      "run_id": 42425979963,
+      "digest": "sha256:1f578462d14ebbffcc7cbefd2f182ac7beb3c1cd2ed6d785790b6fc01314f3a5",
+      "localFile": "consumer_candidate_taxonomy.zip",
+      "archiveSha256Verified": true
+    }
+  ],
+  "contracts": [
+    {
+      "consumer": "audio-analyzer",
+      "consumerRepository": "carstenartur/audio-analyzer",
+      "consumerCommit": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+      "expectedModules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search"
+      ],
+      "baseline": {
+        "result": {
+          "consumer": "audio-analyzer",
+          "mode": "baseline",
+          "candidateVersion": "",
+          "java": "21",
+          "contract": "audio-app reactor verification, dependency resolution and packaged-runtime leakage check"
+        },
+        "sourceRef": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+        "durationSeconds": 227,
+        "junitSuiteCount": 209,
+        "junitTotals": {
+          "tests": 1096,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "candidate": {
+        "result": {
+          "consumer": "audio-analyzer",
+          "mode": "candidate",
+          "candidateVersion": "0.12.1-SNAPSHOT",
+          "java": "21",
+          "contract": "audio-app reactor verification, dependency resolution and packaged-runtime leakage check"
+        },
+        "sourceRef": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+        "durationSeconds": 257,
+        "junitSuiteCount": 209,
+        "junitTotals": {
+          "tests": 1096,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "consumer": "taxonomy",
+      "consumerRepository": "carstenartur/Taxonomy",
+      "consumerCommit": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+      "expectedModules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-smart-http"
+      ],
+      "baseline": {
+        "result": {
+          "consumer": "Taxonomy",
+          "mode": "baseline",
+          "candidateVersion": "",
+          "java": "25",
+          "contract": "Core schema and Hibernate Search unit contracts plus PostgreSQL Testcontainers migration and validate-startup evidence"
+        },
+        "sourceRef": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+        "durationSeconds": 227,
+        "junitSuiteCount": 9,
+        "junitTotals": {
+          "tests": 41,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "candidate": {
+        "result": {
+          "consumer": "Taxonomy",
+          "mode": "candidate",
+          "candidateVersion": "0.12.1-SNAPSHOT",
+          "java": "25",
+          "contract": "Core schema and Hibernate Search unit contracts plus PostgreSQL Testcontainers migration and validate-startup evidence"
+        },
+        "sourceRef": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+        "durationSeconds": 386,
+        "junitSuiteCount": 9,
+        "junitTotals": {
+          "tests": 41,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "consumer": "sandbox",
+      "consumerRepository": "carstenartur/sandbox",
+      "consumerCommit": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+      "expectedModules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search",
+        "jgit-storage-hibernate-java-analysis"
+      ],
+      "baseline": {
+        "result": {
+          "consumer": "sandbox",
+          "mode": "baseline",
+          "candidateVersion": "",
+          "resolvedVersion": "0.11.8",
+          "java": "25",
+          "expectedModules": [
+            "jgit-storage-hibernate-core",
+            "jgit-storage-hibernate-search",
+            "jgit-storage-hibernate-java-analysis"
+          ],
+          "forbiddenModules": [
+            "jgit-storage-hibernate-architecture",
+            "jgit-storage-hibernate-benchmarks"
+          ],
+          "contract": "Core-only OSGi bridge, released Search REST and Java project analysis contracts, legacy preflight, repository lifecycle and shaded-server packaging"
+        },
+        "sourceRef": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+        "durationSeconds": 108,
+        "junitSuiteCount": 45,
+        "junitTotals": {
+          "tests": 210,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "candidate": {
+        "result": {
+          "consumer": "sandbox",
+          "mode": "candidate",
+          "candidateVersion": "0.12.1-SNAPSHOT",
+          "resolvedVersion": "0.12.1-SNAPSHOT",
+          "java": "25",
+          "expectedModules": [
+            "jgit-storage-hibernate-core",
+            "jgit-storage-hibernate-search",
+            "jgit-storage-hibernate-java-analysis"
+          ],
+          "forbiddenModules": [
+            "jgit-storage-hibernate-architecture",
+            "jgit-storage-hibernate-benchmarks"
+          ],
+          "contract": "Core-only OSGi bridge, released Search REST and Java project analysis contracts, legacy preflight, repository lifecycle and shaded-server packaging"
+        },
+        "sourceRef": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+        "durationSeconds": 172,
+        "junitSuiteCount": 45,
+        "junitTotals": {
+          "tests": 210,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    }
+  ],
+  "benchmarkEvidence": [
+    {
+      "folder": "smoke_audio",
+      "runId": 42425979945,
+      "sourceSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+      "coordinates": 4,
+      "observations": 4,
+      "forks": 1,
+      "warmupIterations": 0,
+      "samplesPerCoordinate": 1,
+      "parameters": [
+        {
+          "operation": "audioPublish",
+          "params": {
+            "analysisMiB": "32",
+            "analysisWorkers": "1",
+            "chunkBatch": "16",
+            "coordinate": "262144",
+            "pressure": "idle",
+            "repositories": "1",
+            "writer": "auto"
+          }
+        },
+        {
+          "operation": "audioPublish",
+          "params": {
+            "analysisMiB": "32",
+            "analysisWorkers": "1",
+            "chunkBatch": "16",
+            "coordinate": "2097152",
+            "pressure": "idle",
+            "repositories": "1",
+            "writer": "auto"
+          }
+        },
+        {
+          "operation": "audioReadRecent",
+          "params": {
+            "analysisMiB": "32",
+            "analysisWorkers": "1",
+            "chunkBatch": "16",
+            "coordinate": "262144",
+            "pressure": "idle",
+            "repositories": "1",
+            "writer": "auto"
+          }
+        },
+        {
+          "operation": "audioReadRecent",
+          "params": {
+            "analysisMiB": "32",
+            "analysisWorkers": "1",
+            "chunkBatch": "16",
+            "coordinate": "2097152",
+            "pressure": "idle",
+            "repositories": "1",
+            "writer": "auto"
+          }
+        }
+      ]
+    },
+    {
+      "folder": "smoke_taxonomy",
+      "runId": 42425979945,
+      "sourceSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+      "coordinates": 3,
+      "observations": 3,
+      "forks": 1,
+      "warmupIterations": 0,
+      "samplesPerCoordinate": 1,
+      "parameters": [
+        {
+          "operation": "taxonomyExactPathSummary",
+          "params": {
+            "cacheState": "warm",
+            "coordinate": "100",
+            "deployment": "embedded",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyTextEntity",
+          "params": {
+            "cacheState": "warm",
+            "coordinate": "100",
+            "deployment": "embedded",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyTextSummary",
+          "params": {
+            "cacheState": "warm",
+            "coordinate": "100",
+            "deployment": "embedded",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        }
+      ]
+    },
+    {
+      "folder": "smoke_sandbox",
+      "runId": 42425979945,
+      "sourceSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+      "coordinates": 2,
+      "observations": 2,
+      "forks": 1,
+      "warmupIterations": 0,
+      "samplesPerCoordinate": 1,
+      "parameters": [
+        {
+          "operation": "sandboxAnalyzeBodyEdit",
+          "params": {
+            "coordinate": "10"
+          }
+        },
+        {
+          "operation": "sandboxRebuildSnapshot",
+          "params": {
+            "coordinate": "10"
+          }
+        }
+      ]
+    },
+    {
+      "folder": "smoke_sandbox_index",
+      "runId": 42425979945,
+      "sourceSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+      "coordinates": 4,
+      "observations": 4,
+      "forks": 1,
+      "warmupIterations": 0,
+      "samplesPerCoordinate": 1,
+      "parameters": [
+        {
+          "operation": "sandboxMethodReferences",
+          "params": {
+            "coordinate": "10"
+          }
+        },
+        {
+          "operation": "sandboxPathSymbols",
+          "params": {
+            "coordinate": "10"
+          }
+        },
+        {
+          "operation": "sandboxPersistBodyEdit",
+          "params": {
+            "coordinate": "10"
+          }
+        },
+        {
+          "operation": "sandboxRebuildSemanticIndex",
+          "params": {
+            "coordinate": "10"
+          }
+        }
+      ]
+    },
+    {
+      "folder": "native_0ms/target/taxonomy-postgres",
+      "runId": 42425979894,
+      "sourceSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+      "coordinates": 5,
+      "observations": 5,
+      "forks": 1,
+      "warmupIterations": 0,
+      "samplesPerCoordinate": 1,
+      "parameters": [
+        {
+          "operation": "taxonomyExactPathSummary",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-0ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyProjectionRebuild",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-0ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomySqlPathSummary",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-0ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyTextEntity",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-0ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyTextSummary",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-0ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        }
+      ]
+    },
+    {
+      "folder": "native_20ms/target/taxonomy-postgres",
+      "runId": 42425979894,
+      "sourceSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+      "coordinates": 5,
+      "observations": 5,
+      "forks": 1,
+      "warmupIterations": 0,
+      "samplesPerCoordinate": 1,
+      "parameters": [
+        {
+          "operation": "taxonomyExactPathSummary",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-20ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyProjectionRebuild",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-20ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomySqlPathSummary",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-20ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyTextEntity",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-20ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        },
+        {
+          "operation": "taxonomyTextSummary",
+          "params": {
+            "cacheState": "reopened",
+            "coordinate": "1000",
+            "deployment": "postgresql-rtt-20ms",
+            "indexBatch": "50",
+            "purgeBatch": "250"
+          }
+        }
+      ]
+    }
+  ],
+  "sameCommitQualification": {
+    "eligible": true,
+    "sourceSha": "a528d95101547b81c484b33bd7f3c54c22335512",
+    "freshObservationCount": 23,
+    "scope": "13 bounded consumer smoke observations plus 10 native PostgreSQL observations; not a repeated latency comparison or a historical relabel"
+  },
+  "historicalBoundary": {
+    "audioMeasuredSource": "30f569e97cd1dd703d707a7376dbb8060ec9d8fe",
+    "sandboxMeasuredSource": "92c4f9972ee2534276045b23199a897b353dc86c",
+    "originalPostgresMeasuredSource": "23a5f6a6a42d1042f9f68ffafe8a0ffaa0f3097b",
+    "historicalContractCheckout": "e463feef3309f38bfe41929a5a635fbacef0c648",
+    "historicalPostgresAndContractTree": "9f3ae505a0c37aeb1925bb38926d477fc710b791",
+    "interpretation": "Original PostgreSQL measurement and historical contracts have distinct commit IDs but identical full source trees. Historical Audio/Sandbox measurements keep their original provenance and measurement limits."
+  },
+  "checkedAtUtc": "2026-11-07T23:48:12.333191+00:00",
+  "schemaVersion": 1
+}

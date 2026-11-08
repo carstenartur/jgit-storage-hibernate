@@ -74,6 +74,17 @@ The [PostgreSQL policy comparison](../evidence/pack-publication-2026-11-07/READM
 a shared-repository gain at eight writers, 768 KiB and roughly 5.8 ms RTT. It did not establish
 non-regression across independent repositories or the full payload and RTT matrix.
 
+The [preregistered disk-backed PostgreSQL follow-up](../evidence/publication-paired-2026-11-08/README.md)
+retains all five original outcomes on source `5ed8aad0`. Its 24-pair shared
+8-writer/5-ms cell measured +38.594% throughput, with a two-sided 95% interval of
++36.151% to +41.082%. Three 256-KiB independent cells passed their corrected −5%
+lower-bound test: one writer at 0/50 ms and sixteen writers at 50 ms. The
+sixteen-writer/0-ms cell aborted with a Java heap allocation failure after three
+pairs. Both policies had sampled heap pressure in that cell, and no completed
+acceptance bound is available. A separate GC/JNI diagnosis does not replace the
+failed performance study. The selector stays opt-in, the one-MiB default stays
+unchanged, and larger independent payloads remain outside this new qualification.
+
 Any tuning must preserve these invariants:
 
 - no successful acknowledgement before the authoritative database commit;

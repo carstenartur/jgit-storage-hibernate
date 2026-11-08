@@ -1,0 +1,1402 @@
+[
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "closed": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "reopen": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "setup": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "verify": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      }
+    },
+    "activity_capture_enabled": false,
+    "gate_held_ms": 1505.846352,
+    "heap_limit_bytes": 1073741824,
+    "max_acknowledged_minus_last_observed_visible": 10,
+    "max_visibility_observation_age_ms": 1517.084132,
+    "overload_drain_ms": 926.569314,
+    "pass": "timing",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1538.776951,
+        "min_ms": 12.995874,
+        "observations": 50,
+        "p50_ms": 16.389148,
+        "p95_ms": 30.970628,
+        "p99_ms": 1538.776951
+      },
+      "sustained": {
+        "max_ms": 58.750174,
+        "min_ms": 14.120641,
+        "observations": 100,
+        "p50_ms": 20.16754,
+        "p95_ms": 40.846943,
+        "p99_ms": 54.906334
+      }
+    },
+    "query_count": 488,
+    "queue_backpressure_observed": false,
+    "raw_sha256": {
+      "completion.properties": "84c2b5493c183b430c6b46f8ab346bcbac44ef2490c0ed31dc09613c008d50c7",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "e8e83ef9a81bcb07b1f41c7b1de423a3c500ee0facf01918a175e4d0d8ddd802",
+      "queries.csv": "4b86053841501605fe65f60ac58b90b2fae614f2fb95b4828582fb9f1e74d6ef",
+      "samples.csv": "7a3c8f67e61b623d56f44bb479acc8898274398a07873872c0fe8361e3ab92af",
+      "trace.csv": "d0cb785e04967f7b87f4fb851fe0d5d2c96ccd57d0b2971c97469306f09b7db5",
+      "transactions.csv": "938504b3b7af0bf6b9080ee4b3a570f4b00c719b10a90a84286ad3443923537e"
+    },
+    "resources": "normal",
+    "sampled_heap_max_bytes": 809221976,
+    "scenario": "reference",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 19.637039,
+        "min_ms": 0.606033,
+        "observations": 38,
+        "p50_ms": 1.514642,
+        "p95_ms": 8.34862,
+        "p99_ms": 19.637039
+      },
+      "drain-sustained": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "overload": {
+        "max_ms": 1509.50526,
+        "min_ms": 0.921314,
+        "observations": 2,
+        "p50_ms": 0.921314,
+        "p95_ms": 1509.50526,
+        "p99_ms": 1509.50526
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 54.858103,
+        "min_ms": 0.57027,
+        "observations": 448,
+        "p50_ms": 1.035074,
+        "p95_ms": 4.189578,
+        "p99_ms": 11.201403
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 100.63610951662868,
+    "sustained_drain_ms": 0.178042,
+    "timing_scope": "untraced diagnostic; includes sampling",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  },
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "closed": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "drain-overload": {
+        "commit_publication": 51,
+        "merge_installation": 5,
+        "nrt_reader_open_work": 40
+      },
+      "drain-sustained": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 1
+      },
+      "overload": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "reopen": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 1
+      },
+      "setup": {
+        "commit_publication": 100,
+        "merge_installation": 11,
+        "nrt_reader_open_work": 2
+      },
+      "sustained": {
+        "commit_publication": 100,
+        "merge_installation": 12,
+        "nrt_reader_open_work": 115
+      },
+      "verify": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      }
+    },
+    "activity_capture_enabled": true,
+    "gate_held_ms": 1504.600021,
+    "heap_limit_bytes": 1073741824,
+    "max_acknowledged_minus_last_observed_visible": 20,
+    "max_visibility_observation_age_ms": 1508.831009,
+    "overload_drain_ms": 867.810489,
+    "pass": "trace",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1525.496287,
+        "min_ms": 11.705886,
+        "observations": 50,
+        "p50_ms": 13.734267,
+        "p95_ms": 31.852766,
+        "p99_ms": 1525.496287
+      },
+      "sustained": {
+        "max_ms": 82.09323,
+        "min_ms": 13.044511,
+        "observations": 100,
+        "p50_ms": 15.576576,
+        "p95_ms": 34.264414,
+        "p99_ms": 40.712667
+      }
+    },
+    "query_count": 502,
+    "queue_backpressure_observed": false,
+    "raw_sha256": {
+      "completion.properties": "9ffbb1fde4a840129922262821ff0ca8b713d42f0562fd0e40fc46b1a0b8eaf8",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "0439bab22a144776d8d0b1103b0f72c8501420c877fd63acc2175bf785a90b6d",
+      "queries.csv": "b735734770d686aceab92b1cdcd476ad52442f1ce8f9cf9ffed05e2d034813ef",
+      "samples.csv": "f6a2bbd1047bb21cd2b93d913b2ecb7313e48b9435e687b2034f2ed521b0f115",
+      "trace.csv": "fc463ef86f18f31995780ae2910fd048f11918e270962cc479f9147f2ee30452",
+      "transactions.csv": "9752cf447b87c6e01048cc963b4dac48e1f4ea5f1bc2fdb99cc814529f6031ff"
+    },
+    "resources": "normal",
+    "sampled_heap_max_bytes": 819519048,
+    "scenario": "reference",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 23.226766,
+        "min_ms": 0.67439,
+        "observations": 35,
+        "p50_ms": 1.727264,
+        "p95_ms": 12.704359,
+        "p99_ms": 23.226766
+      },
+      "drain-sustained": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "overload": {
+        "max_ms": 1492.245489,
+        "min_ms": 0.509789,
+        "observations": 2,
+        "p50_ms": 0.509789,
+        "p95_ms": 1492.245489,
+        "p99_ms": 1492.245489
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 19.215182,
+        "min_ms": 0.363675,
+        "observations": 465,
+        "p50_ms": 0.610255,
+        "p95_ms": 2.985958,
+        "p99_ms": 6.427259
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 100.7865268175867,
+    "sustained_drain_ms": 0.500962,
+    "timing_scope": "instrumented diagnostic",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  },
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "closed": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "reopen": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "setup": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "verify": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      }
+    },
+    "activity_capture_enabled": false,
+    "gate_held_ms": 1509.683878,
+    "heap_limit_bytes": 518979584,
+    "max_acknowledged_minus_last_observed_visible": 10,
+    "max_visibility_observation_age_ms": 1541.454463,
+    "overload_drain_ms": 1752.874089,
+    "pass": "timing",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1551.572251,
+        "min_ms": 22.683473,
+        "observations": 50,
+        "p50_ms": 33.899896,
+        "p95_ms": 50.636249,
+        "p99_ms": 1551.572251
+      },
+      "sustained": {
+        "max_ms": 191.778954,
+        "min_ms": 24.045852,
+        "observations": 100,
+        "p50_ms": 41.173328,
+        "p95_ms": 81.976208,
+        "p99_ms": 134.524407
+      }
+    },
+    "query_count": 458,
+    "queue_backpressure_observed": true,
+    "raw_sha256": {
+      "completion.properties": "69234546035ed42189894441a634ea5722d029291b5b308e0a2f017e43481e39",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "3cec6abbfb6a27f9e295418b52c9036e731030640ed4aad97e46645e01dec2a5",
+      "queries.csv": "872ed4f4e31a08c5db336fdb9a97efbb80a27f1ebb81da9002d1d98498998652",
+      "samples.csv": "3f06893c1db96c754664b1865798ef33ab11bff5f7a024a47ae73065d0687086",
+      "trace.csv": "179f4599c4b1d19c9934468b11be93eea1fe3fee67916080c4a44ecea696b23b",
+      "transactions.csv": "da7b50eaa0bbd6d65a5df381fa07c14328762d8f5ce8542f12b09ac0bfd79c7e"
+    },
+    "resources": "constrained",
+    "sampled_heap_max_bytes": 256142064,
+    "scenario": "reference",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 24.83689,
+        "min_ms": 0.884784,
+        "observations": 64,
+        "p50_ms": 3.201847,
+        "p95_ms": 16.768393,
+        "p99_ms": 24.83689
+      },
+      "drain-sustained": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "overload": {
+        "max_ms": 1526.528974,
+        "min_ms": 3.686102,
+        "observations": 2,
+        "p50_ms": 3.686102,
+        "p95_ms": 1526.528974,
+        "p99_ms": 1526.528974
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 148.640483,
+        "min_ms": 0.566499,
+        "observations": 392,
+        "p50_ms": 2.153136,
+        "p95_ms": 13.331227,
+        "p99_ms": 23.849755
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 98.91291323554248,
+    "sustained_drain_ms": 0.212056,
+    "timing_scope": "untraced diagnostic; includes sampling",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  },
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "closed": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "drain-overload": {
+        "commit_publication": 51,
+        "merge_installation": 5,
+        "nrt_reader_open_work": 60
+      },
+      "drain-sustained": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "overload": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "reopen": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 1
+      },
+      "setup": {
+        "commit_publication": 100,
+        "merge_installation": 11,
+        "nrt_reader_open_work": 2
+      },
+      "sustained": {
+        "commit_publication": 100,
+        "merge_installation": 11,
+        "nrt_reader_open_work": 112
+      },
+      "verify": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      }
+    },
+    "activity_capture_enabled": true,
+    "gate_held_ms": 1503.217806,
+    "heap_limit_bytes": 518979584,
+    "max_acknowledged_minus_last_observed_visible": 10,
+    "max_visibility_observation_age_ms": 1508.85592,
+    "overload_drain_ms": 1544.873866,
+    "pass": "trace",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1552.496662,
+        "min_ms": 16.209783,
+        "observations": 50,
+        "p50_ms": 29.878215,
+        "p95_ms": 46.875432,
+        "p99_ms": 1552.496662
+      },
+      "sustained": {
+        "max_ms": 157.066418,
+        "min_ms": 19.265979,
+        "observations": 100,
+        "p50_ms": 31.971409,
+        "p95_ms": 49.906934,
+        "p99_ms": 137.82197
+      }
+    },
+    "query_count": 491,
+    "queue_backpressure_observed": false,
+    "raw_sha256": {
+      "completion.properties": "0752626393238dc1c24b574a8514b3a7c7464fb2f1c80ee039a57ef843b3525c",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "ed7a97d9098245a37642774537b8ec6150c132d4066c2942bb7a42741ff0998f",
+      "queries.csv": "2b082de4bcc884cbde693958d9b3acfbc371988d611c7e6b4d627ea1d6787758",
+      "samples.csv": "f2f86c007db08f2a5257a57c08d8b248e279988d675d4c1bb38c99666b31e5e6",
+      "trace.csv": "1cc69d18226c1afb21e78dc8741924895de013d74931daea201a4ceadb1c6bdf",
+      "transactions.csv": "9523f8778376105e4d2df89282a568c92ea60ee416b3ca5e15b48db81fd83026"
+    },
+    "resources": "constrained",
+    "sampled_heap_max_bytes": 256699240,
+    "scenario": "reference",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 24.430036,
+        "min_ms": 0.631541,
+        "observations": 60,
+        "p50_ms": 1.737839,
+        "p95_ms": 19.426539,
+        "p99_ms": 24.430036
+      },
+      "drain-sustained": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "overload": {
+        "max_ms": 1493.306782,
+        "min_ms": 1.392254,
+        "observations": 2,
+        "p50_ms": 1.392254,
+        "p95_ms": 1493.306782,
+        "p99_ms": 1493.306782
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 99.166571,
+        "min_ms": 0.473846,
+        "observations": 429,
+        "p50_ms": 0.849188,
+        "p95_ms": 6.823337,
+        "p99_ms": 24.609159
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 100.21433559492617,
+    "sustained_drain_ms": 0.074479,
+    "timing_scope": "instrumented diagnostic",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  },
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "closed": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "reopen": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "setup": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "verify": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      }
+    },
+    "activity_capture_enabled": false,
+    "gate_held_ms": 1504.219591,
+    "heap_limit_bytes": 1073741824,
+    "max_acknowledged_minus_last_observed_visible": 339,
+    "max_visibility_observation_age_ms": 1018.428473,
+    "overload_drain_ms": 1044.598956,
+    "pass": "timing",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1518.999971,
+        "min_ms": 10.564258,
+        "observations": 50,
+        "p50_ms": 14.183959,
+        "p95_ms": 24.790732,
+        "p99_ms": 1518.999971
+      },
+      "sustained": {
+        "max_ms": 60.622579,
+        "min_ms": 12.335349,
+        "observations": 100,
+        "p50_ms": 16.180619,
+        "p95_ms": 32.867546,
+        "p99_ms": 47.176815
+      }
+    },
+    "query_count": 535,
+    "queue_backpressure_observed": true,
+    "raw_sha256": {
+      "completion.properties": "74a5b56f4c967ea9afabbeb113ea66bce42d538af8fd01cf9f224d1b3a19ecac",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "223ebe433355407209e02466992c89afcc609b3912e50eccd560ac140f57b72a",
+      "queries.csv": "0b6b953bc681979eb15d184222c060b00f18fe60e47719d074db92adc6b43b7a",
+      "samples.csv": "c84be2eb927c7234e7100ae0242b5886c400ac2dc70c5d48f67d2b4329352d52",
+      "trace.csv": "a6878e0502fedcda248cf5bd03630cfab6b76fe76b5194fddc23b1d68593b13f",
+      "transactions.csv": "4b62f92665339ae0d665aa59b3f694a8115371eada1a411b2a006095c72b8675"
+    },
+    "resources": "normal",
+    "sampled_heap_max_bytes": 798033000,
+    "scenario": "sync-async-r500",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 15.271619,
+        "min_ms": 0.601873,
+        "observations": 47,
+        "p50_ms": 1.10268,
+        "p95_ms": 2.056234,
+        "p99_ms": 15.271619
+      },
+      "drain-sustained": {
+        "max_ms": 15.668498,
+        "min_ms": 0.663849,
+        "observations": 21,
+        "p50_ms": 0.788619,
+        "p95_ms": 1.205269,
+        "p99_ms": 15.668498
+      },
+      "overload": {
+        "max_ms": 1004.079961,
+        "min_ms": 0.514521,
+        "observations": 25,
+        "p50_ms": 0.62731,
+        "p95_ms": 1.101699,
+        "p99_ms": 1004.079961
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 91.521015,
+        "min_ms": 0.61073,
+        "observations": 442,
+        "p50_ms": 1.254601,
+        "p95_ms": 6.673614,
+        "p99_ms": 13.325061
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 100.59867562545718,
+    "sustained_drain_ms": 450.677216,
+    "timing_scope": "untraced diagnostic; includes sampling",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  },
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "closed": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "drain-overload": {
+        "commit_publication": 2,
+        "merge_installation": 3,
+        "nrt_reader_open_work": 3
+      },
+      "drain-sustained": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 1
+      },
+      "overload": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "reopen": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 1
+      },
+      "setup": {
+        "commit_publication": 1,
+        "merge_installation": 5,
+        "nrt_reader_open_work": 3
+      },
+      "sustained": {
+        "commit_publication": 10,
+        "merge_installation": 6,
+        "nrt_reader_open_work": 18
+      },
+      "verify": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      }
+    },
+    "activity_capture_enabled": true,
+    "gate_held_ms": 1502.155747,
+    "heap_limit_bytes": 1073741824,
+    "max_acknowledged_minus_last_observed_visible": 399,
+    "max_visibility_observation_age_ms": 1034.664693,
+    "overload_drain_ms": 1055.814424,
+    "pass": "trace",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1526.278299,
+        "min_ms": 9.288573,
+        "observations": 50,
+        "p50_ms": 12.824916,
+        "p95_ms": 19.064995,
+        "p99_ms": 1526.278299
+      },
+      "sustained": {
+        "max_ms": 32.826996,
+        "min_ms": 10.458628,
+        "observations": 100,
+        "p50_ms": 12.512772,
+        "p95_ms": 24.597473,
+        "p99_ms": 32.482422
+      }
+    },
+    "query_count": 540,
+    "queue_backpressure_observed": true,
+    "raw_sha256": {
+      "completion.properties": "cc4a603a9be1193b147d4e4d20d193aa8ae4bde22ff9e73fbae6b2ddd014bd84",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "a86a34a9dfb9afd35f1eb2b46f1629555cf147f730d26d20e2ebd56d4e2f0d43",
+      "queries.csv": "35477b65e9d649cdf1fbd37f600491b9b5cb6a59ed205e21cac6919d4d37fc59",
+      "samples.csv": "7ee1e0a3c03071ebd7bc589274e1d2832b9e254123ec5ba83cbbfc972576d5aa",
+      "trace.csv": "244c3c1d8b645015acbe68e3d00912a233abc59b5ecc157dabfbaeebdb77efba",
+      "transactions.csv": "3aba708ba570196302abcd416a03c74c9f3c8140dccc7c7e6df868e9b2e51f37"
+    },
+    "resources": "normal",
+    "sampled_heap_max_bytes": 823005440,
+    "scenario": "sync-async-r500",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 17.388044,
+        "min_ms": 0.52454,
+        "observations": 48,
+        "p50_ms": 0.826359,
+        "p95_ms": 3.05849,
+        "p99_ms": 17.388044
+      },
+      "drain-sustained": {
+        "max_ms": 1.10234,
+        "min_ms": 1.10234,
+        "observations": 1,
+        "p50_ms": 1.10234,
+        "p95_ms": 1.10234,
+        "p99_ms": 1.10234
+      },
+      "overload": {
+        "max_ms": 1014.915866,
+        "min_ms": 0.46998,
+        "observations": 25,
+        "p50_ms": 0.576377,
+        "p95_ms": 1.038763,
+        "p99_ms": 1014.915866
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 43.503144,
+        "min_ms": 0.386535,
+        "observations": 466,
+        "p50_ms": 0.678696,
+        "p95_ms": 1.409658,
+        "p99_ms": 13.051635
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 100.79900517784642,
+    "sustained_drain_ms": 1.815239,
+    "timing_scope": "instrumented diagnostic",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  },
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "closed": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "drain-sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "overload": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "reopen": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "setup": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "sustained": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      },
+      "verify": {
+        "commit_publication": null,
+        "merge_installation": null,
+        "nrt_reader_open_work": null
+      }
+    },
+    "activity_capture_enabled": false,
+    "gate_held_ms": 1508.766519,
+    "heap_limit_bytes": 518979584,
+    "max_acknowledged_minus_last_observed_visible": 269,
+    "max_visibility_observation_age_ms": 1032.962604,
+    "overload_drain_ms": 1048.322058,
+    "pass": "timing",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1529.719515,
+        "min_ms": 13.149918,
+        "observations": 50,
+        "p50_ms": 18.484426,
+        "p95_ms": 29.800081,
+        "p99_ms": 1529.719515
+      },
+      "sustained": {
+        "max_ms": 60.114285,
+        "min_ms": 12.034488,
+        "observations": 100,
+        "p50_ms": 22.140884,
+        "p95_ms": 37.127509,
+        "p99_ms": 50.990732
+      }
+    },
+    "query_count": 505,
+    "queue_backpressure_observed": true,
+    "raw_sha256": {
+      "completion.properties": "edf45e3c4208ea7b0637a2646074d68d538df2e451193c8c7f1277dfdc0aab03",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "ba73cfe608e38ba0f3287654d79ed9dcadb089132c00536917ba6fc6acff69c9",
+      "queries.csv": "3b5fb9ae359d64d87b7bf1ab62ea9c138caa6409ccda6cf701a7e005a7261ca7",
+      "samples.csv": "f4c9b5f0b205eafc3792b99b062b9ebc6ed490a4944a28aa7ee65cdffaac1f8e",
+      "trace.csv": "a37a3eea70b49389429052124b4adfb44a67e3729f45bcfca1d3d1f4e7ed7087",
+      "transactions.csv": "889aa97a3ae642bdf1fda9e41d62b3c64ab36787a1f3bcb3279f54b47ca00bc9"
+    },
+    "resources": "constrained",
+    "sampled_heap_max_bytes": 254110216,
+    "scenario": "sync-async-r500",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 16.104958,
+        "min_ms": 0.585926,
+        "observations": 44,
+        "p50_ms": 0.764941,
+        "p95_ms": 5.888598,
+        "p99_ms": 16.104958
+      },
+      "drain-sustained": {
+        "max_ms": 4.298207,
+        "min_ms": 0.464838,
+        "observations": 24,
+        "p50_ms": 0.725493,
+        "p95_ms": 3.480117,
+        "p99_ms": 4.298207
+      },
+      "overload": {
+        "max_ms": 1023.559137,
+        "min_ms": 0.52715,
+        "observations": 24,
+        "p50_ms": 0.862385,
+        "p95_ms": 3.939035,
+        "p99_ms": 1023.559137
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 106.457602,
+        "min_ms": 0.577725,
+        "observations": 413,
+        "p50_ms": 1.200025,
+        "p95_ms": 9.518137,
+        "p99_ms": 21.435312
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 100.81721390130232,
+    "sustained_drain_ms": 490.835715,
+    "timing_scope": "untraced diagnostic; includes sampling",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  },
+  {
+    "activity_by_phase": {
+      "close": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "closed": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "drain-overload": {
+        "commit_publication": 1,
+        "merge_installation": 3,
+        "nrt_reader_open_work": 3
+      },
+      "drain-sustained": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 1
+      },
+      "overload": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      },
+      "reopen": {
+        "commit_publication": 0,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 1
+      },
+      "setup": {
+        "commit_publication": 1,
+        "merge_installation": 5,
+        "nrt_reader_open_work": 3
+      },
+      "sustained": {
+        "commit_publication": 10,
+        "merge_installation": 6,
+        "nrt_reader_open_work": 19
+      },
+      "verify": {
+        "commit_publication": 1,
+        "merge_installation": 0,
+        "nrt_reader_open_work": 0
+      }
+    },
+    "activity_capture_enabled": true,
+    "gate_held_ms": 1510.351823,
+    "heap_limit_bytes": 518979584,
+    "max_acknowledged_minus_last_observed_visible": 339,
+    "max_visibility_observation_age_ms": 1039.651487,
+    "overload_drain_ms": 1050.216549,
+    "pass": "trace",
+    "postgresql_durability": {
+      "fsync": "on",
+      "full_page_writes": "on",
+      "synchronous_commit": "on"
+    },
+    "publication_latency": {
+      "overload": {
+        "max_ms": 1562.513951,
+        "min_ms": 7.352151,
+        "observations": 50,
+        "p50_ms": 14.984186,
+        "p95_ms": 24.003862,
+        "p99_ms": 1562.513951
+      },
+      "sustained": {
+        "max_ms": 132.982522,
+        "min_ms": 9.240035,
+        "observations": 100,
+        "p50_ms": 16.676422,
+        "p95_ms": 38.76633,
+        "p99_ms": 102.540183
+      }
+    },
+    "query_count": 545,
+    "queue_backpressure_observed": true,
+    "raw_sha256": {
+      "completion.properties": "171619186365aa240c4835e1ea3c788b767f3850ef1f9c2bede9583505a5c229",
+      "membership.csv": "3fc0a7030d45ab0e005d4fb6d1282f4d94888b1023e30c77ac2f3bb52d0a5fd4",
+      "metadata.properties": "c225b4c380c6e4961eb48bf5dbbc600a2371d6c68efdfaa5d0ee022ad61190d1",
+      "queries.csv": "e9c6978861d1abcc23d15a71378e51431edd7f49b0c72c7aacc51554830a1e2c",
+      "samples.csv": "69eb556c64f06514da75e19de923189dee338e4a73d9e60eb06fc6d44b939e85",
+      "trace.csv": "881b4b368dfc55debe59dcd539a6e94cefe514d2838b798a12f0621f8559c186",
+      "transactions.csv": "ef498a9f7e277165e80edbcb11c59f85bdfe7c96075c97d4584eec313b9ba866"
+    },
+    "resources": "constrained",
+    "sampled_heap_max_bytes": 249437880,
+    "scenario": "sync-async-r500",
+    "schema_version": 1,
+    "source_commit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "source_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "stable_query_latency_by_start_phase": {
+      "close": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "closed": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "drain-overload": {
+        "max_ms": 24.159753,
+        "min_ms": 0.409486,
+        "observations": 46,
+        "p50_ms": 0.610423,
+        "p95_ms": 6.897659,
+        "p99_ms": 24.159753
+      },
+      "drain-sustained": {
+        "max_ms": 2.875401,
+        "min_ms": 0.395595,
+        "observations": 21,
+        "p50_ms": 0.430827,
+        "p95_ms": 0.515973,
+        "p99_ms": 2.875401
+      },
+      "overload": {
+        "max_ms": 1034.0605,
+        "min_ms": 0.406861,
+        "observations": 25,
+        "p50_ms": 0.46663,
+        "p95_ms": 3.176407,
+        "p99_ms": 1034.0605
+      },
+      "reopen": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "setup": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "sustained": {
+        "max_ms": 16.38466,
+        "min_ms": 0.348736,
+        "observations": 453,
+        "p50_ms": 0.526679,
+        "p95_ms": 4.112682,
+        "p99_ms": 13.121935
+      },
+      "verify": {
+        "max_ms": null,
+        "min_ms": null,
+        "observations": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      }
+    },
+    "sustained_commits_per_second": 100.6602595520283,
+    "sustained_drain_ms": 435.638292,
+    "timing_scope": "instrumented diagnostic",
+    "transaction_count": 150,
+    "verified_commits": 2500
+  }
+]

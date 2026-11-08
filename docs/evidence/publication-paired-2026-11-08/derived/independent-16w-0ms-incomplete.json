@@ -1,0 +1,14 @@
+{
+  "cell": "independent-16w-0ms",
+  "pairCount": 3,
+  "forkCount": 6,
+  "throughputChangePercent": null,
+  "lowerBoundPercent": null,
+  "upperBoundPercent": null,
+  "nonRegressionEstablished": false,
+  "sharedImprovementEstablished": false,
+  "stoppedEarly": false,
+  "outcome": "incomplete",
+  "validatorRejection": "Twenty recorded finalRttSamplesMillis are required",
+  "qualification": "Original partial data retained; no acceptance interval calculated"
+}

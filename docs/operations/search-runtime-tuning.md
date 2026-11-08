@@ -124,10 +124,11 @@ gate on actual Lucene output creation. It proves that the gate is reached, holds
 it for at least 1.5 seconds, and observes an incomplete publication. In the async
 mode it additionally requires a producer stack blocked in `BlockingQueue.put` or
 `offer` beneath Hibernate Search's `BatchingExecutor.submit`, while the gate is
-held. Merely configuring a small queue is not evidence that it filled. The
-write-sync producer normally waits for completion of its index work instead.
-The raw samples distinguish these states. The gate is always released before
-workers are joined or storage is closed, including error and interruption paths.
+held. Merely configuring a small queue is not evidence that it filled. A
+write-sync producer can also block while submitting a batch before waiting for
+completion of its index work. The raw samples distinguish these states. The gate
+is always released before workers are joined or storage is closed, including
+error and interruption paths.
 
 After release, the remaining producer work and visibility must drain within a
 bounded timeout. Exact SQL and Lucene object IDs must equal the Git-reachable
@@ -144,13 +145,14 @@ timeout, a missing activity stream or incomplete cleanup rejects the run.
 | `metadata.properties` | Exact checkout/tree, versions, resource limits and diagnostic settings. |
 | `transactions.csv` | Git-ref advance plus `CommitIndexer` call, not pure Search or complete object-ingestion latency. The phase labels identify the originating sustained/overload workload; overload transactions may finish during drain. |
 | `queries.csv` | Stable top-ten query latency, labelled by the phase in which the query starts. The following total-visible count has its own observation timestamp and is outside that latency. A query can span a phase boundary. |
-| `samples.csv` | Sampled live JVM heap, cumulative JVM GC counters, publication progress, last completed visibility observation and its age, active workers and producer wait state. Last-observed visibility lag is not internal queue depth. |
+| `samples.csv` | Sampled JVM heap usage, cumulative JVM GC counters, publication progress, last completed visibility observation and its age, active workers and producer wait state. Last-observed visibility lag is not internal queue depth. |
 | `trace.csv` | Phase markers plus pinned Lucene InfoStream records in the trace pass. Only phase markers exist in the timing pass. |
 | `membership.csv` | Every checked synthetic object ID and SQL/Lucene/Git/reopen membership. |
 | `completion.properties` | Gate timestamps, drain durations, worker/handler status and verified counts. Written only after successful close/reopen and trace completion. |
 | `sha256.properties` | Hashes of all seven raw files, checked before deriving results. |
 
-The sampled heap maximum is not the instantaneous peak or a constant-space proof.
+The sampled heap maximum includes objects awaiting collection; it is not retained
+live memory, the instantaneous peak or a constant-space proof.
 GC counters include the whole diagnostic JVM, including sampling and concurrent
 queries. Visibility samples can become stale while a query is blocked at the
 gate; the age is retained instead of inventing intermediate observations.
@@ -193,9 +195,17 @@ phase boundaries, observed queue backpressure, resource budgets, drained counts,
 close/reopen and handler/worker evidence before generating `summary.json`,
 `activity-events.csv` and `summary.md`. The hosted workflow also requires the
 exact checked-out commit and a non-skipped native test report. The small local
-HSQLDB fixtures validate this machinery only; hosted diagnostic evidence must be
-retained before treating the remaining issue #196 workload/activity requirements
-as completed.
+HSQLDB fixtures validate this machinery only.
+
+The [retained hosted diagnostic](../evidence/search-runtime-sustained-2026-11-08/README.md)
+contains all four coordinates and eight completed timing/trace passes, with
+verified raw hashes, actual PostgreSQL durability settings, 2,500 identical
+Git/SQL/Lucene identities per pass and persistent reopen. It completes the
+remaining bounded sustained/overload and activity evaluation for issue #196.
+The near-100 commits/s rate follows the imposed pacing; different host CPU
+models and one pass per coordinate do not support a throughput ranking or new
+default/profile. The guide retains the safe reference and explicit async
+failure/reconciliation requirements.
 
 ## Run locally
 

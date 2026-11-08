@@ -158,7 +158,7 @@ comparison uses the identical harness copied onto immutable library sources:
 |---|---|
 | Release | `v0.12.0`, commit `ba6aeecc338968df4279fb9c7c72b15bbb3577fb` |
 | Main after PR #463 | `1c33640bc75206e81a9bc5722768860a2a2321f5` |
-| Proposed | The exact commit selected by the manual dispatch |
+| Proposed | The exact selected workflow source; the retained 2026-11-08 run uses `5ed8aad0f0691bcecb414b319235b67dc0520581` |
 
 This follow-up changes benchmark code, tests and documentation. It records the
 Core, Search and Java Analysis production module trees for every source. When
@@ -221,12 +221,23 @@ logs and source snapshots) and both possible JUnit report locations. This gate
 also runs after a failed measurement or provenance check; a failed, skipped or
 unscannable privacy check prevents the follow-up upload.
 
-To qualify the new measurements, dispatch this mode and
-`consumer-compatibility.yml` separately on the same immutable branch commit.
-Record the run IDs and candidate results before claiming same-source consumer
-compatibility. Historical Audio, sandbox and PostgreSQL measurements retain
-their original source identities. This section defines the follow-up harness;
-it does not assert a successful native run before artifacts have been reviewed.
+To qualify new measurements, run this mode and `consumer-compatibility.yml`
+separately on the same immutable branch commit, using manual dispatch or the
+explicitly guarded validation-branch push. Record the run IDs and candidate
+results before claiming same-source consumer compatibility.
+
+The [retained native publication study](evidence/consumer-publication-2026-11-08/README.md)
+contains all 54 observations from the six pinned library/RTT cells and successful
+real-consumer contracts on exact source `5ed8aad0`. Every publication verified
+complete Git/ref/projection results after reopening, and every native observation
+recorded the three durability settings as `on`. Four bounded Taxonomy workers
+overlapped the same 40 statements, 12 ORM transactions and four JDBC batches at
+20 ms RTT; the native Audio pair adds positive WAL evidence at 2 and 16 MiB.
+Main and Proposed production modules are identical, so their time differences
+cannot justify a new library default. Historical Audio, sandbox and PostgreSQL
+measurements retain their original source identities. The study also retains
+the earlier source-qualified 23-observation integrated smoke/recovery series
+and maps the original six acceptance criteria to evidence.
 
 ### PostgreSQL history, recovery and network conditions
 

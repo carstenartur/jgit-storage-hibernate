@@ -52,9 +52,16 @@ the original release/main comparison above.
 | [Native Taxonomy PostgreSQL](consumer-taxonomy-postgres-2026-11-07/README.md) | Five JMH/native observations at each of calibrated 0/20 ms RTT, plus partial projection, reopen and recovery checks. | Use summary hits when hydration is unnecessary; retain bounded rebuild batches and a Git-authoritative recovery path. |
 | [Concurrent audio](consumer-audio-concurrency-2026-11-07/README.md) | 24 coordinates, 72 observations, one/four repositories, two writers and three chunk batches. | At a 32 MiB aggregate chunk budget across four repositories, batch 8 trades twelve JDBC batch executions for that explicit memory bound. Cache residency differs across repository counts. |
 | [Persisted sandbox projection](consumer-sandbox-persistence-2026-11-07/README.md) | Eight coordinates, 24 observations, 251/1,001-file head snapshots in a 1 GiB heap. | For a known dependency-free body edit, one-file replacement produces equivalent semantic facts with one transaction instead of 251/1,001. |
+| [Qualified integrated smoke and recovery](consumer-publication-2026-11-08/previous-integrated/consumer-211-final-ci-review.md) | Thirteen all-profile smoke observations, including both sandbox variants, plus ten PostgreSQL history/recovery observations and all three consumer contracts on exact PR merge `a528d951`. | Preserve the earlier operational decisions with an explicit same-source compatibility gate; single-shot times remain coverage evidence. |
+| [Native concurrent publication and Audio WAL](consumer-publication-2026-11-08/README.md) | Fifty-four observations across pinned release/Main/Proposed and 0/20 ms RTT, with verified reopen, complete Git/ref/projection equality and all three consumer contracts on exact source `5ed8aad0`. | Use bounded parallelism for independent workspaces when RTT matters; retain Audio writer defaults where the native pair shows no structural advantage. Main and Proposed production module trees are identical. |
 
 These comparisons do not establish a universal production default or a release
 timing ranking for every follow-up profile. Exact-source consumer compatibility
-is a separate publication gate. The broader Taxonomy concurrent-publication
-workload and paired release/current/candidate runs for every new profile remain
-visible follow-up scope.
+is a separate publication gate, now explicitly retained for the integrated
+smoke/recovery series and the native publication study. Concurrent Taxonomy
+publication and Audio-specific native WAL are covered by the latter study.
+The larger historical Audio and sandbox data keep their original sources; the
+new evidence does not relabel them or provide a matched release baseline for
+every historical extension. Further operation-by-operation comparisons belong
+with any future cross-release claim. The [original-criteria assessment](consumer-publication-2026-11-08/README.md#original-acceptance-criteria)
+distinguishes this future research from the completed issue #211 scope.
