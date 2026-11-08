@@ -2,7 +2,9 @@
 """Exercise diagnostic exit reporting and whole-process-group timeout cleanup."""
 import importlib.util
 import json
+import os
 from pathlib import Path
+import signal
 import sys
 import tempfile
 import time
@@ -15,6 +17,57 @@ SPEC.loader.exec_module(diagnostic)
 
 
 class DiagnosticRunnerTest(unittest.TestCase):
+    def test_successful_leader_exit_cleans_surviving_descendant(self):
+        self.assert_leader_exit_cleans_descendant(0)
+
+    def test_failed_leader_exit_cleans_surviving_descendant(self):
+        self.assert_leader_exit_cleans_descendant(7)
+
+    def assert_leader_exit_cleans_descendant(self, exit_code):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identity = root / "child.json"
+            child = (
+                "import json,os,pathlib,signal,time\n"
+                "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
+                "os.write(1,b'child heartbeat\\n')\n"
+                f"pathlib.Path({str(identity)!r}).write_text(json.dumps(dict(group=os.getpgrp())))\n"
+                "while True:\n os.write(1,b'child heartbeat\\n')\n time.sleep(.01)\n")
+            parent = (
+                "import pathlib,subprocess,sys,time\n"
+                f"child=subprocess.Popen([sys.executable,'-c',{child!r}])\n"
+                f"ready=pathlib.Path({str(identity)!r})\n"
+                "deadline=time.monotonic()+2\n"
+                "while not ready.exists() and time.monotonic()<deadline: time.sleep(.01)\n"
+                "assert ready.exists()\n"
+                f"raise SystemExit({exit_code})\n")
+            try:
+                started = time.monotonic()
+                result = diagnostic.run([sys.executable, "-c", parent], root,
+                                        timeout=5, dump_after=2, grace=.1)
+                self.assertEqual(exit_code, result)
+                self.assertLess(time.monotonic() - started, 5)
+                self.assertIn("child heartbeat", (root / "native.log").read_text())
+                before = (root / "native.log").stat().st_size
+                time.sleep(.1)
+                self.assertEqual(before, (root / "native.log").stat().st_size,
+                                 "a child must stop emitting heartbeats when its leader exits")
+                status = json.loads((root / "diagnostic-status.json").read_text())
+                self.assertFalse(status["timed_out"])
+                self.assertEqual(exit_code, status["return_code"])
+                self.assertEqual(exit_code, status["command_return_code"])
+                self.assertIsNone(status["termination_signal"])
+                self.assertEqual("SIGKILL", status["process_group_cleanup_signal"])
+            finally:
+                # Keep the fail-first regression from leaking its deliberately surviving child.
+                if identity.is_file():
+                    group = json.loads(identity.read_text())["group"]
+                    self.assertNotEqual(os.getpgrp(), group)
+                    try:
+                        os.killpg(group, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
     def test_retains_output_and_real_nonzero_exit(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -26,6 +79,7 @@ class DiagnosticRunnerTest(unittest.TestCase):
             self.assertTrue(status["diagnostic_only"])
             self.assertFalse(status["timed_out"])
             self.assertEqual(7, status["return_code"])
+            self.assertIsNone(status["process_group_cleanup_signal"])
 
     def test_timeout_kills_an_uncooperative_descendant_and_preserves_partial_output(self):
         with tempfile.TemporaryDirectory() as temporary:

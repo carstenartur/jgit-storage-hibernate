@@ -83,3 +83,18 @@ sandbox jcmd attach encountered translated PID values; the SIGQUIT fallback
 retained the stacks in native stdout. These checks validate diagnostic plumbing,
 not the unresolved native wait. Production behavior and publication thresholds
 are unchanged, and the original native run remains independently unqualified.
+
+The minimal diagnostic completed successfully in native run 42537024048 at exact
+source 586e8088c8d849c9245ac178414156fa0301cda2. Downloaded archive SHA-256 and source
+identity were checked, its full content passed the privacy scanner, and the
+performance qualifier rejected its diagnostic-only boundary. All phases returned
+within the 28.743-second Maven command. Six expected PostgreSQL batch-warning
+lines each embedded about two million characters of a binary parameter; this
+12.6 MB log volume is retained as a possible console-backpressure factor, not a
+proven wait cause.
+
+The next authorized diagnostic restores the original one warm-up round and three
+repetitions for this same cell, with a 240-second native deadline and the same
+phase/stack collection. It inherits the separately reviewed process-group cleanup
+fix and retains the original failure-probe behavior, keeping the independent
+rollback-metric correction outside this wait investigation.

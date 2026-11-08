@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           prefix=jgit.storage.benchmark.staging-pipeline
           python3 .github/scripts/run_staging_pipeline_diagnostic.py \
-            --output target/staging-diagnostic --timeout-seconds 180 \
+            --output target/staging-diagnostic --timeout-seconds 240 \
             --dump-after-seconds 60 --kill-grace-seconds 10 -- \
             mvn -B -pl jgit-storage-hibernate-benchmarks test \
             -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlPipelineEvidence' \
@@ -46,7 +46,7 @@ jobs:
             "-D$prefix.enabled=true" "-D$prefix.diagnostic=true" \
             "-D$prefix.payload_mib=16" "-D$prefix.window_mib=32" "-D$prefix.writers=1" \
             "-D$prefix.storage=runner" "-D$prefix.requested_rtt_millis=0" \
-            "-D$prefix.read_mib_per_second=0" "-D$prefix.warmups=0" "-D$prefix.repeats=1" \
+            "-D$prefix.read_mib_per_second=0" "-D$prefix.warmups=1" "-D$prefix.repeats=3" \
             "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-diagnostic/raw"
       - name: Check all diagnostic output for connection details
         id: evidence-privacy
@@ -58,7 +58,7 @@ jobs:
         if: always() && steps.evidence-privacy.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: staging-pipeline-diagnostic
+          name: staging-pipeline-diagnostic-original-repetitions
           path: |
             target/staging-diagnostic/**
             jgit-storage-hibernate-benchmarks/target/surefire-reports/**
@@ -70,8 +70,9 @@ jobs:
           ### Diagnostic only
 
           This is one 16 MiB / 32 MiB-window / single-writer / runner-storage / 0 ms RTT cell.
-          It has no warm-up and one repetition. The 4 GiB JVM heap and writer behavior are unchanged.
+          It has the original one warm-up round and three repetitions. The 4 GiB JVM heap and writer behavior are unchanged.
           Phase checkpoints and JVM thread stacks identify a wait; these timings cannot qualify performance.
-          Native execution has a 180-second deadline, bounded thread capture and finite TERM/KILL cleanup.
+          Native execution has a 240-second deadline, bounded thread capture and finite TERM/KILL cleanup.
+          The preceding minimal diagnostic 42537024048 completed in 28.743 seconds; this continuation probes later lifecycle rounds.
           Original evidence run 42534328623 is preserved separately and is not qualified by this diagnostic.
           EOF

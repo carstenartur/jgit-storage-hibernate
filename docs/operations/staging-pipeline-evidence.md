@@ -109,7 +109,7 @@ The separate [diagnostic workflow](../../.github/workflows/staging-pipeline-diag
 runs only by manual dispatch or a push to the exact branch
 `diagnose/staging-pipeline-20261108`. It has no pull-request trigger. Its one cell
 uses 16 MiB payload, a 32 MiB window, one writer, runner storage, no injected RTT,
-no warm-up and one repetition, preserving the existing 4 GiB JVM heap. The test
+one warm-up round and three repetitions, preserving the existing 4 GiB JVM heap. The test
 marks its measurement boundary `diagnostic-only`; the normal evidence qualifier
 rejects that boundary.
 
@@ -122,13 +122,15 @@ only timestamps, process/thread IDs and fixed phase labels, and are retained in
 The [bounded runner](../../.github/scripts/run_staging_pipeline_diagnostic.py)
 starts Maven in a fresh process group. It requests `jcmd <pid> Thread.print -l`
 for that group's JVMs after 60 seconds and on subsequent 60-second intervals.
-Native execution reaches its deadline after 180 seconds; a final stack capture
+Native execution reaches its deadline after 240 seconds; a final stack capture
 has at most 20 seconds, TERM has 10 seconds, and KILL/reaping has at most five
 seconds. A failed or timed-out attach requests a SIGQUIT JVM dump in `native.log`.
 The runner records actual process status, timeout outcome, source commit and
-capture count in `diagnostic-status.json`, and kills surviving group members on
-timeout even if Maven itself already honored TERM. Build time is outside this
-native deadline and bounded by the workflow's 15-minute job limit.
+capture count in `diagnostic-status.json`. After every leader exit, including
+success, it sends KILL to any surviving members of the owned group and records
+that signal separately as `process_group_cleanup_signal`, preserving the leader's
+return code. Build time is outside this native deadline and bounded by the
+workflow's 15-minute job limit.
 
 The entire diagnostic directory, build/native logs, thread stacks and Surefire
 reports pass the same always-run privacy scan before any partial artifact can be
@@ -141,6 +143,13 @@ source `a8d6f491de538cd91eeb11b8f1f68749bf3566e1`. That run's source and outcome
 remain separate evidence. No wait cause or performance result is inferred from
 an incomplete or interrupted cell. The 16 MiB/32 MiB cell takes the synchronous
 fallback in every reader mode, so it does not create a prefetch-reader executor.
+
+The preceding minimal diagnostic used no warm-up and one repetition. It completed
+in 28.743 seconds, with all lifecycle phases returned. Its
+[retained source, artifact digest, checkpoints and logging observations](../evidence/staging-pipeline-wait-2026-11-08/README.md)
+motivated this bounded continuation with the original repetition counts. Both
+diagnostics preserve the original failure-probe behavior to avoid mixing the
+separate rollback-timing correction into the wait investigation.
 
 ## Production decision
 

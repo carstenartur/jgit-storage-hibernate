@@ -60,8 +60,9 @@ def dump_threads(group, output, sequence, budget=20):
 def signal_group(group, signum):
     try:
         os.killpg(group, signum)
+        return True
     except ProcessLookupError:
-        pass
+        return False
 
 
 def run(command, output, timeout=180, dump_after=60, grace=10):
@@ -92,8 +93,6 @@ def run(command, output, timeout=180, dump_after=60, grace=10):
                         termination = "SIGKILL"
                         signal_group(group, signal.SIGKILL)
                         process.wait(timeout=5)
-                    # Kill any surviving descendants even if Maven itself honored SIGTERM.
-                    signal_group(group, signal.SIGKILL)
                     break
                 if now >= next_dump:
                     sequence += 1
@@ -108,11 +107,16 @@ def run(command, output, timeout=180, dump_after=60, grace=10):
             process.wait(timeout=5)
             raise
         finally:
+            # The leader can exit before its children, including on success. This
+            # group belongs to the new session; preserve the already reaped leader's
+            # status while stopping any remaining members without an unbounded wait.
+            cleanup_signal = "SIGKILL" if signal_group(group, signal.SIGKILL) else None
             status = dict(schema_version=1, diagnostic_only=True, started_at=started_at,
                           finished_at=datetime.now(timezone.utc).isoformat(),
                           elapsed_seconds=time.monotonic() - started, timed_out=timed_out,
                           return_code=124 if timed_out else process.returncode,
                           command_return_code=process.returncode, termination_signal=termination,
+                          process_group_cleanup_signal=cleanup_signal,
                           thread_capture_count=sequence,
                           source_commit=os.environ.get("JGIT_EVIDENCE_SOURCE_SHA", "unrecorded"))
             (output / "diagnostic-status.json").write_text(json.dumps(status, indent=2) + "\n")
