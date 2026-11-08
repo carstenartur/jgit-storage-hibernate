@@ -596,7 +596,7 @@
                     <requireProperty>
                       <property>central.otherPublishingProfile</property>
                       <regex>false</regex>
-                      <message>Activate maven-central on its own; do not combine it with public-repository-release or github-packages.</message>
+                      <regexMessage>Activate maven-central on its own; do not combine it with public-repository-release or github-packages.</regexMessage>
                     </requireProperty>
                   </rules>
                 </configuration>

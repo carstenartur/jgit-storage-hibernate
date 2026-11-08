@@ -46,7 +46,7 @@ if "$maven_command" -B -ntp -s "$probe_settings" -N \
   echo 'The Central profile accepted a snapshot project' >&2
   exit 1
 fi
-if ! grep -Fq 'RequireReleaseVersion' "$probe_directory/snapshot.log"; then
+if ! grep -Fq 'RequireReleaseVersion failed' "$probe_directory/snapshot.log"; then
   cat "$probe_directory/snapshot.log" >&2
   exit 1
 fi
