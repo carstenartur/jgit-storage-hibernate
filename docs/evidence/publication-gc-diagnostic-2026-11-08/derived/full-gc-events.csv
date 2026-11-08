@@ -1,0 +1,7 @@
+fork,policy,uptimeMillis,gcId,usedBeforeMiB,usedAfterMiB,heapCapacityMiB,pauseMillis,full,gcLocker
+1,size,14302,96,1020,84,310,41.791,True,False
+2,contention-aware,13270,91,1021,93,337,47.267,True,False
+3,contention-aware,10688,71,1021,83,310,41.402,True,False
+3,contention-aware,17554,111,1016,96,350,41.128,True,False
+3,contention-aware,23066,164,1016,95,354,44.796,True,False
+4,size,20792,124,1021,93,337,48.061,True,False

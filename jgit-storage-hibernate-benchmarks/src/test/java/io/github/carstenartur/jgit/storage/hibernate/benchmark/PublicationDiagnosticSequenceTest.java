@@ -15,6 +15,43 @@ import org.junit.jupiter.api.Test;
 
 class PublicationDiagnosticSequenceTest {
   @Test
+  void doesNotInventAnAttemptWhenInterruptedBeforeStarting() {
+    List<Integer> attempts = new ArrayList<>();
+    List<PublicationDiagnosticSequence.Outcome> retained = new ArrayList<>();
+    try {
+      Thread.currentThread().interrupt();
+      assertThrows(InterruptedException.class, () -> PublicationDiagnosticSequence.run(
+          (ordinal, policy) -> attempts.add(ordinal), retained::addAll));
+      assertTrue(Thread.currentThread().isInterrupted());
+      assertTrue(attempts.isEmpty());
+      assertTrue(retained.isEmpty(), "An unstarted fork must not acquire an outcome");
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
+  void interruptionBetweenForksPreservesOnlyAttemptedOutcomes() {
+    List<Integer> attempts = new ArrayList<>();
+    List<PublicationDiagnosticSequence.Outcome> retained = new ArrayList<>();
+    try {
+      assertThrows(InterruptedException.class, () -> PublicationDiagnosticSequence.run(
+          (ordinal, policy) -> attempts.add(ordinal),
+          outcomes -> {
+            retained.clear();
+            retained.addAll(outcomes);
+            Thread.currentThread().interrupt();
+          }));
+      assertTrue(Thread.currentThread().isInterrupted());
+      assertEquals(List.of(1), attempts);
+      assertEquals(List.of("completed"),
+          retained.stream().map(PublicationDiagnosticSequence.Outcome::status).toList());
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
   void retainsAFailedForkAndAttemptsEveryPredeterminedPolicyOnce() throws Exception {
     List<String> attempts = new ArrayList<>();
     List<Integer> checkpoints = new ArrayList<>();

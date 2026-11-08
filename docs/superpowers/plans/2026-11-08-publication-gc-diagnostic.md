@@ -44,6 +44,6 @@
 **Interfaces:** Profile `publication-gc-diagnostic` and exact branch `codex/publication-gc-diagnostic-20261108` run only the diagnostic job plus workflow contracts. The job publishes one diagnostic-only artifact even when child forks fail.
 
 - [x] Write/run failing event-selection tests, then add the explicit profile, exact branch, pinned runtime, build/validation and bounded upload steps.
-- [ ] Review and commit the source; root coordinates remote push and any final integration.
-- [ ] Run the four-fork job once, retain all outcomes and exact source/archive provenance, inspect GC/JNI/heap records, and report the resulting evidence limits.
+- [x] Review and commit the source; root reviewed and published remote `96f1b08d5d0ca32f98508828c78074f12da688fc`, tree-identical to local `1b327b1f`.
+- [x] Run the four-fork job once: run `42533525581`, all four completed. Original artifact `13638597050` and measured sources retained in `docs/evidence/publication-gc-diagnostic-2026-11-08/`; hosted summary replays byte-for-byte, with 609 GC events and six full collections. No acceptance result is inferred.
 - [ ] Make a correction only if the diagnostic identifies a root cause; any later qualification requires a new protocol and retains the original failure.

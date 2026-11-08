@@ -53,8 +53,13 @@ class PackPublicationGcDiagnosticIT {
     }
     Files.createDirectories(root.resolve("raw"));
     Map<String, Object> protocol = PackPublicationPairedBenchmarkIT.protocol(CELL, source, tree);
+    String variant = System.getProperty("jgit.storage.benchmark.publication.diagnostic.variant", "original");
+    if (!List.of("original", "reftable").contains(variant)) {
+      throw new IllegalArgumentException("Unknown diagnostic variant");
+    }
     protocol.put("schema", "jgit-publication-gc-diagnostic/v1");
     protocol.put("diagnosticOnly", true);
+    protocol.put("variant", variant);
     protocol.put("forkPolicies", PublicationDiagnosticSequence.POLICIES);
     protocol.put("jdkRuntime", "21.0.13+9");
     protocol.put("originalStudyRun", 42431132779L);

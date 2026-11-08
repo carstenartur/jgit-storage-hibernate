@@ -83,6 +83,8 @@ def describe_logs(root, base, output, status):
 def summarize(root):
     root = root.resolve()
     protocol = PAIRED.load_json(root / "protocol.json")
+    variant = protocol.get("variant", "original")
+    require(variant in {"original", "reftable"}, "Unknown diagnostic variant")
     require(protocol.get("schema") == "jgit-publication-gc-diagnostic/v1"
             and protocol.get("diagnosticOnly") is True
             and protocol.get("forkPolicies") == POLICIES
@@ -156,6 +158,7 @@ def summarize(root):
     return {
         "schema": "jgit-publication-gc-diagnostic-summary/v1",
         "diagnosticOnly": True,
+        "variant": variant,
         "sourceCommit": protocol["sourceCommit"],
         "sourceTree": protocol["sourceTree"],
         "originalStudyRun": 42431132779,

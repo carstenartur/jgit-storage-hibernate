@@ -19,8 +19,10 @@ final class PublicationDiagnosticSequence {
     for (int index = 0; index < POLICIES.size(); index++) {
       int ordinal = index + 1;
       String policy = POLICIES.get(index);
+      // Only started actions have a trial manifest. Do not invent an outcome for
+      // a fork skipped because cancellation arrived before its action began.
+      if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
       try {
-        if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
         action.run(ordinal, policy);
         outcomes.add(new Outcome(ordinal, policy, "completed", null));
       } catch (InterruptedException interrupted) {

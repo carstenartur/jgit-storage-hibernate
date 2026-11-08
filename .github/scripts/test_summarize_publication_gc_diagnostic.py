@@ -135,6 +135,15 @@ class PublicationGcDiagnosticTest(unittest.TestCase):
             output.write("[1201ms][warning][gc,alloc] Retried waiting for GCLocker too often allocating 131074 words\n")
         self.assertEqual(MODULE.summarize(self.root)["forks"][0]["gcLockerRetryWarnings"], 1)
 
+    def test_counterfactual_identity_is_retained_and_unknown_variant_rejected(self):
+        self.protocol["variant"] = "reftable"
+        self.flush()
+        self.assertEqual(MODULE.summarize(self.root)["variant"], "reftable")
+        self.protocol["variant"] = "higher-heap"
+        self.flush()
+        with self.assertRaisesRegex(ValueError, "variant"):
+            MODULE.summarize(self.root)
+
 
 if __name__ == "__main__":
     unittest.main()
