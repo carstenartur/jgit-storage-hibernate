@@ -103,6 +103,45 @@ python3 .github/scripts/staging_pipeline_evidence.py summarize \
   target/staging-pipeline --expected-commit "$JGIT_EVIDENCE_SOURCE_SHA"
 ```
 
+## Bounded wait diagnostic
+
+The separate [diagnostic workflow](../../.github/workflows/staging-pipeline-diagnostic.yml)
+runs only by manual dispatch or a push to the exact branch
+`diagnose/staging-pipeline-20261108`. It has no pull-request trigger. Its one cell
+uses 16 MiB payload, a 32 MiB window, one writer, runner storage, no injected RTT,
+no warm-up and one repetition, preserving the existing 4 GiB JVM heap. The test
+marks its measurement boundary `diagnostic-only`; the normal evidence qualifier
+rejects that boundary.
+
+Opt-in phase checkpoints identify container startup, fixture creation, calibration,
+provider/bootstrap, telemetry, publication, reopen, rollback and resource close.
+Checkpoints are outside publication and rollback timing intervals. They contain
+only timestamps, process/thread IDs and fixed phase labels, and are retained in
+`raw/phase-checkpoints.tsv` as well as native stdout.
+
+The [bounded runner](../../.github/scripts/run_staging_pipeline_diagnostic.py)
+starts Maven in a fresh process group. It requests `jcmd <pid> Thread.print -l`
+for that group's JVMs after 60 seconds and on subsequent 60-second intervals.
+Native execution reaches its deadline after 180 seconds; a final stack capture
+has at most 20 seconds, TERM has 10 seconds, and KILL/reaping has at most five
+seconds. A failed or timed-out attach requests a SIGQUIT JVM dump in `native.log`.
+The runner records actual process status, timeout outcome, source commit and
+capture count in `diagnostic-status.json`, and kills surviving group members on
+timeout even if Maven itself already honored TERM. Build time is outside this
+native deadline and bounded by the workflow's 15-minute job limit.
+
+The entire diagnostic directory, build/native logs, thread stacks and Surefire
+reports pass the same always-run privacy scan before any partial artifact can be
+uploaded. A timeout is retained as a failed diagnostic with exit status 124; it
+cannot become a successful performance sample.
+
+This diagnostic was prepared to locate the wait in native run
+[42534328623](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42534328623),
+source `a8d6f491de538cd91eeb11b8f1f68749bf3566e1`. That run's source and outcome
+remain separate evidence. No wait cause or performance result is inferred from
+an incomplete or interrupted cell. The 16 MiB/32 MiB cell takes the synchronous
+fallback in every reader mode, so it does not create a prefetch-reader executor.
+
 ## Production decision
 
 Keep the synchronous production writer. Issue [#189](https://github.com/carstenartur/jgit-storage-hibernate/issues/189)

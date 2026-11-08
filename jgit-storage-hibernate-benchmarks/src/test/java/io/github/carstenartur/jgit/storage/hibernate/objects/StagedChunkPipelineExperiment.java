@@ -8,6 +8,8 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.StagingPipelineDiagnostics.checkpoint;
+
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
@@ -101,8 +103,10 @@ public final class StagedChunkPipelineExperiment {
       throw new IllegalArgumentException("failure boundary must match the configured writer window");
     }
     long failurePosition = (long) windowMiB * CHUNK_BYTES;
+    checkpoint("rollback:counts-before:begin");
     long packsBefore = count(factory, "GitPackEntity");
     long chunksBefore = count(factory, "GitPackChunkEntity");
+    checkpoint("rollback:counts-before:returned");
     var probe = new FailureProbe();
     try (FileChannel channel = FileChannel.open(staged, StandardOpenOption.READ)) {
       if (channel.size() <= failurePosition) {
@@ -110,14 +114,17 @@ public final class StagedChunkPipelineExperiment {
       }
       boolean jdbcFailure = stage == FailureStage.JDBC;
       if (jdbcFailure) {
+        checkpoint("rollback:constraint-add:begin");
         constraint(
             factory,
             "ADD CONSTRAINT staging_pipeline_failure CHECK (chunk_index < " + windowMiB + ")");
+        checkpoint("rollback:constraint-add:returned");
       }
       long returned;
       try {
         Source source = pacedSource(channel, readBytesPerSecond);
         try {
+          checkpoint("rollback:publication:begin");
           publish(
               factory,
               repository,
@@ -134,13 +141,16 @@ public final class StagedChunkPipelineExperiment {
           throw new AssertionError("injected publication failure was not observed");
         } catch (IOException | ConstraintViolationException failure) {
           returned = System.nanoTime();
+          checkpoint("rollback:publication:returned");
           if (jdbcFailure != (failure instanceof ConstraintViolationException)) {
             throw failure;
           }
         }
       } finally {
         if (jdbcFailure) {
+          checkpoint("rollback:constraint-drop:begin");
           constraint(factory, "DROP CONSTRAINT staging_pipeline_failure");
+          checkpoint("rollback:constraint-drop:returned");
         }
       }
       if (probe.detectedAt.get() == 0
@@ -148,8 +158,10 @@ public final class StagedChunkPipelineExperiment {
           || probe.flushedChunks != windowMiB) {
         throw new AssertionError("failure did not roll back exactly one previously flushed window");
       }
+      checkpoint("rollback:counts-after:begin");
       long remainingPacks = count(factory, "GitPackEntity") - packsBefore;
       long remainingChunks = count(factory, "GitPackChunkEntity") - chunksBefore;
+      checkpoint("rollback:counts-after:returned");
       if (remainingPacks != 0 || remainingChunks != 0) {
         throw new AssertionError("failed publication left pack or chunk rows behind");
       }

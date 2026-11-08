@@ -64,3 +64,22 @@ tests and six existing privacy-scanner tests pass, all six workflow shell steps
 parse, the supplementary 88-source compilation succeeds, and the nine existing
 overlap/cancellation contract invocations still pass. Exact native Maven/rollback
 execution remains pending CI.
+
+## Bounded diagnostic continuation
+
+Native run 42534328623 completed its build and embedded contracts but its first
+two native cells remained in collection. The one-cell diagnostic preserves the
+16 MiB/32 MiB/single-writer/runner/0 ms coordinates and 4 GiB heap, removes warm-up,
+and takes one repetition. It adds opt-in phase checkpoints outside measured
+intervals, labels output diagnostic-only, and bounds Maven plus descendants in a
+fresh process group. Periodic and final JVM thread capture precede finite TERM/KILL
+cleanup. Only the exact diagnostic branch or manual dispatch can trigger this
+workflow; partial artifacts still require a successful whole-output privacy scan.
+
+Two executable runner regressions cover ordinary failure/output retention and a
+TERM-resistant parent/child that must stop at the deadline. A real Java sleeper
+also produced retained full JVM thread stacks and a timeout status. In this local
+sandbox jcmd attach encountered translated PID values; the SIGQUIT fallback
+retained the stacks in native stdout. These checks validate diagnostic plumbing,
+not the unresolved native wait. Production behavior and publication thresholds
+are unchanged, and the original native run remains independently unqualified.
