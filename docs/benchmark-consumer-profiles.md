@@ -135,6 +135,99 @@ revision. It supports one file/transaction for the proven body edit versus
 251 or 1,001 files/transactions for a complete replacement, with equivalent
 semantic facts. Its timing, GC and live-index gauges retain the limits above.
 
+### Bounded native publication follow-up
+
+The `publication-followup` manual mode in
+[Taxonomy-shaped PostgreSQL Benchmarks](../.github/workflows/consumer-taxonomy-postgres.yml)
+adds two operations. It leaves the existing smoke, lifecycle and larger manual
+matrices intact. Pull-request consumer jobs also run the new publication
+functional tests; their runtime is not retained as performance evidence.
+
+| Operation | Fixed work per invocation | Native matrix |
+|---|---|---|
+| `taxonomyPublishDelta` | Append the same deterministic terminology change to each of four independent workspaces, advance each main ref by compare-and-set, and index the four new commits through `CommitIndexer` | 1,000 initial reachable commits, equally distributed over four workspaces; one or four publication workers; 0 and 20 ms configured RTT |
+| `audioPublishWithWal` | Append one incompressible artifact and its metadata, atomically advance their two refs, with Search disabled | One repository; 2 and 16 MiB artifacts; current automatic writer and chunk-batch defaults; a bounded 32 MiB synthetic analysis working set with one CPU worker; native PostgreSQL at 0 ms configured RTT |
+
+Each coordinate uses a 1 GiB heap, one fork, one warmup and three measured
+publications. Histories grow by four Taxonomy commits or two Audio commits per
+invocation. Measured publication numbers are therefore 2, 3 and 4, with matching
+content and object IDs in every worker/library/RTT variant. The release and Main
+comparison uses the identical harness copied onto immutable library sources:
+
+| Library role | Source |
+|---|---|
+| Release | `v0.12.0`, commit `ba6aeecc338968df4279fb9c7c72b15bbb3577fb` |
+| Main after PR #463 | `1c33640bc75206e81a9bc5722768860a2a2321f5` |
+| Proposed | The exact commit selected by the manual dispatch |
+
+This follow-up changes benchmark code, tests and documentation. It records the
+Core, Search and Java Analysis production module trees for every source. When
+pinned Main and Proposed have the same production trees, they do not represent
+different production implementations; timing variation between them cannot
+substantiate a new library optimization. A combined integration branch may also
+contain separately reviewed production changes from other issues. Its actual
+module hashes, and whether they differ from pinned Main, remain explicit.
+
+The Taxonomy worker pool is created before measurement. A readiness gate releases
+the active workers together; the one-worker variant processes the same four
+tasks in sequence. JDBC batches are collected on each worker and then summed.
+Failures cancel and join the workers before storage can close. Successful
+workspaces can remain committed if another workspace fails: there is no
+cross-workspace atomicity, nor an atomic Git-plus-Search publication contract.
+An incomplete invocation cannot produce successful evidence.
+
+After the timer and the native telemetry capture, every Taxonomy workspace must
+have the expected refs, symbolic HEAD, complete reflog transitions, delta blob,
+and complete reachable Git commit set. Sorted SQL and Lucene object-ID lists must
+match that set, including cardinality. The provider and filesystem index are
+then reopened and the complete verification repeated. Every newly published
+projection also has its message, author/committer identities and times, changed
+path and content checked against Git. Compound Lucene message/content, exact-path,
+identity and time predicates must return all the new publications. Audio similarly verifies
+both complete branch histories, metadata bytes, payload length and Git content
+hash, plus the reftable reflogs written by its atomic `BatchRefUpdate`. That
+reftable log is read through `RefDatabase`; Taxonomy's single-ref update is also
+checked through the repository's durable SQL reflog API.
+
+Native telemetry covers publication, before the verification and restart work.
+The direct PostgreSQL Docker service explicitly sets `fsync`, `synchronous_commit`
+and `full_page_writes` to `on`. Actual `SHOW` results are retained in the manifest;
+the measured Hibernate provider also checks all three values before each
+iteration, outside the timer and telemetry window. Missing or disabled values
+reject the observation. This is the database engine's reported configuration,
+not proof of a particular host storage device's durability guarantees.
+Each observation needs a positive PostgreSQL WAL insert-LSN delta. Other
+`pg_stat_wal` counters are retained with their availability and statistics-lag
+limits; a zero lagged counter is not proof that no WAL was written. Native
+counters are cumulative observations on a dedicated disposable database host,
+not transaction-attributed physical write amplification. The irreducible logical
+Audio input is its payload size; WAL includes storage, ref and database overhead
+and has no claimed universal multiplier.
+
+JMH GC profiling covers the entire iteration, including full validation and
+provider reopening. Its allocation count is not publication-only allocation.
+Verification may warm Git, database and operating-system caches; reopening the
+provider is not a cold-storage experiment. Lucene bytes are a live, non-atomic
+filesystem gauge after reopening, excluding database and Git files. Three
+observations in one fork do not establish a stable production latency ranking.
+
+The six native jobs retain raw JMH/native JSON, RTT calibration, functional-test
+reports, an exact source snapshot and SHA-256 manifest. Their final comparison
+job requires the same verified Git identities across library, worker and RTT
+variants. The gate validates individual iterations, not accumulated JMH event
+counter scores. Publication artifacts are uploaded only after a separate
+connection-metadata check passes for the complete raw output (including Maven
+logs and source snapshots) and both possible JUnit report locations. This gate
+also runs after a failed measurement or provenance check; a failed, skipped or
+unscannable privacy check prevents the follow-up upload.
+
+To qualify the new measurements, dispatch this mode and
+`consumer-compatibility.yml` separately on the same immutable branch commit.
+Record the run IDs and candidate results before claiming same-source consumer
+compatibility. Historical Audio, sandbox and PostgreSQL measurements retain
+their original source identities. This section defines the follow-up harness;
+it does not assert a successful native run before artifacts have been reviewed.
+
 ### PostgreSQL history, recovery and network conditions
 
 [Taxonomy-shaped PostgreSQL Benchmarks](../.github/workflows/consumer-taxonomy-postgres.yml)

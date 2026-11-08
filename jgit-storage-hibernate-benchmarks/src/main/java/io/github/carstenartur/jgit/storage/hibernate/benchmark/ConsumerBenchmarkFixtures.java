@@ -39,6 +39,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
 /** Creates deterministic Git data for disposable consumer workload repositories. */
@@ -224,6 +225,31 @@ final class ConsumerBenchmarkFixtures {
       publish(inserter, repository, changes);
     }
     return main;
+  }
+
+  static ObjectId publishTaxonomyDelta(
+      Repository repository, int workspace, int publication, ObjectId expectedParent)
+      throws IOException {
+    if (workspace < 0 || publication < 1) {
+      throw new IllegalArgumentException("Expected non-negative workspace and positive publication");
+    }
+    Objects.requireNonNull(expectedParent, "expectedParent");
+    Map<String, ObjectId> files = new TreeMap<>();
+    try (var walk = new RevWalk(repository); var tree = new TreeWalk(repository);
+        var inserter = repository.newObjectInserter()) {
+      tree.addTree(walk.parseCommit(expectedParent).getTree());
+      tree.setRecursive(true);
+      while (tree.next()) files.put(tree.getPathString(), tree.getObjectId(0));
+      files.put("requirements/concurrent.json", text(inserter,
+          "{\"workspace\":" + workspace + ",\"publication\":" + publication
+              + ",\"topic\":\"terminology\"}\n"));
+      PersonIdent publisher = identity("Workspace publisher", "workspace-publisher", 1_000_000 + publication);
+      String message = "Publish workspace terminology delta " + publication;
+      ObjectId next = commit(inserter, files, publisher, publisher, message, List.of(expectedParent));
+      inserter.flush();
+      new RefChange(MAIN, expectedParent, next, publisher, message).apply(repository);
+      return next;
+    }
   }
 
   /**

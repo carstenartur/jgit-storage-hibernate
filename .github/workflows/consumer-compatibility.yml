@@ -18,7 +18,7 @@ on:
       - '.github/scripts/test_summarize_consumer_compatibility.py'
       - '.github/workflows/consumer-compatibility.yml'
   push:
-    branches: [ main ]
+    branches: [ main, codex/performance-followup-20261108 ]
     paths:
       - 'pom.xml'
       - 'jgit-storage-hibernate-*/pom.xml'
@@ -41,7 +41,7 @@ permissions:
 jobs:
   prepare-candidate:
     name: Build isolated library candidate
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'push' || !github.event.deleted)
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.contract.outputs.matrix }}
@@ -97,7 +97,7 @@ jobs:
 
   candidate:
     name: Candidate — ${{ matrix.id }}
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && (github.event_name != 'push' || !github.event.deleted)
     needs: prepare-candidate
     strategy:
       fail-fast: false
@@ -241,6 +241,7 @@ jobs:
           if-no-files-found: error
 
   prepare-baseline:
+    if: github.event_name != 'push' || !github.event.deleted
     name: Prepare consumer baseline matrix
     runs-on: ubuntu-latest
     outputs:
@@ -257,6 +258,7 @@ jobs:
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   baseline:
+    if: github.event_name != 'push' || !github.event.deleted
     name: Baseline — ${{ matrix.id }}
     needs: prepare-baseline
     strategy:
@@ -350,7 +352,7 @@ jobs:
 
   report:
     name: Summarize real-consumer evidence
-    if: always()
+    if: always() && (github.event_name != 'push' || !github.event.deleted)
     needs: [candidate, baseline]
     runs-on: ubuntu-latest
     steps:

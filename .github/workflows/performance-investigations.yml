@@ -11,6 +11,7 @@ on:
         options:
           - smoke
           - full
+          - publication-nonregression
   schedule:
     - cron: '23 5 * * 3'
   pull_request:
@@ -20,6 +21,9 @@ on:
       - '.github/scripts/convert-jmh-repository-aging.py'
       - '.github/scripts/test_convert_jmh_repository_aging.py'
       - '.github/scripts/test_performance_investigations_workflow.py'
+      - '.github/scripts/test_native_followup_trigger.py'
+      - '.github/scripts/summarize-publication-nonregression.py'
+      - '.github/scripts/test_summarize_publication_nonregression.py'
       - '.github/scripts/validate_read_ahead_database_telemetry.py'
       - '.github/scripts/test_validate_read_ahead_database_telemetry.py'
       - '.github/scripts/validate_search_database_telemetry.py'
@@ -27,12 +31,15 @@ on:
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
   push:
-    branches: [ main ]
+    branches: [ main, codex/performance-followup-20261108 ]
     paths:
       - '.github/workflows/performance-investigations.yml'
       - '.github/scripts/convert-jmh-repository-aging.py'
       - '.github/scripts/test_convert_jmh_repository_aging.py'
       - '.github/scripts/test_performance_investigations_workflow.py'
+      - '.github/scripts/test_native_followup_trigger.py'
+      - '.github/scripts/summarize-publication-nonregression.py'
+      - '.github/scripts/test_summarize_publication_nonregression.py'
       - '.github/scripts/validate_read_ahead_database_telemetry.py'
       - '.github/scripts/test_validate_read_ahead_database_telemetry.py'
       - '.github/scripts/validate_search_database_telemetry.py'
@@ -64,7 +71,16 @@ jobs:
       - name: Test read-ahead artifact validation
         run: python3 .github/scripts/test_validate_read_ahead_database_telemetry.py
 
+      - name: Test paired publication evidence and stopping rules
+        run: python3 .github/scripts/test_summarize_publication_nonregression.py
+
+      - name: Test exact native follow-up event selection
+        run: python3 .github/scripts/test_native_followup_trigger.py
+
   investigate:
+    if: >-
+      (github.event_name != 'workflow_dispatch' || inputs.profile != 'publication-nonregression') &&
+      !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108')
     name: ${{ matrix.investigation }} (${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }})
     needs: contract
     runs-on: ubuntu-latest
@@ -302,6 +318,7 @@ jobs:
     needs: contract
     if: >-
       github.event_name != 'schedule' &&
+      !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108') &&
       (github.event_name != 'workflow_dispatch' || inputs.profile == 'smoke')
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -539,7 +556,9 @@ jobs:
   stateless-threshold:
     name: Stateful/stateless threshold at 16/128/512 MiB
     needs: contract
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.profile != 'publication-nonregression')
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -590,3 +609,73 @@ jobs:
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo 'PostgreSQL + HikariCP publishes deterministic 16, 128 and 512 MiB payloads with the production 16-chunk batch window.' >> "$GITHUB_STEP_SUMMARY"
           echo 'Raw JMH JSON includes elapsed time, allocation, GC, JDBC execution, flush and byte-integrity counters.' >> "$GITHUB_STEP_SUMMARY"
+
+  publication-nonregression:
+    name: Publication policy / ${{ matrix.cell }}
+    needs: contract
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.profile == 'publication-nonregression') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        cell:
+          - independent-1w-0ms
+          - independent-1w-50ms
+          - independent-16w-0ms
+          - independent-16w-50ms
+          - shared-8w-5ms
+    env:
+      PUBLICATION_CELL: ${{ matrix.cell }}
+    steps:
+      - name: Checkout immutable study source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build unchanged library and benchmark harness
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+
+      - name: Run fixed paired protocol on a dedicated runner
+        shell: bash
+        run: |
+          mkdir -p "target/publication-paired/$PUBLICATION_CELL"
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackPublicationPairedBenchmarkIT \
+            -Djgit.storage.benchmark.publication.cell="$PUBLICATION_CELL" \
+            -Djgit.storage.benchmark.source="$(git rev-parse HEAD)" \
+            -Djgit.storage.benchmark.sourceTree="$(git rev-parse HEAD^{tree})" \
+            -Dbenchmark.resultDirectory="$GITHUB_WORKSPACE/target/publication-paired/$PUBLICATION_CELL"
+
+      - name: Validate all paired results and retain the observed conclusion
+        run: |
+          python3 .github/scripts/summarize-publication-nonregression.py \
+            "target/publication-paired/$PUBLICATION_CELL"
+          echo '### Preregistered paired publication result' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The result is observational; a complete unfavorable result does not fail data validation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The primary inference concerns throughput. Inspect retained latency, allocation and lock observations separately.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check retained files for connection details
+        id: publication-privacy
+        if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            "target/publication-paired/$PUBLICATION_CELL"
+
+      - name: Upload complete or diagnostic partial study evidence
+        if: always() && steps.publication-privacy.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publication-nonregression-${{ matrix.cell }}
+          path: target/publication-paired/${{ matrix.cell }}/**
+          if-no-files-found: error

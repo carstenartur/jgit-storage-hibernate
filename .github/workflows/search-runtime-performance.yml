@@ -3,6 +3,12 @@ name: Hibernate Search Runtime Tuning
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Existing JMH matrix or bounded sustained/overload diagnostic
+        required: true
+        default: matrix
+        type: choice
+        options: [matrix, sustained]
       matrix:
         description: Runtime settings matrix (use smoke for 10,000 commits)
         required: false
@@ -39,6 +45,8 @@ on:
       - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-runtime.py'
       - '.github/scripts/test_convert_jmh_search_runtime.py'
+      - '.github/scripts/summarize-search-runtime-diagnostic.py'
+      - '.github/scripts/test_summarize_search_runtime_diagnostic.py'
       - '.github/scripts/validate_search_database_telemetry.py'
       - '.github/scripts/publish-benchmark-history.py'
       - '.github/benchmark-dashboard/**'
@@ -50,6 +58,7 @@ on:
     branches:
       - main
       - 'benchmark/search-runtime-full-196-*'
+      - codex/performance-followup-20261108
     paths:
       - '.github/benchmark-triggers/issue196-runtime-evidence.json'
       - '.github/workflows/search-runtime-performance.yml'
@@ -57,6 +66,8 @@ on:
       - '.github/scripts/test_benchmark_units.py'
       - '.github/scripts/convert-jmh-search-runtime.py'
       - '.github/scripts/test_convert_jmh_search_runtime.py'
+      - '.github/scripts/summarize-search-runtime-diagnostic.py'
+      - '.github/scripts/test_summarize_search_runtime_diagnostic.py'
       - '.github/scripts/validate_search_database_telemetry.py'
       - '.github/scripts/publish-benchmark-history.py'
       - '.github/benchmark-dashboard/**'
@@ -75,7 +86,10 @@ permissions:
 jobs:
   select-runtime-runs:
     name: Select Search runtime workloads
-    if: github.event_name != 'push' || !github.event.deleted
+    if: >-
+      (github.event_name != 'workflow_dispatch' || inputs.mode != 'sustained') &&
+      !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108') &&
+      (github.event_name != 'push' || !github.event.deleted)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -124,6 +138,7 @@ jobs:
       ${{ matrix.artifact == 'hibernate-search-runtime-results' && 'PostgreSQL + Lucene runtime coordination matrix' ||
           format('PostgreSQL + Lucene {0} ({1}, {2})', matrix.workload, matrix.resources, matrix.settings) }}
     needs: select-runtime-runs
+    if: needs.select-runtime-runs.result == 'success'
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -150,6 +165,7 @@ jobs:
         run: |
           python3 .github/scripts/test_benchmark_units.py
           python3 .github/scripts/test_convert_jmh_search_runtime.py
+          python3 .github/scripts/test_summarize_search_runtime_diagnostic.py
 
       - name: Build benchmark module with Maven
         shell: bash
@@ -254,6 +270,107 @@ jobs:
           echo '- [Burst visibility polls](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-visibility-polls)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Burst visibility observation wait](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-burst-visibility-observation-wait)' >> "$GITHUB_STEP_SUMMARY"
           echo '- [Rebuild ready p95](https://carstenartur.github.io/jgit-storage-hibernate/dev/bench/#benchmark-hibernate-search-runtime-rebuild-ready-p-95)' >> "$GITHUB_STEP_SUMMARY"
+
+  sustained-diagnostic:
+    name: Sustained ${{ matrix.scenario }} (${{ matrix.resources }})
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'sustained') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        scenario: [reference, sync-async-r500]
+        resources: [normal, constrained]
+    env:
+      DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}
+      DIAGNOSTIC_RESOURCES: ${{ matrix.resources }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify diagnostic parser and lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/test_summarize_search_runtime_diagnostic.py
+          mkdir -p target/search-runtime-sustained
+          mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am install \
+            -Dtest=SearchRuntimeDiagnosticWorkersTest,SearchRuntimeSustainedDiagnosticTest \
+            -Dsurefire.failIfNoSpecifiedTests=false 2>&1 \
+            | tee target/search-runtime-sustained/build-and-correctness.log
+      - name: Run isolated PostgreSQL sustained and activity passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          lscpu --json > target/search-runtime-sustained/cpu.json
+          case "$DIAGNOSTIC_RESOURCES" in
+            normal) cpu_count=4; heap_initial=768m; heap_limit=1g ;;
+            constrained) cpu_count=1; heap_initial=256m; heap_limit=512m ;;
+            *) exit 1 ;;
+          esac
+          cpus="$(python3 - "$cpu_count" <<'PY'
+          import os, sys
+          count = int(sys.argv[1])
+          allowed = sorted(os.sched_getaffinity(0))
+          if len(allowed) < count:
+              raise SystemExit(f'Need {count} allowed CPUs, found {len(allowed)}')
+          print(','.join(map(str, allowed[:count])))
+          PY
+          )"
+          source="$(git rev-parse HEAD)"
+          source_tree="$(git rev-parse 'HEAD^{tree}')"
+          taskset --cpu-list "$cpus" mvn -B -ntp -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=SearchRuntimeSustainedDiagnosticIT \
+            -Dsearch.runtime.sustained.run=true \
+            "-Dsearch.runtime.sustained.scenario=$DIAGNOSTIC_SCENARIO" \
+            "-Dsearch.runtime.resources=$DIAGNOSTIC_RESOURCES" \
+            "-Dsearch.runtime.sustained.output=$GITHUB_WORKSPACE/target/search-runtime-sustained/raw" \
+            "-Dbenchmark.commit=$source" "-Dbenchmark.tree=$source_tree" \
+            "-DargLine=-Xms$heap_initial -Xmx$heap_limit -XX:ActiveProcessorCount=$cpu_count -Dorg.jboss.logging.provider=jdk" \
+            2>&1 | tee target/search-runtime-sustained/native-diagnostic.log
+      - name: Validate exact-source completion and export observations
+        run: |
+          set -euo pipefail
+          for pass in timing trace; do
+            python3 .github/scripts/summarize-search-runtime-diagnostic.py \
+              "target/search-runtime-sustained/raw/$pass" \
+              --output "target/search-runtime-sustained/derived/$pass" \
+              --require-source "$(git rev-parse HEAD)"
+          done
+          python3 - <<'PY'
+          import pathlib
+          import xml.etree.ElementTree as ET
+          reports = list(pathlib.Path('jgit-storage-hibernate-benchmarks/target/surefire-reports').glob(
+              'TEST-*.SearchRuntimeSustainedDiagnosticIT.xml'))
+          assert len(reports) == 1, 'Missing native diagnostic test report'
+          suite = ET.parse(reports[0]).getroot()
+          assert int(suite.attrib['tests']) == 1
+          assert all(int(suite.attrib.get(key, 0)) == 0 for key in ('failures', 'errors', 'skipped'))
+          PY
+          cat target/search-runtime-sustained/derived/timing/summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat target/search-runtime-sustained/derived/trace/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Check diagnostic evidence for connection details
+        id: diagnostic-privacy
+        if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/search-runtime-sustained jgit-storage-hibernate-benchmarks/target/surefire-reports
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && steps.diagnostic-privacy.outcome == 'success'
+        with:
+          name: search-runtime-sustained-${{ matrix.scenario }}-${{ matrix.resources }}
+          path: |
+            target/search-runtime-sustained
+            jgit-storage-hibernate-benchmarks/target/surefire-reports
+          if-no-files-found: error
 
   publish-runtime-history:
     name: Publish Hibernate Search runtime benchmark history

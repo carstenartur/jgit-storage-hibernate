@@ -104,6 +104,25 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
         ):
             self.assertIn(fragment, self.parameter_selection)
 
+    def test_paired_publication_dispatch_does_not_launch_unrelated_matrices(self) -> None:
+        self.assertIn("- publication-nonregression", self.workflow)
+        generic = self.section("  investigate:\n", "  repository-aging-smoke:\n")
+        self.assertIn("inputs.profile != 'publication-nonregression'", generic)
+        threshold = self.section("  stateless-threshold:\n", "  publication-nonregression:\n")
+        self.assertIn("inputs.profile != 'publication-nonregression'", threshold)
+
+    def test_paired_publication_native_results_are_validated_before_upload(self) -> None:
+        self.assertIn("  publication-nonregression:\n", self.workflow)
+        paired = self.workflow.partition("  publication-nonregression:\n")[2]
+        self.assertIn("github.event_name == 'workflow_dispatch'", paired)
+        self.assertIn("inputs.profile == 'publication-nonregression'", paired)
+        self.assertIn("timeout-minutes: 150", paired)
+        self.assertIn("-Dtest=PackPublicationPairedBenchmarkIT", paired)
+        self.assertIn("summarize-publication-nonregression.py", paired)
+        self.assertIn("validate_search_database_telemetry.py --privacy-only", paired)
+        self.assertLess(paired.index("summarize-publication-nonregression.py"), paired.index("actions/upload-artifact@"))
+        self.assertNotIn("jgit-storage-hibernate-benchmarks/target/**", paired)
+
 
 if __name__ == "__main__":
     unittest.main()
