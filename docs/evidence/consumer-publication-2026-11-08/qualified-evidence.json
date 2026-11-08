@@ -1,0 +1,2622 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-08T00:56:48.608093+00:00",
+  "sourceSha": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+  "sourceTree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+  "workflowEvent": "push",
+  "nativeRunId": 42431132637,
+  "compatibilityRunId": 42431132838,
+  "allJobsSucceeded": true,
+  "nativeJobs": 7,
+  "compatibilityJobs": 9,
+  "allArchiveDigestsVerified": true,
+  "artifactCount": 15,
+  "artifacts": [
+    {
+      "id": 13598040319,
+      "name": "consumer-publication-comparison",
+      "runId": 42431132637,
+      "sizeBytes": 503,
+      "sha256": "8148bae93a5abb616b38c4d60d099fdcfcd40bd09b575c61ef8269e0ce506c78",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13598040319"
+    },
+    {
+      "id": 13598005312,
+      "name": "consumer-publication-proposed-20ms",
+      "runId": 42431132637,
+      "sizeBytes": 104882,
+      "sha256": "c180e9bc69d0d512e9802dffc7018517b3d96a18315aa752585ac90ffe7f4e58",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13598005312"
+    },
+    {
+      "id": 13597995226,
+      "name": "consumer-publication-main-0ms",
+      "runId": 42431132637,
+      "sizeBytes": 115693,
+      "sha256": "8c1eb29b2b3a68e3bf69296b5395550f1821bad68626f37023ae6c58f44cea6c",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597995226"
+    },
+    {
+      "id": 13597527859,
+      "name": "consumer-publication-main-20ms",
+      "runId": 42431132637,
+      "sizeBytes": 105283,
+      "sha256": "da742fc194fe06dcad999d45ed276045b98a5f61d5fce534deeb87894c3a23e2",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597527859"
+    },
+    {
+      "id": 13597329095,
+      "name": "consumer-publication-release-20ms",
+      "runId": 42431132637,
+      "sizeBytes": 105244,
+      "sha256": "88c30ec61c85cb923fc743d81a3d84f43841e3db4426712c860cca471af9a712",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597329095"
+    },
+    {
+      "id": 13597109874,
+      "name": "consumer-publication-proposed-0ms",
+      "runId": 42431132637,
+      "sizeBytes": 115253,
+      "sha256": "8ec9eb80f2d2dce29c72707074aa8957d02cebe645bc6eb29185b8fd985a4cdf",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597109874"
+    },
+    {
+      "id": 13596794004,
+      "name": "consumer-publication-release-0ms",
+      "runId": 42431132637,
+      "sizeBytes": 115094,
+      "sha256": "cbe1586e5c26a5a546742542b31eb43c6d375db0547dd4928170b2993a92bda5",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13596794004"
+    },
+    {
+      "id": 13598210289,
+      "name": "consumer-candidate-sandbox",
+      "runId": 42431132838,
+      "sizeBytes": 555015,
+      "sha256": "5431f3c91d4d264c3ccd3d190e267a5502dc53fb84430c01cb5b52255a09196d",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13598210289"
+    },
+    {
+      "id": 13598185228,
+      "name": "consumer-compatibility-summary",
+      "runId": 42431132838,
+      "sizeBytes": 894,
+      "sha256": "4e76afbde0ec1198b2f7a7d6bd006ce791e03e9d2f78a1530172cce403de1eff",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13598185228"
+    },
+    {
+      "id": 13597995184,
+      "name": "jgit-storage-hibernate-consumer-candidate",
+      "runId": 42431132838,
+      "sizeBytes": 67356568,
+      "sha256": "5bcd755e2e345b48c6a95c82f783e0135b5cd75f9ee78c624753fe12906940eb",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597995184"
+    },
+    {
+      "id": 13597836122,
+      "name": "consumer-baseline-taxonomy",
+      "runId": 42431132838,
+      "sizeBytes": 184698,
+      "sha256": "8d9f3e23394b2e8f1609eac1fdcaf4af4167bfc89fb2985e4492ac1b8f171228",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597836122"
+    },
+    {
+      "id": 13597587882,
+      "name": "consumer-candidate-audio-analyzer",
+      "runId": 42431132838,
+      "sizeBytes": 788751,
+      "sha256": "d7aebe05c9e8274e025f55396ff8fd7b3350743a25673b12d40a8ee2df4a59d6",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597587882"
+    },
+    {
+      "id": 13597513040,
+      "name": "consumer-baseline-audio-analyzer",
+      "runId": 42431132838,
+      "sizeBytes": 771765,
+      "sha256": "6d1db43ff1c8a660b71c669ddc9981e0b812b98eadf2d8598b76d1643bf29fa5",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597513040"
+    },
+    {
+      "id": 13597154874,
+      "name": "consumer-baseline-sandbox",
+      "runId": 42431132838,
+      "sizeBytes": 548781,
+      "sha256": "e21d250c8fdf72673bbefb11b7060939c3e55627ceafe3933fcca4881daa638b",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597154874"
+    },
+    {
+      "id": 13596834708,
+      "name": "consumer-candidate-taxonomy",
+      "runId": 42431132838,
+      "sizeBytes": 187260,
+      "sha256": "54d6d7815b789b8a56a71ab29dacdc6d7b0c45683811d0a8d1e905587aa68412",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13596834708"
+    }
+  ],
+  "nativeValidation": {
+    "verified": [
+      {
+        "role": "main",
+        "rtt": 0,
+        "librarySha": "1c33640bc75206e81a9bc5722768860a2a2321f5",
+        "observations": 12,
+        "sourceFilesMatched": 21,
+        "productionModulesIdenticalToHarness": true,
+        "calibrationMedianMicros": 318,
+        "privacyFiles": 70,
+        "fixturePath": "native/consumer-publication-main-0ms/target/consumer-publication/fixture.json",
+        "fixtureSha256": "b5c72b1402ceb816cfa5e54fdfc04cf92be7902b8796772db17ee5454bc70bdc"
+      },
+      {
+        "role": "main",
+        "rtt": 20,
+        "librarySha": "1c33640bc75206e81a9bc5722768860a2a2321f5",
+        "observations": 6,
+        "sourceFilesMatched": 21,
+        "productionModulesIdenticalToHarness": true,
+        "calibrationMedianMicros": 20611,
+        "privacyFiles": 64,
+        "fixturePath": "native/consumer-publication-main-20ms/target/consumer-publication/fixture.json",
+        "fixtureSha256": "55308e009df81d647050e8f6e5614ea584681803153dfc7a9c19b12a863c04ed"
+      },
+      {
+        "role": "proposed",
+        "rtt": 0,
+        "librarySha": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+        "observations": 12,
+        "sourceFilesMatched": 21,
+        "productionModulesIdenticalToHarness": true,
+        "calibrationMedianMicros": 172,
+        "privacyFiles": 70,
+        "fixturePath": "native/consumer-publication-proposed-0ms/target/consumer-publication/fixture.json",
+        "fixtureSha256": "ae7cfa8939287ce477ac602e33ca6cc0bc32633d7f6edc3e6a3e232806cb0fb2"
+      },
+      {
+        "role": "proposed",
+        "rtt": 20,
+        "librarySha": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+        "observations": 6,
+        "sourceFilesMatched": 21,
+        "productionModulesIdenticalToHarness": true,
+        "calibrationMedianMicros": 20623,
+        "privacyFiles": 64,
+        "fixturePath": "native/consumer-publication-proposed-20ms/target/consumer-publication/fixture.json",
+        "fixtureSha256": "9610bcb9b129e246a1019751cc4f52fd834948204bfed4bee8deae0cc8bad126"
+      },
+      {
+        "role": "release",
+        "rtt": 0,
+        "librarySha": "ba6aeecc338968df4279fb9c7c72b15bbb3577fb",
+        "observations": 12,
+        "sourceFilesMatched": 21,
+        "productionModulesIdenticalToHarness": false,
+        "calibrationMedianMicros": 125,
+        "privacyFiles": 70,
+        "fixturePath": "native/consumer-publication-release-0ms/target/consumer-publication/fixture.json",
+        "fixtureSha256": "36ed938ce735d81b10b08eeeb1f59f1b00e371a3e2c1d5246ea00d3dfb8386ef"
+      },
+      {
+        "role": "release",
+        "rtt": 20,
+        "librarySha": "ba6aeecc338968df4279fb9c7c72b15bbb3577fb",
+        "observations": 6,
+        "sourceFilesMatched": 21,
+        "productionModulesIdenticalToHarness": false,
+        "calibrationMedianMicros": 20850,
+        "privacyFiles": 64,
+        "fixturePath": "native/consumer-publication-release-20ms/target/consumer-publication/fixture.json",
+        "fixtureSha256": "5dfc907cb315fa1568a586e218343108f6eb3fb40312eef42fc9b19154e3ca89"
+      }
+    ],
+    "comparison": {
+      "schemaVersion": 1,
+      "harnessSha": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+      "releaseSha": "ba6aeecc338968df4279fb9c7c72b15bbb3577fb",
+      "mainSha": "1c33640bc75206e81a9bc5722768860a2a2321f5",
+      "artifacts": 6,
+      "observations": 54,
+      "mainProductionModulesIdenticalToProposed": true,
+      "identicalGitResultsAcrossLibraryWorkerAndRttVariants": true,
+      "timingScope": "three measurements in one fork; no stable latency ranking implied",
+      "compatibilityQualification": "pending separate consumer-compatibility run on this exact harnessSha"
+    }
+  },
+  "nativeJunit": {
+    "tests": 72,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0
+  },
+  "nativeJunitFiles": [
+    {
+      "path": "native/consumer-publication-main-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationBenchmarkTest.xml",
+      "sha256": "52eac76554ff2a5d613982865b92f63cc9259d7f6f8d982360d9f29f9a88eed9"
+    },
+    {
+      "path": "native/consumer-publication-main-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationLifecycleTest.xml",
+      "sha256": "cbff797ac8888c506f8e8bbd44e519950200881fd240830a7962ef7e72cbdb7b"
+    },
+    {
+      "path": "native/consumer-publication-main-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationWorkersTest.xml",
+      "sha256": "3d2ea28b97c046523dbc22cdd5b4c19ecc7f6b561aedf972825c5abfda3801e7"
+    },
+    {
+      "path": "native/consumer-publication-main-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerTaxonomyDeltaTest.xml",
+      "sha256": "f8a3bbc0a1bd17dc272a55efbeded3f945c3655592f27acac995cd06b9d2516e"
+    },
+    {
+      "path": "native/consumer-publication-main-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationBenchmarkTest.xml",
+      "sha256": "6aff10681f24a356984305e058937862fb5c2bc2c109b3a53eb18ae3260b2c25"
+    },
+    {
+      "path": "native/consumer-publication-main-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationLifecycleTest.xml",
+      "sha256": "804071b69bbb7076ab4bd72022e6ba47fd4d0b32826ece68cbf7883a9b6a6187"
+    },
+    {
+      "path": "native/consumer-publication-main-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationWorkersTest.xml",
+      "sha256": "d7868f171dda1b0eced78742238729783a8a662a607aa27731e341b712bd402c"
+    },
+    {
+      "path": "native/consumer-publication-main-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerTaxonomyDeltaTest.xml",
+      "sha256": "0ca6b37ae4706fb09b4054797b15776961f0d99164deae921f12e2c5cfcbad5b"
+    },
+    {
+      "path": "native/consumer-publication-proposed-0ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationBenchmarkTest.xml",
+      "sha256": "abf3a869de77a8f028131270b3c84c1aecee0c019beae25bee3889677626d180"
+    },
+    {
+      "path": "native/consumer-publication-proposed-0ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationLifecycleTest.xml",
+      "sha256": "7d81e6002930e1c4af2580ee55fc7862c40158e40f08b1a6f559034945079a2b"
+    },
+    {
+      "path": "native/consumer-publication-proposed-0ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationWorkersTest.xml",
+      "sha256": "cafccee96aa7d944e2806f1f5227374c84797330d600a42caed2a5aa9718fdfa"
+    },
+    {
+      "path": "native/consumer-publication-proposed-0ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerTaxonomyDeltaTest.xml",
+      "sha256": "558c8494295b7e1f1776eb485de7379cb99b8912c8f3f2a09ac62574ecf7d4c0"
+    },
+    {
+      "path": "native/consumer-publication-proposed-20ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationBenchmarkTest.xml",
+      "sha256": "3ec8ce008e819556d90cd33180b3b34676c8892acda4ec05d9dab643309fbc99"
+    },
+    {
+      "path": "native/consumer-publication-proposed-20ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationLifecycleTest.xml",
+      "sha256": "78a2d126f70996b2ff0385288d7639f9125a003894a2509c820eafe83043360c"
+    },
+    {
+      "path": "native/consumer-publication-proposed-20ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationWorkersTest.xml",
+      "sha256": "4f1010ad2ec36f4e5cbdc80ec1d91524c338c9a42e52be1616a66f46f8d43f3d"
+    },
+    {
+      "path": "native/consumer-publication-proposed-20ms/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerTaxonomyDeltaTest.xml",
+      "sha256": "3c5ac7b708334d4bb445f227fa38e76ef06bc47cccee22dd0cb46a827c5542ef"
+    },
+    {
+      "path": "native/consumer-publication-release-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationBenchmarkTest.xml",
+      "sha256": "6f406c27c128993f327a7709d60837f44fdba55ab6161880638d408917fae63f"
+    },
+    {
+      "path": "native/consumer-publication-release-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationLifecycleTest.xml",
+      "sha256": "f45939de315e7f43dc045b1a3c21b22119237cc6b99a5d868e32488b71ec163b"
+    },
+    {
+      "path": "native/consumer-publication-release-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationWorkersTest.xml",
+      "sha256": "c2d1ec7d11d0693f73fb70438d14286caf8d9d0664f4c5adbf50e97e6047487a"
+    },
+    {
+      "path": "native/consumer-publication-release-0ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerTaxonomyDeltaTest.xml",
+      "sha256": "2f6bb04ba2c0eaa5fb5a64a9c18e7474bc2bce0dc853d772638ec1dd05873ce2"
+    },
+    {
+      "path": "native/consumer-publication-release-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationBenchmarkTest.xml",
+      "sha256": "8a35db4c49eb69b608763b75e6c12442bbd11394ae2d08bb1b5d3fc90e05827a"
+    },
+    {
+      "path": "native/consumer-publication-release-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationLifecycleTest.xml",
+      "sha256": "a59dd72e626b82c086829e649e7602558b3851198543aea69dc4d11196349ab3"
+    },
+    {
+      "path": "native/consumer-publication-release-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerPublicationWorkersTest.xml",
+      "sha256": "536a9a5664415e08d137db0e3914128d63faadc1cb11f95df781e5a339e94797"
+    },
+    {
+      "path": "native/consumer-publication-release-20ms/compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.ConsumerTaxonomyDeltaTest.xml",
+      "sha256": "f7425c1b835418110fd20eb7cd62d9fce2b94bc9a65657af808e96c34b7e38d2"
+    }
+  ],
+  "compatibilityContracts": [
+    {
+      "consumer": "audio-analyzer",
+      "consumerCommit": "18ca14dda69a51ac83fa8fad0bd22071778fcab0",
+      "modules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search"
+      ],
+      "checks": {
+        "baseline": {
+          "version": "0.11.8",
+          "result": {
+            "consumer": "audio-analyzer",
+            "mode": "baseline",
+            "candidateVersion": "",
+            "java": "21",
+            "contract": "audio-app reactor verification, dependency resolution and packaged-runtime leakage check"
+          },
+          "junitReports": 209,
+          "junitTotals": {
+            "tests": 1096,
+            "errors": 0,
+            "failures": 0,
+            "skipped": 0
+          },
+          "junitFiles": [
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-acquisition/target/surefire-reports/TEST-org.hammer.audio.acquisition.MicrophoneArrayCalibrationTest.xml",
+              "sha256": "200fcbc55b21c8270e67b6f497b48f311c58e091106b10f6862fc35a9fd0e24e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-acquisition/target/surefire-reports/TEST-org.hammer.audio.acquisition.MicrophoneArrayProfileWorkflowTest.xml",
+              "sha256": "457ddfd1efc3c43399089e93aa82e91fb2c8e752902320f55e72d83084d25320"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.ExperimentDocumentPreviewFormatterTest.xml",
+              "sha256": "29aed475bd5788366eef5fd2c5b5ffe38e1968cb7fad54357e0f937902be2309"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.ExperimentWorkbenchLauncherTest.xml",
+              "sha256": "74e20e9d4b593441b21b9206d2d19eb9920ec4f52e045547b24e6862364057ec"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.GuiSmokeTest.xml",
+              "sha256": "6df5244e20a9bc858c18947f232bfc1222c0a84e16401f66c499a594b587e712"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.PhaseDiagramPanelTest.xml",
+              "sha256": "bbff1116a761ae28803a9375559046e109146fe819b8f14076e94675379434bb"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.SpectrumPanelTest.xml",
+              "sha256": "7943205af14615040316a74ef3a6061bb67f6b98e002d1fe4019235c9f3c1f7c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.WaveformModelTest.xml",
+              "sha256": "4ce2f62cfbde1fee1ff78f552fa7fd41c020456c778bce78088eb20607dd69ed"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.WaveformPanelTest.xml",
+              "sha256": "ec01ef8a6e5288cfab9b6f9b14e0bcc0345e925114d62b232de490ba862383ea"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ArchitectureBoundaryTest.xml",
+              "sha256": "0384fcc77b7dfc40867d8b4b6bae561b72fd3452047f3ffed8e0f9cecc8cd9eb"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ArchitectureFitnessTest.xml",
+              "sha256": "edd1c7edbea9d9d023ab4080cdbe045dae4aea555852fb5dfab87c099b842ae4"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplDivisorAndLayoutTest.xml",
+              "sha256": "9972a8653d788f9e3ab4767bff76de0c702f5e0b8b0562330e69a59eea1a36af"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplLifecycleTest.xml",
+              "sha256": "b759ff361139960ca12900b980c0cb151dea0600f99e61598b96908fca300458"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplSampleScalingTest.xml",
+              "sha256": "97ac224a3a45fdd5901e92396359addd5047f0711eb5d9078b92b2ebe0566020"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplTest.xml",
+              "sha256": "55df96ad654f9abb1eea7273c6dc865e989d33f5ceb1571889941025d57fc731"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.DemoAudioCaptureServiceTest.xml",
+              "sha256": "a6961e4cf646a3312a3287e271a34a055b68fc87753f931bb40305426c991bdd"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.JavaSoundMicrophoneWorkflowTest.xml",
+              "sha256": "2bbd668e17cd5ba88158884e0bdf5f2d58f2d97a8b0fcd4b5805041a7b2d3c4b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RecordedAudioCaptureServiceTest.xml",
+              "sha256": "6699ecdca562ccf18a91ee09804b2aaf8ea19d88bad9ace7e36216bef0e9ebd6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RecordingPreflightTest.xml",
+              "sha256": "0cb9f40234adaa4e45ea6969624c8b2bd404c147d5eeaa1bad7ec45ecc6add3b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RecordingTapPipelineTest.xml",
+              "sha256": "52bdd100d57df55f0bb40910fe8eee0f35f7430d08d555d5f4396840f8eb078c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RegularJGitStoragePrototypeTest.xml",
+              "sha256": "c766ab0b3f815ba94641e0b65b5edd5c6d3a18dca536628caa5366cced5565c2"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.ProductionFrontendPackagingTest.xml",
+              "sha256": "51bf330d79790e96a145c2b28383fd95ed6fc6bef131b07005ab07b4ff1f5add"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkbenchConfigurationCollaborationTest.xml",
+              "sha256": "cdcddf35fc77bab36a53c00c8b14bac39bbeace2183c522863339c1ac30dbac4"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkbenchSpaControllerTest.xml",
+              "sha256": "10a21d614a9a1eb9ef8cf68ac3a7b7256263ce2aedfbdb95f81a4f512922bbf8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowOutboxDispatchConfigurationTest.xml",
+              "sha256": "6000ce77eaeb1c6e848d38163b900a34b297b6704cb754075a74243f20d49b33"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowOutboxRetentionConfigurationTest.xml",
+              "sha256": "edf885eac8218a4339927bd6c695d5c513073aae51c58140ff98600605c2f13e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowPersistenceConfigurationTest.xml",
+              "sha256": "1a8c0d58f16e9d1b2d34704a04e39c749f1a685da07730ec96f68f41a709aed4"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowRunConfigurationTest.xml",
+              "sha256": "6119899776b7175de52110bd3d94580ae6aca14124f3846594b23b8cf63c6500"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowSchemaMigrationConfigurationTest.xml",
+              "sha256": "3dad134756894ea7709ede84349561be5c62a4e31c58930d3e3af8b1e0743fe2"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.compare.RecordingComparatorTest.xml",
+              "sha256": "574bb8ee7d77eb31872ab2813b722adffbc4d3943ba0cf1d539afcd0d0039e7e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.experiment.document.http.ExperimentDocumentApplyHttpAdapterTest.xml",
+              "sha256": "6d9dab4e56de1eeb267ec0adc020177d8a1b01f1ca893ba9bf2c055a493c95e1"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.experiment.document.http.ExperimentDocumentHttpAdapterTest.xml",
+              "sha256": "1868284a1afe10ca907352e7084711a7f83fdab3118e6d320ee7565ba70ac343"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.experiment.document.workspace.ExperimentDocumentWorkspaceServiceTest.xml",
+              "sha256": "d66be9b705e087cb8c359abff40e8b4ccecfbbdb108e46b1cfdbad1964026f3f"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.export.EvidenceBundleExporterTest.xml",
+              "sha256": "c98719c0f552a7ef4d46482d70fefb326b5cb906c5c256978043d241367fd257"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.export.ReproducibilityBundleExporterTest.xml",
+              "sha256": "2510af40c101c4a0bd9594d4eebfead7e422288a552103c373bf5071b9c184d8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.schema.WorkflowSearchSchemaMigrationTest.xml",
+              "sha256": "1c9563f6de60a082e4a678f7d00b464bda8f0135af52224c53bba59a92d7931a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.CollaborationPostgreSqlSchemaMigrationIntegrationTest.xml",
+              "sha256": "70a23a0bb1275d80bce7bde9f6b0cd35b583f9801d8623447e69ffc7863939c0"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.CollaborationSchemaMigrationIntegrationTest.xml",
+              "sha256": "c65352cd8efacab6810b9424a124604b3850729e8e176dd48cb1894c98fb06c6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowHistoryRecoveryTest.xml",
+              "sha256": "f0b838d1395d82062b718289d16d4cca784ef74d7b93d4b37b1c3df7cf4f5143"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOperationBodyStoreTest.xml",
+              "sha256": "e6280d27833063e19848b443c6ba64545a420a2782e749378c10e19b109f01ef"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxDispatcherTest.xml",
+              "sha256": "6ea81276a62b9a251cf5a232a5fc096d624979428e256505389a7fe1fe8ef0f6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxRestartTest.xml",
+              "sha256": "692d109d3ef988d0fc173fb022d50cbc17ce8e25e11ee39388041a3f3a4f38a2"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxRetentionPostgreSqlTest.xml",
+              "sha256": "3a0d3504d4185da5548a5b46b4b912ed6221f9024e4da2e9661c911d2d8cc13b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxRetentionStoreTest.xml",
+              "sha256": "f1ba233079dcfdcc9f77ed17fd3db8f28f48c0c3d46911b1eeb67955bc531a87"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxStoreTest.xml",
+              "sha256": "2498de75c51eba7d31b75ac9b0cfd13c718b409f449e7f9d5eaf04a833a82dfd"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionLifecycleStoreTest.xml",
+              "sha256": "be29abf2307527b0f3c826755a9230c1a8388485ad5b2d9372dfc290e4a14376"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionRecoveryTest.xml",
+              "sha256": "cc6db32d4180b31b759bee80c2985132d14668fb93e5aebedac73ca2fec67a97"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionStateStorePostgreSqlConcurrencyTest.xml",
+              "sha256": "03c32bbb2fdf943faf7e70e79fea05e7d1a37712f45944dff957d8b9e7805186"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionStateStoreTest.xml",
+              "sha256": "d66242212b1eb6afd8db6b97904e2048e4e96a094f6a261411df17b00f96195a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowUndoRedoRecoveryTest.xml",
+              "sha256": "16d9a20b06e22f75cfbb7b6164f6391dc1446661aaab86931e2e7519fb8668f9"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.history.CollaborationWorkflowHistoryAccessPolicyTest.xml",
+              "sha256": "1abbe2739d03743b9f4dfb62b3a5d907c52eb78b4715c0f6a2339f02c701ebe7"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.search.WorkflowPostgreSqlProjectionRebuildIntegrationTest.xml",
+              "sha256": "771e7f68e5ecae0545577cb7aa55d44463624d1605ed638c3b65bd210f458648"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.search.WorkflowSemanticHistoryIndexTest.xml",
+              "sha256": "55b581eea6247bd73a1fa2a8d233922aa0159006c17f0d09bc00a33b39bfb22b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.search.WorkflowSemanticProjectionValuesTest.xml",
+              "sha256": "dd26ef541ae6b1f916925aaae5585c3898e37660367d8f32afccc8e7506d5be8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.ConditionalJGitWorkflowCommitTest.xml",
+              "sha256": "82b60d4bd5365db4cb0408b9955fa482a7709830d7ed0854795e8f95bffffc75"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.FileSystemJGitVersionedWorkflowStoreTest.xml",
+              "sha256": "611bd3e93e62cea671c487f47eeaf761ffee8ae19bfcb741f4b7563aa1a58612"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateDeterministicWorkflowRunIntegrationTest.xml",
+              "sha256": "e555344aec4081d63d9f7ae320e0bacc3426e827d311d62f04dd491fd32dc72e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateJGitVersionedWorkflowStoreTest.xml",
+              "sha256": "bd03eabe8e62dd6ee56bbd8f1a757961ee7166046fd00044790609fea67ddbca"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateWorkflowCombinedHistorySearchTest.xml",
+              "sha256": "1f7cad6b9746b76f99d3897d293eddcc7926299f1d3fcd93b0edacc6b9404e29"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateWorkflowHistoryIndexTest.xml",
+              "sha256": "36553acdc38afdfd9e97a65af22d0ce22bced763934e230ae6f72e47578d9797"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateWorkflowMergeIntegrationTest.xml",
+              "sha256": "dd031b04d2c2d29a73b0eb83da7085e081a20216b08a0e78ee135ce5476fe849"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.pluginhost.PluginManagerTest.xml",
+              "sha256": "b6b1bbf2ec8b53b2947d581890cf17a0469bd3ff6c285e74362c220f1ebd61ce"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ui.WaveformRendererTest.xml",
+              "sha256": "7f2838ab179a489769891e8cedd69f00c5449b70e9711eb6c77ebfc7f3a395d1"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ui.theme.PlotRenderThemeTest.xml",
+              "sha256": "3c8549849badce42f1ade37aced767551a2a1f3654be3a20bbfcba178d4586c5"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowCombinedHistoryHttpAdapterTest.xml",
+              "sha256": "5ee8f9ab529e5ea04d3580a8a930d6a677b061fac8f9d98b9efd4ebaa0c32123"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowEditorHttpAdapterTest.xml",
+              "sha256": "96aaffb99679a142bdaa07fbf93fc57692cdcc519e6871048e926ab0fae34a6a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowHistoryCommandHttpAdapterTest.xml",
+              "sha256": "d72103953a7f1c8cbb4e3f3280a2bc961fc451569225ea7eb6b4c7e58a2b2534"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowHistoryFieldChangeHttpAdapterTest.xml",
+              "sha256": "b8c98dca8179ecdc242fef2d33550baf8a197d337e7dd634df1f14528b188bf8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowHistoryIndexHttpAdapterTest.xml",
+              "sha256": "3b6eaa0cc47be347edaccff09653d5fed10f9c72c2e9a55dfd41ab775ed59d01"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowMergeHttpAdapterTest.xml",
+              "sha256": "6e82ef8b83864ab58d05841238b128df45b74fbf8157982978ccb58712796d50"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSemanticHistoryHttpAdapterTest.xml",
+              "sha256": "6df6c12dac2f15af89d55db95bb04bdbb4f19939adbac54eef1d745a72eb103c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionEventHttpAdapterTest.xml",
+              "sha256": "7d3235596b2b483f4cf8a847d6bb989f9f3ee7b7849ada9a3feb6f4918b08952"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionHistoryHttpAdapterTest.xml",
+              "sha256": "41d49420b0e9d74b6818b6acdc06997250de51e0bea9eaa08cf0204254a98c1d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionHttpAdapterTest.xml",
+              "sha256": "e1ad0465a0be37c2c8fc00b14a563bcbc84183c11fe1ba40d96d0d160c6d54cd"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionUndoHttpAdapterTest.xml",
+              "sha256": "6011ab7a2d58726f0d3da9b63d429c6dd4d595dcbb30aab3ccdf040a2851da77"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.WorkflowRunArchitectureTest.xml",
+              "sha256": "3f362cecda0a464a7731f9fc42b8ee59622a9fb77b07e77f5640e35b009c36d8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.http.WorkflowRunHttpAdapterTest.xml",
+              "sha256": "130b725e4822f8da3aaa3673b3466e8a61eafbcbbcbe2c9f87638b84997585f6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.docs.DocumentationLinkTest.xml",
+              "sha256": "ecd47fc44bf311256768a3bb3c3659508b30dca1b4b6906c8bf96233354a098d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-app/target/surefire-reports/TEST-org.hammer.tools.DocImageRendererTest.xml",
+              "sha256": "7ca293789c23c0c4305008db795d33152a667008ae86a3a18ff958873a93fb12"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.buffer.AudioRingBufferTest.xml",
+              "sha256": "e05db4ce47513011d89b2b8b0edee5cd6c570e22cf892d74a9f027113710b0a2"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.core.AudioBlockTest.xml",
+              "sha256": "f78b0db7c1fe902f39d200b491b6db0e5cc52a509eb80547253ca0d84aa528b5"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.core.AudioFormatDescriptorTest.xml",
+              "sha256": "f5cef1ac943968287ad077ee8f58d9fd88b16dbeb1e8cd535b267d44ccb6cbe3"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.MetadataTest.xml",
+              "sha256": "4616959092506cee55c42a45b2e68728a89a0786408bda87c307db45d041f45d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.StableIdsTest.xml",
+              "sha256": "13bcb4f705178208037c444d28072108e167f642d147de7f3f7c2fa2d729e15e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.WorkflowOperationLogTest.xml",
+              "sha256": "e4d0da2981eddb6098b5701e06ba1ae61233b8ed6db931371d2048b11ff08de4"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.WorkflowSerializationTest.xml",
+              "sha256": "0a84c08c643ea2f9aa1943b25bcbd9e24604c13abf35875c68327df072864239"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.WorkflowValidatorTest.xml",
+              "sha256": "b1a6a5db43bb9242c275bb47aa08dacc356b693af6e72c4b47c204c22da6699a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentMetadataKeysTest.xml",
+              "sha256": "55329f4ffb56ef71751dabed1d8febab83fa031e775a8895dd0344c2e2a07ff8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentNodeCatalogTest.xml",
+              "sha256": "886f81cf194b320f62e844403f436433d8da357abf6da33fa583ade7383db53d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentNodeParametersTest.xml",
+              "sha256": "c8e842d13443a97c9323ae171d77fdacc5a2063c4f7c8e49887f5acb0174a707"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentNodeProtocolTest.xml",
+              "sha256": "0de4dfc4429ae9ca191c96d5a3adb75d133b918348902ebb8bc15e1a9f87bfe8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.CollaborativeWorkflowSessionServiceTest.xml",
+              "sha256": "82404b8cf177a7ec2f2e19604da0d46e44398d15232d84612c1d74bb1fe61a60"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowHistoryCapabilityRevisionTest.xml",
+              "sha256": "b447c9a8fc1bdc1b51a35c4bf19e459efdfde32fef658b90c95154233e3b4a00"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionCommandIdOwnershipTest.xml",
+              "sha256": "7b55fce0d004a3514f5b9e15ff04085a9c833e26cdde533a91397b7fa2d43ef8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionEventHubTest.xml",
+              "sha256": "ddf1c4b09f2292d4327de0eeb4b53567fee49fdf53661d4bc5a731c93a8d9d98"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionHistoryCapabilitiesTest.xml",
+              "sha256": "64aa0bc3df5c1020002f0349b1a5c2ef5c3b7d024473e852f7560f4d15ba9347"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionLegacyHistoryTest.xml",
+              "sha256": "aa79a39bd9a9477f5cdff82a0522f7b7426477ed428aa08eaa85798e71ed7a8c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionRegistryTest.xml",
+              "sha256": "0be737205f0c17946f6f0a2f9024b001e5fa8f02afbb90bcc0c74d6fc50e17f8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionSameActorUndoConflictTest.xml",
+              "sha256": "426fccac6ce497717cb3f33826b4b981d77c95e693bc3b27f13fe97bc6c1b15b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionUndoConcurrencyTest.xml",
+              "sha256": "2630f22e94d2df12989c00813c32341ab515b1ae9d8dfb8213b39fc165dd0926"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionUndoRedoTest.xml",
+              "sha256": "b273d0d5d30f9bfa7f1b52342a2cca63038e43832f520d60b51b14bd55fc1920"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.outbox.WorkflowOutboxBackoffPolicyTest.xml",
+              "sha256": "9a66c03a9ed814bd830e9d2d2ac57b5eb25cc1971d3f01f3f71d41d9930bcc3b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.retention.WorkflowOutboxRetentionServiceTest.xml",
+              "sha256": "887b96e6b3286a65e9ff9dddcba1e21dbd2b7b6f3dbbb8536bfd9b40dcd3920e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowOperationBodyCodecMalformedTest.xml",
+              "sha256": "53852683c343b385bdfbfd480dfb9160ad1f9c90563634ce49cb40f8bcbc26d4"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowOperationBodyCodecTest.xml",
+              "sha256": "932a857dc6e78ad27457ae3aaf85cd5b58bfffd366dc593c0397a9268ac28dc7"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowOperationPersistenceCodecLegacyTest.xml",
+              "sha256": "36407f2fc2924f01bdbc8e644e3a2a4e11219dc6ded7aa055731174c8d994de5"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowSessionPersistenceModelTest.xml",
+              "sha256": "a431bf6ed0bbdaa2b755c9d80540572054a2056d5338face8bd1addc1836ed23"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowSessionSequenceModelTest.xml",
+              "sha256": "077f81d199097076839154bcb9326794cd8934235a6c79be9f922ea0bb9b057d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.dsl.WorkflowDslSerializerTest.xml",
+              "sha256": "1206cb67e2c513ac53aeee628dd75886a09e4f047628212b574b8ed8d1b03dd6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.WorkflowEditorDirtyStateTest.xml",
+              "sha256": "0e0c40a9b86312a74a90a4411e6b35705b14249fa1327af7b6f7e2145c39bc30"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.WorkflowEditorServiceTest.xml",
+              "sha256": "52f16018109e0b24c818b7142c46f6747377c0e97573047580041eedacc8b666"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.glsp.GlspWorkflowAdapterTest.xml",
+              "sha256": "df83fa4a6964a9cbc55068e278c4555fa6eb5898b157f069b2b0cc76ab72ee46"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionContextTest.xml",
+              "sha256": "82ea3e91b34159f5b1f48b2040f9795301cf9d3e27f37ac2d2559d54923b809a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionPlanTest.xml",
+              "sha256": "570f6fe3955c39c82859de49fb9202f2da1b1f777c1a4c904b59bfa92022ba29"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionResultTest.xml",
+              "sha256": "828dd341df814dd6bb89525f49e478691bf125b48b967cecd379e284da2e5777"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionSnapshotTest.xml",
+              "sha256": "ce60769a363f92301195c3f6fc3c952e6b42083a5e3746bae696908c7710bf8a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ReproducibilityBundleTest.xml",
+              "sha256": "f53faf2813e8d9034364990327c8e99e88bd914dd4ebb465716efdd1491afa28"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.SnapshotExecutionServiceTest.xml",
+              "sha256": "3e46b562953ae141c2d358ea969597b64e8c03add1841be808411f159c504e05"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.WorkflowRunServiceTest.xml",
+              "sha256": "3d1a94982d002aee22f0ec4003a5c40c30ee9affb4a2655b4e75487e90431ace"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.MergeConflictReportTest.xml",
+              "sha256": "c761610db293f1d224cad39b067282fe76cf6441cb8875ad605b18a06d38ed12"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowCombinedHistoryQueryTest.xml",
+              "sha256": "1e00f502899ed6c7a82ef70309cfc95b05efd3530b167f0ed6ec8f82cc7a7237"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowDiffCompleteSemanticTest.xml",
+              "sha256": "271484a3fc2fd25f24816fd68756a74ceaaf47fcc480841091d4e8e5e42f5a78"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowDiffTest.xml",
+              "sha256": "d70d2d572678e2b8abfecc43f16c4af73c6f07e49bb33cf7c216916355cd4c9e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowHistoryCommandServiceTest.xml",
+              "sha256": "f35cb804ae016fbe6710ec11bdf37e7183840b3f893a5f84369c5e8424ec6178"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowHistorySearchTest.xml",
+              "sha256": "931768e3fe8d40b882a1366457a1a96a660846424d3128772e2df64aa3e84238"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowHistoryTextQueryTest.xml",
+              "sha256": "6b54a3811a8c4c4e7dcc11ec9e23cae0b7ba47cf2f62c86c3094db20eca7b1ad"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowMergeCommandServiceTest.xml",
+              "sha256": "051b5d61505b9d95cf6755d7e97aedce48b797e17f04c6904ac1de97dd4671cc"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowSemanticHistoryQueryTest.xml",
+              "sha256": "5c9c131c049d357b137d422d672092bd137cd01bf495a0eedfcb9911312720a9"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.merge.WorkflowThreeWayMergerTest.xml",
+              "sha256": "3136d50b3acf6724d94a953b75a2235a2fffaa7e56a11a9222d4cb91033be92e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.store.InMemoryVersionedWorkflowStoreContractTest.xml",
+              "sha256": "361efe31f76056b3a18984bd26c62113a9a74ca9ab5884a5d4348a7f1c829ccb"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.store.WorkflowStoreRoundTripTest.xml",
+              "sha256": "631e1d04d5ebe03ce88331f9b06c1b5a98d5e29a1b4c8f843656c8f1818da30e"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.FftTest.xml",
+              "sha256": "f5c1982706f4ef4d5042700b9f66eb37cded83ec08b6b6f9873caff62d3fbeba"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.MeasurementCalculatorTest.xml",
+              "sha256": "7fbd5b0b465de46b06147cc353821f5d2937bc87eb48a53926b5f97444a4d6f0"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.PeakHoldSpectrumTest.xml",
+              "sha256": "a97a0a5e6ff2cb9b945483e9549699fe95a2072744a45c88a1aa4f0560463335"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.RmsPeakAnalyzerTest.xml",
+              "sha256": "063f9a81d135fa54ca6186cf171123e7862ac0b5844b52384cd6911fa1d71c51"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.SpectrumAnalyzerTest.xml",
+              "sha256": "2ac15788fa81f69178c814ade9667cdd1d2563d6b70d914bdcbde17fe78e1d4c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.WaveformTriggerTest.xml",
+              "sha256": "1c872b48b61a856fcfba69554667a27d561d175bde7e5897ae84ed5fbc10ba00"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.capture.SampleDecoderTest.xml",
+              "sha256": "1d452dc1e4adf52250b3ac6c69538c31a32db3d86f5261065969fb6bc9cd7f66"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.diagnosis.DiagnosisAnalyzerTest.xml",
+              "sha256": "9ddf9fa269ed5d807ebfa07f3b2ec5ad27d8e5d8dfbc40ee4b81d92d7f293958"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.DSPPipelineTest.xml",
+              "sha256": "ed41173c0f8c48bedadc94fdfd9add0d5f223d6cc56fb63df52e7e74e1b06ae7"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.GainProcessorTest.xml",
+              "sha256": "22c5b277c15c49aa8720b16dea792a457932bca03cdef844ba6e2c3ccd7aabf9"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.AudioBlockEvidenceTest.xml",
+              "sha256": "c23eaaeb15fe28b755c56ba67f9a4dc67efe485c6fb31b035c566eaa9f06eaea"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.DeterministicAudioNodeExecutorRegistryTest.xml",
+              "sha256": "8cb4679e2f96ead0d5fd213fc3a362061ca9c0a30906e1307d2a645fb09662e5"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.DeterministicAudioParametersTest.xml",
+              "sha256": "d89ebe2bcf4da1761da31c7185c6c836b6e3a77d3e425ffef93df6a5b9fec7b0"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.DeterministicAudioWorkflowExecutionBackendTest.xml",
+              "sha256": "ed434a222b83ef85acad83e757cd59ea324af5fc96acecd26e9e129d9205baf0"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.localization.StereoDelayAnalyzerTest.xml",
+              "sha256": "a8c9048e8e49bda6c6845cd7cb1a0cdef8325966bf5007ab9c3f291fb7c85910"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.recording.AudioBlockRecordingRoundTripTest.xml",
+              "sha256": "7ce1a0de3ae45aa7cc23dc7350a6566a21330ecb2dd4bc76d3887f1a98ff7b58"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.signal.SignalGeneratorTest.xml",
+              "sha256": "57edccda1285d247c16d6f6d2b1dad7e00a29228ff51dbe6457858b7a7901563"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.signal.SineGeneratorTest.xml",
+              "sha256": "1743af2e9f46efe8648cdf91cbfe65b38b9cabaa3e76860c860853f061c43851"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.spectrogram.SpectrogramHistoryTest.xml",
+              "sha256": "fa1c0557ee43bb832567ba096e4b8ac0f73b53d7bdaa271fcd4d98121eae15fb"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentCodecTest.xml",
+              "sha256": "04b90bfafa01498d29bedcb9a54ccaf7e868ab46deaf4df5faa081851ce64aa0"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentFixtureTest.xml",
+              "sha256": "35305cd42ef56c53eb3bdd046464a559b8eee89c67a17d4993994871bba4d44c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentSecurityTest.xml",
+              "sha256": "12fd0806efb20fd07c2de4d5e85a7bc037ec11364916c1217dc8a09eadc46835"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentServiceTest.xml",
+              "sha256": "f17a5f20a72cc2bdbf561bf207587492d581722a54f2adaa99fdcd6e1e6c28c2"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentLocalBindingServiceTest.xml",
+              "sha256": "bad2805a6bc149f1cc3d3d5b63e520103d4fa9a8d53270132bbcfb9f7fb43e69"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.AdaptiveBeamformingSearchTest.xml",
+              "sha256": "e02bc98985abe24a82771236263de12bb930bd5c3c21522e9bba361964c74237"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.CalibratedTdoaEstimatorTest.xml",
+              "sha256": "9ca4e2b08edce20c3fbdcccbd813675866989c34593cc49d0093fb8cb6db6bdb"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.CrossCorrelationTdoaEstimatorTest.xml",
+              "sha256": "5a9cca773a8ca1bda2224a3b1bf7f11cb8e5bd205d038543b338c5b41829c10a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.GccPhatTdoaEstimatorTest.xml",
+              "sha256": "1a98f7225550a2f61246127598fd675fbdd3aa9e0f84f7a0eb1cb9a94424012f"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.MosquitoLocalizationPipelineTest.xml",
+              "sha256": "d300ffdc310f4990a55371ad6ee1b0667da33314bd07d7fbc8e2bbd246b6bedc"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.SubSampleGccPhatTdoaEstimatorTest.xml",
+              "sha256": "1c85997d1c9f30a82945cb30943bb8784df52f499648eef18f18c81378606610"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.TdoaPairConsistencyAnalyzerTest.xml",
+              "sha256": "c960f1dd03d334baf639755dc2692c35c443483a4fb8d45bf0811adb8caecce8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.WingbeatFrequencyTrackerTest.xml",
+              "sha256": "dff0be9c51b65cf6108f163c5cdecb78ad6a6e2328b3e18acecb9e99cb0c9929"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.benchmark.TrackingBenchmarkComparatorTest.xml",
+              "sha256": "42d287ab582b24e934468c5c47885036eca1769ffac996ca9c4902603976e493"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.benchmark.classifier.ClassifierBenchmarkRunnerTest.xml",
+              "sha256": "8c18fc5e1afc30c161bb83ff596b7e3ce1d7324902ddd8f68ea8f6ced8f70b22"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.benchmark.localization.LocalizationBenchmarkRunnerTest.xml",
+              "sha256": "98c9d5a89d329f1e5f3a9fc2d488ca6a90daa387d3a45b80a0f3dcb265f96e69"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.calibration.ArrayTimingCalibrationEstimatorTest.xml",
+              "sha256": "1fd52a918928bfbacdeb43103dcdeebb8cc1f1f650a6504cf70bed18a558ceb6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.DatasetAnalyticsTest.xml",
+              "sha256": "83eb085af7800bd63bd916496b0e8581e0be9d83fc4c584a9fb5a40eb698eed8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.DatasetAudioLoaderTest.xml",
+              "sha256": "c304c03a36df9c94a83af31e1bb858168c894071979638145e6fe475b540d2ab"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.DatasetManifestTest.xml",
+              "sha256": "83bc3c26d0ea0174915a9820233d6e3fc06e74a6688fdaef8c453f0604a54d30"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.FeatureHistogramTest.xml",
+              "sha256": "cc059a71c4d0aacb9b2e65a9e261163ddcd7f7dbaf0803d7bb6780f073c6901c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.HumBugDbImporterTest.xml",
+              "sha256": "bd2e7d67daa17e9392fbdf5ccdeb586b5fc09144ee9255d7fb3d514eabee7b59"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.doppler.DopplerEstimatorTest.xml",
+              "sha256": "d5ccc456290685c8f8ab097f889633752b60d5b550b322e21b05719d3ebfb28b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.feature.comparison.SyntheticRealComparisonTest.xml",
+              "sha256": "d3fcd056ec50903b65a10ca03961daf77f9fbb0c9249f35d7b515b79be782a35"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.feature.evaluation.FeatureEvaluationServiceTest.xml",
+              "sha256": "ce4f6e6e7d9f6ae4522c4010516a3c5f040a28cd1449520957700ff2a9fa9ae2"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.feature.ranking.FeatureRankingServiceTest.xml",
+              "sha256": "6ccbc5704b9f61d69ae2d44d2731690afd6522e9d24f769a9dccf589a817e0c1"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.plugin.AcousticLocalizationPluginTest.xml",
+              "sha256": "5ae9fb668208bdb71f019b87c40db06069df9071e15d6687b571785f95078e6d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.scenario.ScenarioModelTest.xml",
+              "sha256": "2cdf06103ab48353c08c5d5c566172bafe49d0f508070881619023e3bc052f24"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.SimulatedMicrophoneArraySourceTest.xml",
+              "sha256": "f3ee77d9afb730b145702210237c3a28f3397e46391773d2e0389ee5d3633df3"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.WingbeatSignalGeneratorTest.xml",
+              "sha256": "0110bff4b0833e4b1ad029b86612fea7135888052685888a2101889cae09126f"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.GeneratorCalibrationServiceTest.xml",
+              "sha256": "1a688e9f6942b83aecd9ec52b24e7504761207020b9f7b703fe435457398ad2a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.GeneratorComparisonReportTest.xml",
+              "sha256": "6bb92ec7c4ad52c752bfd3d0fbf38c3b45443d6172ab399ae5a0288673739ef6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.SyntheticCalibrationAnalysisTest.xml",
+              "sha256": "3d7e27d55136a61781636f1580027016dcf21766377e28356db2d6649a88e977"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.SyntheticParameterEstimatorTest.xml",
+              "sha256": "e837796c7fde7b1317f012a978b6fc04b96d1e3ccfb652f72850e3b03cef58fb"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.FrameScheduleAndBudgetTest.xml",
+              "sha256": "9bbc91a84c4faf42e80af8c8acbdd22b95c75e005db146b4703fc1ddaba9e272"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.FrequencyClustererTest.xml",
+              "sha256": "341e4dee3257e3a35c92375172a9ce519e2211de2ce0db136253d073e629ee4a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.Kalman2DTest.xml",
+              "sha256": "b71f3d2961dcea067cc260a83be742dcb86c52e1efb054e61e2559ca3ae3aa40"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.MultiPeakDetectorTest.xml",
+              "sha256": "9f7db50511652733b3d45c0c4b4ea02e016f5d23ac8521ae32688fb6ebc1f8a8"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.SourceTrackerTest.xml",
+              "sha256": "ca8869fe067e696619c751a2f09aab304c77cc93e350a81fe40d7f9d42193f97"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.TrackingPipelineScenarioTest.xml",
+              "sha256": "bed5946c5895164e3c346945d4e8a29de5d72412b1a46242b84729d0d624d3a6"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.TrackingSnapshotTest.xml",
+              "sha256": "be253ed80904dde7b7e74d5126252c18cc42b012ff40b2f77b7ede91a5c35bfd"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.DatasetWingbeatEvaluationWorkflowTest.xml",
+              "sha256": "e687566bf3f0f40e7bd110cb845bbcbc148d0aaf93aa2eba9dd4dc0f8f3665be"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.FeatureDistributionComparisonTest.xml",
+              "sha256": "bd08506afab178baa4e37f7ed9ca4c707e678474cdae1f8c7bc02fe714117e8a"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.RuleBasedWingbeatClassifierTest.xml",
+              "sha256": "25be3b81a1ffdfd8a89d796da289f037829f000cf79cc412e889a9a205b9316d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatDatasetEvaluationEdgeCasesTest.xml",
+              "sha256": "22a5f20a46e2c00b30121193f64beeaee1865d11cf6259ff828979ba020cdb8d"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatDatasetTest.xml",
+              "sha256": "816fd9b224438d15814af015fb163b9a0eb2e7848feb7c8f32de1600bed9322b"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatFeatureExtractorTest.xml",
+              "sha256": "e8e05997fce15e37a95e1edc34809604d5e4398f26da14551f4840bb08fb2961"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatFeatureVectorTest.xml",
+              "sha256": "fa5f5c5f4ac4ec6bb8ca5c172b1aaad04eb13caa4c0be20cf6a2ee620b2f7b40"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.AcousticLocalizationWorkbenchPanelTest.xml",
+              "sha256": "ddfd46a3957b3aadc0078f1586debb787f7c337e78e039d427ccb254c4117918"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.ImportedRecordingWorkbenchPanelTest.xml",
+              "sha256": "23c8edf399c7a1a1e701086bf7ceff39577eec71da7dc435159ab009c370c2ca"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.PlaybackModelTest.xml",
+              "sha256": "80e48846c72b7d3413fc2864d0a9881adff74e883aa844a7506ea0dabb84b529"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchExperimentExporterTest.xml",
+              "sha256": "ec17d900c09c46dc8222a9888f5554b6d18c3c30829fb085e9d5c8e79530fbdb"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchScenarioRunnerTest.xml",
+              "sha256": "5df58ed18d792d9203be19f5f548fa8a630b21e9739a9fd34eca4e0c1e844665"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchSynchronizationExportTest.xml",
+              "sha256": "81248d72d0f6a6890eb1d13ba1e6de5dc67c0aa38729da1304959a50397f4932"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchTdoaConsistencyExportTest.xml",
+              "sha256": "35193ea0b1bff8008a86a248cefdf3ce8628cff86eb9144dd43067fffcdf757c"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchTdoaEstimatorSelectionTest.xml",
+              "sha256": "37c2cbd9658b743ea23b40128c9c7a781b6873d85f0806bef01b38c59aaa43d1"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-geometry/target/surefire-reports/TEST-org.hammer.audio.geometry.MicrophoneArrayGeometryTest.xml",
+              "sha256": "1027f9d3f6d4e4943a9b3a981449ba14b0b3cb6ac5631a973e277a5a2ea97a86"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-geometry/target/surefire-reports/TEST-org.hammer.audio.geometry.Vector2Test.xml",
+              "sha256": "ddf54867d4f85f4547b36e4f401d6c8d3001a189c58e905e9042514fa7fe9696"
+            },
+            {
+              "path": "contracts/consumer-baseline-audio-analyzer/audio-plugin-api/target/surefire-reports/TEST-org.hammer.audio.plugin.AudioAnalyzerPluginApiTest.xml",
+              "sha256": "4fe27f26b4cf66e1f2a534c511f9dd3fb58cb38d48457ac92b6863114e66b9a7"
+            }
+          ]
+        },
+        "candidate": {
+          "version": "0.12.1-SNAPSHOT",
+          "result": {
+            "consumer": "audio-analyzer",
+            "mode": "candidate",
+            "candidateVersion": "0.12.1-SNAPSHOT",
+            "java": "21",
+            "contract": "audio-app reactor verification, dependency resolution and packaged-runtime leakage check"
+          },
+          "junitReports": 209,
+          "junitTotals": {
+            "tests": 1096,
+            "errors": 0,
+            "failures": 0,
+            "skipped": 0
+          },
+          "junitFiles": [
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-acquisition/target/surefire-reports/TEST-org.hammer.audio.acquisition.MicrophoneArrayCalibrationTest.xml",
+              "sha256": "6d763ecb65ec1cfa06dca786e987aebeb0a08a79877f7eb01095cf5955056721"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-acquisition/target/surefire-reports/TEST-org.hammer.audio.acquisition.MicrophoneArrayProfileWorkflowTest.xml",
+              "sha256": "47caab8733f6473f74b8e1b39c5d2e1b0e9e250505efe0e198fbb5f0ced60aec"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.ExperimentDocumentPreviewFormatterTest.xml",
+              "sha256": "fdf48c2544c8f802c08d8b570245aeac3f898d88cdc794961fe4b309c7f35586"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.ExperimentWorkbenchLauncherTest.xml",
+              "sha256": "41c260b1eb31978f61fdced3e159bb345c8686729100c1497e3a953589dec747"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.GuiSmokeTest.xml",
+              "sha256": "ec7ec7913cec7f2fbef03f1c0335aef5ee494cc45a4c76003ebe905f4953a6ed"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.PhaseDiagramPanelTest.xml",
+              "sha256": "8d68541148ef852884a6c57cbe7c1c89cb7ebc2ccf21b20825420ac8ca0f1abf"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.SpectrumPanelTest.xml",
+              "sha256": "790e92550156299aa3b2ac5d584f2213ad19df283c571e9f9403c1600ed26d4b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.WaveformModelTest.xml",
+              "sha256": "cecdf2d84a74de7de005ba6323c960ba1f981d73aec27177473e6587ebce2f4e"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.WaveformPanelTest.xml",
+              "sha256": "6b72abd55b68a2a7f8131fabffdc47badb795a59ae0c89fa3c3ebd92bba47cb0"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ArchitectureBoundaryTest.xml",
+              "sha256": "a22e88239ac1dab541c1b25bced9a6027f50a6229b28bdd112dea8e41add0f35"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ArchitectureFitnessTest.xml",
+              "sha256": "a80ed33a30f260decc8dfe32d79709ce31b89590f5becceda9c3ef8255ef9645"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplDivisorAndLayoutTest.xml",
+              "sha256": "07b5ec4eae92273b20286de431b63de97557e7bd2568479f73b24802bf447128"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplLifecycleTest.xml",
+              "sha256": "e20d8fb51adb609284429a8806dcb6d5ee70e90cdeda229c6d165eec0d0225b4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplSampleScalingTest.xml",
+              "sha256": "6f70c98da6b3d754d0a2d07bfbbf6f7105655d6cb727f528aae1bf30363931db"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.AudioCaptureServiceImplTest.xml",
+              "sha256": "c81937630ef4bf6c65027198887f4eadcef42e77c242ceb4f2d306ab81e0680d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.DemoAudioCaptureServiceTest.xml",
+              "sha256": "b2e8899f25ecb46426b9b00b95613467783dfd4780611caaf16f90757efe5b45"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.JavaSoundMicrophoneWorkflowTest.xml",
+              "sha256": "a5977f7c417d37b3115f23fd5e46a72e87e5f191e21a5dfcc3716d496d4ba6eb"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RecordedAudioCaptureServiceTest.xml",
+              "sha256": "f14db46c8f61855e2131eb58ed6c55e02ff9caf8b0baace865ed165ab39a87c3"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RecordingPreflightTest.xml",
+              "sha256": "bcf5abf243ef24cc09bc7111780347e5f0441c4de1a54e4c6704d054c07d9d33"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RecordingTapPipelineTest.xml",
+              "sha256": "0badda7154eeea3038ad0022a48b9e05b16fceb9b8e5b0b7e2436cf93c06b10b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.RegularJGitStoragePrototypeTest.xml",
+              "sha256": "aa7073b25ff8e140dfa9ca824ca21040ff8bab0cb97a3c679b980ef25de0c3c1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.ProductionFrontendPackagingTest.xml",
+              "sha256": "51717e78aa357edf5857aa6bca1d41f820b4295130651e85b579012f366c920f"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkbenchConfigurationCollaborationTest.xml",
+              "sha256": "a9efd576a2a30f828044ed20111e3da2b861f850cfa3c4a9b67a381ed7aefccd"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkbenchSpaControllerTest.xml",
+              "sha256": "604c7e3b40e7447352e14dd0dc6116cfd73e99872caac91cc416446f64645c77"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowOutboxDispatchConfigurationTest.xml",
+              "sha256": "7a8fc2f5dad115d59d4d3c752cd2b749f2701caf76693364a3a2a600908f3202"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowOutboxRetentionConfigurationTest.xml",
+              "sha256": "c1be7255f704ea34ff19914ea1ca525dbb54bb05eaf26d77c9c20ad43e84116e"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowPersistenceConfigurationTest.xml",
+              "sha256": "8042882ee0ec155c525facbf80277aa600c49980260fd60d0291028b5639ced4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowRunConfigurationTest.xml",
+              "sha256": "b40a3979384317b14d39544760b8144ad0888af7a239415ab60c75581a84cecf"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.app.WorkflowSchemaMigrationConfigurationTest.xml",
+              "sha256": "ad6974cbdb4e8e9ae8128ab672e136f55944ff520eb8f87bba265946fee45917"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.compare.RecordingComparatorTest.xml",
+              "sha256": "12bb81669836ce93c60a419269a1dd5cb4a51e9914ea1b8465ee62d355ac47a5"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.experiment.document.http.ExperimentDocumentApplyHttpAdapterTest.xml",
+              "sha256": "36d26a9cccaf75fbd38ae10e3105da56742f025b9d1f08d88cf85fbf84d46bd4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.experiment.document.http.ExperimentDocumentHttpAdapterTest.xml",
+              "sha256": "ec410f97ec45f4d78387de67bba767da4ab627e5b3f7ad46f090a6b835507a37"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.experiment.document.workspace.ExperimentDocumentWorkspaceServiceTest.xml",
+              "sha256": "d7cfaf28b5d84f73ec3a521f8e59e8a28749800c15777e0c7a69007c96205cbb"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.export.EvidenceBundleExporterTest.xml",
+              "sha256": "fd5110a3afb5f5684ad17732228a0558ea70ba3ecc64f0e2ebd66ec110734d3f"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.export.ReproducibilityBundleExporterTest.xml",
+              "sha256": "9da9ff43fd2d1405bf6e1386827b01b688f1cd9aab3757cc557fe36db3a3d155"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.schema.WorkflowSearchSchemaMigrationTest.xml",
+              "sha256": "cc3b9bae5ade7d0fb39cc6843cb73742dd90ef56aa1c9ff35e6779b98575e722"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.CollaborationPostgreSqlSchemaMigrationIntegrationTest.xml",
+              "sha256": "ccf1edf251539b64019e5e36121db1e94ed4df88ddc8f1c38343d4f8c419f83a"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.CollaborationSchemaMigrationIntegrationTest.xml",
+              "sha256": "2bfee0341541a72a35853e20805e9e70ae85fd907e2fe5dbfc3d941352a62499"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowHistoryRecoveryTest.xml",
+              "sha256": "fe44027590a61c2a761081e8596a7d4f1527bb68e6851ac18f38cf511c140b33"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOperationBodyStoreTest.xml",
+              "sha256": "1a0e290ba94e1147587010f6bcb5f55c27c37d9918203f7055d701eb3abbce56"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxDispatcherTest.xml",
+              "sha256": "5e7c55030e21e11736c40b5f7c03ed1244f3ab61db3920190089395950d72cc5"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxRestartTest.xml",
+              "sha256": "afb6a9eee7d8343dfc90acc4812bdadbc3a821496fe9870422fd73ebc44ba2ed"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxRetentionPostgreSqlTest.xml",
+              "sha256": "649eeb9624dc75b24ae1bfae22b63f637535adb08ba0e0d36261d70b6fed6723"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxRetentionStoreTest.xml",
+              "sha256": "815b246b061334a46160362ca16f1f13f16245852fcc3b5f635a59452deac058"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowOutboxStoreTest.xml",
+              "sha256": "646662fccf1764a93588e0e5e5c5aefd7d52dace65fb8de4ddd00589621b20a3"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionLifecycleStoreTest.xml",
+              "sha256": "391b8ed69deb99a34742d1af32cc0f7078e64876bbe203f8ebd0446797f0822b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionRecoveryTest.xml",
+              "sha256": "586d3fefd911767b43afdfc3fbd2e2c6d76f623aad22feede0267a4955479920"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionStateStorePostgreSqlConcurrencyTest.xml",
+              "sha256": "26083f2c99a63bf3da0ec43ea613bad091f6a8ce2920fa80d799bd1c8ac09055"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowSessionStateStoreTest.xml",
+              "sha256": "d2a5ff17bc24271e992e04b03250d848ed256be819863c076f1d79c6f9b76bcf"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.collaboration.store.HibernateWorkflowUndoRedoRecoveryTest.xml",
+              "sha256": "c6d38cbbcd449f8eff7f3e942ffb8a2f6afafe8ec65aebec867323b3e42b9724"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.history.CollaborationWorkflowHistoryAccessPolicyTest.xml",
+              "sha256": "4ce3e651b9cdb9e99760ad8f3274e4d13ffd0ffd8ef87d013fa1300b28ac79a7"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.search.WorkflowPostgreSqlProjectionRebuildIntegrationTest.xml",
+              "sha256": "8f6352ab0070e0fe5b46a9d6d4dce5edf5d287c6faae7c15f27b5a3ccb3242b8"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.search.WorkflowSemanticHistoryIndexTest.xml",
+              "sha256": "3709904a79956346c24c2c4daedf47c70f5ce780ae198e5bc8681ad6c2c04f0c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.search.WorkflowSemanticProjectionValuesTest.xml",
+              "sha256": "a0f15eef950ccd0df5a94943e4578699a0995951673213728297419fff976dc0"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.ConditionalJGitWorkflowCommitTest.xml",
+              "sha256": "e92308f71901d5b5d9c20f5c15c51c1ae4c365a4dce7384144d3513d85836cad"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.FileSystemJGitVersionedWorkflowStoreTest.xml",
+              "sha256": "c8397ddceab07a158784ca9e29e200b637c3b220e62b6c1dd99338d784145528"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateDeterministicWorkflowRunIntegrationTest.xml",
+              "sha256": "1a3a362a267efca58ea44323dccf0110fedbbf78d7b8889c307bcc33bb04d48c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateJGitVersionedWorkflowStoreTest.xml",
+              "sha256": "19e66d63f568d3ddc48b5ffb80bb6140b62806b61f78098bd533352fc878c58c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateWorkflowCombinedHistorySearchTest.xml",
+              "sha256": "ed56d456ad5ed67597312747d9d2a00c4f6ac63c25de2c9a86adb2b855cea164"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateWorkflowHistoryIndexTest.xml",
+              "sha256": "7c415b5d3969672790689cec03bd747c449aaab5a461cabdc93a4f060e70c2bc"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.infrastructure.workflow.store.HibernateWorkflowMergeIntegrationTest.xml",
+              "sha256": "1eb2e07335aed90dca7501bb42357fc45bc98bf04ae8b10e782b3c6d84adf15f"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.pluginhost.PluginManagerTest.xml",
+              "sha256": "76e6b5e951ed55dfbadc9c7b80b7a72b7fabc37ab1e4276176d2a13f150245d8"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ui.WaveformRendererTest.xml",
+              "sha256": "5dade79ab970075cbc4e8a328bba972f27c04f590160ad6856836beb1b2b0325"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.ui.theme.PlotRenderThemeTest.xml",
+              "sha256": "ee6ce0c3534d621a037ce59177ed150a78f0be7d9574dc137b5a89896a021410"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowCombinedHistoryHttpAdapterTest.xml",
+              "sha256": "59813e4b8ee87888e8e461f0402a4810cf6e9566b0ff0769e4ceef39f0c5769d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowEditorHttpAdapterTest.xml",
+              "sha256": "d9980f24ea50f6a9fc75f30b2898b070b403f2fdb9ce6dc7d4b2330ecda76ecd"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowHistoryCommandHttpAdapterTest.xml",
+              "sha256": "27658d1b39691a4e99e10273078f32e1456bce8c22d9913ef07272c2a6a7b750"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowHistoryFieldChangeHttpAdapterTest.xml",
+              "sha256": "0d01ff550734753a46b1a6571fa9ad7e74684cbd9d9154979f51b114fe30ba72"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowHistoryIndexHttpAdapterTest.xml",
+              "sha256": "46113abaa945e144c384e346dbb818fe2386e95f7e18a8dbdc8f3e5f08089825"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowMergeHttpAdapterTest.xml",
+              "sha256": "a018d170782d5df4ed6d86a3d84407691f595ca49d00d4294e78bd6e7dfc4d3f"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSemanticHistoryHttpAdapterTest.xml",
+              "sha256": "f362f6dd26e15e27f52316b165f267356f0251d31ad477eb5d31d8fb589c2f55"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionEventHttpAdapterTest.xml",
+              "sha256": "1544c6d7074b3e7d497d68993ab8119dab64fa47b4dd86e32b5c3d070b2c2e79"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionHistoryHttpAdapterTest.xml",
+              "sha256": "85ccf10db18907b87f3c3255bb9a48ebd545d065cb1a86a889720275a9c6f9db"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionHttpAdapterTest.xml",
+              "sha256": "6e2530ed3cbf40ea11e5299fb066b51c3aff86ba006189d188e229fe73b48261"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.http.WorkflowSessionUndoHttpAdapterTest.xml",
+              "sha256": "b27988ad2383c8f566b142b31a10b8287bf7a0d8730a5d9b29d764c07cad55cb"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.WorkflowRunArchitectureTest.xml",
+              "sha256": "45c6648ae6c4ff200159f5fa92fd527dcb0c90acc336009938450818c80bf83d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.http.WorkflowRunHttpAdapterTest.xml",
+              "sha256": "a7477a0aaecb4f6d8a7c2b2c06a68fcf11d7b6f452acaf6600c940856dfe8d56"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.docs.DocumentationLinkTest.xml",
+              "sha256": "2d159db7910d4e4b6cfb349e33f2d74086ed3611f7257643f8756b0bd677dbe5"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-app/target/surefire-reports/TEST-org.hammer.tools.DocImageRendererTest.xml",
+              "sha256": "4dd936a78f23530d3f51de9044c24a6c048620cf6570af384b937de03eb980f9"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.buffer.AudioRingBufferTest.xml",
+              "sha256": "affdee350a92ee8bcb94623d7ad116f719e5c015441975f1c5e6f43cb2d0e5ed"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.core.AudioBlockTest.xml",
+              "sha256": "20dbaaa071940da7b8474c71b02b0d3594db9a8eb1db1269b1521af3bb5603dc"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.core.AudioFormatDescriptorTest.xml",
+              "sha256": "f31bcb0d2eef0392346c63c4ea2c1fed3056d2414e9a5a661e86f6d5d71efeb1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.MetadataTest.xml",
+              "sha256": "1d15803f579a0574688b29fb94e7fbf141c7e76aa2cfe2b02cbcdd9c7ef7cecc"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.StableIdsTest.xml",
+              "sha256": "97e36229ed549a4f50098ec4da96e6f24973cd37e3afd8edafd9af1dc4ca3048"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.WorkflowOperationLogTest.xml",
+              "sha256": "9e2c567ccafafad99ac994c8852f2581e7545234f7710e709cce34a0b41be779"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.WorkflowSerializationTest.xml",
+              "sha256": "a707d43513a445255fcec65c07102d1b16ec90aeb339627767165c7d0cd2982f"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.WorkflowValidatorTest.xml",
+              "sha256": "f2a848b6d5501104309c08a4ac7b27e38c67795940fd776c8dda010b36880080"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentMetadataKeysTest.xml",
+              "sha256": "18ac0f27a83487f1ccbe45e3e9dfa99c1ab15b0c23d70c2a61dec25ff1fc1681"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentNodeCatalogTest.xml",
+              "sha256": "2fd4b8654211f69f3a8af0076f542bb54adfc6bc768d14aab4602daf25fddcd2"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentNodeParametersTest.xml",
+              "sha256": "d92738df036c31e5ed9fdf3914710426ec0941b56ed974ffb41d81e41167b451"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.catalog.ExperimentNodeProtocolTest.xml",
+              "sha256": "101301bd5a61c57280ce7f34e44a68984366a7d6d8504eb00ce3f64d93b28381"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.CollaborativeWorkflowSessionServiceTest.xml",
+              "sha256": "cfbbae317f6335a7db55fdcc09d7820378a62de1c0b76e09df7fad699f1488a4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowHistoryCapabilityRevisionTest.xml",
+              "sha256": "5ab00ab0c814b316a76d58e5c628b4097090305bf5a1d895b90394eb45447f17"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionCommandIdOwnershipTest.xml",
+              "sha256": "cfeaefaa649508f01f75a6a2429910fd177346065b173f6dd455368a5cb4e67e"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionEventHubTest.xml",
+              "sha256": "e3d3b628cc62a12a72f5c3b73287f03dd3d218c6fcb10b3fba3d73627716dd02"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionHistoryCapabilitiesTest.xml",
+              "sha256": "6968d74b4fa3279d409ff9ae982b3a496ef9a0825f93004d1a0aa0caddb0ef95"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionLegacyHistoryTest.xml",
+              "sha256": "df819cf49cab2772a7d6c1620aa36114c3b78622868b75c831fb37fc15eef8cf"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionRegistryTest.xml",
+              "sha256": "bbd8c67aa3d677556902c3c0e7725645e007aa98512b7102c4f3fad7e01baa41"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionSameActorUndoConflictTest.xml",
+              "sha256": "5e8f78e40842eab9c2f5e7f3519707c567efed0eddc2ebeb1659894ce8bad44d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionUndoConcurrencyTest.xml",
+              "sha256": "cb89596c0fd955e80ef8e98bf6fa6f1db2565c9d2907fbb8418bfb0eff0cd08f"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.WorkflowSessionUndoRedoTest.xml",
+              "sha256": "a89001d782460db7f5c00422d6890d481723ca156fce18959ec6b623f3c27fab"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.outbox.WorkflowOutboxBackoffPolicyTest.xml",
+              "sha256": "7fd8a80e39654b37ed8ada532454e85a2703d5c4b5a47310adabe5cc099de3e8"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.retention.WorkflowOutboxRetentionServiceTest.xml",
+              "sha256": "a7875cecf8660f3852dcdf8ba91e9c3b60f32ffbffaa4e32987415cab867de5e"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowOperationBodyCodecMalformedTest.xml",
+              "sha256": "7a0f33f74b9168c0afdc4b880fbe6ef1bd209e9e492427765b77dc5e9824358e"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowOperationBodyCodecTest.xml",
+              "sha256": "1bab5c653b98026a25172d7b88a427a1492f8e807bfeabdd73bd41361c2531ad"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowOperationPersistenceCodecLegacyTest.xml",
+              "sha256": "fbfa44db9580b222676a3b6ccccebc6c8b321252a06554ee4823b9fa2e7ac37a"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowSessionPersistenceModelTest.xml",
+              "sha256": "dcc6550670bf494a56667fde68297d64cc0903363a35148e6bdb8ff5436aa898"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.collaboration.store.WorkflowSessionSequenceModelTest.xml",
+              "sha256": "bd7e1f62cb6631f5d701c0c73f5cc1c42f188104ec9b70ce2cf3a9a9d4d52a9c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.dsl.WorkflowDslSerializerTest.xml",
+              "sha256": "5b0ad01c31e13fbae8569e6e7b3bbca4bd9a3ab5d8f2d9481aa93b8198dd3a5d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.WorkflowEditorDirtyStateTest.xml",
+              "sha256": "a86a8500fbf9870af86441098573a153faf4a74ec05d086262bf049c3e9625c1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.WorkflowEditorServiceTest.xml",
+              "sha256": "9d46a14ff2127037a45366059fcc356526d3b6fcc4cb2cea8290fd4f845a1706"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.editor.glsp.GlspWorkflowAdapterTest.xml",
+              "sha256": "893eb22f56dce0242096310918adbe52acf6fe721a14c7266861c19a88c91839"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionContextTest.xml",
+              "sha256": "5826e6902e39b50c92eb461d406bdc3a9e858053731acf6c647e83f4d8931321"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionPlanTest.xml",
+              "sha256": "1e34e6d56dcf6e15b21435bb51e3125cbe7b25c376d66a32a2d6ee851acf0f11"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionResultTest.xml",
+              "sha256": "b57bc79034108cadc934e61667c051fb3210e4d90cbdc64b0dcc6e5de635d260"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ExecutionSnapshotTest.xml",
+              "sha256": "564dc000074f2fbde3dbb92fc60dd9b0f4ce5fce4959309fa1907c3ceced4b6c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.ReproducibilityBundleTest.xml",
+              "sha256": "d6dd64b187e88531f2ed2c534d48e305dc8575da30f815602628db69be8680c9"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.SnapshotExecutionServiceTest.xml",
+              "sha256": "385cd778f98382c8729555057ca9d42cb119ddfafa253bdf0c680c1574de9613"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.execution.WorkflowRunServiceTest.xml",
+              "sha256": "2fdd10414f3064017a0d273ece789f9d7cdaf45a796d84f4d968c7b9a7747166"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.MergeConflictReportTest.xml",
+              "sha256": "789fea00f964e988367bcd3469ff08ddecf15004c3a4218554e0415548aa20c4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowCombinedHistoryQueryTest.xml",
+              "sha256": "543552f0fa15409b4ff406caf8f5d962d8e8ac387bf67454577044c6cabc22a1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowDiffCompleteSemanticTest.xml",
+              "sha256": "5bb750760881f3b8b9ed8bf5ca699aa61ed9513b673c8cd95e98debe8b217662"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowDiffTest.xml",
+              "sha256": "f761f61b23dd95187558493b4851618659bf65c7a86a830bb7bfe566a3fcad4c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowHistoryCommandServiceTest.xml",
+              "sha256": "7b75708603dfe4c85c1b832ed2258e51bd9459704155a3b8bfd01b11de8c55e0"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowHistorySearchTest.xml",
+              "sha256": "0262195e7e30eb7fc2703bf776a73e7666e68af5cbd2c123a2403ddb8db752fa"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowHistoryTextQueryTest.xml",
+              "sha256": "bb249ae94349f6ed34a416ed0c15b092865cd21f091a9939da0226ff214eb7b5"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowMergeCommandServiceTest.xml",
+              "sha256": "93a6c98ae7a759606748f43a2e1d6562a5c1dfe6f3c07e4d9201a602187eac39"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.history.WorkflowSemanticHistoryQueryTest.xml",
+              "sha256": "be979d49a9498e595cc093acb0381252ae28ba8c218e1c4ca06acaa499a883b1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.merge.WorkflowThreeWayMergerTest.xml",
+              "sha256": "9c4e8250af7ddc6944085eface46e6ff13f288567ad32e5be91ffc2306feb71b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.store.InMemoryVersionedWorkflowStoreContractTest.xml",
+              "sha256": "69142e48a93f82b2b09150fcfb52210c744722cc74d33adcb0d6e62835a891e6"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-core/target/surefire-reports/TEST-org.hammer.audio.workflow.store.WorkflowStoreRoundTripTest.xml",
+              "sha256": "18f003f90208536ce777d3e73118cf0ff9f501295fe51d97fc807e9d1b6c28d8"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.FftTest.xml",
+              "sha256": "c8f90f39da9ed9bb0e1adfa88666ccb4a67c7a6bb271f67c7318b120f73ec1f3"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.MeasurementCalculatorTest.xml",
+              "sha256": "2321dddc4c4cd7d7b20773805ce54089d42d09c51e369e6783e24bdbb0ba7bcb"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.PeakHoldSpectrumTest.xml",
+              "sha256": "f9527fb0f89d7281e962870ff53bc38024b5ff59c9d0a41d063bd559020215ac"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.RmsPeakAnalyzerTest.xml",
+              "sha256": "6785517a4611e0bbd6943c32338708fa9f45f2ab83a48e8a2976c45d3e734c4c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.SpectrumAnalyzerTest.xml",
+              "sha256": "562de903448575becf3fb33ed695de9e538f276f40b67934b2d66c7169f3f3ae"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.analysis.WaveformTriggerTest.xml",
+              "sha256": "949979c93746e6db3f9514edde778479860c321c17e82855a7d7c53141481d1d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.capture.SampleDecoderTest.xml",
+              "sha256": "3ce1fc85aa6d10d73ba38ab8f142f1bea49ce1f1406d9d25d11d17c7d8aebbc6"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.diagnosis.DiagnosisAnalyzerTest.xml",
+              "sha256": "7ef9342aaf3e898e3beeae6eb78ea45b50d030e9dbdfeaa4fef228ffb97216de"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.DSPPipelineTest.xml",
+              "sha256": "36bdb4ac45f8152c514a61c5560fbdcdb78d3487a9ba6cfed1afcee45d77eab6"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.GainProcessorTest.xml",
+              "sha256": "753842407c4b0adeee0727e66d5668fdbc876150c286ca0247074de8643287b1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.AudioBlockEvidenceTest.xml",
+              "sha256": "5e9dfa10fbdd423eccd366559f6957f0f37536a8208f90fca527479c80c9ed88"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.DeterministicAudioNodeExecutorRegistryTest.xml",
+              "sha256": "ba74d64bbdca2041d3691e1c87605c5aa6d7172559d20f1108464c8ced8a0d00"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.DeterministicAudioParametersTest.xml",
+              "sha256": "11edacb4dda9a17d5cd093dcc846919cf124cdec2e4dbd1030844ced9926e6ee"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.dsp.workflow.DeterministicAudioWorkflowExecutionBackendTest.xml",
+              "sha256": "ed5465fa8257c38844123d6abd870b4b709319688ad30bab2efa55bdfad025f8"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.localization.StereoDelayAnalyzerTest.xml",
+              "sha256": "d01a5ac82f5760f2b7f95b783b973841291b70181b332d35f301ce4d3da4c39d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.recording.AudioBlockRecordingRoundTripTest.xml",
+              "sha256": "eb873c50f57965d34193c7ed1fc0adaf30decd9ba6a8b5c804334c09be55e083"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.signal.SignalGeneratorTest.xml",
+              "sha256": "f9dee896ab50ac993342b34604f18a1c72c0cd125048c1c06f91150274545870"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.signal.SineGeneratorTest.xml",
+              "sha256": "573324066d6f7d877cb81844f5195f01b0d187a9f2573866dd3734e227eedee4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-dsp/target/surefire-reports/TEST-org.hammer.audio.spectrogram.SpectrogramHistoryTest.xml",
+              "sha256": "2274733b818e1b3a19f7687f38d6b3f1e9c0003eb6cd8af4d6bb6a39f89ed791"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentCodecTest.xml",
+              "sha256": "a84191e88e92fe84a789ddfa593246cc73074b3a000b56b6e55a39589ec8eae4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentFixtureTest.xml",
+              "sha256": "fa00d540c79f6125373a89d767717fd2668533176e78b0a73603b98ff5eda0be"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentSecurityTest.xml",
+              "sha256": "fcb00c8d151c7e8e2381b7cd9fb901718ce8006a59c0ca585875639f101125b4"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentDocumentServiceTest.xml",
+              "sha256": "6651fc618dc8b8283c5a1ddc04c32f7c4fcc9439e16c6cd6a4f91221b4c5816d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experiment-document/target/surefire-reports/TEST-org.hammer.audio.experiment.document.ExperimentLocalBindingServiceTest.xml",
+              "sha256": "ff2f58f109a85e6e15c5949c52efe9876374ed4b8c0c2f171afa065f9e50983e"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.AdaptiveBeamformingSearchTest.xml",
+              "sha256": "67c4675dd5046c4b1451686bc15c2fd5dd75ec37395e12e1b82af43449cd30a1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.CalibratedTdoaEstimatorTest.xml",
+              "sha256": "3dd5eeb30aed0b3c8a5e80cf9c1a75b7b72521fcd761410b03d7a00c89e146f2"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.CrossCorrelationTdoaEstimatorTest.xml",
+              "sha256": "0876a0f69f4e3a2d8ab0a6986962d9a2620bd63d5c33dfbfd2aa7fece8b4bdf3"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.GccPhatTdoaEstimatorTest.xml",
+              "sha256": "315be0440ced6a318ec50ed1d6d6deb9986e6599303f351aa8bf780af8a8f39e"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.MosquitoLocalizationPipelineTest.xml",
+              "sha256": "9c7916e5648e513f727d28acc7e1bf4dc36aff84f879f41496d4de9959237093"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.SubSampleGccPhatTdoaEstimatorTest.xml",
+              "sha256": "8634790bca80f2195528d164cc7b28321dcbd2b468ebd266a0bfb0c7671c667b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.TdoaPairConsistencyAnalyzerTest.xml",
+              "sha256": "964acb5126f8c20925a1843bb0a95e2fdaa45ee8d11054a36949612df68c6514"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.WingbeatFrequencyTrackerTest.xml",
+              "sha256": "e3a0b941b1e1bf5f8a03f771bf041e6c9d6e166c99542970709e1efd575035b6"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.benchmark.TrackingBenchmarkComparatorTest.xml",
+              "sha256": "8ce47bd2a0be8b08098afdad172df621d6aa8848b31f6edbdb75095be9edc298"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.benchmark.classifier.ClassifierBenchmarkRunnerTest.xml",
+              "sha256": "5b50cb742295c141514438af2b0e5fbfae05a657035f30e07f512da3c79239d7"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.benchmark.localization.LocalizationBenchmarkRunnerTest.xml",
+              "sha256": "a9cea6337ac259406e81866927cf3f9d7e76ed0e34b26cf625c28852e575dce7"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.calibration.ArrayTimingCalibrationEstimatorTest.xml",
+              "sha256": "9abfebe305090fbcfa9072689cc76bfffe93e709f9467f66776c3646cb1f5667"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.DatasetAnalyticsTest.xml",
+              "sha256": "3321638adf396fd0bd664fcb3a1c85d9dde620f8e75899e6e670ca6550c18629"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.DatasetAudioLoaderTest.xml",
+              "sha256": "8e48bc9c3a4b881e93c9f3043a0b7814c16ed340bd22f89e0e5819c724c20e91"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.DatasetManifestTest.xml",
+              "sha256": "91e31a08ad173182fd6bf18d33c33552c9d7c291485f91ea63e645a07eb9e03b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.FeatureHistogramTest.xml",
+              "sha256": "9b26586ddca05f599c9f0d7390d494842572ff24aea06445cfda67a32798e558"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.dataset.HumBugDbImporterTest.xml",
+              "sha256": "6f38a7585668369f255f0c17f6da15f671acb138ecf914d08859d8b6240dd9d6"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.doppler.DopplerEstimatorTest.xml",
+              "sha256": "bc37c356cffc5ae25c8a60908d5ee3cf414b2dde93d32103e8711d1ae1a8eec8"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.feature.comparison.SyntheticRealComparisonTest.xml",
+              "sha256": "2b6f6bf709bdfbfba61a614da5865c68f0c3c538ef51c91da28ac093e1ff8a19"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.feature.evaluation.FeatureEvaluationServiceTest.xml",
+              "sha256": "d3634deb336015c72dc6747594e408aacba91dd5e005cd1b59526d313f316bc7"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.feature.ranking.FeatureRankingServiceTest.xml",
+              "sha256": "de0b3fafa45b3e86295c7095572bc335f7f5e7f00f3ce9db7fdce60bc2ef067c"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.plugin.AcousticLocalizationPluginTest.xml",
+              "sha256": "f6455812ee2739b3dd98f34182b5407b285daa9bca44e03dcb74092596ee8be9"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.scenario.ScenarioModelTest.xml",
+              "sha256": "41f3a24e826c1390b50c9f843201359737e182d8d6cc312ffa42b4f3d6ea8207"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.SimulatedMicrophoneArraySourceTest.xml",
+              "sha256": "cf14635adb848fbcdf08d01fad9272d4b298a7420824f8e2db34434937ff9bfb"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.WingbeatSignalGeneratorTest.xml",
+              "sha256": "23e627c8c3bd952e184136aab6e99747ff1be78ead32e73a7517d15372cc91a1"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.GeneratorCalibrationServiceTest.xml",
+              "sha256": "e1ab4bed089ef33d8ac653def7663bef9a8144e520ea89e0b48d8199be9e2728"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.GeneratorComparisonReportTest.xml",
+              "sha256": "db823f9a48e2ccfbbb739f69ab623bdbf02a75623b399f4d180ab4cbe9e1aad2"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.SyntheticCalibrationAnalysisTest.xml",
+              "sha256": "85b413eed46aa7d068cd6b4841c046bf45996b71d70eeba6c5effc740bf5229b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.simulation.calibration.SyntheticParameterEstimatorTest.xml",
+              "sha256": "b7b873934d0f950fb62e5c7441c366fc7f7727f33037e46a74057a80e38e3a05"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.FrameScheduleAndBudgetTest.xml",
+              "sha256": "2c08bdcfb9d82ecd7c14f47af7cc1c95e116b733a384599718d760154e07645b"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.FrequencyClustererTest.xml",
+              "sha256": "3263f9d29845f5e220a366f01c39368a856df7119fb8377f680aa4e88e894bef"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.Kalman2DTest.xml",
+              "sha256": "e613f79f13bc48969af8f867d1567fc1fba296acd284107f06712ddb8b66aa64"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.MultiPeakDetectorTest.xml",
+              "sha256": "14492ce06459e23b6be28707b5b19bf0ee5c28e71c146f8e9a1b14cc674b5ac0"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.SourceTrackerTest.xml",
+              "sha256": "604cda05aba0d446b3dd349da77f6784793547c84e11867f7560558eb7a24c32"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.TrackingPipelineScenarioTest.xml",
+              "sha256": "1cb3baa2d383d547c1459f0cdaf8ebb0b8e0eac01af57851ddcf3522682a3d60"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.tracking.TrackingSnapshotTest.xml",
+              "sha256": "762a7d871747a2b7195504653a4885945e3a395efa44be26bb3bdcb3b42bdcbd"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.DatasetWingbeatEvaluationWorkflowTest.xml",
+              "sha256": "853ac0e71a177bc76666d5206aa76d5184e41c2281182257398b3ae89fcb5023"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.FeatureDistributionComparisonTest.xml",
+              "sha256": "1a6eea921256e9bbea9c2d3d5c04f89fad3da22f22c4e9eb989b7bb7ce134600"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.RuleBasedWingbeatClassifierTest.xml",
+              "sha256": "629c47047ca5f76361b284de2182b53348f8c21caad02e082d105f950224a9e5"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatDatasetEvaluationEdgeCasesTest.xml",
+              "sha256": "0d3b694395ff8f7defe64a71cc368878b02b2eeb10f650801e34838f67cd6a88"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatDatasetTest.xml",
+              "sha256": "b4351e0fec9643a93612d3b23e0ba5b1ce2f21b02c2249a352c382edad6498e8"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatFeatureExtractorTest.xml",
+              "sha256": "5aa4daefeb773b2558e3bb8ac9f75f53dc756683864e98daa68cb39f918766c3"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.wingbeat.WingbeatFeatureVectorTest.xml",
+              "sha256": "2b68a203f87f75ee495f0e5f6904402f7076609c52c7ca5746624e0aabb833f9"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.AcousticLocalizationWorkbenchPanelTest.xml",
+              "sha256": "e8deebe0c1e59612cfff9721c17c422612a06efd2587f90c2506dc287664adaa"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.ImportedRecordingWorkbenchPanelTest.xml",
+              "sha256": "73d853394e343c92afe4530e8bdf66371391e4de6928966790162482b9ca818d"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.PlaybackModelTest.xml",
+              "sha256": "236f056c1de8f0b417a33849dc36220043921fb120d9f41a2d8762e396ef12ad"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchExperimentExporterTest.xml",
+              "sha256": "6713a5b871ae8d44d2d6bea41bc07d6227578ae8dad5dca3c442ca1aa537d351"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchScenarioRunnerTest.xml",
+              "sha256": "385a710e981512f3272b4e51472b8682e13dbaa87403bd7705c7dc917a774965"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchSynchronizationExportTest.xml",
+              "sha256": "93f55e4e7d3320b3936ab825d99cb27a6b30c8f577a40b5b6c404d3bf21cf6b9"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchTdoaConsistencyExportTest.xml",
+              "sha256": "cc0ff858bbac163307e948517a5425588bcb3f9d7fb5f01b5006d619a22880e3"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-experimental-acoustic/target/surefire-reports/TEST-org.hammer.audio.experimental.acoustic.workbench.WorkbenchTdoaEstimatorSelectionTest.xml",
+              "sha256": "c0eda657b9e20acf43f29bcc8dc3966606c88ee5733378c478ad2385a0cc0709"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-geometry/target/surefire-reports/TEST-org.hammer.audio.geometry.MicrophoneArrayGeometryTest.xml",
+              "sha256": "c58cc772f19464f1575022218c4ba8bc6f3a70ecfb48c954bba425d93f9fe9ae"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-geometry/target/surefire-reports/TEST-org.hammer.audio.geometry.Vector2Test.xml",
+              "sha256": "1eff63ff38dd68579466d99128f56de3fc73bccb824cc36176f763535e5cca32"
+            },
+            {
+              "path": "contracts/consumer-candidate-audio-analyzer/consumer/audio-plugin-api/target/surefire-reports/TEST-org.hammer.audio.plugin.AudioAnalyzerPluginApiTest.xml",
+              "sha256": "baccbdf6ff455b06a65958af29409098fd0956e7fa89caf51be506e8af66c6dd"
+            }
+          ]
+        }
+      },
+      "candidateCheckout": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+      "sameRunCandidateArtifact": 13597995184,
+      "sameRunCandidateSha256": "5bcd755e2e345b48c6a95c82f783e0135b5cd75f9ee78c624753fe12906940eb",
+      "candidateJobLogSha256": "7b83bba32dd23352f01d6c940ad5c5b8c6f19f1dfd9cc9d87da81c146de7e780"
+    },
+    {
+      "consumer": "taxonomy",
+      "consumerCommit": "098aa054ad2dd9f8e11fbabbc48a1fc7631e13c3",
+      "modules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-smart-http"
+      ],
+      "checks": {
+        "baseline": {
+          "version": "0.11.8",
+          "result": {
+            "consumer": "Taxonomy",
+            "mode": "baseline",
+            "candidateVersion": "",
+            "java": "25",
+            "contract": "Core schema and Hibernate Search unit contracts plus PostgreSQL Testcontainers migration and validate-startup evidence"
+          },
+          "junitReports": 9,
+          "junitTotals": {
+            "tests": 41,
+            "errors": 0,
+            "failures": 0,
+            "skipped": 0
+          },
+          "junitFiles": [
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.composition.persistence.ArchitectureCommitIndexTenantMigrationPostgresIT.xml",
+              "sha256": "da1174a22e9b192f7f03de10a6d1317658cbf309ca70924ae13aa1f5c4c7cf36"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.composition.persistence.TaxonomyPostgresValidateStartupIT.xml",
+              "sha256": "3a7b167373ebb94929c0df59f75696a49e739bdcc89d19e92a6c4528571dcd76"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.composition.persistence.TaxonomySchemaPostgresMigrationIT.xml",
+              "sha256": "ecf0f0c89ae2013241822c5c7b4ecc27901400ba74fe46ee367d542e6d3a5190"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.workspace.storage.JgitStoragePostgresMigrationIT.xml",
+              "sha256": "daf7d25aed9124f3dd8ca02c4a39a4d06360722d63944b5c87d9d96b5e43c6f0"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-app/target/surefire-reports/TEST-com.taxonomy.dsl.CommitIndexHibernateSearchTest.xml",
+              "sha256": "9e8e2dc8fd0c10f5d484c5a0cb9ed91d37d4571559183ce42448cb569779dd71"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-app/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageHibernateIntegrationTest.xml",
+              "sha256": "039c51b381ada9b7edec4d76391e18399ca9f3c99538d0223e03196a23c2c387"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-workspace/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageOptimizedIndexContractTest.xml",
+              "sha256": "fd7cbd4308b8d5391321df1d81cc04f2c573e0a6360d33bb6ffb2c1c3dc8de6d"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-workspace/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageSchemaIndexValidationTest.xml",
+              "sha256": "1badb58431f1a13fe9d3a42dcc82ebaa392a9f7b036434fee0389b713c18c93f"
+            },
+            {
+              "path": "contracts/consumer-baseline-taxonomy/taxonomy-workspace/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageSchemaMigrationConfigTest.xml",
+              "sha256": "e45bf5efb5d0d4aed0b1e1a4d817ee2470456aee243a9786f1366732f249b10b"
+            }
+          ]
+        },
+        "candidate": {
+          "version": "0.12.1-SNAPSHOT",
+          "result": {
+            "consumer": "Taxonomy",
+            "mode": "candidate",
+            "candidateVersion": "0.12.1-SNAPSHOT",
+            "java": "25",
+            "contract": "Core schema and Hibernate Search unit contracts plus PostgreSQL Testcontainers migration and validate-startup evidence"
+          },
+          "junitReports": 9,
+          "junitTotals": {
+            "tests": 41,
+            "errors": 0,
+            "failures": 0,
+            "skipped": 0
+          },
+          "junitFiles": [
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.composition.persistence.ArchitectureCommitIndexTenantMigrationPostgresIT.xml",
+              "sha256": "276c45022ba3bde112d5e2226298163f6909b7ab951c0d27f0e28f823f7e696a"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.composition.persistence.TaxonomyPostgresValidateStartupIT.xml",
+              "sha256": "9996e6ef200af5b63f679f57457060532bae3bacd0285e90b4dfc50bc7fd6529"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.composition.persistence.TaxonomySchemaPostgresMigrationIT.xml",
+              "sha256": "48fc328f9e3c52525a05d557cf45366ab3af0bb070d9712269226a49b551501f"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-app/target/failsafe-reports/TEST-com.taxonomy.workspace.storage.JgitStoragePostgresMigrationIT.xml",
+              "sha256": "0c8a18dfcc22c28d6e459284815043ad5f20846a178d9076561ac154031bd3a7"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-app/target/surefire-reports/TEST-com.taxonomy.dsl.CommitIndexHibernateSearchTest.xml",
+              "sha256": "60f37214d98f3a2f80f30b3d3b18b19aba92d4130d7de9e4f0bc8d5ed49c265b"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-app/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageHibernateIntegrationTest.xml",
+              "sha256": "85b7a89af3e07a2b04ae91d59a1c8b984c91f262bd6eb2872be0ed8d48b8daa0"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-workspace/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageOptimizedIndexContractTest.xml",
+              "sha256": "c4c766d5ba075022875e6b4137850cad9744da8fe70ef712093d64a6eddf6953"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-workspace/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageSchemaIndexValidationTest.xml",
+              "sha256": "99608ff36e38430a39d029028fd36af3546c567023fbc31b2e2027e090d366e3"
+            },
+            {
+              "path": "contracts/consumer-candidate-taxonomy/consumer/taxonomy-workspace/target/surefire-reports/TEST-com.taxonomy.workspace.storage.JgitStorageSchemaMigrationConfigTest.xml",
+              "sha256": "ac8c62f36c8585e9b4902579e0ddb2e2f98eb6abee59896615b95edb1761f4db"
+            }
+          ]
+        }
+      },
+      "candidateCheckout": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+      "sameRunCandidateArtifact": 13597995184,
+      "sameRunCandidateSha256": "5bcd755e2e345b48c6a95c82f783e0135b5cd75f9ee78c624753fe12906940eb",
+      "candidateJobLogSha256": "4d3ed865beed8f66267bcd16f2b223be05363c001488215131f70765a5b1b780"
+    },
+    {
+      "consumer": "sandbox",
+      "consumerCommit": "26391b1c8e4d0324ae3669c7febf45f048e8bccc",
+      "modules": [
+        "jgit-storage-hibernate-core",
+        "jgit-storage-hibernate-search",
+        "jgit-storage-hibernate-java-analysis"
+      ],
+      "checks": {
+        "baseline": {
+          "version": "0.11.8",
+          "result": {
+            "consumer": "sandbox",
+            "mode": "baseline",
+            "candidateVersion": "",
+            "resolvedVersion": "0.11.8",
+            "java": "25",
+            "expectedModules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search",
+              "jgit-storage-hibernate-java-analysis"
+            ],
+            "forbiddenModules": [
+              "jgit-storage-hibernate-architecture",
+              "jgit-storage-hibernate-benchmarks"
+            ],
+            "contract": "Core-only OSGi bridge, released Search REST and Java project analysis contracts, legacy preflight, repository lifecycle and shaded-server packaging"
+          },
+          "junitReports": 45,
+          "junitTotals": {
+            "tests": 210,
+            "errors": 0,
+            "failures": 0,
+            "skipped": 0
+          },
+          "junitFiles": [
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/failsafe-reports/TEST-org.eclipse.jgit.server.config.ReleasedPackagingIT.xml",
+              "sha256": "33dc1019584c9167412928d84903f2a88f0058ee3109d9aecc2d1ad7e2956c39"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.JGitServerApplicationLifecycleTest.xml",
+              "sha256": "af4f88fc0174d159d82099a92a8787c318901c2f6dfe3a04f1b639dc09807527"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.JGitServerWebAppTest.xml",
+              "sha256": "edc761c7374c6e93b17e51ea8b8e06af7b338240f88a755fda0730a08b8cd2ae"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.AnalysisGenerationCacheTest.xml",
+              "sha256": "37a7238b680cf04af6eed1b0d8d257e5136109f17373a3302cd9047d0c98a2ca"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.AnalysisSettingsTest.xml",
+              "sha256": "ba4650d076c1e828cef3c9699b511b4c03aded3c0c899bb574f1cbd4acd67374"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationApiComparisonTest.xml",
+              "sha256": "7e586925aa307be27119c4a1a3bc24b6e2f214c955fc693f3d1048734df3675a"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationFileFormatsTest.xml",
+              "sha256": "f218811529057c9660ddb65e835f1b3b272df12dd0c35ec98c740e7f5f38803f"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationSemanticQueriesTest.xml",
+              "sha256": "4b532e4d1bf98d54da972ebe915c02e77989442ec8126583bd3c9baf6232f0f7"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationSourceReportsTest.xml",
+              "sha256": "2b17d1dd28b422ad88e73b86fcf332199501f5ad32aa04db63d4008d2e9733fd"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationVectorIndexTest.xml",
+              "sha256": "e8b90db1c50742ba5c2791e9b0902bf0d95df670112b16c0d9d990ea096f38af"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.HistoricalAnalysisH2Test.xml",
+              "sha256": "1e2e7a31e50d0af59c906a8e126fb48174f95aac9d54ba043049a3f18a3b6ef7"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.HistoricalPathIndexTest.xml",
+              "sha256": "ef6bad2b394c43adc4a0273de1178f3f8da8cdaf8b4bfe8c77f61ca29dfb44c1"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.HistoricalSourceIndexTest.xml",
+              "sha256": "f583e4425b67d978fcf13bc28c053799faf3ae3d0ed24e5a5a2877a08096c994"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.JavaHistoryCorpusTest.xml",
+              "sha256": "c6562447a48f44f14b25622fafb7c9c62cf0e5fac3d2b155850a8f93cd2d9c70"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.LocalEmbeddingEncoderTest.xml",
+              "sha256": "60faef796c2f7084c59efe4390d6c97285336a72e6d12b4d343a590ba031191c"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.MixedHistoryCorpusTest.xml",
+              "sha256": "22496566845ab81065ce8ab5676683058f8d37ee84320dc026a45ceb1ff98ced"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ReleasedJavaProjectAnalysisTest.xml",
+              "sha256": "65268a55df2dc5fb1614349480572fc7b8822727ad12459234394969c061cbb2"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ReleasedSourceQueriesH2Test.xml",
+              "sha256": "58194cb1565cd3ae2031ce56af6d4290916892cc8950a03e5981a61a46ce6637"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ExternalCoreStartupGuardTest.xml",
+              "sha256": "274de5c2c0f2df1a13e906469b1856c4fbe9c504ed1bb94c2d6ade6de4846a4e"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ExternalRepositoryLifecycleH2Test.xml",
+              "sha256": "447f344322822ed44a771f333202444b123c75162beebcd0cd43a36af4ec4c95"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ExternalServerPersistenceContextTest.xml",
+              "sha256": "d4d0b029ffd78a760232f33d362dae50dac826fb7146c7b81c598041432b7a20"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.HibernateDependencyBoundaryContractTest.xml",
+              "sha256": "7e0de80cff088ffdeb385d44c51063450f0ea2769701a837b59214e82195ba71"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.InheritedSchemaActionTest.xml",
+              "sha256": "d3bfef9cbb4ebfced01d989bbbd6f946a06fb5458410a36743a1a79e194ee47e"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.JGitStorageMigrationMatrixTest.xml",
+              "sha256": "a8411ae7fd0f3b4e64cf7285786dce2629b6aa84234975355ba5ef6c53f6104c"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.LegacyCoreSchemaPreflightTest.xml",
+              "sha256": "53758803a6358cd9d36574df7cee9c186b51a2ebe50aecabea319eb5ccdcdf59"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedFileHistoryH2Test.xml",
+              "sha256": "6a935ee097b974145f5f6d9609932b35d25234a4a7b7428d58ee5d041c43cf87"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedHistoryElasticsearchTest.xml",
+              "sha256": "acabb3ef4ad01b6fb87278024f332b0d880acbc69b4b5d01e83116fddbf8271e"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedHistoryIngestionH2Test.xml",
+              "sha256": "582eefc484926ec776b6db7e33d363724751c2bd1079becf4dbb8b983b59938a"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedHistorySearchH2Test.xml",
+              "sha256": "7bbaad102d74880a69cd45ecb234e416eceb38e19799244b38032ce156440feb"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedRepositoryReadH2Test.xml",
+              "sha256": "15e4a816985eb19d4d64583ef50df899c82f7b0f49c62778e51cfa880b81959e"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedRuntimeStartupH2Test.xml",
+              "sha256": "644671fe7effe68ac2f0f38b6b71ba01a5a7c268bcedd063224ef2422f0dbdfc"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedSchemaAdoptionHsqlTest.xml",
+              "sha256": "c639dea8e2df239b0ca8f943c4920d714600a9a89a5c077f181a4fce25d903ab"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedSchemaHistoryTest.xml",
+              "sha256": "8d8d7233f9f17c5fece1afd6a5279a94d17e7d8de5a0ec63dc226b5f5262595e"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedSchemaInitializerTest.xml",
+              "sha256": "38191bd1f5616eda9b6deedcbf6589951244ff4c6f5f0f770e7f049b4e177e28"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ServerPersistenceContextTest.xml",
+              "sha256": "c2243fd9766956ed4d0c7a36a7c6b1f68e1734d04ebc291d99932773a6a9cb75"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.e2e.EndToEndH2Test.xml",
+              "sha256": "bb0e8eba3d606e1d23c4bb3edccec7944670cb24e3789522197752bbbd9ef7ce"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.history.ReleasedHistoryMaintenanceH2Test.xml",
+              "sha256": "585373d7160f484347c1592717d0e1a7a1dbc13eefb9ae6308b917675bd2dcd6"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.repository.ExternalHibernateRepositoryDeletionTest.xml",
+              "sha256": "db4ac5a516a11c23374722febcd1c7e5a3f9cf40c45e28f216453d13bdabb629"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.repository.ExternalHibernateRepositoryServiceTest.xml",
+              "sha256": "bc640e609d7d724c7cbf1e8c143917461e0de5a33826f7513b856052803fa39b"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.repository.SandboxRepositoryServiceBoundaryTest.xml",
+              "sha256": "dff8da24d125f9a10730bdd1f70014f6e21769bb29cbd11220e47735bb770ec9"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.resolver.HibernateRepositoryResolverOwnershipTest.xml",
+              "sha256": "943c88c116e9617771649717059a5dd97847f2bf0938f175e0168b72abf00404"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.rest.AdminRebuildH2Test.xml",
+              "sha256": "c433508c855be4449b450d7f32ecb1aed3e24e6a55cbc3f5be6a65a7f9a037ee"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.rest.SourceSearchBoundaryRestTest.xml",
+              "sha256": "9c2f6fe8319ed833c6d6ca2a5305c0ab7bbb0c38d423691a7bf5bfc935fe9443"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-storage-hibernate/target/surefire-reports/TEST-org.sandbox.jgit.storage.integration.JGitStorageLibraryBoundaryTest.xml",
+              "sha256": "d0001ea10c3a3f004e78734421d0ab42900d0e17cccd3ee600b32ab77c4a4796"
+            },
+            {
+              "path": "contracts/consumer-baseline-sandbox/sandbox-jgit-storage-hibernate/target/surefire-reports/TEST-org.sandbox.jgit.storage.integration.OsgiManifestContractTest.xml",
+              "sha256": "616bd94fc18dc88131a29ca1210388ad377939a2c8641c935ef258c5d0dbe15a"
+            }
+          ]
+        },
+        "candidate": {
+          "version": "0.12.1-SNAPSHOT",
+          "result": {
+            "consumer": "sandbox",
+            "mode": "candidate",
+            "candidateVersion": "0.12.1-SNAPSHOT",
+            "resolvedVersion": "0.12.1-SNAPSHOT",
+            "java": "25",
+            "expectedModules": [
+              "jgit-storage-hibernate-core",
+              "jgit-storage-hibernate-search",
+              "jgit-storage-hibernate-java-analysis"
+            ],
+            "forbiddenModules": [
+              "jgit-storage-hibernate-architecture",
+              "jgit-storage-hibernate-benchmarks"
+            ],
+            "contract": "Core-only OSGi bridge, released Search REST and Java project analysis contracts, legacy preflight, repository lifecycle and shaded-server packaging"
+          },
+          "junitReports": 45,
+          "junitTotals": {
+            "tests": 210,
+            "errors": 0,
+            "failures": 0,
+            "skipped": 0
+          },
+          "junitFiles": [
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/failsafe-reports/TEST-org.eclipse.jgit.server.config.ReleasedPackagingIT.xml",
+              "sha256": "e3b2e2f824a054b96ecd4418c6a4fc0336b79dd62aea07f6caf884fc9da70f39"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.JGitServerApplicationLifecycleTest.xml",
+              "sha256": "6617a1168dcb08618e12cca4ce1e836abfbc326ce64bc0d84262e4d08d5968bf"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.JGitServerWebAppTest.xml",
+              "sha256": "8d81952c171900a300e6157ea543cd576dc828c700533164cf60ae70093ef570"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.AnalysisGenerationCacheTest.xml",
+              "sha256": "f78cc06bf02e8d86ee55192def2d1553ff1a59c000cd510d52a05c421cdb771f"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.AnalysisSettingsTest.xml",
+              "sha256": "46e07c188bd55e060108769a99adcb62a9e7f32573781d7a773a8d10dfe20816"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationApiComparisonTest.xml",
+              "sha256": "6da0e9eabf49ddbdcc6cc53534e94bd3e5278d03b398096bb45662b5a7f6bb45"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationFileFormatsTest.xml",
+              "sha256": "35f461c4d7aba94adeaa0d0f1f706e79dcf4ff9b3953f1b34b5448c29aa9cc4d"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationSemanticQueriesTest.xml",
+              "sha256": "c4f81e312013fd27ebd965174be1206d4fb741bddacfa14a97b211ef88a33de4"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationSourceReportsTest.xml",
+              "sha256": "1e92c4491aa7e114354ab9d375ebc3558bb8cba6454f97a459eed8040a9964f5"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ApplicationVectorIndexTest.xml",
+              "sha256": "4d476da1e2b97b082c81250cca4a459e4e253ae03d9fdbae728cb743d9056e90"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.HistoricalAnalysisH2Test.xml",
+              "sha256": "b37d1443bffe23c59ce4990ae38e512d0f5b2a9b4e968f3f00ffe7f75e22fc19"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.HistoricalPathIndexTest.xml",
+              "sha256": "e2dd830c3d0a8b63951fb7a7b6c0e4cc8a23bd1974ce085523a6402735c505cf"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.HistoricalSourceIndexTest.xml",
+              "sha256": "12d4ab21f70f2914beb657b6fe6c5c603ac295dc8fe0d4013abffd060adf7ddb"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.JavaHistoryCorpusTest.xml",
+              "sha256": "a3c7afbfcb80f36af2317ddcf42c1f9f6216e52456bca054219283138acbb19f"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.LocalEmbeddingEncoderTest.xml",
+              "sha256": "4855be955744d6b83435bb9931cde3c08939d171811bda75291e6396ecea7873"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.MixedHistoryCorpusTest.xml",
+              "sha256": "d5f99ce5c6d3281b94b2d5fcd0ea225b34c99626a6f513234c3c01e3ac711e74"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ReleasedJavaProjectAnalysisTest.xml",
+              "sha256": "b279ead066a76ed7c74528653f8636603549cf01d3384cd830b54049161906eb"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.analysis.ReleasedSourceQueriesH2Test.xml",
+              "sha256": "9779d9365545b04b2f55cc7c6cf0720869a32502f0c61a7155bd64bd29b5c72c"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ExternalCoreStartupGuardTest.xml",
+              "sha256": "cb65f7501edf038f9786d2ecb399036ba6476fc9750bfeb9f71cf53ee9b46c0a"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ExternalRepositoryLifecycleH2Test.xml",
+              "sha256": "e4604cbf4ce7055bc6afadad73168cb12738852eba92ed41fd1931cd34b7dd02"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ExternalServerPersistenceContextTest.xml",
+              "sha256": "4347667e7aeecba0c8334a15365d3bc6878bbbd25c22323f7f71eb361986fe9d"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.HibernateDependencyBoundaryContractTest.xml",
+              "sha256": "af69f46fc8a6392a64b96fc814fb82e8440b79fa166d594c14cbe09fe6c68e08"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.InheritedSchemaActionTest.xml",
+              "sha256": "f48403b8824e5fc3808efb2bfed0bb5156bc4cd3527cfdc5d3d491427091fd01"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.JGitStorageMigrationMatrixTest.xml",
+              "sha256": "da3b54c5b68f60a0de15f6b85ce1b0cb8b02ac91f92c4f6db1438c029ff101fa"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.LegacyCoreSchemaPreflightTest.xml",
+              "sha256": "639937dbdc2ae5f236cd49aeecad81d6ad3a394d2b8622606aedb388e83014b1"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedFileHistoryH2Test.xml",
+              "sha256": "ae6ac159a0922db1bd5d5c6b880793d6c625ec34bc777d3c05e2c57bbd74bf65"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedHistoryElasticsearchTest.xml",
+              "sha256": "0cc67eb7ad8b696c3c451d917ec938256e7067609dc8300b8cfb1253ed65cc2b"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedHistoryIngestionH2Test.xml",
+              "sha256": "22a6d9f220b8e1404ed9a24d3930279d0ecd20bd7e57eaf974cf0ce1d9e6b54f"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedHistorySearchH2Test.xml",
+              "sha256": "c79d4a554221786fe15412fc510f6185f4aa06bd729211414a26f4de6ed49ab2"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedRepositoryReadH2Test.xml",
+              "sha256": "3a52d3427c5b35c5b0d0c5ea9db17346e79288103a3941ea29030015066ca6b3"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedRuntimeStartupH2Test.xml",
+              "sha256": "6c06329787df579a22ce598c6d05cd731996781c995f971448c6ccac4e1ff6b9"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedSchemaAdoptionHsqlTest.xml",
+              "sha256": "44e73afffa2e6e0985f8e25a6c7a15db3f82a4fa912f0e022b3b4a3e4e2aaa9a"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedSchemaHistoryTest.xml",
+              "sha256": "313a78ec7772069363af4dfb149b31a0d8264ddd6c6bac8e4f94c5d673ae2d5e"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ReleasedSchemaInitializerTest.xml",
+              "sha256": "6b0ad01e7707aef65a783491efe8eb43e27d81198caa51c1996b4e56b41e7613"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.config.ServerPersistenceContextTest.xml",
+              "sha256": "c3ed00923a90e8c419a225649bfb0ec3fac6c7ae9185a66ec1f958bba9c18175"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.e2e.EndToEndH2Test.xml",
+              "sha256": "8bc0cffe9d88eedc454c5b0ac64b0d910d8710218214379c3b3ad4733fb265b0"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.history.ReleasedHistoryMaintenanceH2Test.xml",
+              "sha256": "ddf09a54a0ce61c91a406bc0dc1eec3e93dc17cd71828fb2b29e629a99151f54"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.repository.ExternalHibernateRepositoryDeletionTest.xml",
+              "sha256": "5cf49efa3f41b58548f72a8f5630d31d936067f820b4a135ca6876f8ef7b24d3"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.repository.ExternalHibernateRepositoryServiceTest.xml",
+              "sha256": "e5174f2170b2d900ff7b5046a20286d528e92fdf9c3bbbb5b0bcf7ee1e13b35c"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.repository.SandboxRepositoryServiceBoundaryTest.xml",
+              "sha256": "73574849b93e849285b85b70d6bbd537b0e4adc38dc3497820ee50b0379b1967"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.resolver.HibernateRepositoryResolverOwnershipTest.xml",
+              "sha256": "60ae551632e8992889249f6d47f546d82cb5507c409b73e49d00b04013e98260"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.rest.AdminRebuildH2Test.xml",
+              "sha256": "1c781e07c84afbb689c87667bde9699689756eb0f523b44b590780868b6dd091"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-server-webapp/target/surefire-reports/TEST-org.eclipse.jgit.server.rest.SourceSearchBoundaryRestTest.xml",
+              "sha256": "a520cc52edd457f35d6fc9bec9cd5d9b04a034929145facc46532b8a05e42735"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-storage-hibernate/target/surefire-reports/TEST-org.sandbox.jgit.storage.integration.JGitStorageLibraryBoundaryTest.xml",
+              "sha256": "077a8ddcb78401b9e810e4ab0aaf8b9e82fda5736adf512bb93f352ffe558c94"
+            },
+            {
+              "path": "contracts/consumer-candidate-sandbox/consumer/sandbox-jgit-storage-hibernate/target/surefire-reports/TEST-org.sandbox.jgit.storage.integration.OsgiManifestContractTest.xml",
+              "sha256": "e7461b28965a010e1f3fa079b4991b652e66401b614859048cbda923830a105c"
+            }
+          ]
+        }
+      },
+      "candidateCheckout": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+      "sameRunCandidateArtifact": 13597995184,
+      "sameRunCandidateSha256": "5bcd755e2e345b48c6a95c82f783e0135b5cd75f9ee78c624753fe12906940eb",
+      "candidateJobLogSha256": "7e84be4d951830290c1fb0212f4d4775f37b80517a0647c0dd4f5909a72ff3a2"
+    }
+  ],
+  "consumerSummaryReproducedExactly": true,
+  "nativeComparisonReproducedExactly": true,
+  "candidateBuildLogSha256": "dd9ccfc9077c992286ef0f99fc62413c673e359520bf3c3841dfe2837996e245",
+  "sameSourceCandidateQualification": "passed: proposed library and benchmark harness SHA exactly match the library built and downloaded by all three consumer candidate contracts",
+  "historicalMeasurementsRelabelled": false,
+  "notes": [
+    "The release/main native cells use the identical harness at separate pinned production sources.",
+    "The consumer baseline library is 0.11.8, distinct from the native v0.12.0 release comparison.",
+    "No source branch was moved and no hosted workflow was rerun.",
+    "Historical Audio, Sandbox and PostgreSQL measurements retain their original source qualifications."
+  ]
+}

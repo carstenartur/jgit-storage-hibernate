@@ -1,0 +1,16 @@
+./workspace/scratch/a239e2c5662a/issue196-sustained-evidence/docs/evidence/search-runtime-sustained-2026-11-08/reproduce.py:156: DeprecationWarning: Testing an element's truth value will always return True in future versions.  Use specific 'len(elem)' or 'elem is not None' test instead.
+  and not any(suite.iter("failure")) and not any(suite.iter("error"))
+F..
+======================================================================
+FAIL: test_junit_failure_element_is_not_hidden_by_zero_summary_counter (__main__.ReplayTest.test_junit_failure_element_is_not_hidden_by_zero_summary_counter)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/a239e2c5662a/issue196-sustained-evidence/docs/evidence/search-runtime-sustained-2026-11-08/test_reproduce.py", line 62, in test_junit_failure_element_is_not_hidden_by_zero_summary_counter
+    with self.assertRaisesRegex(ValueError, "JUnit gate failed"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.003s
+
+FAILED (failures=1)

@@ -1,0 +1,212 @@
+{
+  "source": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+  "tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+  "complete_forks": [
+    {
+      "file": "pair-01-contention-aware.json",
+      "sha256": "413a13356a014270f8664be2f2a9b77872eb97c422283dcb9ca4c73260024d04",
+      "maximum_sampled_heap_mib": 1022.9237518310547,
+      "allocation_mib_per_second_range": [
+        551.4376601181189,
+        740.1482167030985
+      ],
+      "allocation_bytes_per_op_range": [
+        6209659.908931699,
+        7402238.72481203
+      ],
+      "gc_count": [
+        42.0,
+        28.0,
+        38.0
+      ],
+      "gc_time_ms": [
+        242.0,
+        189.0,
+        213.0
+      ],
+      "direct": [
+        1142.0,
+        1180.0,
+        1330.0
+      ],
+      "prepersisted": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "file": "pair-01-size.json",
+      "sha256": "ddea5e79dabf32fef355128ddcaaebc5f88ed84249b3d80367d2d1902dd165a3",
+      "maximum_sampled_heap_mib": 1022.4773101806641,
+      "allocation_mib_per_second_range": [
+        396.3529524337531,
+        491.8790269369568
+      ],
+      "allocation_bytes_per_op_range": [
+        5991457.423597679,
+        7109210.410389611
+      ],
+      "gc_count": [
+        24.0,
+        10.0,
+        29.0
+      ],
+      "gc_time_ms": [
+        137.0,
+        85.0,
+        124.0
+      ],
+      "direct": [
+        1034.0,
+        700.0,
+        770.0
+      ],
+      "prepersisted": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "file": "pair-02-contention-aware.json",
+      "sha256": "38b14e3edb8a6665ceb289e3f095a8b09be51bd0340b2ccbeb29c6c413ae812d",
+      "maximum_sampled_heap_mib": 1022.4760513305664,
+      "allocation_mib_per_second_range": [
+        581.0200695253902,
+        808.9808185698695
+      ],
+      "allocation_bytes_per_op_range": [
+        6097220.28336079,
+        7405651.930029155
+      ],
+      "gc_count": [
+        19.0,
+        33.0,
+        42.0
+      ],
+      "gc_time_ms": [
+        103.0,
+        168.0,
+        225.0
+      ],
+      "direct": [
+        1214.0,
+        1348.0,
+        1372.0
+      ],
+      "prepersisted": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "file": "pair-02-size.json",
+      "sha256": "917a4ba8dad5f33f4d4c6add82c0b08f9878344dee02847a0365ee46f06aa5a6",
+      "maximum_sampled_heap_mib": 1023.2503814697266,
+      "allocation_mib_per_second_range": [
+        480.0732944491356,
+        848.1042341904082
+      ],
+      "allocation_bytes_per_op_range": [
+        6068247.254730714,
+        7304490.829076621
+      ],
+      "gc_count": [
+        27.0,
+        29.0,
+        38.0
+      ],
+      "gc_time_ms": [
+        151.0,
+        174.0,
+        150.0
+      ],
+      "direct": [
+        1374.0,
+        1312.0,
+        1018.0
+      ],
+      "prepersisted": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "file": "pair-03-contention-aware.json",
+      "sha256": "0a0b8108631f225dcf882a989985976b614290ccc7b8fc14282d209de19ba4f5",
+      "maximum_sampled_heap_mib": 1023.1422576904297,
+      "allocation_mib_per_second_range": [
+        595.1739645554909,
+        780.4617005190419
+      ],
+      "allocation_bytes_per_op_range": [
+        6361357.571694599,
+        6757150.63030303
+      ],
+      "gc_count": [
+        26.0,
+        45.0,
+        31.0
+      ],
+      "gc_time_ms": [
+        137.0,
+        267.0,
+        174.0
+      ],
+      "direct": [
+        1074.0,
+        1290.0,
+        1320.0
+      ],
+      "prepersisted": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "file": "pair-03-size.json",
+      "sha256": "4285b7cfa6713a1a919d19870caf9d972bab8476d949706de51a621f4beb22a6",
+      "maximum_sampled_heap_mib": 1022.8704071044922,
+      "allocation_mib_per_second_range": [
+        523.4709816016936,
+        734.8986971276072
+      ],
+      "allocation_bytes_per_op_range": [
+        6275584.222565688,
+        7289006.7125
+      ],
+      "gc_count": [
+        38.0,
+        21.0,
+        44.0
+      ],
+      "gc_time_ms": [
+        241.0,
+        154.0,
+        306.0
+      ],
+      "direct": [
+        1294.0,
+        1112.0,
+        1280.0
+      ],
+      "prepersisted": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "failed_fork_log_sha256": "590fc419287409408623ee0f83167a86ce818a2c22c036bd88cdcb1f8684927b",
+  "inspected_external_files": {
+    "jdk21u-g1CollectedHeap.cpp": "e27e55097872ffbae324a3fcde7eacff765c094d5038a33b9d922e5e001732d3",
+    "jmh-sample-buffer-bytecode.txt": "e0e768ee0120db34dfd8d257db086058d0f3f4170efa2c06fb934735803c3e4d",
+    "jgit-allocation-bytecode.txt": "d18006ce0f30301796e081df01083659f78414bf6867ec913161feda5c3bc201",
+    "jdk21u-Deflater.c": "ddd34635e4240986ee0246f052e743187b131e6e34052ea55091a3b0258c09b5",
+    "jdk21u-gcLocker.cpp": "e3a0183c4afe99a16af284658c3085ae8679647365b95dde92631150df88a659"
+  }
+}

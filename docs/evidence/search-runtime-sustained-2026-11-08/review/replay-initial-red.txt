@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/a239e2c5662a/issue196-sustained-evidence/docs/evidence/search-runtime-sustained-2026-11-08/test_reproduce.py", line 17, in <module>
+    SPEC.loader.exec_module(MODULE)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: '/workspace/scratch/a239e2c5662a/issue196-sustained-evidence/docs/evidence/search-runtime-sustained-2026-11-08/reproduce.py'

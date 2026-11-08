@@ -2,9 +2,15 @@ name: Taxonomy-shaped PostgreSQL Benchmarks
 
 on:
   push:
-    branches: [codex/consumer-211-postgres-validation]
+    branches: [codex/consumer-211-postgres-validation, codex/performance-followup-20261108]
   workflow_dispatch:
     inputs:
+      mode:
+        description: Existing lifecycle matrix or bounded publication closure follow-up
+        required: true
+        default: lifecycle
+        type: choice
+        options: [lifecycle, publication-followup]
       scale:
         description: History matrix
         required: true
@@ -21,6 +27,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/consumer-taxonomy-postgres.yml'
+      - '.github/scripts/*consumer*publication*.py'
       - 'pom.xml'
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-search/**'
@@ -35,13 +42,15 @@ concurrency:
 
 jobs:
   measure:
-    name: Taxonomy PostgreSQL at ${{ matrix.rtt }} ms RTT
+    if: github.event_name != 'push' || !github.event.deleted
+    name: ${{ (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted)) && format('Publication PostgreSQL {0} at {1} ms RTT', matrix.library, matrix.rtt) || format('Taxonomy PostgreSQL at {0} ms RTT', matrix.rtt) }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         rtt: [0, 20]
+        library: ${{ fromJSON((inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted)) && '["release", "main", "proposed"]' || '["proposed"]') }}
     services:
       postgres:
         image: postgres:17.10-alpine
@@ -62,6 +71,9 @@ jobs:
           - 8474/tcp
           - 8666/tcp
     env:
+      FOLLOWUP_MODE: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted) && 'publication-followup' || inputs.mode || 'lifecycle' }}
+      LIBRARY_ROLE: ${{ matrix.library }}
+      LIBRARY_DIR: ${{ matrix.library != 'proposed' && 'compared-library' || '.' }}
       MATRIX_SCALE: ${{ inputs.scale || 'smoke' }}
       CACHE_STATE: ${{ inputs.cache || 'reopened' }}
       REQUESTED_RTT: ${{ matrix.rtt }}
@@ -69,11 +81,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Checkout the immutable canonical comparison source
+        if: matrix.library != 'proposed'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: carstenartur/jgit-storage-hibernate
+          ref: ${{ matrix.library == 'release' && 'ba6aeecc338968df4279fb9c7c72b15bbb3577fb' || '1c33640bc75206e81a9bc5722768860a2a2321f5' }}
+          path: compared-library
+          persist-credentials: false
+      - name: Verify publication evidence gate and identical comparison harness
+        if: (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
+        run: |
+          python3 .github/scripts/test_consumer_publication_evidence.py
+          python3 .github/scripts/consumer-publication-evidence.py overlay \
+            --library "$LIBRARY_DIR" --role "$LIBRARY_ROLE"
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+          cache: ${{ (inputs.mode != 'publication-followup' && !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted)) && 'maven' || '' }}
       - name: Configure deterministic PostgreSQL RTT
         env:
           CONTROL_PORT: ${{ job.services.toxiproxy.ports[8474] }}
@@ -102,7 +128,32 @@ jobs:
                       "stream": stream, "toxicity": 1.0,
                       "attributes": {"latency": latency, "jitter": 0}})
           PY
+      - name: Set and verify durable PostgreSQL publication settings
+        if: (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+          command = ["docker", "exec", os.environ["POSTGRES_CONTAINER"],
+                     "psql", "-U", "taxonomy_benchmark", "-d", "taxonomy_benchmark",
+                     "-v", "ON_ERROR_STOP=1", "-At", "-c"]
+          settings = ("fsync", "synchronous_commit", "full_page_writes")
+          for setting in settings:
+              subprocess.run(command + ["ALTER SYSTEM SET " + setting + " = 'on'"], check=True)
+          subprocess.run(command + ["SELECT pg_reload_conf()"], check=True)
+          observed = {setting: subprocess.check_output(command + ["SHOW " + setting], text=True).strip()
+                      for setting in settings}
+          assert all(value == "on" for value in observed.values()), observed
+          root = pathlib.Path("target/consumer-publication")
+          root.mkdir(parents=True, exist_ok=True)
+          (root / "postgresql-durability.json").write_text(json.dumps(observed, indent=2) + "\n")
+          PY
       - name: Verify lifecycle and measure queries and rebuild
+        if: (inputs.mode != 'publication-followup' && !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
         env:
           POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
           PROXY_PORT: ${{ job.services.toxiproxy.ports[8666] }}
@@ -131,6 +182,7 @@ jobs:
             -Djgit.storage.benchmark.connection-properties-file="$connection" \
             -Dconsumer.profiles.output="$GITHUB_WORKSPACE/target/taxonomy-postgres"
       - name: Validate raw evidence and record provenance
+        if: (inputs.mode != 'publication-followup' && !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
         run: |
           python3 - <<'PY'
           import hashlib
@@ -177,12 +229,85 @@ jobs:
           }
           (root / "fixture.json").write_text(json.dumps(metadata, indent=2) + "\n")
           PY
+      - name: Verify and measure bounded native publications
+        if: (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
+        working-directory: ${{ env.LIBRARY_DIR }}
+        env:
+          POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+          PROXY_PORT: ${{ job.services.toxiproxy.ports[8666] }}
+        run: |
+          set -euo pipefail
+          umask 077
+          connection="$(mktemp)"
+          trap 'rm -f "$connection"' EXIT
+          printf '%s\n' \
+            "jgit.storage.benchmark.postgresql.url=jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/taxonomy_benchmark" \
+            "jgit.storage.benchmark.postgresql.measurement-url=jdbc:postgresql://127.0.0.1:$PROXY_PORT/taxonomy_benchmark" \
+            'jgit.storage.benchmark.postgresql.user=taxonomy_benchmark' \
+            'jgit.storage.benchmark.postgresql.password=fixture-only' > "$connection"
+          profile=taxonomy
+          if [[ "$REQUESTED_RTT" == 0 ]]; then profile=all; fi
+          mkdir -p "$GITHUB_WORKSPACE/target/consumer-publication"
+          mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am test \
+            -Dtest=ConsumerPublicationWorkersTest,ConsumerTaxonomyDeltaTest,ConsumerPublicationLifecycleTest,ConsumerPublicationBenchmarkTest \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dconsumer.publication.run=true -Dconsumer.publication.profile="$profile" \
+            -Dconsumer.profiles.taxonomy.rttMillis="$REQUESTED_RTT" \
+            -Djgit.storage.benchmark.connection-properties-file="$connection" \
+            -Dconsumer.publication.output="$GITHUB_WORKSPACE/target/consumer-publication" \
+            2>&1 | tee "$GITHUB_WORKSPACE/target/consumer-publication/benchmark.log"
+      - name: Verify native publications and retain exact source provenance
+        if: (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
+        run: |
+          python3 .github/scripts/consumer-publication-evidence.py record \
+            --library "$LIBRARY_DIR" --role "$LIBRARY_ROLE" --rtt "$REQUESTED_RTT"
+      - name: Check publication raw logs and both JUnit report locations for connection metadata
+        id: publication_privacy
+        if: always() && (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
+        run: |
+          python3 .github/scripts/consumer-publication-evidence.py privacy \
+            --root target/consumer-publication \
+            --reports jgit-storage-hibernate-benchmarks/target/surefire-reports \
+            --reports compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports
+      - name: Upload privacy-checked native publication evidence
+        if: always() && (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted)) && steps.publication_privacy.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-publication-${{ matrix.library }}-${{ matrix.rtt }}ms
+          path: |
+            target/consumer-publication/
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/
+            compared-library/jgit-storage-hibernate-benchmarks/target/surefire-reports/
+          if-no-files-found: error
       - name: Upload raw Taxonomy evidence
-        if: always()
+        if: always() && (inputs.mode != 'publication-followup' && !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: consumer-shaped-taxonomy-postgres-${{ inputs.scale || 'smoke' }}-${{ matrix.rtt }}ms-${{ inputs.cache || 'reopened' }}
           path: |
             target/taxonomy-postgres/
             jgit-storage-hibernate-benchmarks/target/surefire-reports/
+          if-no-files-found: error
+
+  compare-publication:
+    name: Verify identical published Git results across all native variants
+    if: (inputs.mode == 'publication-followup' || (github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108' && !github.event.deleted))
+    needs: measure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: consumer-publication-*
+          path: target/consumer-publication-matrix
+      - name: Validate hashes, source pins, native observations and complete Git equivalence
+        run: |
+          python3 .github/scripts/consumer-publication-evidence.py compare \
+            --root target/consumer-publication-matrix
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-publication-comparison
+          path: target/consumer-publication-matrix/comparison.json
           if-no-files-found: error

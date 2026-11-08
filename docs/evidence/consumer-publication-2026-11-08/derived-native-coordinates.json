@@ -1,0 +1,1622 @@
+[
+  {
+    "role": "main",
+    "requestedRttMillis": 0,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 1,
+    "timingsMillis": [
+      113.391024,
+      145.380404,
+      116.216991
+    ],
+    "medianMillis": 116.216991,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        76132592.0,
+        74267800.0,
+        76804208.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23936,
+      23944,
+      24008
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "main",
+    "requestedRttMillis": 0,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 4,
+    "timingsMillis": [
+      107.89776,
+      139.094005,
+      72.007512
+    ],
+    "medianMillis": 107.89776,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        78278376.0,
+        69864064.0,
+        65536008.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23992,
+      23888,
+      23952
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "main",
+    "requestedRttMillis": 0,
+    "operation": "audio",
+    "coordinate": 2097152,
+    "workers": 1,
+    "timingsMillis": [
+      144.931009,
+      159.947416,
+      141.27246
+    ],
+    "medianMillis": 144.931009,
+    "metrics": {
+      "commitsIndexed": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "databaseBytesWritten": [
+        2100173.0,
+        2100233.0,
+        2100293.0
+      ],
+      "gc.alloc.rate.norm": [
+        29081472.0,
+        29162416.0,
+        29299992.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "jdbcBatches": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "payloadBytes": [
+        2097152.0,
+        2097152.0,
+        2097152.0
+      ],
+      "preparedStatements": [
+        10.0,
+        10.0,
+        10.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        33554432.0,
+        33554432.0,
+        33554432.0
+      ],
+      "transactions": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "workspacesPublished": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      2252856,
+      2254416,
+      2254248
+    ],
+    "gitCommits": [
+      6,
+      8,
+      10
+    ],
+    "sqlCommits": [
+      0,
+      0,
+      0
+    ],
+    "luceneCommits": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "role": "main",
+    "requestedRttMillis": 0,
+    "operation": "audio",
+    "coordinate": 16777216,
+    "workers": 1,
+    "timingsMillis": [
+      858.702109,
+      736.611166,
+      796.693034
+    ],
+    "medianMillis": 796.693034,
+    "metrics": {
+      "commitsIndexed": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "databaseBytesWritten": [
+        16784714.0,
+        16784778.0,
+        16784835.0
+      ],
+      "gc.alloc.rate.norm": [
+        118189960.0,
+        116928424.0,
+        118478064.0
+      ],
+      "gc.count": [
+        10.0,
+        0.0,
+        1.0
+      ],
+      "jdbcBatches": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "payloadBytes": [
+        16777216.0,
+        16777216.0,
+        16777216.0
+      ],
+      "preparedStatements": [
+        13.0,
+        13.0,
+        13.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        33554432.0,
+        33554432.0,
+        33554432.0
+      ],
+      "transactions": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "workspacesPublished": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      17973480,
+      17975040,
+      17974856
+    ],
+    "gitCommits": [
+      6,
+      8,
+      10
+    ],
+    "sqlCommits": [
+      0,
+      0,
+      0
+    ],
+    "luceneCommits": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "role": "main",
+    "requestedRttMillis": 20,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 1,
+    "timingsMillis": [
+      1149.555006,
+      1157.124936,
+      1146.348754
+    ],
+    "medianMillis": 1149.555006,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        77016680.0,
+        75408152.0,
+        77632464.0
+      ],
+      "gc.count": [
+        0.0,
+        0.0,
+        4.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23936,
+      24000,
+      23984
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "main",
+    "requestedRttMillis": 20,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 4,
+    "timingsMillis": [
+      342.861432,
+      360.599406,
+      336.942264
+    ],
+    "medianMillis": 342.861432,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        73387216.0,
+        71853936.0,
+        73948320.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23880,
+      23888,
+      23952
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "proposed",
+    "requestedRttMillis": 0,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 1,
+    "timingsMillis": [
+      89.370348,
+      120.213931,
+      112.167223
+    ],
+    "medianMillis": 112.167223,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        73759904.0,
+        72024328.0,
+        74491296.0
+      ],
+      "gc.count": [
+        0.0,
+        0.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23936,
+      23944,
+      24008
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "proposed",
+    "requestedRttMillis": 0,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 4,
+    "timingsMillis": [
+      70.689887,
+      88.106173,
+      54.902438
+    ],
+    "medianMillis": 70.689887,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        73116840.0,
+        69692424.0,
+        68438320.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23936,
+      23888,
+      24008
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "proposed",
+    "requestedRttMillis": 0,
+    "operation": "audio",
+    "coordinate": 2097152,
+    "workers": 1,
+    "timingsMillis": [
+      133.693097,
+      140.985917,
+      141.470206
+    ],
+    "medianMillis": 140.985917,
+    "metrics": {
+      "commitsIndexed": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "databaseBytesWritten": [
+        2100173.0,
+        2100233.0,
+        2100293.0
+      ],
+      "gc.alloc.rate.norm": [
+        28916080.0,
+        28516624.0,
+        29193952.0
+      ],
+      "gc.count": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "jdbcBatches": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "payloadBytes": [
+        2097152.0,
+        2097152.0,
+        2097152.0
+      ],
+      "preparedStatements": [
+        10.0,
+        10.0,
+        10.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        33554432.0,
+        33554432.0,
+        33554432.0
+      ],
+      "transactions": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "workspacesPublished": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      2252856,
+      2254408,
+      2254248
+    ],
+    "gitCommits": [
+      6,
+      8,
+      10
+    ],
+    "sqlCommits": [
+      0,
+      0,
+      0
+    ],
+    "luceneCommits": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "role": "proposed",
+    "requestedRttMillis": 0,
+    "operation": "audio",
+    "coordinate": 16777216,
+    "workers": 1,
+    "timingsMillis": [
+      999.824456,
+      942.941434,
+      920.432813
+    ],
+    "medianMillis": 942.941434,
+    "metrics": {
+      "commitsIndexed": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "databaseBytesWritten": [
+        16784714.0,
+        16784778.0,
+        16784835.0
+      ],
+      "gc.alloc.rate.norm": [
+        118165952.0,
+        116594248.0,
+        118688848.0
+      ],
+      "gc.count": [
+        1.0,
+        3.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "payloadBytes": [
+        16777216.0,
+        16777216.0,
+        16777216.0
+      ],
+      "preparedStatements": [
+        13.0,
+        13.0,
+        13.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        33554432.0,
+        33554432.0,
+        33554432.0
+      ],
+      "transactions": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "workspacesPublished": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      17973536,
+      17975040,
+      17974856
+    ],
+    "gitCommits": [
+      6,
+      8,
+      10
+    ],
+    "sqlCommits": [
+      0,
+      0,
+      0
+    ],
+    "luceneCommits": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "role": "proposed",
+    "requestedRttMillis": 20,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 1,
+    "timingsMillis": [
+      1146.945064,
+      1314.425441,
+      1395.853246
+    ],
+    "medianMillis": 1314.425441,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        76788224.0,
+        75706680.0,
+        77433880.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23992,
+      23944,
+      403992
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "proposed",
+    "requestedRttMillis": 20,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 4,
+    "timingsMillis": [
+      513.538405,
+      421.907295,
+      626.15389
+    ],
+    "medianMillis": 513.538405,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        73161768.0,
+        71922968.0,
+        74004672.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23880,
+      23960,
+      23928
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "release",
+    "requestedRttMillis": 0,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 1,
+    "timingsMillis": [
+      89.526711,
+      112.498229,
+      91.876385
+    ],
+    "medianMillis": 91.876385,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        73979408.0,
+        72926328.0,
+        75163960.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23936,
+      23944,
+      24008
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "release",
+    "requestedRttMillis": 0,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 4,
+    "timingsMillis": [
+      63.776811,
+      104.306943,
+      69.791256
+    ],
+    "medianMillis": 69.791256,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        77814576.0,
+        69925920.0,
+        66121384.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23880,
+      23888,
+      23952
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "release",
+    "requestedRttMillis": 0,
+    "operation": "audio",
+    "coordinate": 2097152,
+    "workers": 1,
+    "timingsMillis": [
+      107.416585,
+      107.616985,
+      112.487221
+    ],
+    "medianMillis": 107.616985,
+    "metrics": {
+      "commitsIndexed": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "databaseBytesWritten": [
+        2100173.0,
+        2100233.0,
+        2100293.0
+      ],
+      "gc.alloc.rate.norm": [
+        28490728.0,
+        28350432.0,
+        28986840.0
+      ],
+      "gc.count": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "jdbcBatches": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "payloadBytes": [
+        2097152.0,
+        2097152.0,
+        2097152.0
+      ],
+      "preparedStatements": [
+        10.0,
+        10.0,
+        10.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        33554432.0,
+        33554432.0,
+        33554432.0
+      ],
+      "transactions": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "workspacesPublished": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      2252840,
+      2254416,
+      2254232
+    ],
+    "gitCommits": [
+      6,
+      8,
+      10
+    ],
+    "sqlCommits": [
+      0,
+      0,
+      0
+    ],
+    "luceneCommits": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "role": "release",
+    "requestedRttMillis": 0,
+    "operation": "audio",
+    "coordinate": 16777216,
+    "workers": 1,
+    "timingsMillis": [
+      877.06481,
+      682.967649,
+      680.847154
+    ],
+    "medianMillis": 682.967649,
+    "metrics": {
+      "commitsIndexed": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "databaseBytesWritten": [
+        16784714.0,
+        16784778.0,
+        16784835.0
+      ],
+      "gc.alloc.rate.norm": [
+        118184864.0,
+        116926296.0,
+        118485872.0
+      ],
+      "gc.count": [
+        7.0,
+        1.0,
+        0.0
+      ],
+      "jdbcBatches": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "payloadBytes": [
+        16777216.0,
+        16777216.0,
+        16777216.0
+      ],
+      "preparedStatements": [
+        13.0,
+        13.0,
+        13.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        33554432.0,
+        33554432.0,
+        33554432.0
+      ],
+      "transactions": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "workspacesPublished": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      17973480,
+      17975040,
+      17974856
+    ],
+    "gitCommits": [
+      6,
+      8,
+      10
+    ],
+    "sqlCommits": [
+      0,
+      0,
+      0
+    ],
+    "luceneCommits": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "role": "release",
+    "requestedRttMillis": 20,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 1,
+    "timingsMillis": [
+      1171.322199,
+      1175.541016,
+      1149.880953
+    ],
+    "medianMillis": 1171.322199,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        70346568.0,
+        68708576.0,
+        70936168.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23936,
+      23920,
+      24008
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  },
+  {
+    "role": "release",
+    "requestedRttMillis": 20,
+    "operation": "taxonomy",
+    "coordinate": 1000,
+    "workers": 4,
+    "timingsMillis": [
+      346.938285,
+      350.248173,
+      351.628456
+    ],
+    "medianMillis": 350.248173,
+    "metrics": {
+      "commitsIndexed": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "databaseBytesWritten": [
+        7581.0,
+        7581.0,
+        7590.0
+      ],
+      "gc.alloc.rate.norm": [
+        73941696.0,
+        72675496.0,
+        74319576.0
+      ],
+      "gc.count": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "jdbcBatches": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "payloadBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "preparedStatements": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "publicationWorkers": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "retainedAnalysisBytes": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "transactions": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "workspacesPublished": [
+        4.0,
+        4.0,
+        4.0
+      ]
+    },
+    "walInsertLsnBytes": [
+      23888,
+      23824,
+      23896
+    ],
+    "gitCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "sqlCommits": [
+      1008,
+      1012,
+      1016
+    ],
+    "luceneCommits": [
+      1008,
+      1012,
+      1016
+    ]
+  }
+]

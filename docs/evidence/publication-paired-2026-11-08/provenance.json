@@ -1,0 +1,904 @@
+{
+  "sourceCommit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+  "sourceTree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+  "localContentEquivalent": "f293b74420fdf23069449d3cdce324d38d1b3338",
+  "run": {
+    "id": 42431132779,
+    "name": "Performance Investigations",
+    "node_id": "WFR_kwLOTOBUcM8AAAAJ4Re0aw",
+    "head_branch": "codex/performance-followup-20261108",
+    "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "path": ".github/workflows/performance-investigations.yml",
+    "display_title": "Add reviewed native performance follow-up harnesses",
+    "run_number": 773,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "failure",
+    "workflow_id": 329596335,
+    "check_suite_id": 114949351486,
+    "check_suite_node_id": "CS_kwDOTOBUcM8AAAAaw4PoPg",
+    "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42431132779",
+    "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132779",
+    "pull_requests": [],
+    "created_at": "2026-11-08T00:44:30Z",
+    "updated_at": "2026-11-08T01:21:21Z",
+    "actor": {
+      "login": "carstenartur",
+      "id": 3164220,
+      "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/carstenartur",
+      "html_url": "https://github.com/carstenartur",
+      "followers_url": "https://api.github.com/users/carstenartur/followers",
+      "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+      "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+      "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+      "repos_url": "https://api.github.com/users/carstenartur/repos",
+      "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 1,
+    "referenced_workflows": [],
+    "run_started_at": "2026-11-08T00:44:30Z",
+    "triggering_actor": {
+      "login": "carstenartur",
+      "id": 3164220,
+      "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/carstenartur",
+      "html_url": "https://github.com/carstenartur",
+      "followers_url": "https://api.github.com/users/carstenartur/followers",
+      "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+      "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+      "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+      "repos_url": "https://api.github.com/users/carstenartur/repos",
+      "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42431132779/jobs",
+    "logs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42431132779/logs",
+    "check_suite_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-suites/114949351486",
+    "artifacts_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42431132779/artifacts",
+    "cancel_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42431132779/cancel",
+    "rerun_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42431132779/rerun",
+    "previous_attempt_url": null,
+    "workflow_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/workflows/329596335",
+    "head_commit": {
+      "id": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+      "tree_id": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+      "message": "Add reviewed native performance follow-up harnesses\n\nPrepare preregistered paired publication comparisons, bounded sustained Search diagnostics, and native consumer publication evidence. Run the focused studies and real consumer contracts on the same immutable validation-branch commit.\n\nRefs #161, #196, #211. No production defaults or release artifacts changed.",
+      "timestamp": "2026-11-08T00:44:25Z",
+      "author": {
+        "name": "Carsten Hammer",
+        "email": "carsten.hammer@t-online.de"
+      },
+      "committer": {
+        "name": "Carsten Hammer",
+        "email": "carsten.hammer@t-online.de"
+      }
+    },
+    "repository": {
+      "id": 1289770096,
+      "node_id": "R_kgDOTOBUcA",
+      "name": "jgit-storage-hibernate",
+      "full_name": "carstenartur/jgit-storage-hibernate",
+      "private": false,
+      "owner": {
+        "login": "carstenartur",
+        "id": 3164220,
+        "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/carstenartur",
+        "html_url": "https://github.com/carstenartur",
+        "followers_url": "https://api.github.com/users/carstenartur/followers",
+        "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+        "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+        "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+        "repos_url": "https://api.github.com/users/carstenartur/repos",
+        "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate",
+      "description": "Hibernate-backed storage backend for JGit repositories, persisting Git packs, refs, reflogs and searchable history in relational databases.",
+      "fork": false,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate",
+      "forks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/forks",
+      "keys_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/teams",
+      "hooks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/hooks",
+      "issue_events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/events",
+      "assignees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/tags",
+      "blobs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/languages",
+      "stargazers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/stargazers",
+      "contributors_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contributors",
+      "subscribers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscribers",
+      "subscription_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscription",
+      "commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/merges",
+      "archive_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/downloads",
+      "issues_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/labels{/name}",
+      "releases_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/deployments"
+    },
+    "head_repository": {
+      "id": 1289770096,
+      "node_id": "R_kgDOTOBUcA",
+      "name": "jgit-storage-hibernate",
+      "full_name": "carstenartur/jgit-storage-hibernate",
+      "private": false,
+      "owner": {
+        "login": "carstenartur",
+        "id": 3164220,
+        "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/carstenartur",
+        "html_url": "https://github.com/carstenartur",
+        "followers_url": "https://api.github.com/users/carstenartur/followers",
+        "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+        "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+        "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+        "repos_url": "https://api.github.com/users/carstenartur/repos",
+        "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate",
+      "description": "Hibernate-backed storage backend for JGit repositories, persisting Git packs, refs, reflogs and searchable history in relational databases.",
+      "fork": false,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate",
+      "forks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/forks",
+      "keys_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/teams",
+      "hooks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/hooks",
+      "issue_events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/events",
+      "assignees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/tags",
+      "blobs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/languages",
+      "stargazers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/stargazers",
+      "contributors_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contributors",
+      "subscribers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscribers",
+      "subscription_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscription",
+      "commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/merges",
+      "archive_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/downloads",
+      "issues_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/labels{/name}",
+      "releases_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/deployments"
+    }
+  },
+  "jobs": [
+    {
+      "id": 128580045961,
+      "name": "Performance investigation workflow contract",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Validate sharding and aggregation contract",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Test read-ahead artifact validation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Test paired publication evidence and stopping rules",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Test exact native follow-up event selection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        }
+      ]
+    },
+    {
+      "id": 128580085595,
+      "name": "Publication policy / independent-16w-0ms",
+      "status": "completed",
+      "conclusion": "failure",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Build unchanged library and benchmark harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run fixed paired protocol on a dedicated runner",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 5
+        },
+        {
+          "name": "Validate all paired results and retain the observed conclusion",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6
+        },
+        {
+          "name": "Check retained files for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Upload complete or diagnostic partial study evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580085626,
+      "name": "Publication policy / independent-1w-0ms",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Build unchanged library and benchmark harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run fixed paired protocol on a dedicated runner",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate all paired results and retain the observed conclusion",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check retained files for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Upload complete or diagnostic partial study evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580085636,
+      "name": "Publication policy / shared-8w-5ms",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Build unchanged library and benchmark harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run fixed paired protocol on a dedicated runner",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate all paired results and retain the observed conclusion",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check retained files for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Upload complete or diagnostic partial study evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580085639,
+      "name": "Publication policy / independent-1w-50ms",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Build unchanged library and benchmark harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run fixed paired protocol on a dedicated runner",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate all paired results and retain the observed conclusion",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check retained files for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Upload complete or diagnostic partial study evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580085660,
+      "name": "Publication policy / independent-16w-50ms",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Build unchanged library and benchmark harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run fixed paired protocol on a dedicated runner",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate all paired results and retain the observed conclusion",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check retained files for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Upload complete or diagnostic partial study evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Checkout immutable study source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580086659,
+      "name": "Merge and validate repository-aging full matrix",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 128580086681,
+      "name": "repository-aging (smoke)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 128580086758,
+      "name": "${{ matrix.investigation }} (${{ (((github.event_name == 'workflow_dispatch') && inputs.profile) || ((((github.event_name == 'schedule') && 'full') || 'smoke'))) }})",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 128580086965,
+      "name": "repository-aging full \u2014 ${{ matrix.backend }} / ${{ matrix.cache_state }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 128580087166,
+      "name": "Stateful/stateless threshold at 16/128/512 MiB",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132779,
+      "logs_url": null,
+      "steps": null
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 13598581102,
+      "name": "publication-nonregression-shared-8w-5ms",
+      "size_in_bytes": 420257,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598581102",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598581102/zip",
+      "expired": false,
+      "created_at": "2026-11-08T01:09:46Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T01:09:46Z",
+      "digest": "sha256:f6dd6c52c94b7b21484765fea3b3b5ff08b0aeb9607f90b85ed8c65b210a6e34",
+      "workflow_run": {
+        "id": 42431132779,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "cell": "shared-8w-5ms",
+      "jobId": 128580085636
+    },
+    {
+      "id": 13598482588,
+      "name": "publication-nonregression-independent-16w-50ms",
+      "size_in_bytes": 422042,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598482588",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598482588/zip",
+      "expired": false,
+      "created_at": "2026-11-08T01:21:19Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T01:21:19Z",
+      "digest": "sha256:f407290178660a660a73feb5cc52a8b14ec3b30f2e33b6574f6324c3932ef919",
+      "workflow_run": {
+        "id": 42431132779,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "cell": "independent-16w-50ms",
+      "jobId": 128580085660
+    },
+    {
+      "id": 13598246666,
+      "name": "publication-nonregression-independent-1w-50ms",
+      "size_in_bytes": 375160,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598246666",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598246666/zip",
+      "expired": false,
+      "created_at": "2026-11-08T01:08:34Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T01:08:34Z",
+      "digest": "sha256:1f3c6a25d511ca47a017615c8cbf3aaa133a1431e8f8139ee8d7fa8f9729075a",
+      "workflow_run": {
+        "id": 42431132779,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "cell": "independent-1w-50ms",
+      "jobId": 128580085639
+    },
+    {
+      "id": 13598025586,
+      "name": "publication-nonregression-independent-16w-0ms",
+      "size_in_bytes": 56980,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598025586",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598025586/zip",
+      "expired": false,
+      "created_at": "2026-11-08T00:48:54Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T00:48:54Z",
+      "digest": "sha256:1a44472470bb29fa00fba1446c4cb1e05640b5c5af711861d62de9372a087c80",
+      "workflow_run": {
+        "id": 42431132779,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "cell": "independent-16w-0ms",
+      "jobId": 128580085595
+    },
+    {
+      "id": 13597953171,
+      "name": "publication-nonregression-independent-1w-0ms",
+      "size_in_bytes": 418459,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597953171",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597953171/zip",
+      "expired": false,
+      "created_at": "2026-11-08T01:05:42Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T01:05:42Z",
+      "digest": "sha256:cd212309d3fad2079148ec0ad60fe2415a96bb823c6ad39da1c7dcc37b24a901",
+      "workflow_run": {
+        "id": 42431132779,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "cell": "independent-1w-0ms",
+      "jobId": 128580085626
+    }
+  ],
+  "sourcesArchiveSha256": "3758091eb22c910201da0c030dbdd5921ad84eb0fc119d27da9ce460cd5cc9dd",
+  "sourceFiles": {
+    ".github/scripts/summarize-publication-nonregression.py": {
+      "gitBlob": "bfdf130cecd533b5a758939ec9ae601cc0675c73",
+      "sha256": "8f5b3549d6370033b6f0dd9ad9509a9d62c4be891681ceca3b32e2cebc16678f",
+      "bytes": 17240
+    },
+    ".github/scripts/test_summarize_publication_nonregression.py": {
+      "gitBlob": "ebcb18ee27bfd0c1397cef77a0d8e492e5c4a07e",
+      "sha256": "cf2e85f1100427e3a27f74adccfe0f95dca6c46c80e28025f29b4f730db12de5",
+      "bytes": 18559
+    },
+    ".github/scripts/validate_search_database_telemetry.py": {
+      "gitBlob": "cee00c47c4d8989388abc8b6d5a9d1b267c56b16",
+      "sha256": "065aa3aeeeb47b8592c442f94091be7c1c6b9ba0ae6bef45dc695cabc851b64e",
+      "bytes": 4378
+    },
+    ".github/workflows/performance-investigations.yml": {
+      "gitBlob": "bc5a85b6c95369c3e1c67b59ef50113dc832a9b7",
+      "sha256": "38bdfbbc27472a5395e5953cb22fd1c0883bbf78311cf8137d54c13abc00e77e",
+      "bytes": 30331
+    },
+    "jgit-storage-hibernate-benchmarks/pom.xml": {
+      "gitBlob": "8712524a104cd7ae8d84c7c3c53c2342c80f2cac",
+      "sha256": "ec18d869f4a047319a5d42caf2ff17c8d359c4b5b9f3549c85aa51936d6cbd5e",
+      "bytes": 10643
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/BenchmarkConnectionProperties.java": {
+      "gitBlob": "14f0cdfcb77365de23d24672c175c260e7bfbba4",
+      "sha256": "8f27f8f45feed1eb198437f3b79d0f941dd6a5d828a6eb7af6db9cf69fb42071",
+      "bytes": 2343
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ConcurrentPublicationBenchmark.java": {
+      "gitBlob": "baf8adf04deec3a496070764ef7dca674d556c9c",
+      "sha256": "71343d221a22880f4e5184535f11fdead0b45002566583cc11bc783936610ec6",
+      "bytes": 21657
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackPublicationProfiler.java": {
+      "gitBlob": "6f29776b41d98a9bdf481e2af651ff36fa235b14",
+      "sha256": "e61961f0a3359ac9c154c85af68f262ae49780de28676265bd617e92125f0531",
+      "bytes": 3412
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackPublicationPairedBenchmarkIT.java": {
+      "gitBlob": "98e7323d6195dcd61c05958eeadacbbf3065a4fb",
+      "sha256": "4eed1d807378b058e906af936696e26446011d9c44ce1905aacd6370ea17fea7",
+      "bytes": 17748
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PublicationPairing.java": {
+      "gitBlob": "2eee0d963b87a8601b88e1b2864ed1dadd6f772b",
+      "sha256": "58fea77b6099c796616175601018f4012bb67554c41dbce74a6711d46a0d7b07",
+      "bytes": 1679
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PublicationPairingTest.java": {
+      "gitBlob": "665cab31e1c77065b4d35f7c4925e322806b937e",
+      "sha256": "97fe71e4645aa335db646ae437b7cb31ed39b6dbf23f7e274fabecd6be73ca8b",
+      "bytes": 2447
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/config/HibernateSessionFactoryProvider.java": {
+      "gitBlob": "d8e426bb25734231fa84442764e3963b6540af78",
+      "sha256": "419b9003021aa90b4614d1cbde4f1b972f05ff3e43871a6ce67177dd9ef1c8af",
+      "bytes": 3520
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackPublicationSelector.java": {
+      "gitBlob": "19cc13a232545443fd891786d988eb6eba7fb980",
+      "sha256": "8d4ca688584e5cae34b5a2666ef8b9b3d72f3d2f163200aca208b377cf5a212f",
+      "bytes": 13671
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java": {
+      "gitBlob": "be2d0ff12cd8d6d5d7966550fe6b2da4096ca78f",
+      "sha256": "1d86a2fdee02625fd2917cd425c59528e3ec10bafe5ffd03e8902fdaade7d987",
+      "bytes": 37041
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/HibernateTransactionContext.java": {
+      "gitBlob": "e1b563e5f7c7b2b76c34a2b72008b871f25374ba",
+      "sha256": "4433f30f91be42f9e0a262429047a5b9b7a960d0fb8244c856878f8941392a50",
+      "bytes": 15820
+    },
+    "pom.xml": {
+      "gitBlob": "3026b6e9daa73b96026f7c42167c9022687bc2a1",
+      "sha256": "1a6944a6fa3d4dadcd43f9cd92fa8c055dbb5a6038318c8d563b8ee6c21ad9e3",
+      "bytes": 21999
+    }
+  }
+}

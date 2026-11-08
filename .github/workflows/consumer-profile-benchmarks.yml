@@ -108,8 +108,8 @@ jobs:
           for source in ConsumerBenchmarkFixtures BenchmarkConnectionProperties; do
             cp "$base/main/$package/$source.java" "$LIBRARY_DIR/$base/main/$package/"
           done
-          for source in ConsumerBenchmarkFixturesTest ConsumerShapeBenchmark ConsumerProfileBenchmarkTest ConsumerAudioConcurrencyTest ConsumerSandboxIndexBenchmark ConsumerSandboxPersistenceTest; do
-            cp "$base/test/$package/$source.java" "$LIBRARY_DIR/$base/test/$package/"
+          for source in "$base/test/$package"/Consumer*.java; do
+            cp "$source" "$LIBRARY_DIR/$base/test/$package/"
           done
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
@@ -120,7 +120,7 @@ jobs:
         working-directory: ${{ env.LIBRARY_DIR }}
         run: |
           mvn -B -ntp -pl jgit-storage-hibernate-benchmarks -am test \
-            -Dtest=ConsumerBenchmarkFixturesTest,ConsumerAudioConcurrencyTest,ConsumerSandboxPersistenceTest,ConsumerProfileBenchmarkTest \
+            -Dtest=ConsumerBenchmarkFixturesTest,ConsumerAudioConcurrencyTest,ConsumerSandboxPersistenceTest,ConsumerPublicationWorkersTest,ConsumerTaxonomyDeltaTest,ConsumerPublicationLifecycleTest,ConsumerProfileBenchmarkTest \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dconsumer.profiles.run=true -Dconsumer.profiles.shape="$SHAPE" \
             -Dconsumer.profiles.matrix="$PROFILE" \

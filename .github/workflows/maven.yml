@@ -54,7 +54,18 @@ jobs:
           python3 .github/scripts/test_verify_database_test_evidence.py
           python3 .github/scripts/test_verify_public_repository_publishing.py
           python3 .github/scripts/test_verify_central_bundle.py
+          python3 .github/scripts/test_native_followup_trigger.py
+          python3 .github/scripts/test_consumer_publication_evidence.py
+          python3 .github/scripts/test_summarize_publication_nonregression.py
+          python3 .github/scripts/test_summarize_search_runtime_diagnostic.py
           node .github/benchmark-dashboard/dashboard.test.js
+      - name: Replay retained native performance evidence
+        run: |
+          python3 docs/evidence/search-runtime-sustained-2026-11-08/test_reproduce.py
+          python3 docs/evidence/search-runtime-sustained-2026-11-08/reproduce.py --output target/evidence-replay/search-runtime
+          python3 docs/evidence/consumer-publication-2026-11-08/test_verify.py
+          python3 docs/evidence/consumer-publication-2026-11-08/verify.py
+          python3 docs/evidence/publication-paired-2026-11-08/reproduce.py --output target/evidence-replay/publication
       - name: Verify release and security consistency
         run: |
           python3 .github/scripts/verify-release-consistency.py

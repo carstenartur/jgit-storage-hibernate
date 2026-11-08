@@ -257,7 +257,7 @@ class ConsumerProfileBenchmarkTest {
             + "}\n");
   }
 
-  private static void writePostgresRoundTripCalibration(Path root) throws Exception {
+  static void writePostgresRoundTripCalibration(Path root) throws Exception {
     String url =
         BenchmarkConnectionProperties.requiredSystemProperty(
             HibernateRepositoryBenchmark.POSTGRESQL_URL_PROPERTY);
