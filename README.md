@@ -343,6 +343,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lifecycle`, `git_repos
 - [Capacity and recovery](docs/operations/capacity-and-recovery.md)
 - [Taxonomy/Spring adoption runbook](docs/taxonomy-adoption.md)
 - [Release process](docs/release-process.md)
+- [Optional Maven Central preparation and publishing](docs/maven-central.md)
 - [Cite this project](https://doi.org/10.5281/zenodo.21210131)
 
 ## Design boundaries
