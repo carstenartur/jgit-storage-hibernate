@@ -1,0 +1,40 @@
+{
+  "sourceCommit": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+  "sourceTree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+  "runId": 42431132779,
+  "archives": [
+    {
+      "cell": "independent-1w-0ms",
+      "artifactId": 13597953171,
+      "sha256": "sha256:cd212309d3fad2079148ec0ad60fe2415a96bb823c6ad39da1c7dcc37b24a901",
+      "outcome": "complete"
+    },
+    {
+      "cell": "independent-1w-50ms",
+      "artifactId": 13598246666,
+      "sha256": "sha256:1f3c6a25d511ca47a017615c8cbf3aaa133a1431e8f8139ee8d7fa8f9729075a",
+      "outcome": "complete"
+    },
+    {
+      "cell": "independent-16w-0ms",
+      "artifactId": 13598025586,
+      "sha256": "sha256:1a44472470bb29fa00fba1446c4cb1e05640b5c5af711861d62de9372a087c80",
+      "outcome": "incomplete"
+    },
+    {
+      "cell": "independent-16w-50ms",
+      "artifactId": 13598482588,
+      "sha256": "sha256:f407290178660a660a73feb5cc52a8b14ec3b30f2e33b6574f6324c3932ef919",
+      "outcome": "complete"
+    },
+    {
+      "cell": "shared-8w-5ms",
+      "artifactId": 13598581102,
+      "sha256": "sha256:f6dd6c52c94b7b21484765fea3b3b5ff08b0aeb9607f90b85ed8c65b210a6e34",
+      "outcome": "complete"
+    }
+  ],
+  "sourceFilesVerified": 16,
+  "allIndependentNonRegressionEstablished": false,
+  "qualification": "Original failed cells remain incomplete, regardless of later diagnostic outcomes"
+}

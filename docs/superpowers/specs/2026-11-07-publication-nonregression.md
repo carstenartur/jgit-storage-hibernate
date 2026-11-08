@@ -1,0 +1,26 @@
+# Paired publication-policy follow-up
+
+One remaining acceptance gap in issue #161 is that the existing five independent-repository pairs cannot exclude a material throughput regression. Retain the size selector as the production default. This follow-up measures the merged opt-in policy without changing production code or thresholds. It does not complete the original larger-payload/internal-pool/full-matrix scope by itself.
+
+## Preregistered protocol
+
+- Use the unchanged `ConcurrentPublicationBenchmark` and `PackPublicationProfiler`, PostgreSQL 17.10, HikariCP, JDK 21, explicit `fsync=on`, `synchronous_commit=on` and `full_page_writes=on`.
+- Bind PostgreSQL data to the hosted runner filesystem. Record its filesystem type and actual PostgreSQL settings; do not describe runner storage as a production-device qualification.
+- Independent cells: 256 KiB plus 257 bytes, one or sixteen writers, zero or fifty milliseconds requested RTT. These four boundary cells cover the smallest chunked payload, local/networked access and the supported writer extremes. Small payloads plausibly expose proportional policy overhead, but are not a proven worst-case bound. Larger payload and intermediate cells remain outside this specific comparison.
+- Shared cell: 768 KiB plus 257 bytes, eight writers, five milliseconds requested RTT. This repeats the demonstrated contention crossover with disk-backed PostgreSQL.
+- Pairs use fresh JVMs and alternate size/adaptive order. Each fork has two three-second warmups and three five-second measurement iterations. Iterations are not independent replicates. Both policies use identical fixtures, heap, connection settings and reset/warmup behavior; host/database state can still correlate neighboring pairs.
+- Independent cells have exactly two permitted looks: 24 and 96 cumulative pairs. The material-throughput-regression margin is -5%. At each look use a one-sided Bonferroni bound with alpha 0.05/(4 cells * 2 looks) = 0.00625. The Student t critical values are 2.709720420119227 (23 degrees of freedom) and 2.5461530351050503 (95 degrees of freedom).
+- Stop at 24 pairs only if the unrounded lower bound is strictly greater than -5%; otherwise continue to 96 total pairs, including the first 24. There is no third look or extension. Report both looks if performed, never choose the better estimate. Early-stopped estimates may be upward selected; the corrected decision remains valid under the stated t-test assumptions.
+- The shared cell remains a fixed 24 pairs and a two-sided 95% interval (critical value 2.0686576104190486).
+- Fix this design before looking at any new scores. Do not pool prior short forks, discard inconvenient observations, change stopping rules or widen the margin after measuring. With the old log-ratio standard deviation 0.170268, the 96-pair look has illustrative marginal power around 66%; neither this planning example nor longer measurements guarantee a conclusive outcome.
+- A negative/inconclusive interval remains a valid retained result. The evidence validator rejects malformed/incomplete observations, not an unfavorable performance finding. There is no automatic default promotion.
+
+## Required evidence
+
+Keep each unmodified JMH JSON and output log, source/tree identity, UTC fork windows, requested and calibrated RTT, CPU/JVM/heap/filesystem/PostgreSQL metadata and per-file SHA-256. Require exactly 48 complete forks for shared or a valid first-look independent pass; otherwise require all 192 independent forks. Each fork has three measured iterations, no failed/raced publication and finite positive throughput. Retain counter, allocation and lock distributions from the existing profiler. The primary decision concerns throughput only; p95/p99, lock and allocation regressions remain visible and must not be hidden behind a throughput pass. Keep temporary connection properties outside uploaded artifacts, remove them after use and scan retained artifacts for credential/endpoint logging.
+
+Every result must retain its matching `raw/*.log`, with no unlisted raw result or output. Record and validate the actual JMH 1.37/JDK 21/VM versions in every fork against the protocol and environment. Set the fork JVM arguments explicitly: one `-Xms256m`, one `-Xmx1024m`, no inherited conflicting heap settings. CPU count, model, affinity, cgroup CPU/memory limits and OS/VM metadata are required; unavailable platform fields use the literal `unavailable` marker.
+
+Retain the complete PostgreSQL 17 [`pg_stat_checkpointer`](https://www.postgresql.org/docs/17/monitoring-stats.html#MONITORING-PG-STAT-CHECKPOINTER-VIEW) observation before and after each fork. Require typed nonnegative counters and finite nonnegative times; retain `stats_reset` as either its timezone-qualified timestamp or an explicit JSON null. These cumulative observations can lag actual activity. Checkpoint activity and resets are descriptive context, never criteria for discarding a fork or selecting a more favorable result.
+
+A report must distinguish the four independently tested boundaries and the one shared crossover; the conclusion applies only to these conditions. Preserve all historical measurements and their original source attribution.

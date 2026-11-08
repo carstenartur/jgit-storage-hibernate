@@ -200,3 +200,9 @@ Replacing the scroll with multiple public query calls would change the
 consistency contract as the index changes.
 [Hibernate Search scrolling contract](https://docs.hibernate.org/search/8.4/reference/en-US/html_single/#search-dsl-query-scroll)
 [Scalability issue #230](https://github.com/carstenartur/jgit-storage-hibernate/issues/230)
+
+The [supported-integration review](../evidence/search-scroll-upstream-review-2026-11-08.md)
+confirms that public Lucene reader access exists, but a replacement must preserve
+the configured scoring, implicit tenant filters and compact projection semantics.
+The reviewed Hibernate Search 8.4.1 maintenance source still contains the same
+expanding scroll page as 8.4.0; a version bump alone does not remove that behavior.

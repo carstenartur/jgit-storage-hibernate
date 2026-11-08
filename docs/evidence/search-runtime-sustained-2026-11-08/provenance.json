@@ -1,0 +1,517 @@
+{
+  "run": {
+    "id": 42431132661,
+    "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132661",
+    "event": "push",
+    "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+    "head_tree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "started_at": "2026-11-08T00:44:30Z",
+    "updated_at": "2026-11-08T00:49:19Z",
+    "path": ".github/workflows/search-runtime-performance.yml"
+  },
+  "artifacts": [
+    {
+      "id": 13598075445,
+      "name": "search-runtime-sustained-sync-async-r500-constrained",
+      "size_in_bytes": 415384,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598075445",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13598075445/zip",
+      "expired": false,
+      "created_at": "2026-11-08T00:49:15Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T00:49:15Z",
+      "digest": "sha256:67f61c190b93a1e8f771e6bf4f7d6de805f739336927dc093569eaabac1bf49e",
+      "workflow_run": {
+        "id": 42431132661,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "retained_archive": "archives/search-runtime-sustained-sync-async-r500-constrained.zip"
+    },
+    {
+      "id": 13597528045,
+      "name": "search-runtime-sustained-sync-async-r500-normal",
+      "size_in_bytes": 413362,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597528045",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597528045/zip",
+      "expired": false,
+      "created_at": "2026-11-08T00:48:38Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T00:48:38Z",
+      "digest": "sha256:693ece422d114dd99fcfb0182f00dcf36ae17b5cfc6485cbe6ea0743d1e0ccc5",
+      "workflow_run": {
+        "id": 42431132661,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "retained_archive": "archives/search-runtime-sustained-sync-async-r500-normal.zip"
+    },
+    {
+      "id": 13597522702,
+      "name": "search-runtime-sustained-reference-constrained",
+      "size_in_bytes": 836383,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597522702",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597522702/zip",
+      "expired": false,
+      "created_at": "2026-11-08T00:47:01Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T00:47:01Z",
+      "digest": "sha256:5c2f80f8fb27401d5e4bf325517041fa4f8040dad428f8aae46ec87f9ae508c1",
+      "workflow_run": {
+        "id": 42431132661,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "retained_archive": "archives/search-runtime-sustained-reference-constrained.zip"
+    },
+    {
+      "id": 13597094873,
+      "name": "search-runtime-sustained-reference-normal",
+      "size_in_bytes": 842247,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597094873",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13597094873/zip",
+      "expired": false,
+      "created_at": "2026-11-08T00:46:27Z",
+      "expires_at": "2027-02-06T00:44:31Z",
+      "updated_at": "2026-11-08T00:46:27Z",
+      "digest": "sha256:4e73ee4b55d33a55cd26e6105d73d89596c93bef2155aa494421ec6a5a3f9038",
+      "workflow_run": {
+        "id": 42431132661,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/performance-followup-20261108",
+        "head_sha": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+      },
+      "retained_archive": "archives/search-runtime-sustained-reference-normal.zip"
+    }
+  ],
+  "jobs": [
+    {
+      "id": 128580046215,
+      "name": "Sustained reference (constrained)",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132661,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Verify diagnostic parser and lifecycle",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run isolated PostgreSQL sustained and activity passes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate exact-source completion and export observations",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check diagnostic evidence for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580046328,
+      "name": "Sustained sync-async-r500 (normal)",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132661,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Verify diagnostic parser and lifecycle",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run isolated PostgreSQL sustained and activity passes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate exact-source completion and export observations",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check diagnostic evidence for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580046364,
+      "name": "Sustained sync-async-r500 (constrained)",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132661,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Verify diagnostic parser and lifecycle",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run isolated PostgreSQL sustained and activity passes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate exact-source completion and export observations",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check diagnostic evidence for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580046435,
+      "name": "Sustained reference (normal)",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 42431132661,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Verify diagnostic parser and lifecycle",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run isolated PostgreSQL sustained and activity passes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Validate exact-source completion and export observations",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Check diagnostic evidence for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Post Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        }
+      ]
+    },
+    {
+      "id": 128580047131,
+      "name": "Select Search runtime workloads",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132661,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 128580047589,
+      "name": "matrix.artifact == 'hibernate-search-runtime-results' && 'PostgreSQL + Lucene runtime coordination matrix' ||\n    format('PostgreSQL + Lucene {0} ({1}, {2})', matrix.workload, matrix.resources, matrix.settings)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132661,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 128580047698,
+      "name": "Publish Hibernate Search runtime benchmark history",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42431132661,
+      "logs_url": null,
+      "steps": null
+    }
+  ],
+  "local_content_equivalent": "f293b74420fdf23069449d3cdce324d38d1b3338",
+  "qualification": "Actual measurement source is the published head_sha; local commit only supplies byte-identical source through its matching full Git tree.",
+  "source_files": {
+    ".github/scripts/summarize-search-runtime-diagnostic.py": {
+      "git_blob": "73e1a0ea7da849d872a219012ede930cb90d2f60",
+      "sha256": "999f4b8ee7cbae9c2e888f514c3f2e4a06b7529bf64759108a56d9456175ba06",
+      "bytes": 22796
+    },
+    ".github/scripts/test_summarize_search_runtime_diagnostic.py": {
+      "git_blob": "0c1c89491f1dff0e140a2d4a5eee444567df742b",
+      "sha256": "46b763f1a764a2fae9f84184373a2ed8ee0a6e7a2f0810951d1a8e4d7d370a3b",
+      "bytes": 13643
+    },
+    ".github/scripts/validate_search_database_telemetry.py": {
+      "git_blob": "cee00c47c4d8989388abc8b6d5a9d1b267c56b16",
+      "sha256": "065aa3aeeeb47b8592c442f94091be7c1c6b9ba0ae6bef45dc695cabc851b64e",
+      "bytes": 4378
+    },
+    ".github/workflows/search-runtime-performance.yml": {
+      "git_blob": "2ba09a092f2d7fee9170227e3fd4fe8f1ed0c2ef",
+      "sha256": "5a7a2d06c577d6fec73a8a82dcf1f353fd0029478a6af16d1f9ab92fe786a05a",
+      "bytes": 22167
+    },
+    "jgit-storage-hibernate-benchmarks/pom.xml": {
+      "git_blob": "8712524a104cd7ae8d84c7c3c53c2342c80f2cac",
+      "sha256": "ec18d869f4a047319a5d42caf2ff17c8d359c4b5b9f3549c85aa51936d6cbd5e",
+      "bytes": 10643
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/BenchmarkConnectionProperties.java": {
+      "git_blob": "14f0cdfcb77365de23d24672c175c260e7bfbba4",
+      "sha256": "8f27f8f45feed1eb198437f3b79d0f941dd6a5d828a6eb7af6db9cf69fb42071",
+      "bytes": 2343
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/RuntimeBenchmarkFailureHandler.java": {
+      "git_blob": "2325a87911e13a7830d685b443007bc6aaa333d7",
+      "sha256": "ab7d64a462fe93fedf777d87a09aa0c01cf23ff36ec2bb30e60a80554dd12328",
+      "bytes": 1674
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeScenario.java": {
+      "git_blob": "a69ab0ee3d6162cce902ef9d2743c06dcc5d840a",
+      "sha256": "6d9b92bc677887978249d6dbf0a70bee0df2e1fc682a52abd6cb629dabbe9956",
+      "bytes": 6990
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeDiagnosticLog.java": {
+      "git_blob": "3d3a7bf2e23c91880d497e21cdd90fc60b1beb5f",
+      "sha256": "f0be9c243d35457bbe5d3e6d5a079aca5f650f6d060b4bfc445ab5fc802ec194",
+      "bytes": 6567
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeDiagnosticWorkers.java": {
+      "git_blob": "fb91f73f5d40552939763eeadb16de0cda951b56",
+      "sha256": "69a6aa41e18f5d71eecfcf730e60e2c5214adb29a41a2ad6badd62630b045498",
+      "bytes": 3202
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeDiagnosticWorkersTest.java": {
+      "git_blob": "73b9fef7293361421c46abbd18c74258ec4d4bb1",
+      "sha256": "208df853f0ab77774dd75d24db16bcddcfb9ea9d518c3db33edbf8b9ad214542",
+      "bytes": 3772
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeOutputGate.java": {
+      "git_blob": "1df8bdd887e6a900484af44bcfe43b722cf68556",
+      "sha256": "1fca90114cea5716a1f3f1e217ebb493f6ea6585faa35b079f47a6a021e9738c",
+      "bytes": 1860
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeSustainedDiagnostic.java": {
+      "git_blob": "b69a20f986e59aa523050efcd9084e9eac38ebcf",
+      "sha256": "416b0fe2c072cd12a83c7331fdfff9fd8b67e325aab77eda9c31059f39be1743",
+      "bytes": 34502
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeSustainedDiagnosticIT.java": {
+      "git_blob": "07777fee92bd1f29f7f7330215fa06a2a4cc3e7b",
+      "sha256": "4c4265267c16b1f064caeb7d8a1b8d2d250e9956b125352f655bf92cbbb6fcb9",
+      "bytes": 3233
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/SearchRuntimeSustainedDiagnosticTest.java": {
+      "git_blob": "1a236bd88cb9b4d0fae61c68564ddbbe99908096",
+      "sha256": "94396845b1bfdfab2b1f70802f03c84dc234deff3360ede24928087c28a5f198",
+      "bytes": 3384
+    },
+    "pom.xml": {
+      "git_blob": "3026b6e9daa73b96026f7c42167c9022687bc2a1",
+      "sha256": "1a6944a6fa3d4dadcd43f9cd92fa8c055dbb5a6038318c8d563b8ee6c21ad9e3",
+      "bytes": 21999
+    }
+  },
+  "retained_sources_sha256": "ac267681a8e07e5f90ec42e23a19a652430ac71ab5dc562b602b2e3272205d0f",
+  "retained_summarizer_sha256": "999f4b8ee7cbae9c2e888f514c3f2e4a06b7529bf64759108a56d9456175ba06",
+  "summary_wording_correction": "Original hosted summary.md calls the MXBean sample live heap. It measures heap used, including objects awaiting collection. Original bytes are retained; the new report and future renderer use heap used."
+}

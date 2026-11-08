@@ -207,6 +207,17 @@ measured 39.9% higher shared-repository throughput (paired 95% interval +32.4% t
 material regression. The [policy comparison and raw evidence](evidence/pack-publication-2026-11-07/README.md)
 use tmpfs database storage and do not justify a default change.
 
+The [preregistered follow-up](evidence/publication-paired-2026-11-08/README.md)
+uses host-bound ext4 PostgreSQL storage with observed durability settings enabled.
+Its fixed 24-pair shared cell measured +38.594% throughput (95% interval +36.151%
+to +41.082%). At 256 KiB, the independent 1-writer/0-ms, 1-writer/50-ms and
+16-writer/50-ms cells passed their corrected −5% non-regression bound. The
+16-writer/0-ms cell failed during pair four with a Java heap allocation error;
+its partial data is retained without an acceptance interval. The original
+five-cell study remains incomplete as a qualification, and #161 stays open for
+the separately scoped allocation diagnosis. Larger independent payloads and a
+global default change remain unqualified.
+
 ## Automatic stateful/stateless threshold
 
 The focused PostgreSQL + HikariCP matrix uses the production batch window of 16 and verifies close/reopen SHA-256 integrity.
@@ -382,18 +393,22 @@ scalability. [Measurement boundaries and reproducibility](evidence/search-routin
 
 ## What is complete and what remains
 
+Completed evaluations can leave deployment-specific qualification work. The table
+distinguishes that future research from an unmet original acceptance condition;
+retaining a safe default is a valid outcome of a tuning experiment.
+
 | Issue area | Completed | Remaining |
 |---|---|---|
-| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, opt-in bounded contention selector, path/payload diagnostics, schema-isolation regressions and retained paired PostgreSQL comparison | Independent-repository non-regression, the remaining payload/writer/RTT matrix and representative-storage evidence before any default change. |
+| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, isolation/safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md): three independent bounds pass; shared throughput +38.594% with a positive 95% interval. | Still open: the 16-writer/0-ms independent cell aborted with a heap allocation failure; its original acceptance result is missing. Diagnose that failure separately. Larger payloads/provider combinations and any default promotion need separate qualification. |
 | [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Benchmark-only two-window prototype, cancellation/rollback/reopen tests and 27 retained native trials | Full Git publication, 512 MiB and multiwriter/storage comparisons, rollback latency and repeatable local non-regression; production stays synchronous. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
 | Repository aging/repack | Full PostgreSQL/SQL Server/HSQLDB age matrix, repeated provider-restart evidence, and manual maintenance guidance | Broader large-repository repeats and operational budgets before considering automatic scheduling. |
 | Stateful/stateless writer | 16/128/512 matrix, automatic 16-MiB threshold, explicit overrides and integrity tests | Networked concurrent 128/512-MiB validation may refine but is not required for the current safe fallback policy. |
-| [Search runtime settings (#196)](https://github.com/carstenartur/jgit-storage-hibernate/issues/196) | Four complete hosted cells, bounded configuration recipes, explicit durability/visibility contracts, tested failure handler and persistent-index crash/interruption recovery | Exact refresh/merge activity, queue saturation and peak-heap evidence; repeated measurements before any default or named-profile promotion. |
-| [Search routing and topology (#198)](https://github.com/carstenartur/jgit-storage-hibernate/issues/198) | Opt-in routing, exact repository isolation under database collations, transactional purge/replay, local writer-lock recovery, 48 large local observations and 42 remote burst/restart observations across 1/2/4 JVMs | Repeated workload-specific crossover, omitted million-document shard cells, large remote indexes and processor/backend outage recovery. |
-| [Consumer-shaped profiles (#211)](https://github.com/carstenartur/jgit-storage-hibernate/issues/211) | Three deterministic shapes, retained release/main evidence, native PostgreSQL lifecycle/RTT, concurrent audio and persisted sandbox experiments with explicit operating decisions | Larger native Taxonomy histories/concurrent publication, representative audio pressure and physical chunk comparisons, broader semantic invalidation, and exact-source compatibility/comparison evidence for each promoted series. |
-| [History scroll/export (#230)](https://github.com/carstenartur/jgit-storage-hibernate/issues/230) | PostgreSQL/SQL Server 10k/100k/1m matrix, checked ordering/membership, resource release, measured deep-offset guidance and transaction-start cleanup | A supported Lucene continuation that bounds retained hits while preserving snapshot/order semantics; native statement/wait and genuinely cold-cache measurements. |
+| [Search runtime settings (#196)](https://github.com/carstenartur/jgit-storage-hibernate/issues/196) | Completed bounded evaluation: original settings/recovery matrix plus [eight sustained timing/activity passes](evidence/search-runtime-sustained-2026-11-08/README.md), actual PostgreSQL durability settings, observed queue backpressure, separately attributed Lucene activity and 2,500 exact Git/SQL/Lucene/reopen identities per pass. Keep `write-sync`; no new named profile. | Future deployment qualification before a default/profile change. The paced rate is not maximum capacity, sampled heap used is not retained live memory, and activity events do not establish universal lag or fsync guarantees. |
+| [Search routing and topology (#198)](https://github.com/carstenartur/jgit-storage-hibernate/issues/198) | Completed conservative evaluation: opt-in routing, exact repository isolation under database collations, transactional purge/replay, local writer-lock recovery, 48 large local observations and 42 remote burst/restart observations across 1/2/4 JVMs; defaults unchanged. | Future qualification: repeated workload-specific crossover, omitted million-document shard cells, large remote indexes and processor/backend outage recovery. These are not claimed by the completed evaluation. |
+| [Consumer-shaped profiles (#211)](https://github.com/carstenartur/jgit-storage-hibernate/issues/211) | Completed scoped acceptance: three deterministic shapes, bounded smoke/manual matrices and explicit Audio/Taxonomy/sandbox decisions; [54 native release/Main/Proposed observations](evidence/consumer-publication-2026-11-08/README.md) add concurrent workspace publication and Audio WAL, with all three real-consumer contracts on the exact measured source. A separate 23-observation integrated series retains its own source qualification. | Future qualification: larger native histories, higher analysis pressure, alternative physical chunk layouts and general semantic invalidation. Historical experiments keep their original source; Main/Proposed production trees are identical, so their timing differences do not establish a new library optimization. |
+| [History scroll/export (#230)](https://github.com/carstenartur/jgit-storage-hibernate/issues/230) | PostgreSQL/SQL Server 10k/100k/1m matrix, checked ordering/membership, resource release, measured deep-offset guidance and transaction-start cleanup; [upstream integration review](evidence/search-scroll-upstream-review-2026-11-08.md) confirms the growing scroll implementation is unchanged in 8.4.1. | Still open: a supported Lucene continuation that bounds retained hits while preserving snapshot/order, custom similarity and implicit-filter context; native statement/wait and genuinely cold-cache measurements. |
 
 ## Current distance to the useful ceiling
 

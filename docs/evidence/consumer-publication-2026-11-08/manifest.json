@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+  "sourceTree": "8a6035b7563d2901bf8d34f62f2c879bc1cb0601",
+  "localEvidenceBase": "f293b74420fdf23069449d3cdce324d38d1b3338",
+  "roles": {
+    "release": "ba6aeecc338968df4279fb9c7c72b15bbb3577fb",
+    "main": "1c33640bc75206e81a9bc5722768860a2a2321f5",
+    "proposed": "5ed8aad0f0691bcecb414b319235b67dc0520581"
+  },
+  "nativeRunId": 42431132637,
+  "compatibilityRunId": 42431132838,
+  "archiveDigestsVerifiedAtCapture": 15,
+  "retainedCurrentArchives": 14,
+  "artifacts": [
+    {
+      "id": 13598040319,
+      "name": "consumer-publication-comparison",
+      "runId": 42431132637,
+      "sizeBytes": 503,
+      "sha256": "8148bae93a5abb616b38c4d60d099fdcfcd40bd09b575c61ef8269e0ce506c78",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13598040319",
+      "retained": true,
+      "file": "archives/consumer-publication-comparison.zip"
+    },
+    {
+      "id": 13598005312,
+      "name": "consumer-publication-proposed-20ms",
+      "runId": 42431132637,
+      "sizeBytes": 104882,
+      "sha256": "c180e9bc69d0d512e9802dffc7018517b3d96a18315aa752585ac90ffe7f4e58",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13598005312",
+      "retained": true,
+      "file": "archives/consumer-publication-proposed-20ms.zip"
+    },
+    {
+      "id": 13597995226,
+      "name": "consumer-publication-main-0ms",
+      "runId": 42431132637,
+      "sizeBytes": 115693,
+      "sha256": "8c1eb29b2b3a68e3bf69296b5395550f1821bad68626f37023ae6c58f44cea6c",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597995226",
+      "retained": true,
+      "file": "archives/consumer-publication-main-0ms.zip"
+    },
+    {
+      "id": 13597527859,
+      "name": "consumer-publication-main-20ms",
+      "runId": 42431132637,
+      "sizeBytes": 105283,
+      "sha256": "da742fc194fe06dcad999d45ed276045b98a5f61d5fce534deeb87894c3a23e2",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597527859",
+      "retained": true,
+      "file": "archives/consumer-publication-main-20ms.zip"
+    },
+    {
+      "id": 13597329095,
+      "name": "consumer-publication-release-20ms",
+      "runId": 42431132637,
+      "sizeBytes": 105244,
+      "sha256": "88c30ec61c85cb923fc743d81a3d84f43841e3db4426712c860cca471af9a712",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597329095",
+      "retained": true,
+      "file": "archives/consumer-publication-release-20ms.zip"
+    },
+    {
+      "id": 13597109874,
+      "name": "consumer-publication-proposed-0ms",
+      "runId": 42431132637,
+      "sizeBytes": 115253,
+      "sha256": "8ec9eb80f2d2dce29c72707074aa8957d02cebe645bc6eb29185b8fd985a4cdf",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13597109874",
+      "retained": true,
+      "file": "archives/consumer-publication-proposed-0ms.zip"
+    },
+    {
+      "id": 13596794004,
+      "name": "consumer-publication-release-0ms",
+      "runId": 42431132637,
+      "sizeBytes": 115094,
+      "sha256": "cbe1586e5c26a5a546742542b31eb43c6d375db0547dd4928170b2993a92bda5",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132637/artifacts/13596794004",
+      "retained": true,
+      "file": "archives/consumer-publication-release-0ms.zip"
+    },
+    {
+      "id": 13598210289,
+      "name": "consumer-candidate-sandbox",
+      "runId": 42431132838,
+      "sizeBytes": 555015,
+      "sha256": "5431f3c91d4d264c3ccd3d190e267a5502dc53fb84430c01cb5b52255a09196d",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13598210289",
+      "retained": true,
+      "file": "archives/consumer-candidate-sandbox.zip"
+    },
+    {
+      "id": 13598185228,
+      "name": "consumer-compatibility-summary",
+      "runId": 42431132838,
+      "sizeBytes": 894,
+      "sha256": "4e76afbde0ec1198b2f7a7d6bd006ce791e03e9d2f78a1530172cce403de1eff",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13598185228",
+      "retained": true,
+      "file": "archives/consumer-compatibility-summary.zip"
+    },
+    {
+      "id": 13597995184,
+      "name": "jgit-storage-hibernate-consumer-candidate",
+      "runId": 42431132838,
+      "sizeBytes": 67356568,
+      "sha256": "5bcd755e2e345b48c6a95c82f783e0135b5cd75f9ee78c624753fe12906940eb",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597995184",
+      "retained": false
+    },
+    {
+      "id": 13597836122,
+      "name": "consumer-baseline-taxonomy",
+      "runId": 42431132838,
+      "sizeBytes": 184698,
+      "sha256": "8d9f3e23394b2e8f1609eac1fdcaf4af4167bfc89fb2985e4492ac1b8f171228",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597836122",
+      "retained": true,
+      "file": "archives/consumer-baseline-taxonomy.zip"
+    },
+    {
+      "id": 13597587882,
+      "name": "consumer-candidate-audio-analyzer",
+      "runId": 42431132838,
+      "sizeBytes": 788751,
+      "sha256": "d7aebe05c9e8274e025f55396ff8fd7b3350743a25673b12d40a8ee2df4a59d6",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597587882",
+      "retained": true,
+      "file": "archives/consumer-candidate-audio-analyzer.zip"
+    },
+    {
+      "id": 13597513040,
+      "name": "consumer-baseline-audio-analyzer",
+      "runId": 42431132838,
+      "sizeBytes": 771765,
+      "sha256": "6d1db43ff1c8a660b71c669ddc9981e0b812b98eadf2d8598b76d1643bf29fa5",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597513040",
+      "retained": true,
+      "file": "archives/consumer-baseline-audio-analyzer.zip"
+    },
+    {
+      "id": 13597154874,
+      "name": "consumer-baseline-sandbox",
+      "runId": 42431132838,
+      "sizeBytes": 548781,
+      "sha256": "e21d250c8fdf72673bbefb11b7060939c3e55627ceafe3933fcca4881daa638b",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13597154874",
+      "retained": true,
+      "file": "archives/consumer-baseline-sandbox.zip"
+    },
+    {
+      "id": 13596834708,
+      "name": "consumer-candidate-taxonomy",
+      "runId": 42431132838,
+      "sizeBytes": 187260,
+      "sha256": "54d6d7815b789b8a56a71ab29dacdc6d7b0c45683811d0a8d1e905587aa68412",
+      "url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42431132838/artifacts/13596834708",
+      "retained": true,
+      "file": "archives/consumer-candidate-taxonomy.zip"
+    }
+  ],
+  "provenance": [
+    {
+      "file": "provenance/consumer-candidate-build.log.gz",
+      "uncompressedSha256": "dd9ccfc9077c992286ef0f99fc62413c673e359520bf3c3841dfe2837996e245"
+    },
+    {
+      "file": "provenance/consumer-candidate-audio-analyzer.log.gz",
+      "uncompressedSha256": "7b83bba32dd23352f01d6c940ad5c5b8c6f19f1dfd9cc9d87da81c146de7e780"
+    },
+    {
+      "file": "provenance/consumer-candidate-taxonomy.log.gz",
+      "uncompressedSha256": "4d3ed865beed8f66267bcd16f2b223be05363c001488215131f70765a5b1b780"
+    },
+    {
+      "file": "provenance/consumer-candidate-sandbox.log.gz",
+      "uncompressedSha256": "7e84be4d951830290c1fb0212f4d4775f37b80517a0647c0dd4f5909a72ff3a2"
+    },
+    {
+      "file": "provenance/source-api-evidence.json.gz",
+      "uncompressedSha256": "6d791a7f40811aabccaee91729a1cc52a286e2aaed924067b2836ae6a11485e9"
+    },
+    {
+      "file": "provenance/final-api-evidence.json.gz",
+      "uncompressedSha256": "f9b0c9cae7b2735c08ffd0a09373150c0bda4821ba10f858788c7fc73b00a394"
+    },
+    {
+      "file": "provenance/generator-tests.log.gz",
+      "uncompressedSha256": "6f952afaa3474078b6f96957c8e187faeeafc57e224e3bf0199b054b1979b8f1"
+    }
+  ],
+  "sources": [
+    {
+      "repositoryPath": ".github/consumer-compatibility.json",
+      "file": "sources/consumer-compatibility.json",
+      "sha256": "f24178e7957c151ddb6e890d86dbda54583a161e62f4853a73c3da75dd186282"
+    },
+    {
+      "repositoryPath": ".github/scripts/consumer-publication-evidence.py",
+      "file": "sources/consumer-publication-evidence.py",
+      "sha256": "4c3ffee7a2c27e4c2d1198988572979f2e1b90d48fc346ad94a67a514ef519e1"
+    },
+    {
+      "repositoryPath": ".github/scripts/summarize-consumer-compatibility.py",
+      "file": "sources/summarize-consumer-compatibility.py",
+      "sha256": "6b7e3d1447108855f607c1dcea2eea0ef13d3626df0b9c47272b3562d0eff0ed"
+    },
+    {
+      "repositoryPath": ".github/workflows/consumer-compatibility.yml",
+      "file": "sources/consumer-compatibility.yml",
+      "sha256": "aff7b7357356742affe2020aa3de6bc8e42092ebb0766c7124b5b4e0caf087c7"
+    },
+    {
+      "repositoryPath": ".github/workflows/consumer-taxonomy-postgres.yml",
+      "file": "sources/consumer-taxonomy-postgres.yml",
+      "sha256": "f61ec8d7f3f792bc9134108e4f6216cc622615fcd7b7699d547d075c80f6387b"
+    }
+  ],
+  "priorQualifiedSource": "a528d95101547b81c484b33bd7f3c54c22335512",
+  "priorQualifiedTree": "974c3c0589f0067f0135dbd65e3e6f205591902b",
+  "priorQualifiedObservations": 23,
+  "filesSha256": {
+    "README.md": "17d3f5676474fcf8d8e1a675e0ef7584b8b0d098a1509a2b019d47136f7a259f",
+    "archives/consumer-baseline-audio-analyzer.zip": "6d1db43ff1c8a660b71c669ddc9981e0b812b98eadf2d8598b76d1643bf29fa5",
+    "archives/consumer-baseline-sandbox.zip": "e21d250c8fdf72673bbefb11b7060939c3e55627ceafe3933fcca4881daa638b",
+    "archives/consumer-baseline-taxonomy.zip": "8d9f3e23394b2e8f1609eac1fdcaf4af4167bfc89fb2985e4492ac1b8f171228",
+    "archives/consumer-candidate-audio-analyzer.zip": "d7aebe05c9e8274e025f55396ff8fd7b3350743a25673b12d40a8ee2df4a59d6",
+    "archives/consumer-candidate-sandbox.zip": "5431f3c91d4d264c3ccd3d190e267a5502dc53fb84430c01cb5b52255a09196d",
+    "archives/consumer-candidate-taxonomy.zip": "54d6d7815b789b8a56a71ab29dacdc6d7b0c45683811d0a8d1e905587aa68412",
+    "archives/consumer-compatibility-summary.zip": "4e76afbde0ec1198b2f7a7d6bd006ce791e03e9d2f78a1530172cce403de1eff",
+    "archives/consumer-publication-comparison.zip": "8148bae93a5abb616b38c4d60d099fdcfcd40bd09b575c61ef8269e0ce506c78",
+    "archives/consumer-publication-main-0ms.zip": "8c1eb29b2b3a68e3bf69296b5395550f1821bad68626f37023ae6c58f44cea6c",
+    "archives/consumer-publication-main-20ms.zip": "da742fc194fe06dcad999d45ed276045b98a5f61d5fce534deeb87894c3a23e2",
+    "archives/consumer-publication-proposed-0ms.zip": "8ec9eb80f2d2dce29c72707074aa8957d02cebe645bc6eb29185b8fd985a4cdf",
+    "archives/consumer-publication-proposed-20ms.zip": "c180e9bc69d0d512e9802dffc7018517b3d96a18315aa752585ac90ffe7f4e58",
+    "archives/consumer-publication-release-0ms.zip": "cbe1586e5c26a5a546742542b31eb43c6d375db0547dd4928170b2993a92bda5",
+    "archives/consumer-publication-release-20ms.zip": "88c30ec61c85cb923fc743d81a3d84f43841e3db4426712c860cca471af9a712",
+    "derived-native-coordinates.json": "7585bcce911a5171b13a1a39fb440db110ace41ea306f2d3d45280a512f943c6",
+    "derived-native-observations.json": "b99211b36cad46ceff26a5377a61a0e4348050941ea167ea9f15261714603637",
+    "observations.csv": "d4e648e0f18c92c15712479e5f3ab7b33a49d58dd4bbb92e4fe2b9483f3d4fb0",
+    "original-issue.json": "2ff00fdd9b8f1a21f628de7e499864a7b6ba39718fb9efd2cae89f08f938e4a5",
+    "previous-integrated/candidate-audio-analyzer-full-checkout-provenance.log.gz": "9e7afc1d1fa059347a02c06f405d9ddf96982631373d5114e06980ab97815229",
+    "previous-integrated/candidate-audio-provenance.log.gz": "13558baec7db83014ad50f20a04fe5f21808977fbe9343a1d652d2b335ea5fce",
+    "previous-integrated/candidate-build-provenance.log.gz": "eda3cd46cf579740295d5e905e6cab5b8b0ade81428c132d4417487a192a3431",
+    "previous-integrated/candidate-sandbox-full-checkout-provenance.log.gz": "97dd5ac145d0a53e5fb7e308c62111465b2f0b7df2fd055a818dc4b2db490e95",
+    "previous-integrated/candidate-sandbox-provenance.log.gz": "499ded01c54eb131340329f8f9ed749d7d28d8ba4c4c1da9190e46a87472f9d4",
+    "previous-integrated/candidate-taxonomy-full-checkout-provenance.log.gz": "9b005d1f2fbfcc1e17b151f93981d7a0b5006802722d1b57ae27c09514c08919",
+    "previous-integrated/candidate-taxonomy-provenance.log.gz": "51c395b5c03cb243daf3d4378090281a18ee972a4605286e04a8d638637d440d",
+    "previous-integrated/consumer-211-final-ci-review.json": "86ec55f47e24c68e9a594481079a827ec78e0002428ba75624d99019929e4788",
+    "previous-integrated/consumer-211-final-ci-review.md": "dd0ef0599df278b7f2082796d834c5e6d6432235a3b671775e3a27b388729229",
+    "previous-integrated/consumer_baseline_audio_analyzer.zip": "b1ce0a1665d24752b002fe4fe4756970c340a7255ab0b1e01b015302984d1ebb",
+    "previous-integrated/consumer_baseline_sandbox.zip": "f85b47337d99166a66e24769bc8a3cc0c899941a3152c86ba141388266d5759a",
+    "previous-integrated/consumer_baseline_taxonomy.zip": "fc399fb416bb65d57c267a4227b48f2e0c528b8b78cfbbaedee29a1a6d1596a0",
+    "previous-integrated/consumer_candidate_audio_analyzer.zip": "80216a53891261ca067d167a4f341df5760e8828891cc72102d60d82abb8cbe1",
+    "previous-integrated/consumer_candidate_sandbox.zip": "d078d39cb171779262644bfc3aedb5b639975c0fbbd4ead67756b2c5401201be",
+    "previous-integrated/consumer_candidate_taxonomy.zip": "1f578462d14ebbffcc7cbefd2f182ac7beb3c1cd2ed6d785790b6fc01314f3a5",
+    "previous-integrated/consumer_compatibility_summary.zip": "1e4ff9350a79240f943b457628d3583b5817f025c6bf44ba9ae90d6821a2837a",
+    "previous-integrated/native_0ms.zip": "5900204f0ae08368cb144d921cf8edd376ee4330fd649d6fbf4f0d06a4fc1555",
+    "previous-integrated/native_20ms.zip": "948e9356f402442a6e71df4d56fbad5f5b11aea4816e66798113afff5a5f203e",
+    "previous-integrated/smoke_audio.zip": "ed4b0f5122f851adda1482c5f452e6fb89ad784db4d37a0d9247fc204ac44d21",
+    "previous-integrated/smoke_sandbox.zip": "a0c12e4bdcdfe7403a08941251f2ec7e871b9ee902744885ea3d7c0ac158addd",
+    "previous-integrated/smoke_sandbox_index.zip": "a1bc237331cc439776f2b4b5b5a89b5c48dda789a3c28fc408540a8f9a3e249d",
+    "previous-integrated/smoke_taxonomy.zip": "742552533e86f71b5b74a4b5f51b9c3bde3174263acaeb29accfbabfe39f8fb5",
+    "provenance/consumer-candidate-audio-analyzer.log.gz": "5cb12fee98a84e71108f0c3f336c73c85c685269a5d731f6789d1cd577ec981c",
+    "provenance/consumer-candidate-build.log.gz": "74cc3f2d2c99902838c7cde617ef60c04bb84575aafbd1b700d4202e7b77d6af",
+    "provenance/consumer-candidate-sandbox.log.gz": "e16ef2180cce3bca9da0490f4c6c25fc298d7c007fa92c705e8e660acfa6438b",
+    "provenance/consumer-candidate-taxonomy.log.gz": "9c0b82225675c42163e5b77f9c83b1e31ec5ef78a06a7438d8aa4eedb512fc69",
+    "provenance/final-api-evidence.json.gz": "286f2673425011f07de9be355c887200d3dd98abb2ad91dc5b1da90e7bcb51b5",
+    "provenance/generator-tests.log.gz": "69417c66caad5a7d101d3c902fee1e13ea9e1f993aedc7842e7b49323ee8886c",
+    "provenance/source-api-evidence.json.gz": "50525760e99b9cfd29296525ffe175c9d12957042b6bb89a1a433f897e6cc0ca",
+    "qualified-evidence.json": "bd495707e286d5eaef4d8ee21e3ae7c5cb301d14c3e228a6067e95aa3d0b10f8",
+    "sources/consumer-compatibility.json": "f24178e7957c151ddb6e890d86dbda54583a161e62f4853a73c3da75dd186282",
+    "sources/consumer-compatibility.yml": "aff7b7357356742affe2020aa3de6bc8e42092ebb0766c7124b5b4e0caf087c7",
+    "sources/consumer-publication-evidence.py": "4c3ffee7a2c27e4c2d1198988572979f2e1b90d48fc346ad94a67a514ef519e1",
+    "sources/consumer-taxonomy-postgres.yml": "f61ec8d7f3f792bc9134108e4f6216cc622615fcd7b7699d547d075c80f6387b",
+    "sources/summarize-consumer-compatibility.py": "6b7e3d1447108855f607c1dcea2eea0ef13d3626df0b9c47272b3562d0eff0ed",
+    "verify.py": "4e85759cb7c841597892b9f42dbfb1874e4e3a32db117bb9b6786a89c7e581a5"
+  }
+}

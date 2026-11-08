@@ -1,0 +1,6 @@
+cell,pairCount,forkCount,throughputChangePercent,lowerBoundPercent,upperBoundPercent,nonRegressionEstablished,sharedImprovementEstablished,stoppedEarly,outcome
+independent-1w-0ms,24,48,0.13445350712425036,-0.6871883492809016,0.9628930297013277,True,False,True,complete
+independent-1w-50ms,24,48,-0.08874173368520868,-0.42128660440365107,0.2449136764976453,True,False,True,complete
+independent-16w-0ms,3,6,,,,False,False,False,incomplete
+independent-16w-50ms,24,48,0.20063059744992265,-0.4327954820733414,0.8380864034294312,True,False,True,complete
+shared-8w-5ms,24,48,38.594391189681666,36.150912257383425,41.08172285270049,False,True,False,complete
