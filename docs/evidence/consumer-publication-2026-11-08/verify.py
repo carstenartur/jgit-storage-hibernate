@@ -42,11 +42,27 @@ def unpack(archive, destination):
 
 def junit(directory):
     totals = dict(tests=0, errors=0, failures=0, skipped=0)
-    for path in directory.rglob("TEST-*.xml"):
+    reports = sorted(directory.rglob("TEST-*.xml"))
+    if not reports:
+        raise ValueError("No JUnit reports in " + str(directory))
+    for path in reports:
         suite = ET.parse(path).getroot()
-        assert suite.tag == "testsuite"
+        if suite.tag != "testsuite":
+            raise ValueError("Expected a JUnit testsuite: " + str(path))
+        try:
+            counts = {key: int(suite.attrib[key]) for key in totals}
+        except (KeyError, ValueError) as failure:
+            raise ValueError("Invalid or missing JUnit counter: " + str(path)) from failure
+        if any(value < 0 for value in counts.values()):
+            raise ValueError("Negative JUnit counter: " + str(path))
+        cases = suite.findall("testcase")
+        if len(cases) != counts["tests"]:
+            raise ValueError("JUnit testcase count disagrees with declared total: " + str(path))
+        if any(counts[key] for key in ("errors", "failures", "skipped")) or any(
+                element.tag in ("failure", "error", "skipped") for element in suite.iter()):
+            raise ValueError("JUnit evidence contains unsuccessful tests: " + str(path))
         for key in totals:
-            totals[key] += int(suite.get(key, 0))
+            totals[key] += counts[key]
     return totals
 
 

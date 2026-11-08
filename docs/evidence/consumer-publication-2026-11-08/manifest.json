@@ -278,6 +278,7 @@
     "sources/consumer-publication-evidence.py": "4c3ffee7a2c27e4c2d1198988572979f2e1b90d48fc346ad94a67a514ef519e1",
     "sources/consumer-taxonomy-postgres.yml": "f61ec8d7f3f792bc9134108e4f6216cc622615fcd7b7699d547d075c80f6387b",
     "sources/summarize-consumer-compatibility.py": "6b7e3d1447108855f607c1dcea2eea0ef13d3626df0b9c47272b3562d0eff0ed",
-    "verify.py": "4e85759cb7c841597892b9f42dbfb1874e4e3a32db117bb9b6786a89c7e581a5"
+    "verify.py": "34da7708642a492c329516ba0b6c7fd8aec43b6e768d10e0a4fbf192a4e7e6dc",
+    "test_verify.py": "8429c0e61d20e52e5afbf1c42dc6a806bcd81a8eba03895860d591cca2cb2d22"
   }
 }

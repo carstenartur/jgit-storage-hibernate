@@ -63,6 +63,7 @@ jobs:
         run: |
           python3 docs/evidence/search-runtime-sustained-2026-11-08/test_reproduce.py
           python3 docs/evidence/search-runtime-sustained-2026-11-08/reproduce.py --output target/evidence-replay/search-runtime
+          python3 docs/evidence/consumer-publication-2026-11-08/test_verify.py
           python3 docs/evidence/consumer-publication-2026-11-08/verify.py
           python3 docs/evidence/publication-paired-2026-11-08/reproduce.py --output target/evidence-replay/publication
       - name: Verify release and security consistency
