@@ -13,12 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.carstenartur.jgit.storage.hibernate.benchmark.BenchmarkConnectionProperties;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -27,11 +30,42 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 class StagedChunkPipelineExperimentTest {
   private static final int CHUNK_BYTES = HibernateObjDatabase.PACK_CHUNK_SIZE;
+  @TempDir Path scratch;
+
+  @ParameterizedTest
+  @EnumSource(StagedChunkPipelineExperiment.Mode.class)
+  void recordsRollbackAfterAFlushedWindowForBothFailureDirections(
+      StagedChunkPipelineExperiment.Mode mode) throws Exception {
+    Path staged = scratch.resolve("rollback.pack");
+    try (var output = Files.newOutputStream(staged)) {
+      output.write(new byte[3 * CHUNK_BYTES + 1]);
+    }
+    for (var stage : StagedChunkPipelineExperiment.FailureStage.values()) {
+      try (var provider = new HibernateSessionFactoryProvider(properties());
+          var repository =
+              HibernateRepository.create(provider.getSessionFactory(), "measured-rollback")) {
+        repository.create(true);
+        long packsBefore = count(provider, "GitPackEntity");
+        long chunksBefore = count(provider, "GitPackChunkEntity");
+        var result =
+            StagedChunkPipelineExperiment.measureRollback(
+                provider.getSessionFactory(), repository, staged, mode, 0, 1, stage);
+        assertTrue(result.rollbackNanos() > 0);
+        assertTrue(result.failureToReturnNanos() >= result.rollbackNanos());
+        assertEquals(1, result.flushedChunks());
+        assertEquals(packsBefore, count(provider, "GitPackEntity"));
+        assertEquals(chunksBefore, count(provider, "GitPackChunkEntity"));
+        assertEquals(0, result.remainingPacks());
+        assertEquals(0, result.remainingChunks());
+      }
+    }
+  }
 
   @ParameterizedTest
   @EnumSource(
@@ -257,6 +291,7 @@ class StagedChunkPipelineExperimentTest {
   }
 
   private static Properties properties() {
+    BenchmarkConnectionProperties.suppressConnectionMetadataLogging();
     var properties = new Properties();
     properties.setProperty(
         "hibernate.connection.url", "jdbc:hsqldb:mem:chunk-pipeline-" + UUID.randomUUID());

@@ -236,6 +236,11 @@ from 1,993 ms to 1,181 ms with a virtual reader, with an additional 16 MiB
 payload window. This measures the staged transfer and transaction commit.
 [Raw evidence and phase charts](evidence/staging-pipeline-2026-11-07/README.md)
 
+[Repeatable native staging and rollback profiles](operations/staging-pipeline-evidence.md)
+extend the experiment to explicit 512 MiB, concurrency, storage and RTT coordinates.
+Their timing boundary remains staged transfer through commit; complete Git
+publication and repeatable non-regression remain acceptance gates for #189.
+
 ## Durable receiver batching
 
 The original benchmark queue only grouped scheduling; every command still executed its own transaction. That was insufficient for the receiver use case.
