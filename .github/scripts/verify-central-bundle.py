@@ -78,23 +78,16 @@ def verify(bundle, root, signatures):
                 raise ValueError(f"Missing reactor artifact: {name}")
         artifacts = sorted(name for name in entries if name.endswith((".jar", ".pom")))
         for name in artifacts:
-            data = archive.read(entries[name])
             for suffix in (".asc", ".md5", ".sha1"):
                 if name + suffix not in entries:
                     raise ValueError(f"Missing sidecar: {name + suffix}")
             if not archive.read(entries[name + ".asc"]).strip():
                 raise ValueError(f"Empty signature: {name}.asc")
-            for algorithm in ("md5", "sha1", "sha256", "sha512"):
-                checksum = name + "." + algorithm
-                if checksum in entries:
-                    actual = archive.read(entries[checksum]).decode("ascii").strip().lower()
-                    if actual != hashlib.new(algorithm, data).hexdigest():
-                        raise ValueError(f"Invalid checksum: {checksum}")
             if signatures:
                 with tempfile.TemporaryDirectory(prefix="central-signature-") as directory:
                     payload = Path(directory) / "artifact"
                     signature = Path(directory) / "artifact.asc"
-                    payload.write_bytes(data)
+                    payload.write_bytes(archive.read(entries[name]))
                     signature.write_bytes(archive.read(entries[name + ".asc"]))
                     result = subprocess.run(["gpg", "--no-options", "--batch", "--no-auto-key-retrieve",
                                              "--verify", str(signature), str(payload)],
@@ -102,9 +95,15 @@ def verify(bundle, root, signatures):
                     if result.returncode:
                         raise ValueError(f"Invalid signature for {name}: {result.stderr.strip()}")
         for name in entries:
-            base = re.sub(r"\.(?:md5|sha1|sha256|sha512)$", "", name).removesuffix(".asc")
-            if base not in entries:
+            payload, _, suffix = name.rpartition(".")
+            if suffix not in ("asc", "md5", "sha1", "sha256", "sha512"):
+                continue
+            if payload not in entries:
                 raise ValueError(f"Orphan sidecar: {name}")
+            if suffix != "asc":
+                actual = archive.read(entries[name]).decode("ascii").strip().lower()
+                if actual != hashlib.new(suffix, archive.read(entries[payload])).hexdigest():
+                    raise ValueError(f"Invalid checksum: {name}")
     print(f"Verified {len(artifacts)} artifacts for {len(modules)} reactor modules" +
           (" and their GPG signatures" if signatures else " (signature presence only)"))
 

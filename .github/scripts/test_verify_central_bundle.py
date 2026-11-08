@@ -105,6 +105,29 @@ class CentralBundleTest(unittest.TestCase):
             self.assert_rejected(self.gate(), name)
             del self.entries[name]
 
+    def test_signature_checksums_use_the_signature_payload(self):
+        for artifact in (PRIMARY[0], PRIMARY[3]):
+            for algorithm in ("md5", "sha1", "sha256", "sha512"):
+                with self.subTest(artifact=artifact, algorithm=algorithm):
+                    name = artifact + ".asc." + algorithm
+                    try:
+                        self.entries[name] = hashlib.new(
+                            algorithm, self.entries[artifact + ".asc"]).hexdigest().encode() + b"\n"
+                        result = self.gate()
+                        self.assertEqual(0, result.returncode, result.stderr)
+                        self.entries[name] = hashlib.new(
+                            algorithm, self.entries[artifact]).hexdigest().encode()
+                        self.assert_rejected(self.gate(), "Invalid checksum: " + name)
+                    finally:
+                        self.entries.pop(name, None)
+
+    def test_orphan_sidecars_are_rejected(self):
+        artifact = BASE + "core/1.2.3/core-1.2.3-extra.jar"
+        for suffix in (".asc", ".sha1", ".asc.sha1"):
+            with self.subTest(suffix=suffix):
+                name = artifact + suffix
+                self.assert_rejected(self.gate(extra=((name, b"orphan"),)), "Orphan sidecar: " + name)
+
     def test_duplicate_unsafe_and_unexpected_zip_paths_are_rejected(self):
         for name in (PRIMARY[0], "../outside.pom", "/outside.pom", "org\\example\\bad.pom",
                      BASE + "core/1.2.3/./core-1.2.3.pom", BASE + "other/1.2.3/other-1.2.3.pom"):
