@@ -206,3 +206,11 @@ confirms that public Lucene reader access exists, but a replacement must preserv
 the configured scoring, implicit tenant filters and compact projection semantics.
 The reviewed Hibernate Search 8.4.1 maintenance source still contains the same
 expanding scroll page as 8.4.0; a version bump alone does not remove that behavior.
+
+The separate [native retained-hit reproduction](../evidence/search-ranked-scroll-retained-2026-11-08/README.md)
+measures live Lucene `FieldDoc` objects during ranked scrolling. With unchanged
+128-row chunks, the 8,192-document run retained 4,096 hits at its sampled midpoint,
+and the 65,536-document run retained 32,768. Both released those hits after the
+closed scroll became unreachable. These Hibernate Search 8.4.0 diagnostic runs
+perturb garbage collection and make no throughput claim; they expose the retained
+page growth that an end-of-export heap measurement would miss.

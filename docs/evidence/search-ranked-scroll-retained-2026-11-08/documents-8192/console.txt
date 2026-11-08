@@ -1,0 +1,39 @@
+Nov 09, 2026 12:09:35 AM org.hibernate.Version logVersion
+INFO: HHH000001: Hibernate ORM core version 7.4.14.Final
+Nov 09, 2026 12:09:36 AM org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl constructDialect
+WARN: HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+Nov 09, 2026 12:09:36 AM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
+INFO: HHH10001005: Database info:
+	Database JDBC URL [undefined/unknown]
+	Database driver: undefined/unknown
+	Database dialect: PostgreSQLDialect
+	Database version: 14.0
+	Default catalog/schema: unknown/unknown
+	Autocommit mode: undefined/unknown
+	Isolation level: <unknown>
+	JDBC fetch size: undefined/unknown
+	Pool: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+Nov 09, 2026 12:09:36 AM org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchPreIntegrationService$Initiator initiateService
+INFO: HSEARCH000034: Hibernate Search version 8.4.0.Final
+Nov 09, 2026 12:09:37 AM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
+INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+Nov 09, 2026 12:09:37 AM org.hibernate.engine.jdbc.connections.internal.ConnectionProviderInitiator noAppropriateConnectionProvider
+WARN: HHH102003: No appropriate connection provider encountered; client must supply connections
+Nov 09, 2026 12:09:37 AM org.hibernate.search.backend.lucene.impl.LuceneBackendFactory getLuceneVersion
+WARN: HSEARCH000075: Missing value for configuration property 'hibernate.search.backend.lucene_version': using LATEST (currently '9.12.3'). Context: default backend
+Nov 09, 2026 12:09:37 AM org.apache.lucene.internal.vectorization.VectorizationProvider lookup
+WARNING: You are running with Java 23 or later. To make full use of the Vector API, please update Apache Lucene.
+phase,consumed_rows,live_field_docs,field_doc_shallow_bytes,score_doc_array_shallow_bytes
+before_open,0,0,0,0
+chunk_1,128,512,16384,2096
+chunk_2,256,512,16384,2096
+chunk_4,512,512,16384,2096
+chunk_8,1024,1024,32768,4144
+chunk_16,2048,2048,65536,8240
+chunk_32,4096,4096,131072,16432
+chunk_64,8192,512,16384,2096
+after_close,8192,0,0,32
+Exception in thread "main" java.lang.AssertionError: Retained 4096 ranked hits; configured budget is 1024
+	at io.github.carstenartur.reproducer.RankedScrollMemoryProbe.main(RankedScrollMemoryProbe.java:102)
