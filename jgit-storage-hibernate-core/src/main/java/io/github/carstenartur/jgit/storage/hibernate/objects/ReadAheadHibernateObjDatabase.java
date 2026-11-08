@@ -53,10 +53,11 @@ import org.hibernate.SessionFactory;
  * still load only the requested bounded window, and no Hibernate session or JDBC connection is held
  * for the lifetime of the channel.
  *
- * <p>The writable channel reports the same one MiB alignment used by persisted chunks and readable
- * channels. This keeps JGit's write-time DFS block cache aligned with later reads after pack-list
+ * <p>The writable pack channel reports the same one MiB alignment used by persisted chunks and
+ * readable channels. This keeps JGit's write-time DFS block cache aligned with later reads after pack-list
  * invalidation and prevents stale blocks with a different alignment from being reused by copy-as-is
- * protocol transfers.
+ * protocol transfers. Reftable output keeps JGit's configured logical block size instead of
+ * overriding it with physical pack-chunk alignment.
  *
  * <p>Completed unpublished extensions are retained in bounded JVM-local temporary files. JGit closes
  * every extension before it invokes {@code commitPack}; that callback persists all expected
@@ -297,7 +298,11 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
   @Override
   protected DfsOutputStream writeFile(DfsPackDescription description, PackExt extension)
       throws IOException {
-    return new AlignedDfsOutputStream(stagedExtensions.open(description, extension));
+    DfsOutputStream staged = stagedExtensions.open(description, extension);
+    // JGit replaces ReftableConfig's ref-block size and alignment when this
+    // output advertises a physical block size. Reftables do not populate the
+    // pack writer's DFS block cache, so they need no pack-chunk alignment hint.
+    return extension == PackExt.REFTABLE ? staged : new AlignedDfsOutputStream(staged);
   }
 
   @Override

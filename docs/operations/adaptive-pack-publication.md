@@ -85,6 +85,12 @@ acceptance bound is available. A separate GC/JNI diagnosis does not replace the
 failed performance study. The selector stays opt-in, the one-MiB default stays
 unchanged, and larger independent payloads remain outside this new qualification.
 
+The [fixed four-fork GC/JNI diagnostic](../evidence/publication-gc-diagnostic-2026-11-08/README.md)
+subsequently completed under the original JDK 21 and one-GiB heap. Both policies
+exhibited hundreds of JNI allocation stalls; full collections returned heap
+occupancy to 83–96 MiB. These observations support an allocation-pressure
+investigation and do not supply the missing original acceptance result.
+
 Any tuning must preserve these invariants:
 
 - no successful acknowledgement before the authoritative database commit;

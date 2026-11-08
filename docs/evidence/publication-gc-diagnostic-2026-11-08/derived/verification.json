@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+  "sourceTree": "273b30da2c6b007b2e54133091ce403dc2a151d6",
+  "run": 42533525581,
+  "artifact": 13638597050,
+  "archiveSha256": "fef8a8d07f8044c5d6c52008352cdd7853ba2d106a4f096a904261a3c3dd6046",
+  "hostedSummaryByteIdentical": true,
+  "forks": 4,
+  "gcEvents": 609,
+  "fullGcEvents": 6,
+  "acceptanceInference": false
+}

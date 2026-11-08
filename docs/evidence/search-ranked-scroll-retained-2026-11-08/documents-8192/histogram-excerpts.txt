@@ -1,0 +1,73 @@
+# Native live class-histogram excerpts; unrelated classes are omitted.
+# Full originals are generated at every checkpoint by the standalone reproducer.
+
+# before_open
+# original-sha256=96c94dc111c8eeee26c6bc2b5c9f3b70470377b7477e3db7dcb0cc4dcb20aac3
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+# No org.apache.lucene.search.FieldDoc entry in this native histogram.
+Total        220876       13963480
+
+# chunk_1
+# original-sha256=1650862464ca80ae91d4814beea29d9e75aca6f50fc6ded2d6c93b4684c10408
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+  47:           512          16384  org.apache.lucene.search.FieldDoc
+ 178:             3           2096  [Lorg.apache.lucene.search.ScoreDoc;
+Total        233987       14520792
+
+# chunk_2
+# original-sha256=4b98ea8a84e97287ae69699bfbe54b0db59f36cf84d22b5767ce25d4a01a01a5
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+  47:           512          16384  org.apache.lucene.search.FieldDoc
+ 178:             3           2096  [Lorg.apache.lucene.search.ScoreDoc;
+Total        233992       14520960
+
+# chunk_4
+# original-sha256=20eb4b2514d810ae9c9b49b02ef2c17ed709139e00c6ec2cb6e6953fa216d6b6
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+  47:           512          16384  org.apache.lucene.search.FieldDoc
+ 178:             3           2096  [Lorg.apache.lucene.search.ScoreDoc;
+Total        234003       14521376
+
+# chunk_8
+# original-sha256=25a2be17baf1362b4b9ece09b0c47e6d9cab735c808ce6bf9fbe429ed83ea875
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+  36:          1024          32768  org.apache.lucene.search.FieldDoc
+ 119:             3           4144  [Lorg.apache.lucene.search.ScoreDoc;
+Total        239168       14718216
+
+# chunk_16
+# original-sha256=1a241262feee3d03b92b18b72fda4f764f88d68fd78ee490dfcdf1de973756b2
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+  21:          2048          65536  org.apache.lucene.search.FieldDoc
+  74:             3           8240  [Lorg.apache.lucene.search.ScoreDoc;
+Total        249425       15108368
+
+# chunk_32
+# original-sha256=4e5ab1179a501a4c4db66ccc51028f8077c3506da0625745f0b2cbb8985ca8b8
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+  15:          4096         131072  org.apache.lucene.search.FieldDoc
+  52:             3          16432  [Lorg.apache.lucene.search.ScoreDoc;
+Total        269932       15887848
+
+# chunk_64
+# original-sha256=68a8ae69eea41db9eab7eddbb8d018e217c87b125efd72a7e9fe5ff9979f6f70
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+  51:           512          16384  org.apache.lucene.search.FieldDoc
+ 180:             3           2096  [Lorg.apache.lucene.search.ScoreDoc;
+Total        257213       15573488
+
+# after_close
+# original-sha256=dc923c43d6a95ef22331c15877e933ecaa3e312dd873461757a627ad25a140dd
+ num     #instances         #bytes  class name (module)
+-------------------------------------------------------
+1606:             2             32  [Lorg.apache.lucene.search.ScoreDoc;
+# No org.apache.lucene.search.FieldDoc entry in this native histogram.
+Total        230273       14389096

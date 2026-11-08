@@ -185,7 +185,7 @@ class PackPublicationPairedBenchmarkIT {
     }
   }
 
-  private static Options options(
+  static Options options(
       Cell cell, String policy, Path connectionFile, Path resultFile, Path outputFile) {
     String method =
         cell.shared() ? "publishToSameRepository" : "publishToDifferentRepositories";
@@ -215,7 +215,7 @@ class PackPublicationPairedBenchmarkIT {
         .build();
   }
 
-  private static Map<String, Object> protocol(Cell cell, String source, String tree) {
+  static Map<String, Object> protocol(Cell cell, String source, String tree) {
     Map<String, Object> values = new LinkedHashMap<>();
     values.put("schema", "jgit-publication-paired/v1");
     values.put("cell", cell.id());
@@ -242,7 +242,7 @@ class PackPublicationPairedBenchmarkIT {
     return values;
   }
 
-  private static Map<String, Object> environment(
+  static Map<String, Object> environment(
       Connection connection,
       Cell cell,
       String source,
@@ -286,7 +286,7 @@ class PackPublicationPairedBenchmarkIT {
     return values;
   }
 
-  private static List<Double> calibrate(Connection connection, int requested) throws Exception {
+  static List<Double> calibrate(Connection connection, int requested) throws Exception {
     List<Double> samples = new ArrayList<>();
     try (Statement statement = connection.createStatement()) {
       statement.setQueryTimeout(10);
@@ -310,7 +310,7 @@ class PackPublicationPairedBenchmarkIT {
     return samples;
   }
 
-  private static JsonElement checkpointState(Connection connection) throws Exception {
+  static JsonElement checkpointState(Connection connection) throws Exception {
     return JsonParser.parseString(
         queryString(connection, "select to_jsonb(s)::text from pg_stat_checkpointer s"));
   }
@@ -327,7 +327,7 @@ class PackPublicationPairedBenchmarkIT {
     }
   }
 
-  private static Path writeConnectionFile(String url, PostgreSQLContainer<?> postgres)
+  static Path writeConnectionFile(String url, PostgreSQLContainer<?> postgres)
       throws Exception {
     Path path =
         Files.createTempFile(
@@ -348,7 +348,7 @@ class PackPublicationPairedBenchmarkIT {
     return path;
   }
 
-  private static String sourceProperty(String name) {
+  static String sourceProperty(String name) {
     String value = System.getProperty(name, "");
     if (!value.matches("[0-9a-f]{40}")) {
       throw new IllegalArgumentException(name + " must be an immutable 40-character Git SHA");
@@ -373,11 +373,11 @@ class PackPublicationPairedBenchmarkIT {
     }
   }
 
-  private static void writeJson(Path path, Object value) throws Exception {
+  static void writeJson(Path path, Object value) throws Exception {
     Files.writeString(path, JSON.toJson(value) + "\n", StandardCharsets.UTF_8);
   }
 
-  private record Cell(String id, boolean shared, int writers, int payloadKiB, int rttMillis) {
+  record Cell(String id, boolean shared, int writers, int payloadKiB, int rttMillis) {
     static Cell parse(String id) {
       if (id == null) {
         throw new IllegalArgumentException("Select one explicit publication cell");

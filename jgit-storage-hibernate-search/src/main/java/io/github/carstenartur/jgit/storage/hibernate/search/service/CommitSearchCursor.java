@@ -13,11 +13,12 @@ import java.util.Objects;
 import java.util.concurrent.CancellationException;
 
 /**
- * Bounded, closeable cursor over compact Git commit-history search hits.
+ * Closeable cursor returning bounded chunks of compact Git commit-history search hits.
  *
  * <p>Each call to {@link #nextChunk()} returns at most the configured chunk size used to create the
  * cursor. An empty list marks the end of the result set and closes the underlying resources
  * automatically. Callers that stop early must close the cursor, preferably with try-with-resources.
+ * Backend retained search state may grow during traversal.
  *
  * <p>The cursor is deliberately single-threaded. Interrupting the consuming thread cancels the
  * cursor before another chunk is fetched and preserves the thread's interrupted status.
@@ -47,11 +48,10 @@ public final class CommitSearchCursor implements AutoCloseable {
     if (current == null) {
       throw new IllegalStateException("search cursor is closed");
     }
-    if (Thread.currentThread().isInterrupted()) {
-      close();
-      throw new CancellationException("search cursor cancelled by thread interruption");
-    }
     try {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new CancellationException("search cursor cancelled by thread interruption");
+      }
       List<CommitSearchHit> hits = List.copyOf(current.nextChunk());
       if (hits.isEmpty()) {
         close();
@@ -60,8 +60,10 @@ public final class CommitSearchCursor implements AutoCloseable {
     } catch (RuntimeException | Error failure) {
       try {
         close();
-      } catch (RuntimeException closeFailure) {
-        failure.addSuppressed(closeFailure);
+      } catch (RuntimeException | Error closeFailure) {
+        if (closeFailure != failure) {
+          failure.addSuppressed(closeFailure);
+        }
       }
       throw failure;
     }

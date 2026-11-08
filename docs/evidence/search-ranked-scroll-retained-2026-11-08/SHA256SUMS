@@ -1,0 +1,13 @@
+289c60fe01c2cdb4573d513d57454db15d79f27ed9328f630066ea3eee3e2ec6  reproducers/hibernate-search-ranked-scroll/pom.xml
+d50e14548ea068091fe15c6846d92102f7d11b74f2000e2fc3cc7859e4003bb3  reproducers/hibernate-search-ranked-scroll/README.md
+bc734b1441da0f375bd61228d7c400168090ba0fa77b265f79ff181fef7494f2  reproducers/hibernate-search-ranked-scroll/src/main/java/io/github/carstenartur/reproducer/RankedScrollMemoryProbe.java
+86107315e6e52ad8cd758e7d71f1912e5f61f589972cf46bbd271e8b07e7b31b  docs/evidence/search-ranked-scroll-retained-2026-11-08/README.md
+47b4f8a89296883f323c008fbe8f2069dbb386827e837d25c699f15406fca28b  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-65536/console.txt
+e8e7f51d84fdd18e2435f7effb0f8962eb08ba27bb481b0977ab2d47c60c7b2e  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-65536/environment.txt
+66c19d20c5587a8774cdf50b509479e76470c40f5cce30b086f7b9617e8011bf  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-65536/histogram-excerpts.txt
+aed4e9075b4830ba79679d289fdeb6f2335d77694ef29b6befe783e01267261e  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-65536/retained-hits.csv
+41f7018d0ea1a15bb47b3d903c7da25b4664fb79c55f76d83a9e68a3c8bbcd78  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-8192/console.txt
+8cb523c56c574f3666d58204a4229b72c35e751469811f678846067d43c2f400  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-8192/environment.txt
+abe63c28d80fd26084b8541814d880a642e25a3b40b41dd31c1f6a285a7e4e14  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-8192/histogram-excerpts.txt
+901e0ddd93b8ef1d4941270dfd022908839bd49ba3565467403e15d0d1ab8c46  docs/evidence/search-ranked-scroll-retained-2026-11-08/documents-8192/retained-hits.csv
+019b8f9dfd6f4e90504f9d00387575edef8248c817665d9aa5cff436d27fe7e1  docs/evidence/search-ranked-scroll-retained-2026-11-08/runtime-jars.sha256

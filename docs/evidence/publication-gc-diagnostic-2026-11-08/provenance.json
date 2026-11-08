@@ -1,0 +1,1226 @@
+{
+  "schema": "jgit-publication-gc-diagnostic-evidence/v1",
+  "sourceCommit": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+  "sourceTree": "273b30da2c6b007b2e54133091ce403dc2a151d6",
+  "localContentEquivalentCommit": "1b327b1f2bc12a88f2abfb7bb43cae71e48bf72c",
+  "originalStudyRun": 42431132779,
+  "originalStudySource": "5ed8aad0f0691bcecb414b319235b67dc0520581",
+  "run": {
+    "id": 42533525581,
+    "name": "Performance Investigations",
+    "node_id": "WFR_kwLOTOBUcM8AAAAJ5zIYTQ",
+    "head_branch": "codex/publication-gc-diagnostic-20261108",
+    "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+    "path": ".github/workflows/performance-investigations.yml",
+    "display_title": "Diagnose publication allocation failure with four fixed original-runt\u2026",
+    "run_number": 791,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "workflow_id": 329596335,
+    "check_suite_id": 115211256162,
+    "check_suite_node_id": "CS_kwDOTOBUcM8AAAAa0yBBYg",
+    "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+    "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+    "pull_requests": [],
+    "created_at": "2026-11-08T23:06:22Z",
+    "updated_at": "2026-11-08T23:09:47Z",
+    "actor": {
+      "login": "carstenartur",
+      "id": 3164220,
+      "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/carstenartur",
+      "html_url": "https://github.com/carstenartur",
+      "followers_url": "https://api.github.com/users/carstenartur/followers",
+      "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+      "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+      "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+      "repos_url": "https://api.github.com/users/carstenartur/repos",
+      "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 1,
+    "referenced_workflows": [],
+    "run_started_at": "2026-11-08T23:06:22Z",
+    "triggering_actor": {
+      "login": "carstenartur",
+      "id": 3164220,
+      "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/carstenartur",
+      "html_url": "https://github.com/carstenartur",
+      "followers_url": "https://api.github.com/users/carstenartur/followers",
+      "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+      "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+      "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+      "repos_url": "https://api.github.com/users/carstenartur/repos",
+      "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/jobs",
+    "logs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/logs",
+    "check_suite_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-suites/115211256162",
+    "artifacts_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/artifacts",
+    "cancel_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/cancel",
+    "rerun_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/rerun",
+    "previous_attempt_url": null,
+    "workflow_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/workflows/329596335",
+    "head_commit": {
+      "id": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "tree_id": "273b30da2c6b007b2e54133091ce403dc2a151d6",
+      "message": "Diagnose publication allocation failure with four fixed original-runtime forks\n\nKeep the original 1-GiB heap, original JDK 21.0.13+9 and measured library/workload unchanged. Retain each predetermined success or failure with bounded GC/JNI logs. This diagnostic does not resume or replace the incomplete non-regression study.\n\nRefs #161",
+      "timestamp": "2026-11-08T23:06:19Z",
+      "author": {
+        "name": "Carsten Hammer",
+        "email": "carsten.hammer@t-online.de"
+      },
+      "committer": {
+        "name": "Carsten Hammer",
+        "email": "carsten.hammer@t-online.de"
+      }
+    },
+    "repository": {
+      "id": 1289770096,
+      "node_id": "R_kgDOTOBUcA",
+      "name": "jgit-storage-hibernate",
+      "full_name": "carstenartur/jgit-storage-hibernate",
+      "private": false,
+      "owner": {
+        "login": "carstenartur",
+        "id": 3164220,
+        "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/carstenartur",
+        "html_url": "https://github.com/carstenartur",
+        "followers_url": "https://api.github.com/users/carstenartur/followers",
+        "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+        "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+        "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+        "repos_url": "https://api.github.com/users/carstenartur/repos",
+        "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate",
+      "description": "Hibernate-backed storage backend for JGit repositories, persisting Git packs, refs, reflogs and searchable history in relational databases.",
+      "fork": false,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate",
+      "forks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/forks",
+      "keys_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/teams",
+      "hooks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/hooks",
+      "issue_events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/events",
+      "assignees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/tags",
+      "blobs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/languages",
+      "stargazers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/stargazers",
+      "contributors_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contributors",
+      "subscribers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscribers",
+      "subscription_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscription",
+      "commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/merges",
+      "archive_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/downloads",
+      "issues_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/labels{/name}",
+      "releases_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/deployments"
+    },
+    "head_repository": {
+      "id": 1289770096,
+      "node_id": "R_kgDOTOBUcA",
+      "name": "jgit-storage-hibernate",
+      "full_name": "carstenartur/jgit-storage-hibernate",
+      "private": false,
+      "owner": {
+        "login": "carstenartur",
+        "id": 3164220,
+        "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/carstenartur",
+        "html_url": "https://github.com/carstenartur",
+        "followers_url": "https://api.github.com/users/carstenartur/followers",
+        "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+        "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+        "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+        "repos_url": "https://api.github.com/users/carstenartur/repos",
+        "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate",
+      "description": "Hibernate-backed storage backend for JGit repositories, persisting Git packs, refs, reflogs and searchable history in relational databases.",
+      "fork": false,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate",
+      "forks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/forks",
+      "keys_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/teams",
+      "hooks_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/hooks",
+      "issue_events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/events",
+      "assignees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/tags",
+      "blobs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/languages",
+      "stargazers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/stargazers",
+      "contributors_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contributors",
+      "subscribers_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscribers",
+      "subscription_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/subscription",
+      "commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/merges",
+      "archive_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/downloads",
+      "issues_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/labels{/name}",
+      "releases_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/deployments"
+    }
+  },
+  "jobs": [
+    {
+      "id": 128892706503,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeApqexw",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892706503",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892706503",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-08T23:06:23Z",
+      "started_at": "2026-11-08T23:06:25Z",
+      "completed_at": "2026-11-08T23:06:32Z",
+      "name": "Performance investigation workflow contract",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-08T23:06:26Z",
+          "completed_at": "2026-11-08T23:06:27Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-08T23:06:27Z",
+          "completed_at": "2026-11-08T23:06:28Z"
+        },
+        {
+          "name": "Validate sharding and aggregation contract",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-08T23:06:28Z",
+          "completed_at": "2026-11-08T23:06:28Z"
+        },
+        {
+          "name": "Test read-ahead artifact validation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-08T23:06:28Z",
+          "completed_at": "2026-11-08T23:06:28Z"
+        },
+        {
+          "name": "Test paired publication evidence and stopping rules",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-08T23:06:28Z",
+          "completed_at": "2026-11-08T23:06:29Z"
+        },
+        {
+          "name": "Test bounded GC diagnostic evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-08T23:06:29Z",
+          "completed_at": "2026-11-08T23:06:29Z"
+        },
+        {
+          "name": "Test exact native follow-up event selection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-08T23:06:29Z",
+          "completed_at": "2026-11-08T23:06:29Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-11-08T23:06:29Z",
+          "completed_at": "2026-11-08T23:06:30Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-08T23:06:30Z",
+          "completed_at": "2026-11-08T23:06:30Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892706503",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000399332,
+      "runner_name": "GitHub Actions 1000399332",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 128892750113,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeAptJIQ",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892750113",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892750113",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-08T23:06:33Z",
+      "started_at": "2026-11-08T23:06:35Z",
+      "completed_at": "2026-11-08T23:09:46Z",
+      "name": "Publication allocation diagnostic / four fixed forks",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-08T23:06:35Z",
+          "completed_at": "2026-11-08T23:06:36Z"
+        },
+        {
+          "name": "Checkout diagnostic source and original source identity",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-08T23:06:36Z",
+          "completed_at": "2026-11-08T23:06:53Z"
+        },
+        {
+          "name": "Set up original Temurin 21.0.13+9",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-08T23:06:53Z",
+          "completed_at": "2026-11-08T23:06:55Z"
+        },
+        {
+          "name": "Require unchanged measured library and workload",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-08T23:06:55Z",
+          "completed_at": "2026-11-08T23:06:55Z"
+        },
+        {
+          "name": "Build unchanged library and test diagnostic sequence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-08T23:06:55Z",
+          "completed_at": "2026-11-08T23:07:38Z"
+        },
+        {
+          "name": "Run exactly four GC and JNI diagnostic forks",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-08T23:07:38Z",
+          "completed_at": "2026-11-08T23:09:42Z"
+        },
+        {
+          "name": "Retain diagnostic observations without acceptance inference",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-08T23:09:42Z",
+          "completed_at": "2026-11-08T23:09:42Z"
+        },
+        {
+          "name": "Scan every retained diagnostic file for connection details",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-08T23:09:42Z",
+          "completed_at": "2026-11-08T23:09:42Z"
+        },
+        {
+          "name": "Upload complete or partial diagnostic with all log segments",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-08T23:09:42Z",
+          "completed_at": "2026-11-08T23:09:44Z"
+        },
+        {
+          "name": "Post Set up original Temurin 21.0.13+9",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-08T23:09:44Z",
+          "completed_at": "2026-11-08T23:09:44Z"
+        },
+        {
+          "name": "Post Checkout diagnostic source and original source identity",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-08T23:09:44Z",
+          "completed_at": "2026-11-08T23:09:44Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-08T23:09:44Z",
+          "completed_at": "2026-11-08T23:09:44Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892750113",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000399334,
+      "runner_name": "GitHub Actions 1000399334",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 128892751326,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeAptN3g",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892751326",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892751326",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-08T23:06:33Z",
+      "started_at": "2026-11-08T23:06:33Z",
+      "completed_at": "2026-11-08T23:06:32Z",
+      "name": "${{ matrix.investigation }} (${{ (((github.event_name == 'workflow_dispatch') && inputs.profile) || ((((github.event_name == 'schedule') && 'full') || 'smoke'))) }})",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892751326",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    },
+    {
+      "id": 128892751810,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeAptPwg",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892751810",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892751810",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-08T23:06:33Z",
+      "started_at": "2026-11-08T23:06:33Z",
+      "completed_at": "2026-11-08T23:06:32Z",
+      "name": "repository-aging full \u2014 ${{ matrix.backend }} / ${{ matrix.cache_state }}",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892751810",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    },
+    {
+      "id": 128892751812,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeAptPxA",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892751812",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892751812",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-08T23:06:33Z",
+      "started_at": "2026-11-08T23:06:33Z",
+      "completed_at": "2026-11-08T23:06:32Z",
+      "name": "Publication policy / ${{ matrix.cell }}",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892751812",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    },
+    {
+      "id": 128892751814,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeAptPxg",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892751814",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892751814",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-08T23:06:33Z",
+      "started_at": "2026-11-08T23:06:33Z",
+      "completed_at": "2026-11-08T23:06:33Z",
+      "name": "Merge and validate repository-aging full matrix",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892751814",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    },
+    {
+      "id": 128892752046,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeAptQrg",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892752046",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892752046",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-08T23:06:33Z",
+      "started_at": "2026-11-08T23:06:33Z",
+      "completed_at": "2026-11-08T23:06:32Z",
+      "name": "repository-aging (smoke)",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892752046",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    },
+    {
+      "id": 128892752084,
+      "run_id": 42533525581,
+      "workflow_name": "Performance Investigations",
+      "head_branch": "codex/publication-gc-diagnostic-20261108",
+      "run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/runs/42533525581",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTOBUcM8AAAAeAptQ1A",
+      "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/jobs/128892752084",
+      "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42533525581/job/128892752084",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-08T23:06:33Z",
+      "started_at": "2026-11-08T23:06:33Z",
+      "completed_at": "2026-11-08T23:06:33Z",
+      "name": "Stateful/stateless threshold at 16/128/512 MiB",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/check-runs/128892752084",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 13638597050,
+      "node_id": "MDg6QXJ0aWZhY3QxMzYzODU5NzA1MA==",
+      "name": "publication-gc-diagnostic-original-jdk21",
+      "size_in_bytes": 880458,
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13638597050",
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13638597050/zip",
+      "expired": false,
+      "digest": "sha256:fef8a8d07f8044c5d6c52008352cdd7853ba2d106a4f096a904261a3c3dd6046",
+      "created_at": "2026-11-08T23:09:44Z",
+      "updated_at": "2026-11-08T23:09:44Z",
+      "expires_at": "2027-02-06T23:06:22Z",
+      "workflow_run": {
+        "id": 42533525581,
+        "repository_id": 1289770096,
+        "head_repository_id": 1289770096,
+        "head_branch": "codex/publication-gc-diagnostic-20261108",
+        "head_sha": "96f1b08d5d0ca32f98508828c78074f12da688fc"
+      }
+    }
+  ],
+  "archive": {
+    "path": "archives/publication-gc-diagnostic-original-jdk21.zip",
+    "sha256": "fef8a8d07f8044c5d6c52008352cdd7853ba2d106a4f096a904261a3c3dd6046",
+    "bytes": 880458
+  },
+  "sourcesArchiveSha256": "7a6d6f3fa37e947bbc8b387479ad8cfd08eff37a35bec563712b8ad35351e712",
+  "sourceFiles": {
+    ".github/scripts/summarize-publication-gc-diagnostic.py": {
+      "sha256": "a987edee34a8752fcd270ae9ec42c062933db9b4d39ad92c3063dc88245dbaa8",
+      "gitBlob": "cf72c56071f1c1591db88f656e2cd2a576b9cefe"
+    },
+    ".github/scripts/summarize-publication-nonregression.py": {
+      "sha256": "8f5b3549d6370033b6f0dd9ad9509a9d62c4be891681ceca3b32e2cebc16678f",
+      "gitBlob": "bfdf130cecd533b5a758939ec9ae601cc0675c73"
+    },
+    ".github/scripts/test_summarize_publication_gc_diagnostic.py": {
+      "sha256": "f05faddc74ac097bb8eb10fae09dc150fb686af4225f90e76d2ed5115381e8c8",
+      "gitBlob": "1a9c756eda8ae975b47ab372033bb31615a684b7"
+    },
+    ".github/scripts/validate_search_database_telemetry.py": {
+      "sha256": "065aa3aeeeb47b8592c442f94091be7c1c6b9ba0ae6bef45dc695cabc851b64e",
+      "gitBlob": "cee00c47c4d8989388abc8b6d5a9d1b267c56b16"
+    },
+    ".github/workflows/performance-investigations.yml": {
+      "sha256": "0e5cfdacb2275c11bcf9b4c87f240478ebc4fca30be0389eeee3b4de2dc101a5",
+      "gitBlob": "84857d5750c019af29eb2a86ba64959da4808a84"
+    },
+    "jgit-storage-hibernate-benchmarks/pom.xml": {
+      "sha256": "ec18d869f4a047319a5d42caf2ff17c8d359c4b5b9f3549c85aa51936d6cbd5e",
+      "gitBlob": "8712524a104cd7ae8d84c7c3c53c2342c80f2cac"
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ConcurrentPublicationBenchmark.java": {
+      "sha256": "71343d221a22880f4e5184535f11fdead0b45002566583cc11bc783936610ec6",
+      "gitBlob": "baf8adf04deec3a496070764ef7dca674d556c9c"
+    },
+    "jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackPublicationProfiler.java": {
+      "sha256": "e61961f0a3359ac9c154c85af68f262ae49780de28676265bd617e92125f0531",
+      "gitBlob": "6f29776b41d98a9bdf481e2af651ff36fa235b14"
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackPublicationGcDiagnosticIT.java": {
+      "sha256": "214e43e630a54de630856f58adee242e75559c85b71a533c0be6c8ec51ed036a",
+      "gitBlob": "bdb390add4c5112a27f3a24e1dffbf92434d1401"
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackPublicationPairedBenchmarkIT.java": {
+      "sha256": "7d993547aa365643ede095379ac4bad9211a5f0ffd4174b56a770206aacff6c2",
+      "gitBlob": "eea8cdee6caaafa6eab2ad5aba46787a8f8b8cfb"
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PublicationDiagnosticSequence.java": {
+      "sha256": "50a3455520d5de5ed9ccc12d8266d622dfbfa8b9d16422faf58f968e34024033",
+      "gitBlob": "8626ee77772d3c99a7be0d39ea23602849760d8c"
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PublicationDiagnosticSequenceTest.java": {
+      "sha256": "1dc28964af49381d8dcd9e278472a74b3fa671adf5d2922097a087d4d6776c1f",
+      "gitBlob": "3a7bbb20810822b9e15fd66f48fa9923574ec9fa"
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PublicationPairing.java": {
+      "sha256": "58fea77b6099c796616175601018f4012bb67554c41dbce74a6711d46a0d7b07",
+      "gitBlob": "2eee0d963b87a8601b88e1b2864ed1dadd6f772b"
+    },
+    "jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PublicationPairingTest.java": {
+      "sha256": "97fe71e4645aa335db646ae437b7cb31ed39b6dbf23f7e274fabecd6be73ca8b",
+      "gitBlob": "665cab31e1c77065b4d35f7c4925e322806b937e"
+    },
+    "jgit-storage-hibernate-core/pom.xml": {
+      "sha256": "63e2250e9dc7ea0dfd7ce46d0c202220ec4f28c1c9ae1b7445c9ccf9ea3b6d84",
+      "gitBlob": "75e17ffde68fceb38880d7f05d9584764eeabdeb"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/AuthorizedRepositorySession.java": {
+      "sha256": "cf6aec3de8e7683d79a76d484668acfc292338fe4e1067d7aebc89f08c4a8f69",
+      "gitBlob": "891e31bbe73fea447b1a509ec32215a41f70feaf"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/DefaultAuthorizedRepositorySession.java": {
+      "sha256": "8ad6af3ca1098eeb8b64b106b033adda289b8344b751f7fd72238623a15f3d74",
+      "gitBlob": "2f84896520a4a224af3079737f29c83ac2984624"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/DefaultHibernateGitStorage.java": {
+      "sha256": "c407b772e9df8e816c2b45253f7c10b143889f035e8bfd36217445249e826e57",
+      "gitBlob": "0afd38f6abafe692830110d09186577669e858ca"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/DefaultHibernateRepositoryFactory.java": {
+      "sha256": "e9f4ae9908830a77890f9906c2c0925c0c5516d81504937ef2cd37d5190d35a1",
+      "gitBlob": "a33aebd4ee9a75f9f44b1d4534bdf2db929eedbf"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/HibernateGitStorage.java": {
+      "sha256": "26033a5f87f19cab637a91cd50ddead64969d845c97f2823c1cfa179244442d2",
+      "gitBlob": "6ddc18a547bc63ab01e5cc48f72bf3136cc8ef89"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/HibernateRepositoryFactory.java": {
+      "sha256": "5cf20c268e147c271a8bb28c8f8788ea4867bc07edbf59121aa86271235e8a6e",
+      "gitBlob": "e09dc00e9baa529230594e711ea390c3cdf0fe6e"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/HibernateRepositoryTransferService.java": {
+      "sha256": "65319de3497724f5b253d1dd37f5805c5bb1f67973327765b44533e74b504eab",
+      "gitBlob": "b24e8e1880c744e7889623fbf0a95dbf591eaa65"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/HibernateStorageException.java": {
+      "sha256": "b4cfdc723e05cb6c6e6741623bd9130a205fe92d66e2a982e440f137d4101a8d",
+      "gitBlob": "8751badeeaf68067a73e092e1d5349d8a8709f8a"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/InternalApi.java": {
+      "sha256": "5008c64897c4ef8a15e9377d55d6ab69159c9216ddd5c031e4fd8a5b5e76b87e",
+      "gitBlob": "87ea9ca87939c12ded42e2ffdcd27e8939894f3d"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/PackCleanupResult.java": {
+      "sha256": "e67ecaf5b8bd32de479dfde5a697e26efd6d6c819c1946a9fab1a152c146b86d",
+      "gitBlob": "3b11ec4dcbe8a4bc9faacac82ebe4c0bb357bbe5"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/PackRepackOptions.java": {
+      "sha256": "61d170cf3080bc72f727f3eca46c77f09af987c3cf0ee8ffbc97213a74a3dbc3",
+      "gitBlob": "8da8aebfb56f6cc6231574cdc975f67dc4e1b9a3"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/PackRepackResult.java": {
+      "sha256": "ee7ebd7ecd3ab4f76c41aeb41bcf1a965bf34d438d7798a0569590de648c1f8d",
+      "gitBlob": "4ceacb071c5558ce2c9e35336e20b5a3650231e9"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/PackStorageMaintenance.java": {
+      "sha256": "25a3a72990a498f681a842af8a3b2e6d12c8c4e954e82cd13273757edcb49a0c",
+      "gitBlob": "7d58bfa4b8c5e5edb1d00eb6b2e93dea2709d982"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/PackStorageStatistics.java": {
+      "sha256": "e62460d87da888399fbb8d9133310175776cbb11e833b66686c756259227a533",
+      "gitBlob": "819bb19487f61a57d9b98312864d0ee000760fba"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RefTransferResult.java": {
+      "sha256": "a306b133119cdace0068756c8f06797192e5235903f468550eeb3616e0956095",
+      "gitBlob": "a39f6f81d779d7b9488838492d26fbb9bc60dddb"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RefTransferSpec.java": {
+      "sha256": "bff9d90cd93d86ccfd150d095593e39ef884efde22cfdd67f6f47f67375892de",
+      "gitBlob": "88939a9922838d4dafa10ce49ee4e0f2d8b7096d"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryAccessDeniedException.java": {
+      "sha256": "0f030a47ecda761aa49d6647915e7d0690a3561b2f263bbd0be580530c0ee08e",
+      "gitBlob": "50a146839e1c6a7f9c818a84c0fe468c627500c1"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryAccessOperation.java": {
+      "sha256": "36633f1ff978e3730476609821bf28885c260ab03080c8fe1c352e86014cdf70",
+      "gitBlob": "ce500a6e3c814f3a5c55a76733c7189666f6e1c1"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryAccessPolicy.java": {
+      "sha256": "5207366b912488e3e1b3a154dcf00cae4043d7bbfc72efde8eb38b0c21da4616",
+      "gitBlob": "7f762fcbcce7d38f36290cd69711ad557c9d9aa2"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryAccessRequest.java": {
+      "sha256": "3148c667e2ab41a1c7c9ecebd8ada2a8c9195b42814cf5ef59992d3dab23a9fd",
+      "gitBlob": "1f0ca1045b99525662b80a55c181879c9d447245"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryDeletionParticipant.java": {
+      "sha256": "71cf07b039aa9ee36862f9548e46e44c0a1536c29294f83b609d1aebeb5d1174",
+      "gitBlob": "04a92bfdd1d9f0c76ace9aebda64d0b03e5f4d78"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryDeletionResult.java": {
+      "sha256": "e91dc7e37700fda2a74395ce7ef423a12fd7c7d59e24445264f92e27d5d456b3",
+      "gitBlob": "72bdd517ac4a39e2602ba49f82acbca80f7b8cc5"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryDoesNotExistException.java": {
+      "sha256": "88745dd99d8d21c8d96e7983596839d6ab560c5806bd2a177c79aa893bf6d1c8",
+      "gitBlob": "d953d7100ecfa3078c48338fb3e23f61fc7aeadc"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryName.java": {
+      "sha256": "27c38d284edb2162541e4a59b9d09d5b8ddda243b2d0c15bd156ee751c080115",
+      "gitBlob": "5b491530e0abfafc553a8b238811727ce47849ff"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryStorageStatistics.java": {
+      "sha256": "df0124516afb8f6dfe81ac2273f0b880b17ec6211019bf71474f411447809692",
+      "gitBlob": "357e2d6a54e785a888ecddb48dd6740b66fd0558"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferCheckpointHook.java": {
+      "sha256": "7b6c7625e4324141bffe9b09c8f4895070738e7c1b25b77427c7700128d044eb",
+      "gitBlob": "e26e17a7641a4bdc404c289924b36a6068cbf64b"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferExecutor.java": {
+      "sha256": "f6edc8b7dbbfbc25f11d046b5980dff96ef422a579627bd85e7b270bfb597c09",
+      "gitBlob": "ad93d35091fdae7bb21e4559a2fc31ff917c3856"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferMode.java": {
+      "sha256": "a47275d2e3708e6141ebcbebf0c421f870e64421901c19afab37e9e5d52f141b",
+      "gitBlob": "0f7b2bd787dbea9705bb89c76d8c6358f800e247"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferRequest.java": {
+      "sha256": "5067dd7a153d17489958783922f7c50df508d108efb02d8df04cead296f500c5",
+      "gitBlob": "c5ef09ee035fda58d4ad017a939bddde787aeb66"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferResult.java": {
+      "sha256": "164b75ac077dfca996e74a99affc2cad711d63905cf8f44dc286d3c0a549c451",
+      "gitBlob": "b314f54d3a7fb92266501984df41dae6dd7420ee"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/SecuredHibernateRepositoryFactory.java": {
+      "sha256": "0be88fb03e3c43ce2c2f84b9200a0f709fb487d6689ea42b986de8bf7ffec0cf",
+      "gitBlob": "e5b7780fa468a2e41453600f54fe357aee49a53d"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/StoredObjectStatistics.java": {
+      "sha256": "84aeb09ff5901e50f02963ec81f0c7e5c048c03f624f80bc1d73d2dc4702aea8",
+      "gitBlob": "f0bcc5d30eccc38538937f1e013f53e7af9e8e57"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/TargetRefPolicy.java": {
+      "sha256": "1b0a4e45646aaf4dad5b4284d2efcd7ad36b106ff37c764ee3bc1693bec0e34b",
+      "gitBlob": "02efeba95c2927278a1c1b64e547d473e40703a5"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/config/CoreEntities.java": {
+      "sha256": "d9481c1acf4d7e266ca327a9a2fe4f39a9846549325b8e7bee85c628309e228d",
+      "gitBlob": "30a106c3e95adbd607f8559b2c0a9b9bdaf01856"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/config/HibernateSessionFactoryProvider.java": {
+      "sha256": "419b9003021aa90b4614d1cbde4f1b972f05ff3e43871a6ce67177dd9ef1c8af",
+      "gitBlob": "d8e426bb25734231fa84442764e3963b6540af78"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/config/HibernateStorageSettings.java": {
+      "sha256": "f2bc6b0c6298cf0534180246c053a0ca43b35f0f342f2a065453748074f5382b",
+      "gitBlob": "e973bcbe6e95819a881ed669e3d712a125e2e222"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/config/JgitOracleDialect.java": {
+      "sha256": "ba99cf679d91a2a2d3c8bfffa6f3e5832168b8c42045ef6b086b9faf6a24b173",
+      "gitBlob": "e2b72a78602fbbf531f2c13a5a2e39a07c7c844d"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/config/JgitOracleDialectResolver.java": {
+      "sha256": "05c411cea0fd9e1d498ee06e70b66c9bcb7520c818efdc476e9bd5c432886740",
+      "gitBlob": "8ee30e84fbf1a6f3c745e210beacc363a241a6de"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitPackChunkEntity.java": {
+      "sha256": "d62826e09988497d7ff13d1b032c2c85a561b6f0d0fb02703ddd6304fd512a32",
+      "gitBlob": "6f682bfc80a9a68b2d948b480bf54d92f4e6fbae"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitPackChunkId.java": {
+      "sha256": "a015b887a3e8362a7498afed335acf70db267a93fbfa3b39e426fd0bff6206b9",
+      "gitBlob": "ad52e60cac541526ef312d9d72de47a37678c345"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitPackEntity.java": {
+      "sha256": "46093a169609334bc52c34c98c58c3ad0459d70bb45ae327d84155cdd4fbd907",
+      "gitBlob": "4aa8ce02f5590578182d64edd09b9cd6d87692e7"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitReflogEntity.java": {
+      "sha256": "8be4e201f96da99b6258f4e1c4717f4a640f7bfadd416c3e0e871de0a8a72f3e",
+      "gitBlob": "ff7b9f7a69fc158c545552978877ef2a898d3f54"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitRepositoryLifecycleEntity.java": {
+      "sha256": "accf757eda1c91a4c3f308264ae98a19e503abdadf49c51d6083e2363b301ddf",
+      "gitBlob": "ec588abaccdff35286d0208669fa2d32be907501"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/entity/GitRepositoryLockEntity.java": {
+      "sha256": "cbf9015931b0f49150a256d011ba582e1066a17a1a92e855ec3a779c2edf1886",
+      "gitBlob": "8a4a78df07b89cfd5b73e715c85799217b7fc294"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/BoundedInlinePayloadCache.java": {
+      "sha256": "0039e73ae8f8802b90a6996a81c6b6b8c7c5d0a380a167fced0fc55abc7208ca",
+      "gitBlob": "5821ee7fd1cf27b6db32f6c5ba68f0365dcccd2f"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/HibernateObjDatabase.java": {
+      "sha256": "537d0b29ae71739fca2d14d930b658d7fed8cc924284a5665a7606108b877b6f",
+      "gitBlob": "66ea52a828dbd76fe5db60a485de3a679f07863a"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/HibernatePackChunkWriter.java": {
+      "sha256": "1ea08798991579381e384435090a480c1ae0de903aee8f8f4b3e87ea5d495f39",
+      "gitBlob": "38b5b83585349e1d4fe4baef2983ccaddd206125"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackDescriptionMetadata.java": {
+      "sha256": "51e44f6cf8ea693a83fa0dc8bfd8aa64347ee2664cd6147bffe1e39ba3802cdd",
+      "gitBlob": "45cbf26e530047285da926c4dfb3e34acd0536b8"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackExtensionStagingBuffer.java": {
+      "sha256": "7f64248c18d36f57a23b9a298147e3726bf617ece3f39cb1a66fa7936793045b",
+      "gitBlob": "9faaff979701146c56f28cec8b83959e3d44d5ef"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackPublicationSelectionCounters.java": {
+      "sha256": "bdd5f562025eac5cb219941b37e6604705b761269d053a2f12fa94907992cbbb",
+      "gitBlob": "31649ea7481127d98f88786cc7c415b85599ccd0"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/PackPublicationSelector.java": {
+      "sha256": "8d4ca688584e5cae34b5a2666ef8b9b3d72f3d2f163200aca208b377cf5a212f",
+      "gitBlob": "19cc13a232545443fd891786d988eb6eba7fb980"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/ReadAheadHibernateObjDatabase.java": {
+      "sha256": "632dbbf3ba468ba0e794cbcb9cd59dbfc12fc009cb4ee20923baad215c6bd9fb",
+      "gitBlob": "86b9157087e84b826ac3431250f65912413cd564"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java": {
+      "sha256": "1d86a2fdee02625fd2917cd425c59528e3ec10bafe5ffd03e8902fdaade7d987",
+      "gitBlob": "be2d0ff12cd8d6d5d7966550fe6b2da4096ca78f"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StorageByteCounters.java": {
+      "sha256": "cbab68020e4b336121da48d806ffaadc4923a4c85a37b7178c1335dd3a4610ba",
+      "gitBlob": "b1f6fb479338ad9ec5975a577a6be2d96cd6d878"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/package-info.java": {
+      "sha256": "d0f669ebed5aad642b27e899bb37aa609f7f15319d67e4a1ed5e6c2327db073f",
+      "gitBlob": "bb34104bcc2ee035ae7b928ae41e75ac525521f7"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/package-info.java": {
+      "sha256": "e43fe2b1ce39f15974946438d8f29c76e50bc46b4434854fa1dd97e3df401a40",
+      "gitBlob": "09abf84e8b44709df1b6ad351c346eafd47f1b4e"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/queue/DurableStripedWriteQueue.java": {
+      "sha256": "3bfcbc9052805b6fac2c3dd564bdbfd39e2609a6a32604f8ce207fadfaa4aa2a",
+      "gitBlob": "f1a2d53d9df51eca68c5154c02ebf295e28687ab"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/queue/DurableWriteQueueSettings.java": {
+      "sha256": "fdee1f7adcce08fdcaf1f8809c31374a010c8dd40cbd8295ca5ad26629177754",
+      "gitBlob": "2f85fdcad66df76ef49a3b948523606dcc3a7824"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/queue/HibernateDurableBatchProcessor.java": {
+      "sha256": "91d644da0cc42de1cc36632080d2022bcace6365a3ec21eae3c1eec6a584f70f",
+      "gitBlob": "60535c83988e50773b74d9b09a6d524ec5d76cbd"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/DurableReflogWriter.java": {
+      "sha256": "62afea570d2d0d63c8fab579e522eb1c53030770f14add3860ea5edf66798766",
+      "gitBlob": "6719ba17b1ba9c5273bde0d2e404faf2aa21c5c2"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateBatchRefUpdate.java": {
+      "sha256": "3c3662cfafc72360ca0bd51a7ccca198f893a2b691fadc2cd05425c20180665e",
+      "gitBlob": "3f67cb18f2077b4b33bab02a20236735d97dc3ea"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateRefDatabase.java": {
+      "sha256": "f1f36c92afa6f9ab292971cc3fca9f3b72ca34399f928951761dc522131b5e53",
+      "gitBlob": "7d6f16a774277f221e7b0fefb31ba91981d17d9e"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateRefUpdate.java": {
+      "sha256": "2d9d996fffa7b0b14feea9fc10170c98232a9d8a5da7dbc76f5ac95a7585ba08",
+      "gitBlob": "32bbdb1fa170609dbe5c966df89ed59da664d062"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateReflogBatchProcessor.java": {
+      "sha256": "870f51860578c9fdef968bc1e5790a7b24935b9c016fa1f8203e43e1420cda48",
+      "gitBlob": "3477d99541d0a69824e2376599a2b78d3af64da1"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateReflogReader.java": {
+      "sha256": "f144ef6cee437f60309a00363c8d2932e31d053d95e48db9c0b3f85f4f633af8",
+      "gitBlob": "994e3b52af34b666e0fbd14ab2b684a47fc24071"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/HibernateReflogWriter.java": {
+      "sha256": "eb00aad26241995d5429a2238dc7cfcf8dda83d91bfbcf742db17e08dc693182",
+      "gitBlob": "1ef2bb1a2328808cb18950eb6263b10e8a6353e9"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/ReflogAppendCommand.java": {
+      "sha256": "61eba67c67ae78dffd74a1c97fe7ffdd55c1da5c6a9ef4ff7d1255d5acacc826",
+      "gitBlob": "e371335f1757c012f5b1b76bc96ca363b6656983"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/ReflogAppendResult.java": {
+      "sha256": "3cdd8fe9a3f9e6f9c8b543cbc37d12f3bb72985ae993a219c048e87c5ac477ef",
+      "gitBlob": "99356d8cc2273c22cb2ef0bea6775ea861d3b6bb"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/ReflogBatchRejectedException.java": {
+      "sha256": "d9668091963e760446d75ad2783051954a7abb8fce210d3314c335ad4b467369",
+      "gitBlob": "8a8025abc9309a6dcdcd93baa7b70893ed34db11"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/refs/package-info.java": {
+      "sha256": "2cf3fbb2d79c913deedaa20278b9aca41e5208b4e056356d4f1ee99ca2d53bce",
+      "gitBlob": "6cf3bd9a08826f7944010474ee7b29826e5daccd"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/repository/HibernateRepository.java": {
+      "sha256": "e52248f20e73ef17a8b523c39cb6b062313582520c6e0d5c9e37532e79585774",
+      "gitBlob": "23cb552dc9438a89201ceda582187a30935fff95"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/repository/HibernateRepositoryBuilder.java": {
+      "sha256": "80044f8769b157dc8d1e07cb06bed751befeae67797c06dd359878197a9d0823",
+      "gitBlob": "be98e27eea245fef9e9c5de8726122037dbde343"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/repository/package-info.java": {
+      "sha256": "529a0c4a0f8cb36be4f2279f92b283cb8d7ccd15030e1d232df880a35b00e104",
+      "gitBlob": "4ce15045411b5dde436a5c0e645ec4eb20b8f7c5"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/schema/CoreSchemaMigrations.java": {
+      "sha256": "6eeb3f4375d74e8f5738427cf2cc005e7cae132c897619e544573ea378ef129e",
+      "gitBlob": "bffd8fe8aed208fc63edefb2c8fce746a1467253"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/schema/LegacyCoreSchemaAdoption.java": {
+      "sha256": "29b41a4582003688cef979b6d5fcf09b601e1da3326f49fe86b5e69308e97937",
+      "gitBlob": "680b3da3421fd1183b45b8762753befd63c08fdc"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/schema/LegacyCoreSchemaAdoptionException.java": {
+      "sha256": "fb215c6b153e3bb7e7d6ab2c1da167f14b26ab9b023623e6ae5cf718f4bd6f96",
+      "gitBlob": "8bafcfff61452210bd056bfbb7d7dd8474f3d111"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/HibernateTransactionContext.java": {
+      "sha256": "4433f30f91be42f9e0a262429047a5b9b7a960d0fb8244c856878f8941392a50",
+      "gitBlob": "e1b563e5f7c7b2b76c34a2b72008b871f25374ba"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/PackFileReadMetrics.java": {
+      "sha256": "4b0995cc1cf78c17df69181ae516c54d60d1a8bdc98e70d5e9302073c30b33d0",
+      "gitBlob": "2fc7cbe76a7a15dffed7b68744d0aa0814795a81"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/PackPublicationPolicySnapshot.java": {
+      "sha256": "8d97b9cf0550252728f3c380d28dcae514a83572778870eb2aef715fca07add0",
+      "gitBlob": "a00b067ca703bc70a3764d40af4845eef6b57677"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/PackPublicationSelectionMetrics.java": {
+      "sha256": "14fcd3264783a5f85c973eba62c89f5a9b3d6ea42e27c954d942c401336531a9",
+      "gitBlob": "5bc4cf4b47ae4844f6f13f4ed64b60dfa1e9e922"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/StagingSpillMetrics.java": {
+      "sha256": "77ec8fe105780af8f8520e9d619ba1613b506ef5c13546cbac64e43b164c219b",
+      "gitBlob": "ca8b4a63bdb5e44d16fd73022bdc851ec28db6c3"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/StorageByteMetrics.java": {
+      "sha256": "1b83c70164b49d9864069d285674de8f336306cce745957c7fd14cdb64bf7b3a",
+      "gitBlob": "b6b607425671e133daa14125ad655040d65f141f"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/StorageOperationBreakdown.java": {
+      "sha256": "874606818adf1d666321826a53fb14d17a724a45fac3930beba659083b5fe2fc",
+      "gitBlob": "1cc3de37f5a365e202625bdf2b6e14989fab09c2"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/StorageOperationKind.java": {
+      "sha256": "d4240686ff267f51c3bea3712545d2b3473871555221e37d684814a362061ddf",
+      "gitBlob": "9125d0372af72ea79ae07c1d465e8490e7dfd08e"
+    },
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/transaction/StorageOperationMetrics.java": {
+      "sha256": "a620c4d136b60cb425398b88758ecfa915e367d6e20024ef7fd5b61e06c62bdf",
+      "gitBlob": "d002193e799d9cb797d15530f09eed6089a8648b"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/adoption/hsqldb/V1__adopt_pre_library_schema.sql": {
+      "sha256": "3d820483deb8841df2cb1da041b74fb9929b12e44b84dbd97b65edbec578f8ca",
+      "gitBlob": "bff885ef8f4af0afc63b5d53d474eb1b101f9b78"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/adoption/hsqldb/V2__normalize_legacy_taxonomy_column_lengths.sql": {
+      "sha256": "1e664522b78f5e9a4ec43fc2661402d906459e492049eac37907a0d3123f4fc2",
+      "gitBlob": "e3234f3b599a3289bd598aefc2e09168b9a92a2e"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/adoption/postgresql/V1__adopt_pre_library_schema.sql": {
+      "sha256": "9deba3c38e2df3339a368266241986b3354a568612372edf52477d8d9cbf3c3f",
+      "gitBlob": "e8aad4957153c6aad9191474e39096b460b42589"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/adoption/postgresql/V2__normalize_legacy_taxonomy_column_lengths.sql": {
+      "sha256": "c071fa7e56fa7136f92553641bfe15143823549fd380e01c1a47c58a8ef2273f",
+      "gitBlob": "e97ee268d3fc8b6c6cf663b070574b9677fbc57c"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/adoption/sqlserver/V1__adopt_pre_library_schema.sql": {
+      "sha256": "934691fc38db075cc74b1573e4ab91e993b1b926fe5592760be71d0ffee0fd01",
+      "gitBlob": "5423566a28e55273e7df5b000055908911ee31ff"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/adoption/sqlserver/V2__normalize_legacy_sandbox_column_types.sql": {
+      "sha256": "f3a906a097650255e1df8955b4ffbbe596958d1100ed6f9a186e88a7badb20a6",
+      "gitBlob": "9ee914fae1ac2f3fef9fbb94fa2058fe222fb538"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_1_14_1__add_chunked_pack_storage.sql": {
+      "sha256": "4054a21119efa3787aa52dff4dfd4acf085b8be3d4e9eae3605a7be6014dcc90",
+      "gitBlob": "82ab9b9e5124131b95aa10b95a3d066f0063a249"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_1_14_2__add_pack_write_leases.sql": {
+      "sha256": "88824abd6334094a50df97ff09072a1592fc387ef6b1980608aaaad7bfa90f36",
+      "gitBlob": "2eedf64be47e42942510f7504225332988361550"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_1_14__add_repository_lock.sql": {
+      "sha256": "03e6c6f31fa09e4efd07ad0eff110360ee99056cb9b21ebc60c0ab2af184ec10",
+      "gitBlob": "05fafc76c1058df4d3208bbbc4a0d03916cbb5b9"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_1_17__optimize_reverse_reflog_reads.sql": {
+      "sha256": "d58c67bc5f013b5399a0ac5596e3bbf979023b9914a8782c9d972560cc7198af",
+      "gitBlob": "3696eb6cfff246af7cd792c99124804597d12811"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_1_18__persist_pack_description_metadata.sql": {
+      "sha256": "d7cc884a60d14a210861f741c523d7c1d1d1719d7b1085da2afa557023cec31a",
+      "gitBlob": "b1638a992700b2b06a25e312d128392e95a07a95"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_1_4__create_core_schema.sql": {
+      "sha256": "43954f5e0557362c423fa6eaf6c7f41ac197347e7227f841f6845f442581e106",
+      "gitBlob": "ee37fa4f7a42f177591d58d65af8e3c2792792da"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_1_5__establish_versioned_core_schema.sql": {
+      "sha256": "79c917c750af2ba1fd6628f06c17407d67afaaea6b177b7cad4d71a99a0b0484",
+      "gitBlob": "e2423afe61439d2e26ef8ade491271ed1ade0903"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_9_1__add_reflog_reference_key.sql": {
+      "sha256": "a69b7f186c6276b0747363a2b36b59438b46f18c2e5b81db4d2138c72381c1fa",
+      "gitBlob": "aeb3b5e606a9b13b483c5da3c7ba4db530e7b318"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/h2/V0_9_2__add_reflog_delivery_id.sql": {
+      "sha256": "46853705642dd72f3b2e9b2e60e032a2c8d71a0f58f474c678ec02770aef7045",
+      "gitBlob": "a908b0d9374454d9e65a8e617876c1c94f80b411"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_1_14_1__add_chunked_pack_storage.sql": {
+      "sha256": "ecd1cdb73701899b1dd4a665fde625d8a69cb86f920b43a85902792b72228987",
+      "gitBlob": "d6d706d2e377bfaf4ce6d61fd4bb6afc073ff3ad"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_1_14_2__add_pack_write_leases.sql": {
+      "sha256": "1a93f64a948e87eb4b3b8ec9f0a34d7d576be1c95c36506f13a6f4a3ce2315c2",
+      "gitBlob": "39429ea908239ce20a5251fba8b62e9751074649"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_1_14__add_repository_lock.sql": {
+      "sha256": "0cf31f1d076fa3e2ba825abfe7a264efdb1fa734a735ce157408a796ba5698e4",
+      "gitBlob": "5b59c2f51bd764f27f13efac5e51194b112a08d9"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_1_17__optimize_reverse_reflog_reads.sql": {
+      "sha256": "d58c67bc5f013b5399a0ac5596e3bbf979023b9914a8782c9d972560cc7198af",
+      "gitBlob": "3696eb6cfff246af7cd792c99124804597d12811"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_1_18__persist_pack_description_metadata.sql": {
+      "sha256": "70b1fe7e62945f532499723044beaca8297befa63b9cd04d100e86719f92edc4",
+      "gitBlob": "1211809b76a4e9139bccf0adb3cc8b895c623bf5"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_1_4__create_core_schema.sql": {
+      "sha256": "caabe09ea90aae1606d0070d2251762ec065e031178e6e28cf22e4dddfac50cb",
+      "gitBlob": "2709490094cc9e8e180a961dcc9e3ac5934581b1"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_1_5__establish_versioned_core_schema.sql": {
+      "sha256": "79c917c750af2ba1fd6628f06c17407d67afaaea6b177b7cad4d71a99a0b0484",
+      "gitBlob": "e2423afe61439d2e26ef8ade491271ed1ade0903"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_9_1__add_reflog_reference_key.sql": {
+      "sha256": "a69b7f186c6276b0747363a2b36b59438b46f18c2e5b81db4d2138c72381c1fa",
+      "gitBlob": "aeb3b5e606a9b13b483c5da3c7ba4db530e7b318"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/hsqldb/V0_9_2__add_reflog_delivery_id.sql": {
+      "sha256": "46853705642dd72f3b2e9b2e60e032a2c8d71a0f58f474c678ec02770aef7045",
+      "gitBlob": "a908b0d9374454d9e65a8e617876c1c94f80b411"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/oracle/V0_12_0__create_core_schema.sql": {
+      "sha256": "478fc3579e50ceb006b8d1e567f27bc1e0f80818b8aea001331f9dd7e21ad8e7",
+      "gitBlob": "ce2f2ace248824eb1e3a09c859c1f5cd9cac3dc7"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_1_14_1__add_chunked_pack_storage.sql": {
+      "sha256": "90a073a6c5ebae0426d81d17da6c7e57dbabbc147f1f364b157d680f5bc6d6a5",
+      "gitBlob": "a36e09fb88ae0822192ad78d5e7f23defc0d1d44"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_1_14_2__add_pack_write_leases.sql": {
+      "sha256": "88824abd6334094a50df97ff09072a1592fc387ef6b1980608aaaad7bfa90f36",
+      "gitBlob": "2eedf64be47e42942510f7504225332988361550"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_1_14__add_repository_lock.sql": {
+      "sha256": "3b8bf97f1cd59a7bcd1a2cc8891d4d7cfda06ce38deb6888cc17a4a0bc729086",
+      "gitBlob": "6e324b53fd46f58c144b6ec65cd89c4410fdd0eb"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_1_17__optimize_reverse_reflog_reads.sql": {
+      "sha256": "d58c67bc5f013b5399a0ac5596e3bbf979023b9914a8782c9d972560cc7198af",
+      "gitBlob": "3696eb6cfff246af7cd792c99124804597d12811"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_1_18__persist_pack_description_metadata.sql": {
+      "sha256": "422c3ceffb6b1611e04461baa117797d697766c464526f8ca975e23a34b2d8fb",
+      "gitBlob": "699b77b3abba7778267fcca7065485242a39a49b"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_1_4__create_core_schema.sql": {
+      "sha256": "268fb074cc266b9f012d6e6728b40fbb6ef00395f0d63da61f5a7e9938582491",
+      "gitBlob": "7e41c1f97156bb7e2e7a906f5321ec621fbfd5ba"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_1_5__establish_versioned_core_schema.sql": {
+      "sha256": "79c917c750af2ba1fd6628f06c17407d67afaaea6b177b7cad4d71a99a0b0484",
+      "gitBlob": "e2423afe61439d2e26ef8ade491271ed1ade0903"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_9_1__add_reflog_reference_key.sql": {
+      "sha256": "d30b079e1a1156641b267b2b69e282bf30b7516daebef9a2d6a8d6b32bc254d8",
+      "gitBlob": "1ad39e43436446bbd0a49619cfb3465a9102a795"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/postgresql/V0_9_2__add_reflog_delivery_id.sql": {
+      "sha256": "8ece4a1d210fc7ff00f3534e013730aaee93ee988312e82e9f5b904d35fb9dca",
+      "gitBlob": "2b0d89918a2b2d64621fa786433650568ead1188"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_1_14_1__add_chunked_pack_storage.sql": {
+      "sha256": "0134a3cbd26095ea0a0849627cee107e2b71bfee3b60c969da630c9c1ecbde42",
+      "gitBlob": "c4a84fbc8e525faa7de450ee15f4f6d4092f6848"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_1_14_2__add_pack_write_leases.sql": {
+      "sha256": "2c0ee5d5a3ce5366334a244827d2f7ac3a2f9e4ebc03312f7572a82d2a44bb2c",
+      "gitBlob": "1f96ddbdfc7b7c70babe19dbac8f94289bac184a"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_1_14__add_repository_lock.sql": {
+      "sha256": "7f450e71981fd7075b46b52838e74cd1da6fe691de3764b6addfecdfec31fc38",
+      "gitBlob": "97a7e55fb093a2313801465ffca2b7333406cfbb"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_1_17__optimize_reverse_reflog_reads.sql": {
+      "sha256": "d387d4bd053a7462f4fea289f1f6279d6a7e18bdf2b1b69a40fa89dbbe571146",
+      "gitBlob": "688310f2a798582029e4aa7501cadc181dd908d7"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_1_18__persist_pack_description_metadata.sql": {
+      "sha256": "f2eed1b8eb81609226077012cf6348b3835d99cd24f8c4c270a91c9e996b57a8",
+      "gitBlob": "37f08108872aafdd3ee02f959b01eccf2af83035"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_1_4__create_core_schema.sql": {
+      "sha256": "49bcc1f8ba77479187f6f65ebc2b674fd727be034e845b732f314e96f824dd73",
+      "gitBlob": "1778132e3235642894348599d91a43f2d41b50c3"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_1_5__establish_versioned_core_schema.sql": {
+      "sha256": "ccc2715abd94e2db47d97737b44c94975ca3227427daf15a2101a273674c2c13",
+      "gitBlob": "4c76a6e329d28636ec4bd177d3214678fa9c0b6a"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_9_1__add_reflog_reference_key.sql": {
+      "sha256": "8345ece5070b4610c161210f6d327dc9d06fae24a67bd240c877089c84bc1c8d",
+      "gitBlob": "0c5c47f2ac2bd96728fc6b551a710049d5489790"
+    },
+    "jgit-storage-hibernate-core/src/main/resources/db/migration/jgit-storage-hibernate/core/sqlserver/V0_9_2__add_reflog_delivery_id.sql": {
+      "sha256": "f2ad9c0d73a2c94ecd1c38e9825c6a3c47f1aa31eeec16956f6943c381e79c71",
+      "gitBlob": "e13366d06275e2eba05339242c464f8733bbb9f6"
+    },
+    "pom.xml": {
+      "sha256": "1a6944a6fa3d4dadcd43f9cd92fa8c055dbb5a6038318c8d563b8ee6c21ad9e3",
+      "gitBlob": "3026b6e9daa73b96026f7c42167c9022687bc2a1"
+    }
+  }
+}
