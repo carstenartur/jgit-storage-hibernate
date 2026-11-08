@@ -132,6 +132,26 @@ class NativeFollowupTriggerTest(unittest.TestCase):
         self.assertTrue(job_enabled(name, "repository-aging-full-shard", "schedule", ref="refs/heads/main"))
         self.assertTrue(job_enabled(name, "stateless-threshold", "schedule", ref="refs/heads/main"))
 
+    def test_gc_diagnostic_mode_is_separate_from_all_qualification_workloads(self):
+        name = "performance-investigations.yml"
+        ref = "refs/heads/codex/publication-gc-diagnostic-20261108"
+        unrelated = ("investigate", "repository-aging-smoke", "repository-aging-full-shard",
+                     "stateless-threshold", "publication-nonregression")
+        for event in ("push", "workflow_dispatch"):
+            with self.subTest(event=event):
+                self.assertTrue(job_enabled(name, "publication-gc-diagnostic", event,
+                                            ref=ref, profile="publication-gc-diagnostic"))
+                for job in unrelated:
+                    self.assertFalse(job_enabled(name, job, event,
+                                                 ref=ref, profile="publication-gc-diagnostic"), job)
+        for event, candidate in (("push", "refs/heads/main"), ("push", ref + "-extra"),
+                                 ("pull_request", ref), ("schedule", ref)):
+            self.assertFalse(job_enabled(name, "publication-gc-diagnostic", event, ref=candidate))
+        self.assertFalse(job_enabled(name, "publication-gc-diagnostic", "push", ref=ref, deleted=True))
+        for mode in ("smoke", "full", "publication-nonregression"):
+            self.assertFalse(job_enabled(name, "publication-gc-diagnostic", "workflow_dispatch",
+                                         ref=ref, profile=mode))
+
 
 if __name__ == "__main__":
     unittest.main()

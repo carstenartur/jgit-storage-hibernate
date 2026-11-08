@@ -12,6 +12,7 @@ on:
           - smoke
           - full
           - publication-nonregression
+          - publication-gc-diagnostic
   schedule:
     - cron: '23 5 * * 3'
   pull_request:
@@ -24,6 +25,8 @@ on:
       - '.github/scripts/test_native_followup_trigger.py'
       - '.github/scripts/summarize-publication-nonregression.py'
       - '.github/scripts/test_summarize_publication_nonregression.py'
+      - '.github/scripts/summarize-publication-gc-diagnostic.py'
+      - '.github/scripts/test_summarize_publication_gc_diagnostic.py'
       - '.github/scripts/validate_read_ahead_database_telemetry.py'
       - '.github/scripts/test_validate_read_ahead_database_telemetry.py'
       - '.github/scripts/validate_search_database_telemetry.py'
@@ -31,7 +34,7 @@ on:
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
   push:
-    branches: [ main, codex/performance-followup-20261108 ]
+    branches: [ main, codex/performance-followup-20261108, codex/publication-gc-diagnostic-20261108 ]
     paths:
       - '.github/workflows/performance-investigations.yml'
       - '.github/scripts/convert-jmh-repository-aging.py'
@@ -40,6 +43,8 @@ on:
       - '.github/scripts/test_native_followup_trigger.py'
       - '.github/scripts/summarize-publication-nonregression.py'
       - '.github/scripts/test_summarize_publication_nonregression.py'
+      - '.github/scripts/summarize-publication-gc-diagnostic.py'
+      - '.github/scripts/test_summarize_publication_gc_diagnostic.py'
       - '.github/scripts/validate_read_ahead_database_telemetry.py'
       - '.github/scripts/test_validate_read_ahead_database_telemetry.py'
       - '.github/scripts/validate_search_database_telemetry.py'
@@ -74,13 +79,16 @@ jobs:
       - name: Test paired publication evidence and stopping rules
         run: python3 .github/scripts/test_summarize_publication_nonregression.py
 
+      - name: Test bounded GC diagnostic evidence
+        run: python3 .github/scripts/test_summarize_publication_gc_diagnostic.py
+
       - name: Test exact native follow-up event selection
         run: python3 .github/scripts/test_native_followup_trigger.py
 
   investigate:
     if: >-
-      (github.event_name != 'workflow_dispatch' || inputs.profile != 'publication-nonregression') &&
-      !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108')
+      (github.event_name != 'workflow_dispatch' || (inputs.profile != 'publication-nonregression' && inputs.profile != 'publication-gc-diagnostic')) &&
+      !(github.event_name == 'push' && (github.ref == 'refs/heads/codex/performance-followup-20261108' || github.ref == 'refs/heads/codex/publication-gc-diagnostic-20261108'))
     name: ${{ matrix.investigation }} (${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }})
     needs: contract
     runs-on: ubuntu-latest
@@ -318,7 +326,7 @@ jobs:
     needs: contract
     if: >-
       github.event_name != 'schedule' &&
-      !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108') &&
+      !(github.event_name == 'push' && (github.ref == 'refs/heads/codex/performance-followup-20261108' || github.ref == 'refs/heads/codex/publication-gc-diagnostic-20261108')) &&
       (github.event_name != 'workflow_dispatch' || inputs.profile == 'smoke')
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -558,7 +566,7 @@ jobs:
     needs: contract
     if: >-
       github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_dispatch' && inputs.profile != 'publication-nonregression')
+      (github.event_name == 'workflow_dispatch' && inputs.profile != 'publication-nonregression' && inputs.profile != 'publication-gc-diagnostic')
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -678,4 +686,80 @@ jobs:
         with:
           name: publication-nonregression-${{ matrix.cell }}
           path: target/publication-paired/${{ matrix.cell }}/**
+          if-no-files-found: error
+
+  publication-gc-diagnostic:
+    name: Publication allocation diagnostic / four fixed forks
+    needs: contract
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.profile == 'publication-gc-diagnostic') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/codex/publication-gc-diagnostic-20261108' && !github.event.deleted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout diagnostic source and original source identity
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up original Temurin 21.0.13+9
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21.0.13+9'
+          cache: maven
+
+      - name: Require unchanged measured library and workload
+        shell: bash
+        run: |
+          mkdir -p target/publication-gc-diagnostic
+          compared_paths=(
+            pom.xml
+            jgit-storage-hibernate-core/pom.xml
+            jgit-storage-hibernate-benchmarks/pom.xml
+            jgit-storage-hibernate-core/src/main
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/ConcurrentPublicationBenchmark.java
+            jgit-storage-hibernate-benchmarks/src/main/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/PackPublicationProfiler.java
+          )
+          git diff --exit-code 5ed8aad0f0691bcecb414b319235b67dc0520581 -- "${compared_paths[@]}"
+          git ls-tree -r HEAD -- "${compared_paths[@]}" \
+            > target/publication-gc-diagnostic/unchanged-source-blobs.txt
+
+      - name: Build unchanged library and test diagnostic sequence
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install \
+            -Dtest=PublicationDiagnosticSequenceTest,PublicationPairingTest \
+            -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Run exactly four GC and JNI diagnostic forks
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackPublicationGcDiagnosticIT \
+            -Djgit.storage.benchmark.source="$(git rev-parse HEAD)" \
+            -Djgit.storage.benchmark.sourceTree="$(git rev-parse HEAD^{tree})" \
+            -Dbenchmark.resultDirectory="$GITHUB_WORKSPACE/target/publication-gc-diagnostic"
+
+      - name: Retain diagnostic observations without acceptance inference
+        if: always()
+        run: |
+          python3 .github/scripts/summarize-publication-gc-diagnostic.py target/publication-gc-diagnostic
+          echo '### Fixed publication allocation diagnostic' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All four predetermined child outcomes are retained. This is not a resumed non-regression study.' >> "$GITHUB_STEP_SUMMARY"
+          cat target/publication-gc-diagnostic/summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Scan every retained diagnostic file for connection details
+        id: diagnostic-privacy
+        if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/publication-gc-diagnostic
+
+      - name: Upload complete or partial diagnostic with all log segments
+        if: always() && steps.diagnostic-privacy.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publication-gc-diagnostic-original-jdk21
+          path: target/publication-gc-diagnostic/**
           if-no-files-found: error
