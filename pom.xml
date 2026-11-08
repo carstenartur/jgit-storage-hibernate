@@ -98,7 +98,7 @@
     <maven.shade-plugin.version>${maven-shade-plugin.version}</maven.shade-plugin.version>
     <versions-maven-plugin.version>2.23.0</versions-maven-plugin.version>
     <jacoco-maven-plugin.version>0.8.16</jacoco-maven-plugin.version>
-    <japicmp-maven-plugin.version>0.26.5</japicmp-maven-plugin.version>
+    <japicmp-maven-plugin.version>0.27.0</japicmp-maven-plugin.version>
 
     <api.baseline.version>0.1.13</api.baseline.version>
     <japicmp.skip>false</japicmp.skip>
