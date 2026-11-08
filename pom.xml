@@ -104,6 +104,8 @@
     <japicmp.skip>false</japicmp.skip>
     <jacoco.minimum.line>0.00</jacoco.minimum.line>
     <jacoco.minimum.branch>0.00</jacoco.minimum.branch>
+    <!-- A Central build must not also select another publication channel. -->
+    <central.otherPublishingProfile>false</central.otherPublishingProfile>
   </properties>
 
   <repositories>
@@ -533,6 +535,9 @@
   <profiles>
     <profile>
       <id>github-packages</id>
+      <properties>
+        <central.otherPublishingProfile>true</central.otherPublishingProfile>
+      </properties>
       <distributionManagement>
         <repository>
           <id>github</id>
@@ -550,6 +555,7 @@
     <profile>
       <id>public-repository-release</id>
       <properties>
+        <central.otherPublishingProfile>true</central.otherPublishingProfile>
         <public.repository.directory>${maven.multiModuleProjectDirectory}/target/public-maven-repository</public.repository.directory>
       </properties>
       <distributionManagement>
@@ -559,6 +565,78 @@
           <url>file://${public.repository.directory}</url>
         </repository>
       </distributionManagement>
+    </profile>
+
+    <!-- Optional preparation: no activation and no upload unless explicitly requested. -->
+    <profile>
+      <id>maven-central</id>
+      <properties>
+        <central.skipUpload>true</central.skipUpload>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>require-central-release</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <requireMavenVersion>
+                      <version>[3.9,4)</version>
+                      <message>The Central publishing extension requires Maven 3.9.x or 3.10.x; Maven 4 is not supported.</message>
+                    </requireMavenVersion>
+                    <requireReleaseVersion />
+                    <requireReleaseDeps />
+                    <requireProperty>
+                      <property>central.otherPublishingProfile</property>
+                      <regex>false</regex>
+                      <regexMessage>Activate maven-central on its own; do not combine it with public-repository-release or github-packages.</regexMessage>
+                    </requireProperty>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.12.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <skipUpload>${central.skipUpload}</skipUpload>
+              <autoPublish>false</autoPublish>
+              <waitUntil>validated</waitUntil>
+              <waitForPublishCompletion>false</waitForPublishCompletion>
+              <ignorePublishedComponents>false</ignorePublishedComponents>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <configuration>
+              <bestPractices>true</bestPractices>
+              <skip>false</skip>
+            </configuration>
+            <executions>
+              <execution>
+                <id>sign-central-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>

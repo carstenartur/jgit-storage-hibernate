@@ -33,6 +33,8 @@ jobs:
           python3 -m py_compile .github/scripts/prepare-public-repository.py .github/scripts/test_prepare_public_repository.py .github/scripts/verify-public-repository-publishing.py .github/scripts/update-release-metadata.py .github/scripts/test_update_release_metadata.py .github/scripts/verify-release-consistency.py .github/scripts/verify-security-policy.py .github/scripts/benchmark_consumer_relevance.py .github/scripts/test_benchmark_consumer_relevance.py .github/scripts/publish-benchmark-history-core.py .github/scripts/publish-benchmark-history.py .github/scripts/test_publish_benchmark_history.py .github/scripts/verify-benchmark-consumer-relevance.py .github/scripts/test_verify_benchmark_consumer_relevance.py .github/scripts/convert-jmh-backend-comparison.py .github/scripts/test_convert_jmh_backend_comparison.py .github/scripts/write-performance-badge.py .github/scripts/test_write_performance_badge.py .github/scripts/select_published_server_version.py .github/scripts/test_select_published_server_version.py .github/scripts/test_release_workflow_trigger.py .github/scripts/test_dispatch_generated_pr_checks.py .github/scripts/test_verify_public_repository_consumption.py
           python3 -m py_compile .github/scripts/test_ci_badge_workflow.py
           python3 -m py_compile .github/scripts/verify-database-test-evidence.py .github/scripts/test_verify_database_test_evidence.py
+          bash -n .github/scripts/verify-central-profile.sh
+          python3 -m py_compile .github/scripts/verify-central-bundle.py .github/scripts/test_verify_central_bundle.py .github/scripts/test_verify_public_repository_publishing.py
           node --check .github/benchmark-dashboard/dashboard.js
       - name: Test release, publication and dashboard tooling
         run: |
@@ -50,6 +52,8 @@ jobs:
           python3 .github/scripts/test_verify_public_repository_consumption.py
           python3 .github/scripts/test_ci_badge_workflow.py
           python3 .github/scripts/test_verify_database_test_evidence.py
+          python3 .github/scripts/test_verify_public_repository_publishing.py
+          python3 .github/scripts/test_verify_central_bundle.py
           node .github/benchmark-dashboard/dashboard.test.js
       - name: Verify release and security consistency
         run: |
@@ -151,6 +155,10 @@ jobs:
             2>&1 | tee -a public-repository-contract.log
       - name: Require repository evidence
         run: test -s target/public-repository-evidence/manifest.json
+      - name: Verify optional Central bundle without publishing credentials
+        run: |
+          set -euo pipefail
+          bash .github/scripts/verify-central-profile.sh 2>&1 | tee central-bundle-verification.log
       - name: Upload public repository evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -159,4 +167,5 @@ jobs:
           path: |
             public-repository-contract.log
             target/public-repository-evidence/manifest.json
+            central-bundle-verification.log
           if-no-files-found: error

@@ -28,6 +28,40 @@ def profile(root,pid):
 def read(path,errors):
     if not path.is_file(): errors.append(f"missing {path}"); return ""
     return path.read_text(encoding="utf-8")
+
+def verify_optional_central(root, errors):
+    """Allow Central preparation without leaking publishing into other builds."""
+    central = profile(root, "maven-central")
+    plugins = central.findall("m:build/m:plugins/m:plugin", NS) if central is not None else []
+    for plugin in root.findall(".//m:plugin", NS):
+        artifact = txt(plugin, "m:artifactId")
+        if artifact in {"central-publishing-maven-plugin", "maven-gpg-plugin"} and plugin not in plugins:
+            errors.append(f"{artifact} must remain inside the maven-central profile")
+    if central is None:
+        return
+    if central.find("m:activation", NS) is not None:
+        errors.append("maven-central must be activated explicitly")
+    if txt(central, "m:properties/m:central.skipUpload") != "true":
+        errors.append("maven-central must skip upload by default")
+    publisher = next((p for p in plugins if txt(p, "m:artifactId") == "central-publishing-maven-plugin"), None)
+    signer = next((p for p in plugins if txt(p, "m:artifactId") == "maven-gpg-plugin"), None)
+    if publisher is None or signer is None:
+        errors.append("maven-central must configure both publishing and signing")
+        return
+    if txt(publisher, "m:configuration/m:skipUpload") != "${central.skipUpload}":
+        errors.append("Central skipUpload must use ${central.skipUpload}")
+    for option in ("autoPublish", "waitForPublishCompletion", "ignorePublishedComponents"):
+        if txt(publisher, "m:configuration/m:" + option) != "false":
+            errors.append(f"Central {option} must remain false")
+    if txt(publisher, "m:configuration/m:waitUntil") != "validated":
+        errors.append("Central uploads must wait for validation")
+    if txt(publisher, "m:configuration/m:publishingServerId") != "central":
+        errors.append("Central credentials must come from Maven server central")
+    if txt(signer, "m:configuration/m:skip") != "false":
+        errors.append("Central signing must not be skipped")
+    if txt(signer, "m:configuration/m:bestPractices") != "true":
+        errors.append("Central signing must enforce GPG best practices")
+
 def main():
     errors=[]
     root=ET.parse(ROOT).getroot()
@@ -42,9 +76,7 @@ def main():
         if txt(repo,"m:url")!="file://${public.repository.directory}": errors.append("public release must deploy to a file staging repository")
     github=profile(root,"github-packages")
     if github is None: errors.append("missing explicit github-packages snapshot profile")
-    all_pom=ROOT.read_text(encoding="utf-8")
-    for forbidden in ("central-publishing-maven-plugin","maven-gpg-plugin","central-release"):
-        if forbidden in all_pom: errors.append(f"obsolete Central publishing fragment remains: {forbidden}")
+    verify_optional_central(root, errors)
 
     reactor={txt(module,".") for module in root.findall("m:modules/m:module",NS)}
     if not PUBLISHED.issubset(reactor):

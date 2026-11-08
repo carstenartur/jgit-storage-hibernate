@@ -5,6 +5,10 @@ The project publishes immutable Maven releases to an anonymous static repository
 multi-architecture OCI image in GitHub Container Registry. Development snapshots may continue to use
 GitHub Packages for Maven artifacts.
 
+An optional [Maven Central profile](maven-central.md) can prepare a signed local
+bundle or explicitly upload it for manual Portal publication. It is independent
+of the default release workflow described here.
+
 ## Public artifacts
 
 - `io.github.carstenartur:jgit-storage-hibernate-parent`
@@ -69,8 +73,12 @@ The root POM keeps Maven publication behind explicit profiles:
 
 - `public-repository-release` deploys to a local file repository for immutable public releases;
 - `github-packages` supplies authenticated snapshot distribution metadata.
+- `maven-central` prepares a signed local Central bundle by default; only
+  `-Dcentral.skipUpload=false` uploads it, and Portal publication remains manual.
 
-No Sonatype account, Central token, PGP key or consumer credential is part of this path.
+No Sonatype account, Central token, PGP key or consumer credential is part of the
+default branch-backed release path. The Central profile must be selected on its
+own and is never enabled by the release script.
 
 ## Repository permissions and token model
 
@@ -128,6 +136,12 @@ Boot Starter, Server and Testcontainers. Those four optional modules are publish
 SHA-1 sidecars, but are not yet included in the manifest's additional SHA-256/SHA-512 generation or
 the anonymous consumer contract. Publication completeness and automated verification coverage are
 therefore separate scopes.
+
+The same CI job additionally verifies the optional Central profile with empty
+Maven settings and a temporary signing key. It checks every reactor module,
+required checksum and GPG signature without uploading anything. The temporary
+key and test-signed bundle are not retained as release artifacts. See
+[Maven Central preparation](maven-central.md#how-ci-verifies-this-without-your-account).
 
 `Server image publication contract` statically verifies immutable source selection, first-write
 version-tag behavior, full-SHA action pins, tag/reactor validation, non-rollback aliases,
