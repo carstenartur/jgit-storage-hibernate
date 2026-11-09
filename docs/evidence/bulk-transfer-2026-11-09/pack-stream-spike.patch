@@ -1,0 +1,210 @@
+diff --git a/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferExecutor.java b/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferExecutor.java
+index ad93d35..c4ae40e 100644
+--- a/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferExecutor.java
++++ b/jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/RepositoryTransferExecutor.java
+@@ -8,20 +8,24 @@
+  */
+ package io.github.carstenartur.jgit.storage.hibernate;
+ 
++import java.io.BufferedInputStream;
++import java.io.BufferedOutputStream;
+ import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
+ import java.util.ArrayList;
+ import java.util.LinkedHashMap;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Objects;
++import org.eclipse.jgit.internal.storage.pack.PackWriter;
++import org.eclipse.jgit.storage.pack.PackConfig;
+ import org.eclipse.jgit.lib.BatchRefUpdate;
+ import org.eclipse.jgit.lib.Constants;
+ import org.eclipse.jgit.lib.NullProgressMonitor;
+ import org.eclipse.jgit.lib.ObjectId;
+ import org.eclipse.jgit.lib.ObjectInserter;
+-import org.eclipse.jgit.lib.ObjectLoader;
+ import org.eclipse.jgit.lib.ObjectReader;
+-import org.eclipse.jgit.lib.ObjectStream;
+ import org.eclipse.jgit.lib.PersonIdent;
+ import org.eclipse.jgit.lib.Ref;
+ import org.eclipse.jgit.lib.Repository;
+@@ -215,10 +219,12 @@ final class RepositoryTransferExecutor {
+       List<Ref> targetRefs)
+       throws IOException {
+     TransferCounters counters = new TransferCounters();
++    PackConfig config = new PackConfig(source);
++    config.setDeltaCompress(false);
+     try (ObjectReader sourceReader = source.newObjectReader();
+         ObjectReader targetReader = target.newObjectReader();
+-        ObjectInserter targetInserter = target.newObjectInserter();
+-        ObjectWalk walk = new ObjectWalk(source)) {
++        ObjectWalk walk = new ObjectWalk(source);
++        PackWriter writer = new PackWriter(config, source.newObjectReader())) {
+       for (ResolvedRefTransfer resolved : resolvedRefs) {
+         walk.markStart(walk.parseAny(resolved.sourceObjectId()));
+       }
+@@ -231,40 +237,66 @@ final class RepositoryTransferExecutor {
+ 
+       RevCommit commit;
+       while ((commit = walk.next()) != null) {
+-        copyObject(commit, sourceReader, targetReader, targetInserter, counters);
++        addMissingObject(commit, sourceReader, targetReader, writer, counters);
+       }
+       RevObject object;
+       while ((object = walk.nextObject()) != null) {
+-        copyObject(object, sourceReader, targetReader, targetInserter, counters);
++        addMissingObject(object, sourceReader, targetReader, writer, counters);
++      }
++      if (counters.objectsTransferred != 0) {
++        importPack(target, writer);
+       }
+-      targetInserter.flush();
+     }
+     return counters;
+   }
+ 
+-  private static void copyObject(
++  private static void addMissingObject(
+       RevObject object,
+       ObjectReader sourceReader,
+       ObjectReader targetReader,
+-      ObjectInserter targetInserter,
++      PackWriter writer,
+       TransferCounters counters)
+       throws IOException {
+     counters.objectsVisited = Math.addExact(counters.objectsVisited, 1);
+     if (targetReader.has(object)) {
+       return;
+     }
++    writer.addObject(object);
++    counters.objectsTransferred = Math.addExact(counters.objectsTransferred, 1);
++    counters.bytesTransferred = Math.addExact(
++        counters.bytesTransferred, sourceReader.getObjectSize(object, object.getType()));
++  }
+ 
+-    ObjectLoader loader = sourceReader.open(object);
+-    ObjectId inserted;
+-    try (ObjectStream stream = loader.openStream()) {
+-      inserted = targetInserter.insert(loader.getType(), loader.getSize(), stream);
+-    }
+-    if (!inserted.equals(object)) {
+-      throw new HibernateStorageException(
+-          "Canonical object ID changed while transferring " + object.name());
++  private static void importPack(Repository target, PackWriter writer) throws IOException {
++    Path pack = Files.createTempFile("jgit-transfer-spike-", ".pack");
++    try {
++      writer.setThin(false);
++      writer.setIndexDisabled(true);
++      try (var out = new BufferedOutputStream(Files.newOutputStream(pack))) {
++        writer.writePack(NullProgressMonitor.INSTANCE, NullProgressMonitor.INSTANCE, out);
++      }
++      var expected = writer.getObjectSet();
++      try (ObjectInserter targetInserter = target.newObjectInserter();
++          var in = new BufferedInputStream(Files.newInputStream(pack))) {
++        var parser = targetInserter.newPackParser(in);
++        parser.setAllowThin(false);
++        parser.setNeedNewObjectIds(true);
++        parser.setCheckEofAfterPackFooter(true);
++        parser.parse(NullProgressMonitor.INSTANCE);
++        if (parser.getObjectCount() != expected.size()) {
++          throw new HibernateStorageException("Pack transfer changed object count");
++        }
++        var received = parser.getNewObjectIds();
++        for (var object : expected) {
++          if (!received.contains(object)) {
++            throw new HibernateStorageException("Pack transfer omitted " + object.name());
++          }
++        }
++        targetInserter.flush();
++      }
++    } finally {
++      Files.deleteIfExists(pack);
+     }
+-    counters.objectsTransferred = Math.addExact(counters.objectsTransferred, 1);
+-    counters.bytesTransferred = Math.addExact(counters.bytesTransferred, loader.getSize());
+   }
+ 
+   private static void verifyConnectivity(
+diff --git a/jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/PackStreamLargeH2Test.java b/jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/PackStreamLargeH2Test.java
+new file mode 100644
+index 0000000..675310d
+--- /dev/null
++++ b/jgit-storage-hibernate-core/src/test/java/io/github/carstenartur/jgit/storage/hibernate/PackStreamLargeH2Test.java
+@@ -0,0 +1,76 @@
++package io.github.carstenartur.jgit.storage.hibernate;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
++import java.security.MessageDigest;
++import java.util.HexFormat;
++import java.util.List;
++import java.util.Properties;
++import java.util.Random;
++import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
++import org.eclipse.jgit.internal.storage.dfs.DfsBlockCacheConfig;
++import org.eclipse.jgit.lib.CommitBuilder;
++import org.eclipse.jgit.lib.Constants;
++import org.eclipse.jgit.lib.FileMode;
++import org.eclipse.jgit.lib.ObjectId;
++import org.eclipse.jgit.lib.PersonIdent;
++import org.eclipse.jgit.lib.RefUpdate;
++import org.eclipse.jgit.lib.TreeFormatter;
++import org.junit.jupiter.api.Test;
++
++class PackStreamLargeH2Test {
++  @Test
++  void transferredLargePackSurvivesSourceDeletionAndColdReopen() throws Exception {
++    byte[] data = new byte[20 * 1024 * 1024 + 257];
++    new Random(184).nextBytes(data);
++    String expectedHash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));
++    Properties properties = new Properties();
++    properties.put("hibernate.connection.url", "jdbc:h2:mem:bulk-pack-large");
++    properties.put("hibernate.connection.driver_class", "org.h2.Driver");
++    properties.put("hibernate.hbm2ddl.auto", "create-drop");
++    try (var provider = new HibernateSessionFactoryProvider(properties)) {
++      var factory = new DefaultHibernateRepositoryFactory(provider.getSessionFactory());
++      var sourceName = new RepositoryName("source");
++      var targetName = new RepositoryName("target");
++      ObjectId blob;
++      ObjectId commitId;
++      try (var source = factory.open(sourceName); var inserter = source.repository().newObjectInserter()) {
++        blob = inserter.insert(Constants.OBJ_BLOB, data);
++        TreeFormatter tree = new TreeFormatter();
++        tree.append("payload.bin", FileMode.REGULAR_FILE, blob);
++        CommitBuilder commit = new CommitBuilder();
++        commit.setTreeId(inserter.insert(tree));
++        PersonIdent author = new PersonIdent("Transfer spike", "transfer@example.invalid");
++        commit.setAuthor(author);
++        commit.setCommitter(author);
++        commit.setMessage("bounded pack transfer");
++        commitId = inserter.insert(commit);
++        inserter.flush();
++        RefUpdate update = source.repository().updateRef("refs/heads/main");
++        update.setExpectedOldObjectId(ObjectId.zeroId());
++        update.setNewObjectId(commitId);
++        assertEquals(RefUpdate.Result.NEW, update.update());
++      }
++      var result = factory.transfer(RepositoryTransferRequest.initialClone(
++          sourceName, targetName, List.of(new RefTransferSpec("refs/heads/main", "refs/heads/main"))));
++      assertEquals(3, result.objectsTransferred());
++      assertTrue(result.bytesTransferred() >= data.length);
++      assertEquals(commitId, result.refs().get("refs/heads/main").targetObjectId());
++      assertTrue(factory.deleteRepository(sourceName).deletedAnything());
++
++      DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
++      try (var target = factory.open(targetName);
++          var stream = target.repository().open(blob).openStream()) {
++        var digest = MessageDigest.getInstance("SHA-256");
++        byte[] buffer = new byte[64 * 1024];
++        for (int n; (n = stream.read(buffer)) != -1; ) {
++          digest.update(buffer, 0, n);
++        }
++        assertEquals(expectedHash, HexFormat.of().formatHex(digest.digest()));
++        assertEquals(commitId, target.repository().exactRef("refs/heads/main").getObjectId());
++      }
++    }
++  }
++}

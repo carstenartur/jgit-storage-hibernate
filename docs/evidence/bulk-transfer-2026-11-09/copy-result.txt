@@ -1,0 +1,7 @@
+PostgreSQL 18.6 (PGlite 0.5.15) on wasm32-unknown-emscripten, compiled by emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.13 (e13ee988ce3d87a738dd8f3661d02223308c412a), 32-bit
+PASS success exact bytea, generated IDs and SHA-256
+PASS truncated rolled back rows
+PASS duplicate rolled back rows
+PASS foreign-key rolled back rows
+PASS rollback rolled back rows
+PASS retry exact bytea, generated IDs and SHA-256
