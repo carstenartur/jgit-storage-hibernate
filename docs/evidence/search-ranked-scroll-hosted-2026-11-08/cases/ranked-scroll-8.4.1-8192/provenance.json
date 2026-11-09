@@ -1,0 +1,142 @@
+{
+  "chunkSize": 128,
+  "documents": 8192,
+  "jdkBuild": "21.0.13+9",
+  "runtimeJars": {
+    "angus-activation-2.0.3.jar": {
+      "bytes": 26729,
+      "sha256": "a6bd35c538cf90fff941ad6258c40c08fca0b5c9c3f536c657114f27ce0527a7"
+    },
+    "antlr4-runtime-4.13.2.jar": {
+      "bytes": 326307,
+      "sha256": "dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7"
+    },
+    "byte-buddy-1.18.14.jar": {
+      "bytes": 4658001,
+      "sha256": "b7f2b2f111c6ddc09d3d9718ca5895dde16217bb4e5f2d2a6eb571f274909a82"
+    },
+    "hibernate-core-7.4.14.Final.jar": {
+      "bytes": 15350391,
+      "sha256": "d41b4adc59b53aaa3a69ab46dfc5a9dab4d3eac3229d7e0a8e24a4e27c46831f"
+    },
+    "hibernate-models-1.1.1.jar": {
+      "bytes": 222526,
+      "sha256": "7cb645f2ebe5fcb63e21d26259cef62d93a1ca77c400bda6992c92cb19826a89"
+    },
+    "hibernate-search-backend-lucene-8.4.1.Final.jar": {
+      "bytes": 1265389,
+      "sha256": "7ca4c033253b65ee1111f91a652c66e458fc513eae8a138128bf3e7d3df6fa53"
+    },
+    "hibernate-search-engine-8.4.1.Final.jar": {
+      "bytes": 1067879,
+      "sha256": "29fb3407f11153e04a4ac0c8a29ace701c696eaecb4b42158f035f108fa36a17"
+    },
+    "hibernate-search-mapper-orm-8.4.1.Final.jar": {
+      "bytes": 382515,
+      "sha256": "7784c1786c54228a991c49dd5eb835c86291fd47a9f71f5799746fdb1b990843"
+    },
+    "hibernate-search-mapper-pojo-base-8.4.1.Final.jar": {
+      "bytes": 1199817,
+      "sha256": "96973121032d8d2e3aee94fb15d8a8e5510c8a3de575ac25ee9888915e61147c"
+    },
+    "hibernate-search-util-common-8.4.1.Final.jar": {
+      "bytes": 134825,
+      "sha256": "92aad5f13fcc5694e748c40e08fcc3bbc8fc4fa2ae376fa078e508f2e52ffd96"
+    },
+    "hppc-0.10.0.jar": {
+      "bytes": 1529274,
+      "sha256": "edc83b336476a2b06f7c17d09b17e98bb07678daf968c9825cc14275bdf20a26"
+    },
+    "istack-commons-runtime-4.1.2.jar": {
+      "bytes": 25788,
+      "sha256": "7fd6792361f4dd00f8c56af4a20cecc0066deea4a8f3dec38348af23fc2296ee"
+    },
+    "jakarta.activation-api-2.1.4.jar": {
+      "bytes": 67380,
+      "sha256": "c9db52100ce6c8aac95cc39075f95720d2e561b11f8051b81c121ad4effd7004"
+    },
+    "jakarta.inject-api-2.0.1.jar": {
+      "bytes": 10681,
+      "sha256": "f7dc98062fccf14126abb751b64fab12c312566e8cbdc8483598bffcea93af7c"
+    },
+    "jakarta.persistence-api-3.2.0.jar": {
+      "bytes": 195939,
+      "sha256": "be8a26b0e75c84c1b7600f759256fbc68d60333d89ec0ce3f784fc3ffa09aa8c"
+    },
+    "jakarta.transaction-api-2.0.1.jar": {
+      "bytes": 28607,
+      "sha256": "50c0a7c760c13ae6c042acf182b28f0047413db95b4636fb8879bcffab5ba875"
+    },
+    "jakarta.xml.bind-api-4.0.4.jar": {
+      "bytes": 131188,
+      "sha256": "c507ca69a8c6dd11bf4afeec9e0d412c4fa3933fffb0a84680ea5727e8472124"
+    },
+    "jandex-3.3.2.jar": {
+      "bytes": 395603,
+      "sha256": "b7a214dbb405c11cfa62fd4319810a46e502b633ce86d6e2dea7a5065b932256"
+    },
+    "jaxb-core-4.0.7.jar": {
+      "bytes": 139157,
+      "sha256": "f29af5c37592c3a06a912da8cdf1d16036e6ca6d4eed9be6f7670e60fa466601"
+    },
+    "jaxb-runtime-4.0.7.jar": {
+      "bytes": 922292,
+      "sha256": "61a5daf5a1987f7ed7149c5a883ddf220ca9bf714a8d8cffc85fac301e92b5f2"
+    },
+    "jboss-logging-3.6.3.Final.jar": {
+      "bytes": 62672,
+      "sha256": "7c12ee575508f81e22b1db9334b969d0ec54ef0fd1dcba24eeab1a44235fc366"
+    },
+    "lucene-analysis-common-9.12.3.jar": {
+      "bytes": 1726657,
+      "sha256": "fa571bd7caf0f0b4faf46a72ca004a7836f348c31d92bd522dddcc3d128d287e"
+    },
+    "lucene-core-9.12.3.jar": {
+      "bytes": 4266133,
+      "sha256": "b64a3f8098a7572034fb30085cdee01b34ec81fb0e5a31b471536af58dc6c01b"
+    },
+    "lucene-facet-9.12.3.jar": {
+      "bytes": 351720,
+      "sha256": "688e9b71fecba026e44f0a228cc0e09af3c9aec5e1f5b10e9f102a6730ef7dec"
+    },
+    "lucene-highlighter-9.12.3.jar": {
+      "bytes": 274458,
+      "sha256": "4cfa3c462ddd253bc8663d89afef821daff30dcb5b376a764e4e55b926bca7b9"
+    },
+    "lucene-join-9.12.3.jar": {
+      "bytes": 177212,
+      "sha256": "62d90a550a1117d521cded9504d7c73288bcdbdf691b68d17caf04ad01efbf46"
+    },
+    "lucene-memory-9.12.3.jar": {
+      "bytes": 63938,
+      "sha256": "54ebbfd18e33933a063510d3d0d71ee84adb7d1a8e9eda8c744e7221e5c3ee40"
+    },
+    "lucene-queries-9.12.3.jar": {
+      "bytes": 513409,
+      "sha256": "81c8993da5dcca9da5e4041b623f00169868e37988691434b14fc910c700a30c"
+    },
+    "lucene-queryparser-9.12.3.jar": {
+      "bytes": 422172,
+      "sha256": "5db83a184512fd7a46cf7b34efa997b5f1b28ad1cee26dd665180b19eab0a1b1"
+    },
+    "lucene-sandbox-9.12.3.jar": {
+      "bytes": 305303,
+      "sha256": "21cf9ad1bb97265983c698b9c5eb071b1a4a1d4f0f74b98c6e61ad8f04c5c9d7"
+    },
+    "txw2-4.0.7.jar": {
+      "bytes": 73275,
+      "sha256": "c725676f2550caa3f57943f2d10dfac7e14c3abb34a6a9d89ac7ebbf1bde3269"
+    }
+  },
+  "schemaVersion": 1,
+  "searchVersion": "8.4.1.Final",
+  "sourceCommit": "96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+  "sourceFiles": {
+    ".github/scripts/validate_ranked_scroll_evidence.py": "7695637a0d54eb9b00dc60231aaae22432b5c8555221e4e24d3016f497e3636f",
+    ".github/scripts/validate_search_database_telemetry.py": "065aa3aeeeb47b8592c442f94091be7c1c6b9ba0ae6bef45dc695cabc851b64e",
+    ".github/workflows/search-ranked-scroll-memory.yml": "cc06e73b24312d544105f420e1507701e5bc67a7d9325bb55447191dd4afb3e3",
+    "reproducers/hibernate-search-ranked-scroll/logging.properties": "37ee2f78787362cda64ca9e77f9adb1640054da42c81af9369999ad3ade41241",
+    "reproducers/hibernate-search-ranked-scroll/pom.xml": "289c60fe01c2cdb4573d513d57454db15d79f27ed9328f630066ea3eee3e2ec6",
+    "reproducers/hibernate-search-ranked-scroll/src/main/java/io/github/carstenartur/reproducer/RankedScrollMemoryProbe.java": "bc734b1441da0f375bd61228d7c400168090ba0fa77b265f79ff181fef7494f2"
+  }
+}

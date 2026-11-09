@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.github.carstenartur.reproducer</groupId>
   <artifactId>hibernate-search-ranked-scroll</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0</version>
   <name>Hibernate Search ranked scroll retained-hit reproducer</name>
 
   <!-- Deliberately independent of the application reactor and database drivers. -->

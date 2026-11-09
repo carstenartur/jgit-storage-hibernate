@@ -55,6 +55,13 @@ window. The experiment verifies that one complete window reached the existing
 chunk writer before the failure and that pack/chunk row counts return to their
 pre-publication values.
 
+The injected reader exception waits for the owner thread to finish flushing the
+first window. Prefetch can reach the next window while that JDBC write is still
+active; beginning detection-to-return timing there would incorrectly include the
+rest of the normal write. The completion signal carries the first-flush timestamp.
+Waiting is interruptible, so a failed first write can cancel and join the waiting
+reader without inventing an injected read failure.
+
 `failure_to_return_nanos` starts where the injected read exception or JDBC failure
 is detected and ends when the failed publication returns after cancelling and
 joining its reader, rolling back and closing the owner session.
@@ -62,6 +69,12 @@ joining its reader, rolling back and closing the owner session.
 verification queries and constraint removal are outside both timings. These are
 native single-writer failure observations, not multiwriter fault-injection or
 process-crash recovery measurements.
+
+`first_window_flushed_nanos` and `failure_detected_nanos` are monotonic elapsed
+times from the same rollback-probe creation. Qualification requires a positive
+first-flush time and failure detection at or after it, for both failure directions.
+Raw rollback rows without this ordering evidence are rejected. Earlier rows that
+only counted flushed chunks cannot establish the advertised detection boundary.
 
 ## Artifacts and qualification
 
@@ -102,6 +115,54 @@ mvn -B -pl jgit-storage-hibernate-benchmarks test \
 python3 .github/scripts/staging_pipeline_evidence.py summarize \
   target/staging-pipeline --expected-commit "$JGIT_EVIDENCE_SOURCE_SHA"
 ```
+
+## Bounded wait diagnostic
+
+The separate [diagnostic workflow](../../.github/workflows/staging-pipeline-diagnostic.yml)
+runs only by manual dispatch or a push to the exact branch
+`diagnose/staging-pipeline-20261108`. It has no pull-request trigger. Its one cell
+uses 16 MiB payload, a 32 MiB window, one writer, runner storage, no injected RTT,
+one warm-up round and three repetitions, preserving the existing 4 GiB JVM heap. The test
+marks its measurement boundary `diagnostic-only`; the normal evidence qualifier
+rejects that boundary.
+
+Opt-in phase checkpoints identify container startup, fixture creation, calibration,
+provider/bootstrap, telemetry, publication, reopen, rollback and resource close.
+Checkpoints are outside publication and rollback timing intervals. They contain
+only timestamps, process/thread IDs and fixed phase labels, and are retained in
+`raw/phase-checkpoints.tsv` as well as native stdout.
+
+The [bounded runner](../../.github/scripts/run_staging_pipeline_diagnostic.py)
+starts Maven in a fresh process group. It requests `jcmd <pid> Thread.print -l`
+for that group's JVMs after 60 seconds and on subsequent 60-second intervals.
+Native execution reaches its deadline after 240 seconds; a final stack capture
+has at most 20 seconds, TERM has 10 seconds, and KILL/reaping has at most five
+seconds. A failed or timed-out attach requests a SIGQUIT JVM dump in `native.log`.
+The runner records actual process status, timeout outcome, source commit and
+capture count in `diagnostic-status.json`. After every leader exit, including
+success, it sends KILL to any surviving members of the owned group and records
+that signal separately as `process_group_cleanup_signal`, preserving the leader's
+return code. Build time is outside this native deadline and bounded by the
+workflow's 15-minute job limit.
+
+The entire diagnostic directory, build/native logs, thread stacks and Surefire
+reports pass the same always-run privacy scan before any partial artifact can be
+uploaded. A timeout is retained as a failed diagnostic with exit status 124; it
+cannot become a successful performance sample.
+
+This diagnostic was prepared to locate the wait in native run
+[42534328623](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42534328623),
+source `a8d6f491de538cd91eeb11b8f1f68749bf3566e1`. That run's source and outcome
+remain separate evidence. No wait cause or performance result is inferred from
+an incomplete or interrupted cell. The 16 MiB/32 MiB cell takes the synchronous
+fallback in every reader mode, so it does not create a prefetch-reader executor.
+
+The preceding minimal diagnostic used no warm-up and one repetition. It completed
+in 28.743 seconds, with all lifecycle phases returned. Its
+[retained source, artifact digest, checkpoints and logging observations](../evidence/staging-pipeline-wait-2026-11-08/README.md)
+motivated this bounded continuation with the original repetition counts. Both
+diagnostics preserve the original failure-probe behavior to avoid mixing the
+separate rollback-timing correction into the wait investigation.
 
 ## Production decision
 

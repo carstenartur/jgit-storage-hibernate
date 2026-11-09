@@ -1,4 +1,9 @@
-# Ranked-scroll live-hit evidence
+# Ranked-scroll live-hit evidence (cached classpath)
+
+This folder retains the original cached-classpath Java 25 runs. A subsequent
+[hosted Java 21 followup](../search-ranked-scroll-hosted-2026-11-08/README.md)
+resolved the declared Maven graph and executed all four Search 8.4.0/8.4.1 and
+8,192/65,536-document cells. Those native results are retained separately.
 
 Issue [#230](https://github.com/carstenartur/jgit-storage-hibernate/issues/230)
 remains open. The existing cursor limits the number of projected hits returned
@@ -55,6 +60,11 @@ matched. These checks isolate the ranked-hit state from database entity hydratio
 - `SHA256SUMS` protects the retained artifacts and the source/POM used to produce
   them. Verify from the repository root with `sha256sum -c
   docs/evidence/search-ranked-scroll-retained-2026-11-08/SHA256SUMS`.
+- The [frozen reproducer POM](sources/hibernate-search-ranked-scroll.pom) preserves
+  the exact original `1.0-SNAPSHOT` bytes and checksum. The active standalone POM
+  now uses version `1.0` to satisfy the repository release guard. This coordinate
+  change does not alter the Java source or dependency versions, and is not a rerun
+  or relabeling of these measurements.
 
 The counts are live-object samples, and the bytes are shallow sizes. They do not
 measure the entire cursor object graph, all temporary allocations, or a peak

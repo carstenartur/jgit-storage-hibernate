@@ -79,6 +79,55 @@ class PublicationGcDiagnosticTest(unittest.TestCase):
         self.assertEqual(result["forks"][0]["gcLockerCollections"], 1)
         self.assertEqual(result["forks"][0]["maximumPostGcMiB"], 80)
 
+    def test_completed_fork_rejects_empty_gc_and_initialization_logs(self):
+        for suffix in ("-gc.log", "-init.log"):
+            path = self.root / ("raw/fork-01-size" + suffix)
+            original = path.read_text()
+            for contents in ("", " \t\n"):
+                with self.subTest(suffix=suffix, contents=contents):
+                    try:
+                        path.write_text(contents)
+                        with self.assertRaisesRegex(ValueError, "required diagnostic logs"):
+                            MODULE.summarize(self.root)
+                    finally:
+                        path.write_text(original)
+
+    def test_empty_jni_log_is_complete_without_allocation_stalls(self):
+        path = self.root / "raw/fork-01-size-jni.log"
+        for contents in ("", " \t\n"):
+            with self.subTest(contents=contents):
+                path.write_text(contents)
+                result = MODULE.summarize(self.root)
+                self.assertEqual(result["status"], "complete-diagnostic")
+                self.assertEqual(result["forks"][0]["missingLogKinds"], [])
+                self.assertEqual(result["forks"][0]["jniAllocationStalls"], 0)
+
+    def test_failed_fork_with_empty_gc_or_initialization_logs_is_incomplete(self):
+        self.outcomes[0].update(status="failed", failureType="org.openjdk.jmh.runner.RunnerException")
+        self.flush()
+        for suffix in ("-gc.log", "-init.log"):
+            with self.subTest(suffix=suffix):
+                path = self.root / ("raw/fork-01-size" + suffix)
+                original = path.read_text()
+                try:
+                    path.write_text("")
+                    result = MODULE.summarize(self.root)
+                    self.assertEqual(result["status"], "incomplete-diagnostic")
+                    self.assertEqual(result["forks"][0]["missingLogKinds"], [suffix])
+                    self.assertEqual(result["forks"][0]["status"], "failed")
+                finally:
+                    path.write_text(original)
+
+    def test_empty_active_gc_log_can_use_a_nonempty_rotated_segment(self):
+        path = self.root / "raw/fork-01-size-gc.log"
+        rotated = path.with_name(path.name + ".0")
+        rotated.write_text(path.read_text())
+        path.write_text("")
+        result = MODULE.summarize(self.root)
+        self.assertEqual(result["status"], "complete-diagnostic")
+        self.assertEqual(result["forks"][0]["missingLogKinds"], [])
+        self.assertEqual(result["forks"][0]["gcCollections"], 1)
+
     def test_failed_child_stays_failed_and_other_children_are_retained(self):
         self.outcomes[1].update(status="failed", failureType="org.openjdk.jmh.runner.RunnerException")
         trial = self.trials[1]

@@ -8,6 +8,8 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.StagingPipelineDiagnostics.checkpoint;
+
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
@@ -101,8 +104,10 @@ public final class StagedChunkPipelineExperiment {
       throw new IllegalArgumentException("failure boundary must match the configured writer window");
     }
     long failurePosition = (long) windowMiB * CHUNK_BYTES;
+    checkpoint("rollback:counts-before:begin");
     long packsBefore = count(factory, "GitPackEntity");
     long chunksBefore = count(factory, "GitPackChunkEntity");
+    checkpoint("rollback:counts-before:returned");
     var probe = new FailureProbe();
     try (FileChannel channel = FileChannel.open(staged, StandardOpenOption.READ)) {
       if (channel.size() <= failurePosition) {
@@ -110,14 +115,17 @@ public final class StagedChunkPipelineExperiment {
       }
       boolean jdbcFailure = stage == FailureStage.JDBC;
       if (jdbcFailure) {
+        checkpoint("rollback:constraint-add:begin");
         constraint(
             factory,
             "ADD CONSTRAINT staging_pipeline_failure CHECK (chunk_index < " + windowMiB + ")");
+        checkpoint("rollback:constraint-add:returned");
       }
       long returned;
       try {
         Source source = pacedSource(channel, readBytesPerSecond);
         try {
+          checkpoint("rollback:publication:begin");
           publish(
               factory,
               repository,
@@ -125,8 +133,7 @@ public final class StagedChunkPipelineExperiment {
               mode,
               (position, target) -> {
                 if (!jdbcFailure && position >= failurePosition) {
-                  probe.detected();
-                  throw new IOException("injected staging failure after the first window");
+                  probe.failReader();
                 }
                 return source.read(position, target);
               },
@@ -134,26 +141,35 @@ public final class StagedChunkPipelineExperiment {
           throw new AssertionError("injected publication failure was not observed");
         } catch (IOException | ConstraintViolationException failure) {
           returned = System.nanoTime();
+          checkpoint("rollback:publication:returned");
           if (jdbcFailure != (failure instanceof ConstraintViolationException)) {
             throw failure;
           }
         }
       } finally {
         if (jdbcFailure) {
+          checkpoint("rollback:constraint-drop:begin");
           constraint(factory, "DROP CONSTRAINT staging_pipeline_failure");
+          checkpoint("rollback:constraint-drop:returned");
         }
       }
       if (probe.detectedAt.get() == 0
+          || probe.firstWindowFlushedAt == 0
+          || probe.detectedAt.get() - probe.firstWindowFlushedAt < 0
           || probe.rollbackNanos <= 0
           || probe.flushedChunks != windowMiB) {
         throw new AssertionError("failure did not roll back exactly one previously flushed window");
       }
+      checkpoint("rollback:counts-after:begin");
       long remainingPacks = count(factory, "GitPackEntity") - packsBefore;
       long remainingChunks = count(factory, "GitPackChunkEntity") - chunksBefore;
+      checkpoint("rollback:counts-after:returned");
       if (remainingPacks != 0 || remainingChunks != 0) {
         throw new AssertionError("failed publication left pack or chunk rows behind");
       }
       return new Rollback(
+          probe.firstWindowFlushedAt - probe.startedAt,
+          probe.detectedAt.get() - probe.startedAt,
           returned - probe.detectedAt.get(),
           probe.rollbackNanos,
           probe.flushedChunks,
@@ -234,7 +250,7 @@ public final class StagedChunkPipelineExperiment {
                         writer.close();
                       }
                       if (probe != null) {
-                        probe.flushedChunks += rows.size();
+                        probe.flushed(rows.size());
                       }
                     } catch (RuntimeException failure) {
                       if (probe != null) {
@@ -408,16 +424,50 @@ public final class StagedChunkPipelineExperiment {
   public record Publication(DfsPackDescription description, long elapsedNanos, Transfer transfer) {}
 
   public record Rollback(
+      long firstWindowFlushedNanos,
+      long failureDetectedNanos,
       long failureToReturnNanos,
       long rollbackNanos,
       int flushedChunks,
       long remainingPacks,
       long remainingChunks) {}
 
-  private static final class FailureProbe {
+  static final class FailureProbe {
+    private final long startedAt = System.nanoTime();
     private final AtomicLong detectedAt = new AtomicLong();
+    private final CountDownLatch firstWindowFlushed = new CountDownLatch(1);
+    private long firstWindowFlushedAt;
     private long rollbackNanos;
     private int flushedChunks;
+
+    void flushed(int chunks) {
+      flushedChunks += chunks;
+      if (firstWindowFlushedAt == 0) {
+        firstWindowFlushedAt = System.nanoTime();
+        firstWindowFlushed.countDown();
+      }
+    }
+
+    void failReader() throws IOException {
+      try {
+        // Prefetch reaches this boundary before the owner finishes writing the first window.
+        // Cancellation interrupts the wait if that write fails, so joining the reader stays finite.
+        firstWindowFlushed.await();
+      } catch (InterruptedException interrupted) {
+        throw interrupted(interrupted);
+      }
+      checkInterrupted();
+      detected();
+      throw new IOException("injected staging failure after the first window");
+    }
+
+    long firstWindowFlushedAt() {
+      return firstWindowFlushedAt;
+    }
+
+    long detectedAt() {
+      return detectedAt.get();
+    }
 
     private void detected() {
       detectedAt.compareAndSet(0, System.nanoTime());

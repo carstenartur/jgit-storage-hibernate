@@ -1,0 +1,1 @@
+Validated 8192 rows; sampled retained-hit maximum=4096; no memory bound asserted

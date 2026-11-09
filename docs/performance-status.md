@@ -220,11 +220,17 @@ payloads and a global default change remain unqualified.
 The separate [four-fork allocation diagnostic](evidence/publication-gc-diagnostic-2026-11-08/README.md)
 kept the original JDK and one-GiB heap. Both policies completed with substantial
 GCLocker allocation pressure; full collections returned occupancy to 83–96 MiB.
-This does not reproduce or erase the earlier failure. A separate correction now
-preserves JGit's default four-KiB or explicitly configured Reftable blocks instead
-of overriding them with the one-MiB pack alignment hint. Pack alignment and the
-publication selector remain unchanged. Issue #161 still needs a separately
-qualified corrected-source result for the incomplete independent cell.
+This does not reproduce or erase the earlier failure. The separate
+[Reftable layout candidate](evidence/publication-reftable-diagnostic-2026-11-08/README.md)
+reduced measured allocation to 4.37–4.49 million bytes per operation, compared with
+6.80–7.15 million in the original diagnostic. Absolute throughput was also lower
+on a different host. JGit explicitly allows the existing alignment override, so
+this is a tuning tradeoff, not an independently established correctness fix.
+A same-host comparison must assess its insertion behavior, with separate
+compaction/read coverage before promotion. Production retains the existing
+one-MiB alignment; the candidate is preserved only in experimental sources.
+Issue #161 still needs a separately qualified source and a complete
+independent-repository comparison.
 
 ## Automatic stateful/stateless threshold
 
@@ -346,10 +352,13 @@ A successful million-result run within a 2 GiB heap does not prove constant
 space. The structured-cursor transaction-start failure now closes its newly
 opened session and preserves the original exception, with a regression test.
 
-The [standalone retained-hit reproducer](evidence/search-ranked-scroll-retained-2026-11-08/README.md)
+The [hosted retained-hit matrix](evidence/search-ranked-scroll-hosted-2026-11-08/README.md)
 observed 4,096 and 32,768 live ranked hits at the sampled midpoints of 8,192- and
-65,536-document exports with the same 128-row chunks. Its cached Search 8.4.0
-runtime and dependency limitations are recorded explicitly. Cursor cleanup now
+65,536-document exports with the same 128-row chunks in both Search 8.4.0 and
+8.4.1. All four cells used the declared Maven dependency graph and pinned
+Temurin 21.0.13+9; they retain complete native histograms and exact source/JAR
+identities. The earlier cached-runtime observations remain separately labeled.
+Cursor cleanup now
 also preserves fetch failures and cancellation when closing throws an exception
 or error; twelve focused regression cases cover that correction. This cleanup
 fix does not supply the missing fixed-memory guarantee.
@@ -420,7 +429,7 @@ retaining a safe default is a valid outcome of a tuning experiment.
 
 | Issue area | Completed | Remaining |
 |---|---|---|
-| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md); [four original-runtime GC diagnostic forks](evidence/publication-gc-diagnostic-2026-11-08/README.md) and a separately tested Reftable block-configuration correction. | Still open: the 16-writer/0-ms independent cell aborted; its original acceptance result is missing. A corrected-source qualification must retain its own protocol and identity. Larger payloads/provider combinations and any default promotion need separate qualification. |
+| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md); [four original-runtime GC diagnostic forks](evidence/publication-gc-diagnostic-2026-11-08/README.md), an independently recorded [Reftable allocation candidate](evidence/publication-reftable-diagnostic-2026-11-08/README.md), and layout/content integrity checks. | Still open: the 16-writer/0-ms independent cell aborted; its original acceptance result is missing. Candidate layout and selector qualification need separate controlled comparisons with their own protocols and identities. Larger payloads/provider combinations and any default promotion need separate qualification. |
 | [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Benchmark-only two-window prototype, cancellation/rollback/reopen tests and 27 retained native trials | Full Git publication, 512 MiB and multiwriter/storage comparisons, rollback latency and repeatable local non-regression; production stays synchronous. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |

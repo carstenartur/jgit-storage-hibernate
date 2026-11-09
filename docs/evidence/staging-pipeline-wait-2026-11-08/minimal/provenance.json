@@ -1,0 +1,81 @@
+{
+  "run_id": 42537024048,
+  "run_attempt": 1,
+  "run_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42537024048",
+  "source_commit": "586e8088c8d849c9245ac178414156fa0301cda2",
+  "source_tree": "aa2ba94b1a7577845b0144beb4db69f0570c0b39",
+  "branch": "diagnose/staging-pipeline-20261108",
+  "conclusion": "success",
+  "artifact_id": 13638839520,
+  "artifact_name": "staging-pipeline-diagnostic",
+  "archive_sha256": "sha256:eb8329d9d2faa0c7367d8f00379cd3b546575c552aebdeed831f4d13070101a6",
+  "archive_sha256_verified": true,
+  "privacy_scan": "passed after download",
+  "performance_qualified": false,
+  "measurement_boundary": "diagnostic-only",
+  "raw_root": "extracted/target/staging-diagnostic",
+  "production_decision": "keep synchronous",
+  "source_tree_verified": true,
+  "performance_qualifier_result": "rejected: unrecognized measurement boundary",
+  "archive_entries": {
+    "target/staging-diagnostic/diagnostic-status.json": {
+      "bytes": 391,
+      "sha256": "677cb83b4f4db11fdde2001938a5c7b79a4d462346f62071329db034e3bbfe44"
+    },
+    "target/staging-diagnostic/build.log": {
+      "bytes": 78940,
+      "sha256": "9887733331db4387c142001299cc63aa079281d382b7533fa77044de0bb41569"
+    },
+    "target/staging-diagnostic/native.log": {
+      "bytes": 12625415,
+      "sha256": "e82ea6761d038f2d1009e4b231b42b61d0c44b00fb5297afa3a9eeef94abba9b"
+    },
+    "target/staging-diagnostic/raw/database-telemetry.ndjson": {
+      "bytes": 6289,
+      "sha256": "79dad48cfb13a2ccee74de6f5b41a13cfee860ef5746ab44dc9e59f5c4ad215d"
+    },
+    "target/staging-diagnostic/raw/environment.properties": {
+      "bytes": 420,
+      "sha256": "79f1529bbf70bd2bb66a08610fa359633998ecdd71e7dce91da9400a82ee7661"
+    },
+    "target/staging-diagnostic/raw/timeline.csv": {
+      "bytes": 345,
+      "sha256": "7e89747b08e13f88f57eb79f9f475d5976588f0e798871b0644edcfd855ee604"
+    },
+    "target/staging-diagnostic/raw/trials.csv": {
+      "bytes": 652,
+      "sha256": "98592426daea4a24958cc0e96ba5358867cb7a552992ff857f6c77e5d2f4106c"
+    },
+    "target/staging-diagnostic/raw/database-telemetry.json": {
+      "bytes": 6353,
+      "sha256": "277209ac8044e54095b97e766951eb583f2d964bd4dfef51542a6c52a59b179d"
+    },
+    "target/staging-diagnostic/raw/phase-checkpoints.tsv": {
+      "bytes": 7849,
+      "sha256": "80784733bea3325580e61468007cd288c3aec00803dd05c00b2b5bc00f9baaea"
+    },
+    "target/staging-diagnostic/raw/rollback.csv": {
+      "bytes": 453,
+      "sha256": "4190fc3db9f4f889cf41de2daec2198f08b260e3c8eddf02d1f3c51e35a73e18"
+    },
+    "target/staging-diagnostic/raw/rtt-calibration.csv": {
+      "bytes": 98,
+      "sha256": "7787630b69c2c890d05119ea909fdb597423c2fb07c202ce750ed1edf0d1e219"
+    },
+    "jgit-storage-hibernate-benchmarks/target/surefire-reports/io.github.carstenartur.jgit.storage.hibernate.benchmark.StagedChunkPipelineEvidenceTest.txt": {
+      "bytes": 424,
+      "sha256": "4eacdd6405059223c59079cba53a0f1b6fd0aba1118e3addbf57468a344257af"
+    },
+    "jgit-storage-hibernate-benchmarks/target/surefire-reports/TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.StagedChunkPipelineEvidenceTest.xml": {
+      "bytes": 12624993,
+      "sha256": "e6c5501978c913671ec000d02a81b76ac9ba9a5b9162c07c111d94ebebc7dc45"
+    }
+  },
+  "retained_subset": [
+    "diagnostic-status.json",
+    "phase-checkpoints.tsv",
+    "environment.properties",
+    "phase-durations.json",
+    "log-volume.json"
+  ]
+}

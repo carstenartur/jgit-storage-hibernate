@@ -1,0 +1,16 @@
+{
+  "sourceCommit": "fcd8eb6ba5fa009f50c20f927fe6e932aca6510b",
+  "sourceTree": "a349eaed773a8708550dba313718073ff82aeb8e",
+  "run": 42535450496,
+  "artifact": 13639605477,
+  "archiveSha256": "95cd07744a4194c1751ae826cfa3f4e8a728e28e5e3609668612dd87795d141f",
+  "hostedSummaryByteIdentical": true,
+  "forks": 4,
+  "gcEvents": 271,
+  "fullGcEvents": 1,
+  "originalDiagnosticReplayed": true,
+  "guardedSourceChanges": [
+    "jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/ReadAheadHibernateObjDatabase.java"
+  ],
+  "acceptanceInference": false
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "diagnostic_only": true,
+  "started_at": "2026-11-08T23:50:32.965039+00:00",
+  "finished_at": "2026-11-08T23:51:01.708178+00:00",
+  "elapsed_seconds": 28.743136671000002,
+  "timed_out": false,
+  "return_code": 0,
+  "command_return_code": 0,
+  "termination_signal": null,
+  "thread_capture_count": 0,
+  "source_commit": "586e8088c8d849c9245ac178414156fa0301cda2"
+}

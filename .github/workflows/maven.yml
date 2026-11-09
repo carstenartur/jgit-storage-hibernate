@@ -60,6 +60,7 @@ jobs:
           python3 .github/scripts/test_summarize_publication_gc_diagnostic.py
           python3 .github/scripts/test_verify_publication_diagnostic_source.py
           python3 .github/scripts/test_staging_pipeline_evidence.py
+          python3 .github/scripts/test_run_staging_pipeline_diagnostic.py
           python3 .github/scripts/test_validate_ranked_scroll_evidence.py
           python3 .github/scripts/test_summarize_search_runtime_diagnostic.py
           node .github/benchmark-dashboard/dashboard.test.js
@@ -71,7 +72,9 @@ jobs:
           python3 docs/evidence/consumer-publication-2026-11-08/verify.py
           python3 docs/evidence/publication-paired-2026-11-08/reproduce.py --output target/evidence-replay/publication
           python3 docs/evidence/publication-gc-diagnostic-2026-11-08/reproduce.py --output target/evidence-replay/publication-gc
+          python3 docs/evidence/publication-reftable-diagnostic-2026-11-08/reproduce.py --output target/evidence-replay/publication-reftable
           sha256sum -c docs/evidence/search-ranked-scroll-retained-2026-11-08/SHA256SUMS
+          sha256sum -c docs/evidence/search-ranked-scroll-hosted-2026-11-08/SHA256SUMS
       - name: Verify release and security consistency
         run: |
           python3 .github/scripts/verify-release-consistency.py

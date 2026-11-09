@@ -104,3 +104,10 @@ and PostgreSQL/SQL Server acceptance matrix.
 The [retained 8.4.0 observations](../../docs/evidence/search-ranked-scroll-retained-2026-11-08/README.md)
 show the same 128-row chunks retaining 4,096 live ranked hits in an 8,192-document
 run and 32,768 in a 65,536-document run at the sampled midpoints.
+
+The separate [hosted Java 21 observations](../../docs/evidence/search-ranked-scroll-hosted-2026-11-08/README.md)
+repeat both corpus sizes for Search 8.4.0 and 8.4.1 using the declared
+Maven-resolved graph. All four jobs succeeded and reproduced the growing hit
+state. The [diagnostic workflow](../../.github/workflows/search-ranked-scroll-memory.yml)
+can be dispatched manually; it deliberately omits the optional hit budget and
+requires complete traversal, valid evidence and privacy checks before upload.

@@ -39,3 +39,15 @@ The narrowest contract-preserving route is a supported Hibernate Search fix/back
 Before such a replacement can satisfy #230, tests must prove stable membership and score/time/ID ordering while the live index changes, default and custom Similarity parity, routing and tenant isolation, compact-field/null/Instant parity without entity hydration, bounded retained page state as result count increases, and reader/session/transaction cleanup on normal exhaustion, early close, interruption and injected failure. The dependency versions must remain explicit: [Hibernate's compatibility policy](https://hibernate.org/support/compatibility-policy/) excludes Lucene-specific extensions from its general SPI compatibility promise.
 
 The existing operational guide separately lists the still-requested native query-plan/wait evidence and database-restart trials. Those missing matrix dimensions and the bounded-memory failure remain visible; the completed runs are not being reclassified as full acceptance.
+
+## Hosted confirmation with both maintenance versions
+
+The [hosted retained-hit followup](search-ranked-scroll-hosted-2026-11-08/README.md)
+subsequently executed Search 8.4.0.Final and 8.4.1.Final on pinned Temurin
+21.0.13+9-LTS with their declared Maven-resolved runtime graphs. All four
+8,192/65,536-document cells completed and passed native evidence validation.
+With unchanged 128-row chunks, both versions retained 4,096 live ranked hits at
+the smaller sampled midpoint and 32,768 at the larger one, then zero after
+releasing the closed scroll. The original ZIPs, complete histograms, source/JAR
+hashes and exact run identity are retained in that report. This is new runtime
+evidence for the remaining memory blocker; #230 remains open.

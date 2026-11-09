@@ -214,3 +214,9 @@ and the 65,536-document run retained 32,768. Both released those hits after the
 closed scroll became unreachable. These Hibernate Search 8.4.0 diagnostic runs
 perturb garbage collection and make no throughput claim; they expose the retained
 page growth that an end-of-export heap measurement would miss.
+
+A subsequent [hosted Java 21 followup](../evidence/search-ranked-scroll-hosted-2026-11-08/README.md)
+ran all four Search 8.4.0/8.4.1 and 8,192/65,536-document cells with Maven-resolved
+dependencies. Both versions reproduced the same growing native hit counts and
+released them after closure. Successful diagnostic jobs confirm those
+observations; the ranked-scroll bounded-memory requirement remains open.
