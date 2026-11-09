@@ -1,0 +1,5 @@
+[0.718s][info][class,load] org.hibernate.search.backend.lucene.impl.LuceneBeanConfigurer source: file:@MAVEN_REPOSITORY@/org/hibernate/search/hibernate-search-backend-lucene/8.4.1.Final/hibernate-search-backend-lucene-8.4.1.Final.jar
+[0.036s][info][class,load] org.hibernate.search.engine.search.sort.dsl.SortFinalStep source: file:@MAVEN_REPOSITORY@/org/hibernate/search/hibernate-search-engine/8.4.1.Final/hibernate-search-engine-8.4.1.Final.jar
+[0.146s][info][class,load] org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchIntegrator source: file:@MAVEN_REPOSITORY@/org/hibernate/search/hibernate-search-mapper-orm/8.4.1.Final/hibernate-search-mapper-orm-8.4.1.Final.jar
+[0.549s][info][class,load] org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed source: file:@MAVEN_REPOSITORY@/org/hibernate/search/hibernate-search-mapper-pojo-base/8.4.1.Final/hibernate-search-mapper-pojo-base-8.4.1.Final.jar
+[0.227s][info][class,load] org.hibernate.search.util.common.SearchException source: file:@MAVEN_REPOSITORY@/org/hibernate/search/hibernate-search-util-common/8.4.1.Final/hibernate-search-util-common-8.4.1.Final.jar

@@ -1,0 +1,1 @@
+[5.970s][info][class,load] org.hibernate.search.backend.lucene.search.query.impl.LuceneSearchScrollImpl source: file:@STUDY_ROOT@/experiment/cap-overlay.jar

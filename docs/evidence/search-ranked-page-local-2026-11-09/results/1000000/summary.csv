@@ -1,0 +1,3 @@
+documents,variant,total_hit_threshold,verified_export_ms,first_row_ms,first_fetch_ms,all_fetches_ms,max_fetch_ms,max_sampled_live_field_docs,field_docs_after_release
+1000000,release,default,24903.04,637.876,592.907,24373.702,1578.551,476224,0
+1000000,16384,default,38973.403,1041.271,993.205,38475.628,993.205,16385,0

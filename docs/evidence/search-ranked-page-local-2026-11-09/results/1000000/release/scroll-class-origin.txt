@@ -1,0 +1,1 @@
+[23.881s][info][class,load] org.hibernate.search.backend.lucene.search.query.impl.LuceneSearchScrollImpl source: file:@MAVEN_REPOSITORY@/org/hibernate/search/hibernate-search-backend-lucene/8.4.1.Final/hibernate-search-backend-lucene-8.4.1.Final.jar

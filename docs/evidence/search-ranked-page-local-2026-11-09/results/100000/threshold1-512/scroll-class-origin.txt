@@ -1,0 +1,1 @@
+[6.453s][info][class,load] org.hibernate.search.backend.lucene.search.query.impl.LuceneSearchScrollImpl source: file:@STUDY_ROOT@/search-clean/backend/lucene/target/hibernate-search-backend-lucene-8.4.2-SNAPSHOT.jar

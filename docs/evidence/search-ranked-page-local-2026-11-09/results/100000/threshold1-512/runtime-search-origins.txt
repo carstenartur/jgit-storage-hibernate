@@ -1,0 +1,5 @@
+[0.637s][info][class,load] org.hibernate.search.backend.lucene.impl.LuceneBeanConfigurer source: file:@STUDY_ROOT@/search-clean/backend/lucene/target/hibernate-search-backend-lucene-8.4.2-SNAPSHOT.jar
+[0.031s][info][class,load] org.hibernate.search.engine.search.sort.dsl.SortFinalStep source: file:@STUDY_ROOT@/search-clean/engine/target/hibernate-search-engine-8.4.2-SNAPSHOT.jar
+[0.149s][info][class,load] org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchIntegrator source: file:@STUDY_ROOT@/search-clean/mapper/orm/target/hibernate-search-mapper-orm-8.4.2-SNAPSHOT.jar
+[0.498s][info][class,load] org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed source: file:@STUDY_ROOT@/search-clean/mapper/pojo-base/target/hibernate-search-mapper-pojo-base-8.4.2-SNAPSHOT.jar
+[0.230s][info][class,load] org.hibernate.search.util.common.SearchException source: file:@STUDY_ROOT@/search-clean/util/common/target/hibernate-search-util-common-8.4.2-SNAPSHOT.jar

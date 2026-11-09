@@ -1,0 +1,14 @@
+captured-at=2026-11-09T11:32:54.987943221Z
+java=21.0.13+9-LTS
+hibernate=7.4.14.Final
+hibernate-search=8.4.2-SNAPSHOT
+lucene=9.12.3
+documents=100000
+chunk-size=128
+maximum-heap-bytes=536870912
+measurement=HotSpot DiagnosticCommand.gcClassHistogram; -all omitted
+retained-hit-budget=16385
+entity-loads=0
+prepared-statements=0
+sessions-opened=392
+sessions-closed=392

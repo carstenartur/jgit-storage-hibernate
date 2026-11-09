@@ -1,0 +1,8 @@
+documents,variant,total_hit_threshold,median_verified_export_ms,median_first_fetch_ms,median_all_fetches_ms,median_max_fetch_ms,max_sampled_live_field_docs,field_docs_after_release
+100000,release,default,2046.21,57.025,1988.142,125.766,34976,0
+100000,512,default,6755.589,48.427,6705.977,64.716,513,0
+100000,4096,default,2124.335,78.364,2080.807,80.491,4097,0
+100000,16384,default,1573.129,98.191,1526.125,98.191,16385,0
+100000,512,1,6733.509,53.02,6677.18,77.424,,
+100000,4096,1,2275.772,79.996,2228.048,79.996,,
+100000,16384,1,1735.058,119.069,1689.979,119.069,,

@@ -1,0 +1,9 @@
+# Million-document spot check protocol
+
+Declared before the million-document runs. Run genuine Search 8.4.1.Final first, then exact source candidate 2e6751194ff514e4d3e6fc31b672acc68ae96997 with only the scratch cap overlay set to 16,384 ranked hits. Both use the Maven-resolved release dependency graph with the five Search artifacts replaced by exact-source JARs in the candidate cell. Record resolved classpaths, Java class origins, source and artifact SHA-256 values.
+
+Each cell gets a fresh Temurin 21.0.13+9 JVM with `-Xms256m -Xmx512m -XX:ActiveProcessorCount=2`. Use the same standalone local-heap fixture, one million documents, fixed chunk 128, default exact total-hit threshold and the same score/time/object-ID ordering. The fixture uses equal scores, no database or JDBC, and checks every projected row, its order and the balance of opened/closed ORM sessions.
+
+After seeding, time exactly one full traversal without class histograms. Record wall-clock time including scroll open, row verification and close, plus time from opening the traversal to the first nonempty `next()`, first `next()` time, summed `next()` time and maximum `next()` time. Then start a separate untimed traversal in the same JVM using the original live histogram checkpoints, with a budget of 16,385 sampled live `FieldDoc` instances for the candidate. Assert zero residual `FieldDoc` instances after releasing the scroll. The timed traversal always precedes any class histogram. JVMs run sequentially to limit competition. There is no warmup export or rerun in either cell.
+
+Treat timings as one local fixed-order observation per cell. The counts sample retained ranked hits after `next()` and cannot establish whole-process peak heap, retained object graphs, native database behavior or a general non-regression percentage.
