@@ -134,15 +134,17 @@ jobs:
 
   search-candidate:
     if: github.event_name == 'push' && github.ref == 'refs/heads/evidence/history-scroll-search-candidate-20261109' && !github.event.deleted
-    name: ${{ matrix.backend }} / Search base and source candidate / 10000 documents
+    name: ${{ matrix.backend }} / Search base and source candidate / ${{ matrix.documents }} documents
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
         backend: [postgresql, sqlserver]
+        documents: [100000]
     env:
       BENCHMARK_BACKEND: ${{ matrix.backend }}
+      BENCHMARK_DOCUMENTS: ${{ matrix.documents }}
       SEARCH_CANDIDATE_COMMIT: 2e6751194ff514e4d3e6fc31b672acc68ae96997
       SEARCH_CANDIDATE_VERSION: 8.4.2-SNAPSHOT
 
@@ -305,7 +307,7 @@ jobs:
                 -DargLine="-Xms1g -Xmx2g -Dorg.jboss.logging.provider=jdk -Djava.util.logging.config.file=$GITHUB_WORKSPACE/reproducers/hibernate-search-ranked-scroll/logging.properties -Xlog:class+load=info:file=$variant_dir/class-load-%p.log:uptime,level,tags" \
                 -Dhibernate-search.version="$version" -Dmaven.repo.local="$maven_repo" \
                 -Dbenchmark.scroll.backend="$BENCHMARK_BACKEND" \
-                -Dbenchmark.scroll.documents=10000 -Dbenchmark.scroll.chunkSizes=100 \
+                -Dbenchmark.scroll.documents="$BENCHMARK_DOCUMENTS" -Dbenchmark.scroll.chunkSizes=100 \
                 -Dbenchmark.scroll.repetitions=1 -Dbenchmark.scroll.output="$variant_dir" \
                 -Dbenchmark.commit="$GITHUB_SHA" 2>&1 | tee "$variant_dir/maven.log"
               native_pipeline=("${PIPESTATUS[@]}")
@@ -341,7 +343,7 @@ jobs:
             cat "$variant_dir/provenance-check.log"
             printf '%s\n' "$provenance_status" > "$variant_dir/provenance.exit-code"
             if python3 .github/scripts/summarize-history-scroll-export.py "$variant_dir" \
-              --documents 10000 --chunks 100 --repetitions 1 > "$variant_dir/summary.log" 2>&1; then
+              --documents "$BENCHMARK_DOCUMENTS" --chunks 100 --repetitions 1 > "$variant_dir/summary.log" 2>&1; then
               summary_status=0
             else
               summary_status=$?
@@ -390,6 +392,6 @@ jobs:
         timeout-minutes: 5
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: history-scroll-source-candidate-${{ matrix.backend }}-10000-${{ github.sha }}
+          name: history-scroll-source-candidate-${{ matrix.backend }}-${{ matrix.documents }}-${{ github.sha }}
           path: target/history-scroll/
           if-no-files-found: error
