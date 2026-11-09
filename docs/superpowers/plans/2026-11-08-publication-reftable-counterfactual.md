@@ -8,7 +8,7 @@ failed publication qualification.
 **Preceding evidence:** The [original diagnostic](../../evidence/publication-gc-diagnostic-2026-11-08/README.md)
 completed four forks with repeated humongous allocation and GCLocker collections.
 Its full collections reclaimed the heap from roughly one GiB to 83–96 MiB.
-The [independently reproduced configuration defect](2026-11-08-reftable-output-alignment.md)
+The [reproduced configuration behavior](2026-11-08-reftable-output-alignment.md)
 overrode JGit's default 4,096-byte reftable blocks with a one-MiB physical pack
 alignment hint. The correction preserves configured/default reftable behavior.
 
@@ -64,7 +64,18 @@ Neither diagnostic changes the production size-policy default.
   pass, as do 11 directly compiled Java sequence/pairing tests. Replay the
   original diagnostic's hosted summary byte-for-byte (609 GC events, six full
   collections). The hosted build remains mandatory before the new workload.
-- [ ] Review and publish the isolated source through the parent agent.
-- [ ] Run once, retain the artifact/digest and exact measured sources, replay
-  the hosted summary offline, and assess whether a new qualification is
-  justified. A failure remains evidence, not a reason to enlarge the heap.
+- [x] Parent reviewed and published isolated source
+  `fcd8eb6ba5fa009f50c20f927fe6e932aca6510b`, tree
+  `a349eaed773a8708550dba313718073ff82aeb8e`.
+- [x] Run once: `42535450496`, artifact `13639605477`, four completed forks.
+  [Retained evidence](../../evidence/publication-reftable-diagnostic-2026-11-08/README.md)
+  replays the hosted summary byte-for-byte (271 GC events, one full collection)
+  and independently verifies the preceding diagnostic and permitted source
+  difference. Reduced allocation supports considering a new qualification;
+  residual near-limit pressure and host/throughput differences remain explicit.
+
+**Later contract review:** JGit permits the original one-MiB recommendation and
+intentionally uses it for reftables. The earlier defect interpretation was too
+strong. A controlled same-host implementation comparison must address the
+observed throughput concern before recommending this candidate; the four layout
+tests establish the changed behavior, not that the old behavior was invalid.

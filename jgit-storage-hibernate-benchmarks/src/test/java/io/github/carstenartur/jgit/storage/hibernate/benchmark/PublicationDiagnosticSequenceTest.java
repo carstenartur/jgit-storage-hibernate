@@ -15,6 +15,23 @@ import org.junit.jupiter.api.Test;
 
 class PublicationDiagnosticSequenceTest {
   @Test
+  void retainsAllEightFixedVariantAttemptsAfterAnOrdinaryFailure() throws Exception {
+    List<String> variants = new ArrayList<>(List.of("baseline", "candidate", "candidate", "baseline",
+        "baseline", "candidate", "candidate", "baseline"));
+    List<String> attempts = new ArrayList<>();
+    var outcomes = PublicationDiagnosticSequence.run(variants, (ordinal, variant) -> {
+      attempts.add(variant);
+      variants.clear(); // The caller cannot mutate the predetermined sequence.
+      if (ordinal == 2) throw new PublicationDiagnosticSequence.ForkFailure(new IOException("child failed"));
+    }, retained -> {});
+    assertEquals(List.of("baseline", "candidate", "candidate", "baseline",
+        "baseline", "candidate", "candidate", "baseline"), attempts);
+    assertEquals(8, outcomes.size());
+    assertEquals("failed", outcomes.get(1).status());
+    assertEquals("completed", outcomes.get(7).status());
+  }
+
+  @Test
   void doesNotInventAnAttemptWhenInterruptedBeforeStarting() {
     List<Integer> attempts = new ArrayList<>();
     List<PublicationDiagnosticSequence.Outcome> retained = new ArrayList<>();

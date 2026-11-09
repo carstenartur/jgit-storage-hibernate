@@ -91,6 +91,17 @@ exhibited hundreds of JNI allocation stalls; full collections returned heap
 occupancy to 83–96 MiB. These observations support an allocation-pressure
 investigation and do not supply the missing original acceptance result.
 
+The separate [reftable candidate and counterfactual](../evidence/publication-reftable-diagnostic-2026-11-08/README.md)
+retain JGit's configured/default logical reftable blocks while keeping pack
+alignment unchanged. Its four forks reported 4.37–4.49 million allocated
+bytes/publication, versus 6.80–7.15 million in the original diagnostic. One
+corrected-source fork still reached the heap ceiling and required full GC.
+The runs used different hosts and had different throughput; neither an OOM-free
+guarantee nor a policy non-regression result follows from this comparison.
+JGit permits the previous alignment recommendation too, and the changed block
+size also changes ref-table compaction thresholds. A controlled implementation
+comparison is needed before recommending the candidate.
+
 Any tuning must preserve these invariants:
 
 - no successful acknowledgement before the authoritative database commit;

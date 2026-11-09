@@ -52,10 +52,11 @@ def describe_logs(root, base, output, status):
                     "Unexpected diagnostic log segment")
             maximum = 64 * 1024 if suffix == "-init.log" else 16 * 1024**2 + 64 * 1024
             require(path.stat().st_size <= maximum, "Diagnostic log exceeded its fixed size bound")
-        if not candidates:
-            missing.append(suffix)
         files.extend(candidates)
         groups[suffix] = "\n".join(path.read_text(errors="strict") for path in candidates)
+        # JNI logging can legitimately remain empty when no critical-region stalls occur.
+        if not candidates or (suffix != "-jni.log" and not groups[suffix].strip()):
+            missing.append(suffix)
     require(status != "completed" or not missing, "Completed fork lacks required diagnostic logs")
     gc = groups["-gc.log"]
     # Unified logs emit a start and a completed line for many pauses. Occupancy

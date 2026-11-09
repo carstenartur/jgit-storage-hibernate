@@ -61,6 +61,21 @@ def step_enabled(name, step, event, **kwargs):
 
 
 class NativeFollowupTriggerTest(unittest.TestCase):
+    def test_controlled_reftable_comparison_selects_only_the_eight_fork_job(self):
+        name = "performance-investigations.yml"
+        ref = "refs/heads/codex/publication-reftable-paired-20261108"
+        for event in ("push", "workflow_dispatch"):
+            self.assertTrue(job_enabled(name, "publication-reftable-comparison", event, ref=ref,
+                                        profile="publication-reftable-comparison"))
+            for job in ("investigate", "repository-aging-smoke", "repository-aging-full-shard",
+                        "stateless-threshold", "publication-nonregression", "publication-gc-diagnostic"):
+                self.assertFalse(job_enabled(name, job, event, ref=ref,
+                                             profile="publication-reftable-comparison"), job)
+        for event, candidate in (("push", ref + "-extra"), ("push", "refs/heads/main"),
+                                 ("pull_request", ref), ("schedule", ref)):
+            self.assertFalse(job_enabled(name, "publication-reftable-comparison", event, ref=candidate))
+        self.assertFalse(job_enabled(name, "publication-reftable-comparison", "push", ref=ref, deleted=True))
+
     def test_each_required_workflow_accepts_only_the_exact_named_branch(self):
         for name in ("performance-investigations.yml", "search-runtime-performance.yml",
                      "consumer-taxonomy-postgres.yml", "consumer-compatibility.yml"):

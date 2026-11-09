@@ -102,7 +102,7 @@ This supports allocation pressure interacting with critical regions as a
 mechanism. Because the OOM did not recur, the original failed JVM's precise live
 heap and the decisive thread occupying a critical region remain unobserved.
 
-The library reports a one-MiB output block size for every extension. Inspected
+The measured original library reports a one-MiB output block size for every extension. Inspected
 JGit 7.8 bytecode shows `DfsPackCompactor.configureReftable` replaces the configured
 ref block size whenever that output value is positive. Consequently pack
 alignment also overrides default four-KiB/configured ref blocks and influences
@@ -116,6 +116,13 @@ Any corrected-source counterfactual needs its own source and artifact identity.
 Later qualification requires a separately declared protocol and every outcome
 retained. Diagnostic successes cannot supply the missing original 24/96-pair
 acceptance result.
+
+The separate [corrected-source counterfactual](../publication-reftable-diagnostic-2026-11-08/README.md)
+subsequently completed its four fixed forks. It preserves configured/default
+reftable blocks, reports lower allocation per publication, and retains one
+full collection after renewed near-limit pressure. Its different host and
+lower absolute throughput are reported explicitly. It neither changes this
+original evidence nor supplies a policy qualification result.
 
 ## Offline replay
 
