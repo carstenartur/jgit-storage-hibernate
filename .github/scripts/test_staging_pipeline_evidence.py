@@ -86,6 +86,102 @@ class StagingEvidenceTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 evidence.matrix(profile, repeats)
 
+    def test_local_git_profile_contains_only_independent_preregistered_forks(self):
+        forks = evidence.matrix("local-git", 9)["include"]
+        self.assertEqual([f"p128-b16-w1-runner-r0-fork-{i}" for i in range(1, 7)],
+                         [fork["id"] for fork in forks])
+        for fork in forks:
+            self.assertEqual(dict(payload=128, window=16, writers=1, storage="runner",
+                                  rtt=0, rate=0, repeats=9, warmups=2, git_only=True),
+                             {key: value for key, value in fork.items() if key != "id"})
+        with self.assertRaisesRegex(ValueError, "nine"):
+            evidence.matrix("local-git", 3)
+
+    def test_local_git_uses_six_fork_means_and_retains_a_failed_comparison(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for index in range(1, 7):
+                self.write_git_fork(directory, index)
+            result = evidence.summarize_local_git(directory, "a" * 40, 1)
+            self.assertEqual(6, result["fork_count"])
+            self.assertEqual(162, result["publications"])
+            self.assertAlmostEqual(2.4857699250, result["comparisons"]["VIRTUAL"]["change_percent"])
+            self.assertAlmostEqual(4.4681041375, result["comparisons"]["VIRTUAL"]["upper_percent"])
+            self.assertTrue(result["comparisons"]["VIRTUAL"]["non_regression"])
+            self.assertFalse(result["comparisons"]["PLATFORM"]["non_regression"])
+
+    def test_local_git_rejects_failed_junit_and_different_workflow_attempts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for index in range(1, 6):
+                self.write_git_fork(directory, index)
+            self.write_git_fork(directory, 6, attempt=2)
+            with self.assertRaisesRegex(ValueError, "forks"):
+                evidence.summarize_local_git(directory, "a" * 40, 1)
+            self.write_git_fork(directory, 6, failed=True)
+            with self.assertRaisesRegex(ValueError, "JUnit"):
+                evidence.summarize_local_git(directory, "a" * 40, 1)
+
+    def test_local_git_requires_native_wal_and_common_git_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for index in range(1, 7):
+                self.write_git_fork(directory, index)
+            self.write_git_fork(directory, 6, wal=0)
+            with self.assertRaisesRegex(ValueError, "WAL"):
+                evidence.summarize_local_git(directory, "a" * 40, 1)
+            self.write_git_fork(directory, 6, blob="d" * 40)
+            with self.assertRaisesRegex(ValueError, "identity"):
+                evidence.summarize_local_git(directory, "a" * 40, 1)
+
+    def test_local_git_requires_the_declared_postgresql_version(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for index in range(1, 6):
+                self.write_git_fork(directory, index)
+            self.write_git_fork(directory, 6, version="170009")
+            with self.assertRaisesRegex(ValueError, "PostgreSQL 17.10"):
+                evidence.summarize_local_git(directory, "a" * 40, 1)
+
+    @staticmethod
+    def write_git_fork(directory, index, attempt=1, failed=False, wal=1, blob="c" * 40, version="170010"):
+        # Synthetic validator fixtures are never retained as performance evidence.
+        artifact = directory / f"staging-pipeline-p128-b16-w1-runner-r0-fork-{index}-attempt-{attempt}"
+        raw = artifact / "target/staging-pipeline/raw"
+        raw.mkdir(parents=True, exist_ok=True)
+        (raw / "git-publication.properties").write_text(
+            f"source_commit={'a' * 40}\nmeasurement_boundary=git-object-insertion-through-ref-commit\n"
+            "publication_policy=production-configured\nstaging_filesystem=ext4\n"
+            "warmup_rounds=2\nrepeats=9\nrequested_rtt_ms=0\nrtt_nanos=153000\n")
+        modes = evidence.MODES
+        rows = []
+        observations = []
+        for sample in range(1, 10):
+            for offset in range(3):
+                mode = modes[(sample - 1 + offset) % 3]
+                duration = dict(SYNCHRONOUS=100, VIRTUAL=99 + index, PLATFORM=110)[mode]
+                rows.append(dict(sample=sample, mode=mode, payload_bytes=128 * 1024 * 1024 + 257,
+                                 window_mib=16, read_bytes_per_second=0, publication_nanos=duration,
+                                 cpu_nanos=100, allocated_bytes=150, heap_peak_upper_bytes=200,
+                                 retained_windows=1 if mode == "SYNCHRONOUS" else 2,
+                                 prepersisted_packs=1, commit="b" * 40, blob=blob))
+                observations.append(dict(coordinate=dict(sample=str(sample), mode=mode),
+                                         backend="postgresql", enabled=True,
+                                         metadata={"postgresql.server_version_num": version},
+                                         counters={"postgresql.wal.insert_lsn_bytes": wal}))
+        with (raw / "git-publication.csv").open("w", newline="") as sink:
+            writer = csv.DictWriter(sink, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
+        (raw / "git-publication-telemetry.ndjson").write_text(
+            "\n".join(json.dumps(observation) for observation in observations) + "\n")
+        reports = artifact / "jgit-storage-hibernate-benchmarks/target/surefire-reports"
+        reports.mkdir(parents=True, exist_ok=True)
+        (reports / "TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.StagedChunkPipelineEvidenceTest.xml").write_text(
+            f'<testsuite tests="1" errors="0" skipped="0" failures="{int(failed)}">'
+            '<testcase name="recordsPostgresqlGitPublicationEvidence"/>'
+            '</testsuite>')
+
     def test_paced_trial_must_show_the_requested_read_limit_in_measured_time(self):
         rows = [self.trial(mode) for mode in evidence.MODES]
         for row in rows:

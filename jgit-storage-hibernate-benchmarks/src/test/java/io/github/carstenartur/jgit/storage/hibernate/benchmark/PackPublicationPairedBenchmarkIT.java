@@ -51,11 +51,17 @@ class PackPublicationPairedBenchmarkIT {
   private static final String CONNECTION_FILE =
       "jgit.storage.benchmark.connection-properties-file";
   private static final int PROXY_DATA_PORT = 8666;
+  private static final String JDK25_CELL = "independent-16w-0ms-jdk25";
+  private static final int JDK25_PAIRS = 16;
 
   @Test
   @Timeout(value = 145, unit = TimeUnit.MINUTES)
   void retainsPreregisteredPairedForks() throws Exception {
     Cell cell = Cell.parse(System.getProperty("jgit.storage.benchmark.publication.cell"));
+    if (cell.jdk25Replication()
+        && !"25.0.5+8-LTS".equals(System.getProperty("java.vm.version"))) {
+      throw new IllegalStateException("The separate replication requires Temurin 25.0.5+8");
+    }
     String source = sourceProperty("jgit.storage.benchmark.source");
     String tree = sourceProperty("jgit.storage.benchmark.sourceTree");
     Path root =
@@ -126,7 +132,8 @@ class PackPublicationPairedBenchmarkIT {
             environment(observer, cell, source, tree, fileStoreType, postgres);
         writeJson(root.resolve("environment.json"), environment);
         List<Double> ratios = new ArrayList<>();
-        int maximum = cell.shared() ? 24 : 96;
+        List<Integer> pairStages = cell.pairStages();
+        int maximum = pairStages.getLast();
         for (int pair = 1; pair <= maximum; pair++) {
           Map<String, Double> scores = new LinkedHashMap<>();
           for (int position = 0; position < 2; position++) {
@@ -165,8 +172,8 @@ class PackPublicationPairedBenchmarkIT {
                 cell.id(), pair, position, policy);
           }
           ratios.add(scores.get("contention-aware") / scores.get("size"));
-          if (!cell.shared()
-              && pair == 24
+          if (pairStages.size() > 1
+              && pair == pairStages.getFirst()
               && PublicationPairing.lowerBoundPercent(ratios) > -5.0) {
             break;
           }
@@ -189,6 +196,11 @@ class PackPublicationPairedBenchmarkIT {
       Cell cell, String policy, Path connectionFile, Path resultFile, Path outputFile) {
     String method =
         cell.shared() ? "publishToSameRepository" : "publishToDifferentRepositories";
+    List<String> jvmArgs =
+        new ArrayList<>(List.of("-Xms256m", "-Xmx1024m", "-D" + CONNECTION_FILE + "=" + connectionFile));
+    if (cell.jdk25Replication()) {
+      jvmArgs.add("-XX:+UseG1GC");
+    }
     return new OptionsBuilder()
         .include(Pattern.quote(ConcurrentPublicationBenchmark.class.getName() + "." + method) + "$")
         .mode(Mode.Throughput)
@@ -211,17 +223,19 @@ class PackPublicationPairedBenchmarkIT {
         .resultFormat(ResultFormatType.JSON)
         .result(resultFile.toString())
         .output(outputFile.toString())
-        .jvmArgs("-Xms256m", "-Xmx1024m", "-D" + CONNECTION_FILE + "=" + connectionFile)
+        .jvmArgs(jvmArgs.toArray(String[]::new))
         .build();
   }
 
   static Map<String, Object> protocol(Cell cell, String source, String tree) {
     Map<String, Object> values = new LinkedHashMap<>();
-    values.put("schema", "jgit-publication-paired/v1");
+    values.put(
+        "schema",
+        cell.jdk25Replication() ? "jgit-publication-paired-jdk25/v1" : "jgit-publication-paired/v1");
     values.put("cell", cell.id());
     values.put("sourceCommit", source);
     values.put("sourceTree", tree);
-    values.put("pairStages", cell.shared() ? List.of(24) : List.of(24, 96));
+    values.put("pairStages", cell.pairStages());
     values.put("warmupIterations", 2);
     values.put("warmupSeconds", 3);
     values.put("measurementIterations", 3);
@@ -231,7 +245,7 @@ class PackPublicationPairedBenchmarkIT {
     values.put("marginPercent", -5.0);
     values.put("heapMiB", 1024);
     values.put("initialHeapMiB", 256);
-    values.put("jdkMajor", 21);
+    values.put("jdkMajor", cell.jdk25Replication() ? 25 : 21);
     values.put("jmhVersion", "1.37");
     values.put("layout", cell.shared() ? "shared" : "independent");
     values.put("writers", cell.writers());
@@ -378,6 +392,17 @@ class PackPublicationPairedBenchmarkIT {
   }
 
   record Cell(String id, boolean shared, int writers, int payloadKiB, int rttMillis) {
+    boolean jdk25Replication() {
+      return JDK25_CELL.equals(id);
+    }
+
+    List<Integer> pairStages() {
+      if (jdk25Replication()) {
+        return List.of(JDK25_PAIRS);
+      }
+      return shared ? List.of(24) : List.of(24, 96);
+    }
+
     static Cell parse(String id) {
       if (id == null) {
         throw new IllegalArgumentException("Select one explicit publication cell");
@@ -386,6 +411,7 @@ class PackPublicationPairedBenchmarkIT {
         case "independent-1w-0ms" -> new Cell(id, false, 1, 256, 0);
         case "independent-1w-50ms" -> new Cell(id, false, 1, 256, 50);
         case "independent-16w-0ms" -> new Cell(id, false, 16, 256, 0);
+        case JDK25_CELL -> new Cell(id, false, 16, 256, 0);
         case "independent-16w-50ms" -> new Cell(id, false, 16, 256, 50);
         case "shared-8w-5ms" -> new Cell(id, true, 8, 768, 5);
         default -> throw new IllegalArgumentException("Unknown preregistered publication cell: " + id);

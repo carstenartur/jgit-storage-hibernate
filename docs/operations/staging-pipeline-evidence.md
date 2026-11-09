@@ -34,14 +34,41 @@ Run `StagedChunkPipelineEvidenceTest#recordsPostgresqlGitPublicationEvidence`
 with `jgit.storage.benchmark.staging-pipeline.git_publication.enabled=true` and
 the existing single-writer coordinate properties to repeat these controls. Set
 the JVM's `java.io.tmpdir` to the desired staging filesystem. These are separate
-single-writer observations; they neither expand the raw-transfer matrix nor
-establish repeatable non-regression by themselves. A complete Git push remains
-outside this experiment.
+single-writer observations. A complete Git push remains outside this experiment.
+
+### Local non-regression protocol
+
+The `local-git` profile repeats only the 128 MiB + 257 byte, 16 MiB window,
+single-writer, unpaced runner-disk control against native PostgreSQL 17.10 with
+no added RTT. It does not rerun the raw transfer or rollback timing matrix.
+Dispatch it with `repeats=9`, or use the exact
+`evidence/staging-local-git-20261109` push branch.
+
+Six separately hosted jobs each start a fresh JVM and PostgreSQL container.
+Each fork discards two warm-up rounds and retains nine rounds of the three modes
+in rotating order. The native command has a seven-minute deadline and at most
+two jobs run concurrently. All six forks from the same workflow attempt must
+succeed. Each publication must pass durable ref and cold SHA-256 verification,
+and the aggregate must confirm identical commit/blob IDs, WAL movement, the
+expected one or two retained windows, pre-persistence and loopback RTT below
+5 ms. Failure or missing evidence leaves the coordinate unqualified.
+
+The independent observation is a fork's mean of the nine within-round
+log elapsed-time ratios of a candidate to synchronous. Report each candidate's
+geometric mean elapsed-time change and a one-sided 97.5% Student t upper bound
+over six fork means. This gives 95% joint confidence across the two candidates
+using Bonferroni correction. The preregistered non-regression margin is a 5%
+elapsed-time increase. A candidate qualifies only if its upper bound is at or
+below that margin. Results apply to this coordinate and the hosted runners.
+The production writer remains synchronous.
+
+
+[Measured six-fork outcome](../evidence/open-performance-issues-2026-11-09.md#local-single-writer-staging)
 
 ## Native evidence profiles
 
 The [Bounded Staging Pipeline Evidence workflow](../../.github/workflows/staging-pipeline-evidence.yml)
-provides three explicit profiles. Pull requests run one smoke coordinate. A
+provides four explicit profiles. Pull requests run one smoke coordinate. A
 controlled `evidence/staging-pipeline-*` branch runs the eight coverage coordinates.
 Manual dispatch defaults to the smoke profile; the full matrix is opt-in.
 At most two cells run concurrently, and each cell has a 60-minute limit.
@@ -50,6 +77,7 @@ At most two cells run concurrently, and each cell has a 60-minute limit.
 | --- | ---: | --- |
 | `smoke` | 1 | 16 MiB, 16 MiB window, one writer, runner storage, direct PostgreSQL |
 | `coverage` | 8 | Includes 512 MiB, 4/16 writers, 16/32 MiB windows, runner/tmpfs/paced staging and 0/5/20/50 ms RTT |
+| `local-git` | 1, with 6 forks | Repeat the local single-writer complete Git control |
 | `full` | 216 | The Cartesian product of the original issue's payload, window, writer, storage and RTT dimensions |
 
 Coverage and full profiles execute one unretained warm-up round per mode, followed
