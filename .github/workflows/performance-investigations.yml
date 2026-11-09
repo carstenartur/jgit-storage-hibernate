@@ -12,6 +12,9 @@ on:
           - smoke
           - full
           - publication-nonregression
+          - publication-gc-diagnostic
+          - publication-gc-counterfactual
+          - publication-reftable-comparison
   schedule:
     - cron: '23 5 * * 3'
   pull_request:
@@ -24,6 +27,14 @@ on:
       - '.github/scripts/test_native_followup_trigger.py'
       - '.github/scripts/summarize-publication-nonregression.py'
       - '.github/scripts/test_summarize_publication_nonregression.py'
+      - '.github/scripts/summarize-publication-gc-diagnostic.py'
+      - '.github/scripts/test_summarize_publication_gc_diagnostic.py'
+      - '.github/scripts/verify-publication-diagnostic-source.py'
+      - '.github/scripts/test_verify_publication_diagnostic_source.py'
+      - '.github/scripts/prepare-publication-reftable-comparison.py'
+      - '.github/scripts/test_prepare_publication_reftable_comparison.py'
+      - '.github/scripts/summarize-publication-reftable-comparison.py'
+      - '.github/scripts/test_summarize_publication_reftable_comparison.py'
       - '.github/scripts/validate_read_ahead_database_telemetry.py'
       - '.github/scripts/test_validate_read_ahead_database_telemetry.py'
       - '.github/scripts/validate_search_database_telemetry.py'
@@ -31,7 +42,7 @@ on:
       - 'jgit-storage-hibernate-core/**'
       - 'jgit-storage-hibernate-benchmarks/**'
   push:
-    branches: [ main, codex/performance-followup-20261108 ]
+    branches: [ main, codex/performance-followup-20261108, codex/publication-gc-diagnostic-20261108, codex/publication-reftable-diagnostic-20261108, codex/publication-reftable-paired-20261108 ]
     paths:
       - '.github/workflows/performance-investigations.yml'
       - '.github/scripts/convert-jmh-repository-aging.py'
@@ -40,6 +51,14 @@ on:
       - '.github/scripts/test_native_followup_trigger.py'
       - '.github/scripts/summarize-publication-nonregression.py'
       - '.github/scripts/test_summarize_publication_nonregression.py'
+      - '.github/scripts/summarize-publication-gc-diagnostic.py'
+      - '.github/scripts/test_summarize_publication_gc_diagnostic.py'
+      - '.github/scripts/verify-publication-diagnostic-source.py'
+      - '.github/scripts/test_verify_publication_diagnostic_source.py'
+      - '.github/scripts/prepare-publication-reftable-comparison.py'
+      - '.github/scripts/test_prepare_publication_reftable_comparison.py'
+      - '.github/scripts/summarize-publication-reftable-comparison.py'
+      - '.github/scripts/test_summarize_publication_reftable_comparison.py'
       - '.github/scripts/validate_read_ahead_database_telemetry.py'
       - '.github/scripts/test_validate_read_ahead_database_telemetry.py'
       - '.github/scripts/validate_search_database_telemetry.py'
@@ -74,13 +93,20 @@ jobs:
       - name: Test paired publication evidence and stopping rules
         run: python3 .github/scripts/test_summarize_publication_nonregression.py
 
+      - name: Test bounded GC diagnostic evidence
+        run: |
+          python3 .github/scripts/test_summarize_publication_gc_diagnostic.py
+          python3 .github/scripts/test_verify_publication_diagnostic_source.py
+          python3 .github/scripts/test_prepare_publication_reftable_comparison.py
+          python3 .github/scripts/test_summarize_publication_reftable_comparison.py
+
       - name: Test exact native follow-up event selection
         run: python3 .github/scripts/test_native_followup_trigger.py
 
   investigate:
     if: >-
-      (github.event_name != 'workflow_dispatch' || inputs.profile != 'publication-nonregression') &&
-      !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108')
+      (github.event_name != 'workflow_dispatch' || (inputs.profile != 'publication-nonregression' && inputs.profile != 'publication-gc-diagnostic' && inputs.profile != 'publication-gc-counterfactual' && inputs.profile != 'publication-reftable-comparison')) &&
+      !(github.event_name == 'push' && (github.ref == 'refs/heads/codex/performance-followup-20261108' || github.ref == 'refs/heads/codex/publication-gc-diagnostic-20261108' || github.ref == 'refs/heads/codex/publication-reftable-diagnostic-20261108' || github.ref == 'refs/heads/codex/publication-reftable-paired-20261108'))
     name: ${{ matrix.investigation }} (${{ github.event_name == 'workflow_dispatch' && inputs.profile || (github.event_name == 'schedule' && 'full' || 'smoke') }})
     needs: contract
     runs-on: ubuntu-latest
@@ -318,7 +344,7 @@ jobs:
     needs: contract
     if: >-
       github.event_name != 'schedule' &&
-      !(github.event_name == 'push' && github.ref == 'refs/heads/codex/performance-followup-20261108') &&
+      !(github.event_name == 'push' && (github.ref == 'refs/heads/codex/performance-followup-20261108' || github.ref == 'refs/heads/codex/publication-gc-diagnostic-20261108' || github.ref == 'refs/heads/codex/publication-reftable-diagnostic-20261108' || github.ref == 'refs/heads/codex/publication-reftable-paired-20261108')) &&
       (github.event_name != 'workflow_dispatch' || inputs.profile == 'smoke')
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -558,7 +584,7 @@ jobs:
     needs: contract
     if: >-
       github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_dispatch' && inputs.profile != 'publication-nonregression')
+      (github.event_name == 'workflow_dispatch' && inputs.profile != 'publication-nonregression' && inputs.profile != 'publication-gc-diagnostic' && inputs.profile != 'publication-gc-counterfactual' && inputs.profile != 'publication-reftable-comparison')
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -678,4 +704,171 @@ jobs:
         with:
           name: publication-nonregression-${{ matrix.cell }}
           path: target/publication-paired/${{ matrix.cell }}/**
+          if-no-files-found: error
+
+  publication-gc-diagnostic:
+    name: Publication allocation diagnostic / four fixed forks
+    needs: contract
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.profile == 'publication-gc-diagnostic' || inputs.profile == 'publication-gc-counterfactual')) ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/codex/publication-gc-diagnostic-20261108' || github.ref == 'refs/heads/codex/publication-reftable-diagnostic-20261108') && !github.event.deleted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PUBLICATION_DIAGNOSTIC_VARIANT: ${{ ((github.event_name == 'workflow_dispatch' && inputs.profile == 'publication-gc-counterfactual') || (github.event_name == 'push' && github.ref == 'refs/heads/codex/publication-reftable-diagnostic-20261108')) && 'reftable' || 'original' }}
+    steps:
+      - name: Checkout diagnostic source and original source identity
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up original Temurin 21.0.13+9
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21.0.13+9'
+          cache: maven
+
+      - name: Require exactly the declared library and workload changes
+        shell: bash
+        run: |
+          mkdir -p target/publication-gc-diagnostic
+          python3 .github/scripts/verify-publication-diagnostic-source.py \
+            --variant "$PUBLICATION_DIAGNOSTIC_VARIANT" \
+            --output target/publication-gc-diagnostic/unchanged-source-blobs.txt
+
+      - name: Build declared library and test diagnostic sequence
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install \
+            -Dtest=PublicationDiagnosticSequenceTest,PublicationPairingTest \
+            -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Verify configured reftable output against real JGit
+        if: env.PUBLICATION_DIAGNOSTIC_VARIANT == 'reftable'
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-core test -Dtest=ReftableOutputAlignmentTest
+
+      - name: Run exactly four GC and JNI diagnostic forks
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackPublicationGcDiagnosticIT \
+            -Djgit.storage.benchmark.publication.diagnostic.variant="$PUBLICATION_DIAGNOSTIC_VARIANT" \
+            -Djgit.storage.benchmark.source="$(git rev-parse HEAD)" \
+            -Djgit.storage.benchmark.sourceTree="$(git rev-parse HEAD^{tree})" \
+            -Dbenchmark.resultDirectory="$GITHUB_WORKSPACE/target/publication-gc-diagnostic"
+
+      - name: Retain diagnostic observations without acceptance inference
+        if: always()
+        run: |
+          python3 .github/scripts/summarize-publication-gc-diagnostic.py target/publication-gc-diagnostic
+          echo '### Fixed publication allocation diagnostic' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All four predetermined child outcomes are retained. This is not a resumed non-regression study.' >> "$GITHUB_STEP_SUMMARY"
+          cat target/publication-gc-diagnostic/summary.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Scan every retained diagnostic file for connection details
+        id: diagnostic-privacy
+        if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/publication-gc-diagnostic
+
+      - name: Upload complete or partial diagnostic with all log segments
+        if: always() && steps.diagnostic-privacy.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publication-gc-diagnostic-${{ env.PUBLICATION_DIAGNOSTIC_VARIANT }}-jdk21
+          path: target/publication-gc-diagnostic/**
+          if-no-files-found: error
+
+  publication-reftable-comparison:
+    name: Reftable alignment comparison / four fixed pairs
+    needs: contract
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.profile == 'publication-reftable-comparison') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/codex/publication-reftable-paired-20261108' && !github.event.deleted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout immutable comparison harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up original Temurin 21.0.13+9
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21.0.13+9'
+          cache: maven
+
+      - name: Require the declared original dependencies and workload
+        run: |
+          python3 .github/scripts/prepare-publication-reftable-comparison.py \
+            --harness-source "$GITHUB_WORKSPACE" --verify-harness-only
+
+      - name: Build both immutable historical core implementations
+        shell: bash
+        env:
+          REFTABLE_BASELINE_SOURCE: ${{ runner.temp }}/reftable-baseline-source
+          REFTABLE_CANDIDATE_SOURCE: ${{ runner.temp }}/reftable-candidate-source
+        run: |
+          git fetch --no-tags origin \
+            96f1b08d5d0ca32f98508828c78074f12da688fc \
+            fcd8eb6ba5fa009f50c20f927fe6e932aca6510b
+          git worktree add --detach "$REFTABLE_BASELINE_SOURCE" 96f1b08d5d0ca32f98508828c78074f12da688fc
+          git worktree add --detach "$REFTABLE_CANDIDATE_SOURCE" fcd8eb6ba5fa009f50c20f927fe6e932aca6510b
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -f "$REFTABLE_BASELINE_SOURCE/pom.xml" -pl jgit-storage-hibernate-core -am package -DskipTests
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -f "$REFTABLE_CANDIDATE_SOURCE/pom.xml" -pl jgit-storage-hibernate-core -am package -DskipTests
+
+      - name: Audit source and every compiled core entry before measurement
+        env:
+          REFTABLE_BASELINE_SOURCE: ${{ runner.temp }}/reftable-baseline-source
+          REFTABLE_CANDIDATE_SOURCE: ${{ runner.temp }}/reftable-candidate-source
+        run: |
+          python3 .github/scripts/prepare-publication-reftable-comparison.py \
+            --baseline-source "$REFTABLE_BASELINE_SOURCE" \
+            --candidate-source "$REFTABLE_CANDIDATE_SOURCE" \
+            --harness-source "$GITHUB_WORKSPACE" \
+            --output target/publication-reftable-comparison
+
+      - name: Build harness and verify classpath identity and finite sequence
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks -am install \
+            -Dtest=PublicationDiagnosticSequenceTest,PublicationPairingTest,PublicationVariantClasspathTest,PublicationCoreIdentityProfilerTest \
+            -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Run exactly four implementation pairs on one host
+        run: |
+          mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+            -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest=PackPublicationReftableComparisonIT \
+            -Djgit.storage.benchmark.source="$(git rev-parse HEAD)" \
+            -Djgit.storage.benchmark.sourceTree="$(git rev-parse HEAD^{tree})" \
+            -Dbenchmark.resultDirectory="$GITHUB_WORKSPACE/target/publication-reftable-comparison"
+
+      - name: Validate all child identities and retain the fixed paired result
+        run: |
+          python3 .github/scripts/summarize-publication-reftable-comparison.py target/publication-reftable-comparison
+          echo '### Controlled reftable implementation comparison' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Exactly four fixed pairs; failures or inconclusive results are retained. This does not qualify a publication policy or promote production tuning.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Scan retained comparison data for connection details
+        id: reftable-comparison-privacy
+        if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/publication-reftable-comparison
+
+      - name: Upload complete or partial comparison and both exact core JARs
+        if: always() && steps.reftable-comparison-privacy.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publication-reftable-controlled-four-pairs
+          path: target/publication-reftable-comparison/**
           if-no-files-found: error

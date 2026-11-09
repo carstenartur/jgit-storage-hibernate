@@ -1,0 +1,32 @@
+io.github.carstenartur.reproducer:hibernate-search-ranked-scroll:jar:1.0-SNAPSHOT
++- org.hibernate.search:hibernate-search-mapper-orm:jar:8.4.1.Final:compile
+|  +- org.hibernate.search:hibernate-search-engine:jar:8.4.1.Final:compile
+|  +- org.hibernate.search:hibernate-search-mapper-pojo-base:jar:8.4.1.Final:compile
+|  +- org.hibernate.search:hibernate-search-util-common:jar:8.4.1.Final:compile
+|  +- org.hibernate.models:hibernate-models:jar:1.1.1:compile
+|  +- jakarta.persistence:jakarta.persistence-api:jar:3.2.0:compile
+|  +- jakarta.transaction:jakarta.transaction-api:jar:2.0.1:compile
+|  +- io.smallrye:jandex:jar:3.3.2:compile
+|  +- org.jboss.logging:jboss-logging:jar:3.6.3.Final:compile
+|  \- jakarta.xml.bind:jakarta.xml.bind-api:jar:4.0.4:compile
+|     \- jakarta.activation:jakarta.activation-api:jar:2.1.4:compile
++- org.hibernate.search:hibernate-search-backend-lucene:jar:8.4.1.Final:compile
+|  +- org.apache.lucene:lucene-core:jar:9.12.3:compile
+|  +- org.apache.lucene:lucene-analysis-common:jar:9.12.3:compile
+|  +- org.apache.lucene:lucene-queryparser:jar:9.12.3:compile
+|  |  +- org.apache.lucene:lucene-queries:jar:9.12.3:compile
+|  |  \- org.apache.lucene:lucene-sandbox:jar:9.12.3:compile
+|  |     \- org.apache.lucene:lucene-facet:jar:9.12.3:compile
+|  +- org.apache.lucene:lucene-join:jar:9.12.3:compile
+|  +- com.carrotsearch:hppc:jar:0.10.0:compile
+|  \- org.apache.lucene:lucene-highlighter:jar:9.12.3:compile
+|     \- org.apache.lucene:lucene-memory:jar:9.12.3:runtime
+\- org.hibernate.orm:hibernate-core:jar:7.4.14.Final:compile
+   +- net.bytebuddy:byte-buddy:jar:1.18.14:runtime
+   +- org.glassfish.jaxb:jaxb-runtime:jar:4.0.7:runtime
+   |  \- org.glassfish.jaxb:jaxb-core:jar:4.0.7:runtime
+   |     +- org.eclipse.angus:angus-activation:jar:2.0.3:runtime
+   |     +- org.glassfish.jaxb:txw2:jar:4.0.7:runtime
+   |     \- com.sun.istack:istack-commons-runtime:jar:4.1.2:runtime
+   +- jakarta.inject:jakarta.inject-api:jar:2.0.1:runtime
+   \- org.antlr:antlr4-runtime:jar:4.13.2:runtime

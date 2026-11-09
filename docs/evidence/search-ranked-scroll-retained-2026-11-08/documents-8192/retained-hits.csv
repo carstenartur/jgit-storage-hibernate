@@ -1,0 +1,10 @@
+phase,consumed_rows,live_field_docs,field_doc_shallow_bytes,score_doc_array_shallow_bytes
+before_open,0,0,0,0
+chunk_1,128,512,16384,2096
+chunk_2,256,512,16384,2096
+chunk_4,512,512,16384,2096
+chunk_8,1024,1024,32768,4144
+chunk_16,2048,2048,65536,8240
+chunk_32,4096,4096,131072,16432
+chunk_64,8192,512,16384,2096
+after_close,8192,0,0,32

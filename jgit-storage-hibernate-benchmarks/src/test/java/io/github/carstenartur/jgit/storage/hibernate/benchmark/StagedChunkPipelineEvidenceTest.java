@@ -6,15 +6,19 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.benchmark;
 
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.StagingPipelineDiagnostics.checkpoint;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.management.OperatingSystemMXBean;
 import com.sun.management.ThreadMXBean;
+import eu.rekawek.toxiproxy.ToxiproxyClient;
+import eu.rekawek.toxiproxy.model.ToxicDirection;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment;
+import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment.FailureStage;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment.Mode;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment.Publication;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment.Span;
@@ -40,7 +44,9 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.containers.Network;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.toxiproxy.ToxiproxyContainer;
 
 class StagedChunkPipelineEvidenceTest {
   private static final String PREFIX = "jgit.storage.benchmark.staging-pipeline";
@@ -74,6 +80,7 @@ class StagedChunkPipelineEvidenceTest {
   @Test
   @EnabledIfSystemProperty(named = PREFIX + ".enabled", matches = "true")
   void recordsPostgresqlPipelineEvidence() throws Exception {
+    checkpoint("native-test:begin");
     String routed = System.getenv("JGIT_STAGING_PIPELINE_DISPOSABLE_JDBC_URL");
     if (routed != null) {
       String direct = System.getenv().getOrDefault("JGIT_STAGING_PIPELINE_DIRECT_JDBC_URL", routed);
@@ -84,25 +91,60 @@ class StagedChunkPipelineEvidenceTest {
       record(routed, direct, "benchmark", "");
       return;
     }
-    try (var postgres =
-        new PostgreSQLContainer("postgres:17.10-alpine")
-            .withDatabaseName("jgit_stage_pipeline_disposable")
-            .withCommand(
-                "postgres",
-                "-c",
-                "fsync=on",
-                "-c",
-                "synchronous_commit=on",
-                "-c",
-                "track_io_timing=on",
-                "-c",
-                "track_wal_io_timing=on")) {
+    try (var network = Network.newNetwork();
+        var postgres =
+            new PostgreSQLContainer("postgres:17.10-alpine")
+                .withDatabaseName("jgit_stage_pipeline_disposable")
+                .withNetwork(network)
+                .withNetworkAliases("staging-postgres")
+                .withCommand(
+                    "postgres",
+                    "-c",
+                    "fsync=on",
+                    "-c",
+                    "synchronous_commit=on",
+                    "-c",
+                    "track_io_timing=on",
+                    "-c",
+                    "track_wal_io_timing=on")) {
+      checkpoint("postgres:start:begin");
       postgres.start();
-      record(
-          postgres.getJdbcUrl(),
-          postgres.getJdbcUrl(),
-          postgres.getUsername(),
-          postgres.getPassword());
+      checkpoint("postgres:start:returned");
+      int requestedRtt = Integer.getInteger(PREFIX + ".requested_rtt_millis", 0);
+      if (requestedRtt == 0) {
+        record(
+            postgres.getJdbcUrl(),
+            postgres.getJdbcUrl(),
+            postgres.getUsername(),
+            postgres.getPassword());
+      } else {
+        try (var proxy =
+            new ToxiproxyContainer("ghcr.io/shopify/toxiproxy:2.12.0").withNetwork(network)) {
+          checkpoint("proxy:start:begin");
+          proxy.start();
+          checkpoint("proxy:start:returned");
+          var client = new ToxiproxyClient(proxy.getHost(), proxy.getControlPort());
+          var route =
+              client.createProxy("staging-postgres", "0.0.0.0:8666", "staging-postgres:5432");
+          route.toxics().latency("upstream", ToxicDirection.UPSTREAM, requestedRtt / 2);
+          route
+              .toxics()
+              .latency("downstream", ToxicDirection.DOWNSTREAM, requestedRtt - requestedRtt / 2);
+          record(
+              "jdbc:postgresql://"
+                  + proxy.getHost()
+                  + ":"
+                  + proxy.getMappedPort(8666)
+                  + "/"
+                  + postgres.getDatabaseName(),
+              postgres.getJdbcUrl(),
+              postgres.getUsername(),
+              postgres.getPassword());
+        }
+      }
+      checkpoint("containers:close:begin");
+    } finally {
+      checkpoint("native-test:returned");
     }
   }
 
@@ -114,15 +156,26 @@ class StagedChunkPipelineEvidenceTest {
     int windowMiB = Integer.getInteger(PREFIX + ".window_mib", 16);
     int writers = Integer.getInteger(PREFIX + ".writers", 1);
     int repeats = Integer.getInteger(PREFIX + ".repeats", 3);
+    int warmups = Integer.getInteger(PREFIX + ".warmups", 1);
     int rateMiB = Integer.getInteger(PREFIX + ".read_mib_per_second", 0);
     int requestedRtt = Integer.getInteger(PREFIX + ".requested_rtt_millis", 0);
     assertTrue(List.of(16, 128, 512).contains(payloadMiB));
     assertTrue(List.of(16, 32).contains(windowMiB));
     assertTrue(List.of(1, 4, 16).contains(writers));
     assertTrue(List.of(0, 5, 20, 50).contains(requestedRtt));
-    assertTrue(repeats > 0 && repeats <= 9 && rateMiB >= 0);
+    assertTrue(repeats > 0 && repeats <= 9 && warmups >= 0 && warmups <= 3 && rateMiB >= 0);
+    checkpoint("fixture:create:begin");
     Fixture fixture = fixture(payloadMiB);
-    long rttNanos = calibrate(url, user, password);
+    checkpoint("fixture:create:returned");
+    String storage = System.getProperty(PREFIX + ".storage", rateMiB > 0 ? "paced" : "runner");
+    assertTrue(List.of("runner", "tmpfs", "paced").contains(storage));
+    String fileSystem = Files.getFileStore(fixture.file()).type();
+    assertTrue(!storage.equals("tmpfs") || fileSystem.equals("tmpfs"), "tmpfs cell must use tmpfs");
+    assertTrue(!storage.equals("paced") || rateMiB > 0, "paced cell requires a read rate");
+    checkpoint("calibration:begin");
+    Calibration calibration = calibrate(url, user, password);
+    checkpoint("calibration:returned");
+    long rttNanos = calibration.medianNanos();
     double actualRtt = rttNanos / 1_000_000.0;
     assertTrue(
         requestedRtt == 0
@@ -131,21 +184,58 @@ class StagedChunkPipelineEvidenceTest {
         "SELECT 1 did not observe requested RTT: " + actualRtt);
     Path output = Path.of(System.getProperty(PREFIX + ".output", "target/staging-pipeline"));
     Files.createDirectories(output);
+    var rtt = new StringBuilder("sample,rtt_nanos\n");
+    for (int i = 0; i < calibration.samples().length; i++) {
+      append(rtt, i + 1, calibration.samples()[i]);
+    }
+    Files.writeString(output.resolve("rtt-calibration.csv"), rtt);
+    var environment = new Properties();
+    environment.setProperty(
+        "source_commit", System.getenv().getOrDefault("JGIT_EVIDENCE_SOURCE_SHA", "unrecorded"));
+    environment.setProperty(
+        "measurement_boundary",
+        StagingPipelineDiagnostics.enabled()
+            ? "diagnostic-only"
+            : "staged-transfer-through-transaction-commit");
+    environment.setProperty("java_version", System.getProperty("java.runtime.version"));
+    environment.setProperty(
+        "os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
+    environment.setProperty("storage", storage);
+    environment.setProperty("staging_filesystem", fileSystem);
+    environment.setProperty("staging_directory", fixture.file().getParent().toString());
+    environment.setProperty("warmup_rounds", Integer.toString(warmups));
+    environment.setProperty("repeats", Integer.toString(repeats));
+    environment.setProperty("rollback_writers", "1");
+    environment.setProperty("max_heap_bytes", Long.toString(Runtime.getRuntime().maxMemory()));
+    environment.setProperty(
+        "available_processors", Integer.toString(Runtime.getRuntime().availableProcessors()));
+    try (var sink = Files.newOutputStream(output.resolve("environment.properties"))) {
+      environment.store(sink, "Native staging diagnostic; one fixture shared by all writers");
+    }
     Path nativeFile = output.resolve("database-telemetry.ndjson");
     Files.deleteIfExists(nativeFile);
     var summary =
         new StringBuilder(
-            "sample,mode,payload_bytes,window_mib,writers,requested_rtt_ms,rtt_nanos,read_mib_per_second,wall_nanos,cpu_nanos,allocated_bytes,heap_peak_upper_bytes,buffer_bound_bytes,staging_read_nanos,jdbc_window_nanos,reader_wait_nanos,overlap_nanos\n");
+            "sample,mode,payload_bytes,window_mib,writers,requested_rtt_ms,rtt_nanos,read_mib_per_second,wall_nanos,cpu_nanos,allocated_bytes,heap_peak_upper_bytes,buffer_bound_bytes,staging_read_nanos,jdbc_window_nanos,reader_wait_nanos,overlap_nanos,staging_written_bytes,staging_read_bytes\n");
     var timeline = new StringBuilder("sample,mode,writer,phase,start_nanos,duration_nanos,bytes\n");
     Properties properties = connection(url, user, password, "org.postgresql.Driver", windowMiB);
     try (var telemetry =
         DatabaseTelemetryCollectors.create("postgresql", true, telemetryUrl, user, password)) {
+      for (int warmup = 0; warmup < warmups; warmup++) {
+        for (Mode mode : Mode.values()) {
+          checkpoint("warmup:" + warmup + ":" + mode + ":begin");
+          measure(properties, telemetry, fixture, mode, writers, (long) rateMiB * MIB);
+          checkpoint("warmup:" + warmup + ":" + mode + ":returned");
+        }
+      }
       for (int sample = 1; sample <= repeats; sample++) {
         // Rotate the first mode to distribute process warm-up across modes.
         for (int order = 0; order < Mode.values().length; order++) {
           Mode mode = Mode.values()[(sample - 1 + order) % Mode.values().length];
+          checkpoint("sample:" + sample + ":" + mode + ":begin");
           Trial trial =
               measure(properties, telemetry, fixture, mode, writers, (long) rateMiB * MIB);
+          checkpoint("sample:" + sample + ":" + mode + ":returned");
           assertTrue(
               trial.delta().counters().getOrDefault("postgresql.wal.insert_lsn_bytes", 0L) > 0);
           DatabaseTelemetryJson.appendNdjson(
@@ -210,13 +300,78 @@ class StagedChunkPipelineEvidenceTest {
               read,
               write,
               wait,
-              overlap);
+              overlap,
+              fixture.bytes(),
+              fixture.bytes() * writers);
+          Files.writeString(output.resolve("trials.csv"), summary);
+          Files.writeString(output.resolve("timeline.csv"), timeline);
         }
       }
     }
     Files.writeString(output.resolve("trials.csv"), summary);
     Files.writeString(output.resolve("timeline.csv"), timeline);
     DatabaseTelemetryJson.writeAggregate(nativeFile, output.resolve("database-telemetry.json"));
+    recordRollbacks(
+        properties,
+        fixture.bytes() > (long) windowMiB * MIB ? fixture : fixture(windowMiB + 1),
+        windowMiB,
+        repeats,
+        (long) rateMiB * MIB,
+        output);
+  }
+
+  private static void recordRollbacks(
+      Properties properties,
+      Fixture fixture,
+      int windowMiB,
+      int repeats,
+      long readRate,
+      Path output)
+      throws Exception {
+    var rows =
+        new StringBuilder(
+            "sample,mode,failure_stage,window_mib,payload_bytes,first_window_flushed_nanos,failure_detected_nanos,failure_to_return_nanos,rollback_nanos,flushed_chunks,remaining_packs,remaining_chunks\n");
+    checkpoint("rollback-provider:open:begin");
+    try (var provider = new HibernateSessionFactoryProvider(properties);
+        var repository = HibernateRepository.create(provider.getSessionFactory(), "staging-rollback")) {
+      checkpoint("rollback-provider:open:returned");
+      repository.create(true);
+      for (int sample = 1; sample <= repeats; sample++) {
+        for (Mode mode : Mode.values()) {
+          for (FailureStage stage : FailureStage.values()) {
+            checkpoint("rollback:" + sample + ":" + mode + ":" + stage + ":begin");
+            var result =
+                StagedChunkPipelineExperiment.measureRollback(
+                    provider.getSessionFactory(),
+                    repository,
+                    fixture.file(),
+                    mode,
+                    readRate,
+                    windowMiB,
+                    stage);
+            checkpoint("rollback:" + sample + ":" + mode + ":" + stage + ":returned");
+            append(
+                rows,
+                sample,
+                mode,
+                stage,
+                windowMiB,
+                fixture.bytes(),
+                result.firstWindowFlushedNanos(),
+                result.failureDetectedNanos(),
+                result.failureToReturnNanos(),
+                result.rollbackNanos(),
+                result.flushedChunks(),
+                result.remainingPacks(),
+                result.remainingChunks());
+            Files.writeString(output.resolve("rollback.csv"), rows);
+          }
+        }
+      }
+      checkpoint("rollback-resources:close:begin");
+    } finally {
+      checkpoint("rollback-resources:close:returned");
+    }
   }
 
   private static Trial measure(
@@ -227,15 +382,18 @@ class StagedChunkPipelineEvidenceTest {
       int writers,
       long readRate)
       throws Exception {
+    checkpoint("provider:open:begin");
     try (var provider = new HibernateSessionFactoryProvider(properties);
         var pool =
             new ThreadPoolExecutor(
                 writers, writers, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(writers))) {
+      checkpoint("provider:open:returned");
       var factory = provider.getSessionFactory();
       var ready = new CountDownLatch(writers);
       var start = new CountDownLatch(1);
       List<Future<Publication>> pending = new ArrayList<>(writers);
       try {
+        checkpoint("repository-setup:begin");
         for (int i = 0; i < writers; i++) {
           String repositoryName = "stage-pipeline-" + i;
           try (var repository = HibernateRepository.create(factory, repositoryName)) {
@@ -255,6 +413,7 @@ class StagedChunkPipelineEvidenceTest {
         }
         List<Publication> published = new ArrayList<>(writers);
         assertTrue(ready.await(30, TimeUnit.SECONDS), "publishers did not reach barrier");
+        checkpoint("repository-setup:returned");
         var heap =
             ManagementFactory.getMemoryPoolMXBeans().stream()
                 .filter(poolBean -> poolBean.getType() == MemoryType.HEAP)
@@ -262,7 +421,10 @@ class StagedChunkPipelineEvidenceTest {
         heap.forEach(poolBean -> poolBean.resetPeakUsage());
         var system = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
         var threads = (ThreadMXBean) ManagementFactory.getThreadMXBean();
+        checkpoint("telemetry:before:begin");
         DatabaseTelemetrySnapshot before = telemetry.capture();
+        checkpoint("telemetry:before:returned");
+        checkpoint("publication:begin");
         long cpuStart = system.getProcessCpuTime();
         long allocationStart = threads.getTotalThreadAllocatedBytes();
         long started = System.nanoTime();
@@ -277,7 +439,10 @@ class StagedChunkPipelineEvidenceTest {
         long allocated = threads.getTotalThreadAllocatedBytes() - allocationStart;
         long heapUpper =
             heap.stream().mapToLong(poolBean -> poolBean.getPeakUsage().getUsed()).sum();
+        checkpoint("publication:returned");
+        checkpoint("telemetry:after:begin");
         DatabaseTelemetryDelta delta = before.deltaTo(telemetry.capture());
+        checkpoint("telemetry:after:returned");
         for (int writer = 0; writer < published.size(); writer++) {
           Publication publication = published.get(writer);
           assertTrue(publication.elapsedNanos() > 0);
@@ -288,6 +453,7 @@ class StagedChunkPipelineEvidenceTest {
           if (mode == Mode.SYNCHRONOUS) {
             assertEquals(0L, overlap(publication.transfer().spans()));
           }
+          checkpoint("reopen:" + writer + ":begin");
           try (var reopened = HibernateRepository.create(factory, "stage-pipeline-" + writer)) {
             var digest = MessageDigest.getInstance("SHA-256");
             assertEquals(
@@ -296,12 +462,16 @@ class StagedChunkPipelineEvidenceTest {
                     reopened, publication.description(), digest));
             assertArrayEquals(fixture.digest(), digest.digest());
           }
+          checkpoint("reopen:" + writer + ":returned");
         }
         return new Trial(List.copyOf(published), elapsed, cpu, allocated, heapUpper, delta);
       } finally {
+        checkpoint("resources:close:begin");
         pending.forEach(future -> future.cancel(true));
         start.countDown();
       }
+    } finally {
+      checkpoint("resources:close:returned");
     }
   }
 
@@ -326,7 +496,10 @@ class StagedChunkPipelineEvidenceTest {
 
   private Fixture fixture(int payloadMiB) throws Exception {
     var digest = MessageDigest.getInstance("SHA-256");
-    Path file = Files.createTempFile(scratch, "staged-pack-", ".tmp");
+    Path directory = Path.of(System.getProperty(PREFIX + ".staging_directory", scratch.toString()));
+    Files.createDirectories(directory);
+    Path file = Files.createTempFile(directory, "staged-pack-", ".tmp");
+    file.toFile().deleteOnExit();
     long bytes = (long) payloadMiB * MIB + 257;
     Random random = new Random(189);
     byte[] block = new byte[64 * 1024];
@@ -343,6 +516,7 @@ class StagedChunkPipelineEvidenceTest {
 
   private static Properties connection(
       String url, String user, String password, String driver, int windowMiB) {
+    BenchmarkConnectionProperties.suppressConnectionMetadataLogging();
     Properties props = new Properties();
     props.setProperty("hibernate.connection.url", url);
     props.setProperty("hibernate.connection.username", user);
@@ -365,7 +539,7 @@ class StagedChunkPipelineEvidenceTest {
         + "connectTimeout=10&socketTimeout=30&cancelSignalTimeout=5";
   }
 
-  private static long calibrate(String url, String user, String password) throws Exception {
+  private static Calibration calibrate(String url, String user, String password) throws Exception {
     long[] samples = new long[9];
     try (var connection = DriverManager.getConnection(url, user, password);
         var query = connection.prepareStatement("SELECT 1")) {
@@ -380,8 +554,9 @@ class StagedChunkPipelineEvidenceTest {
         }
       }
     }
-    Arrays.sort(samples);
-    return samples[samples.length / 2];
+    long[] sorted = samples.clone();
+    Arrays.sort(sorted);
+    return new Calibration(sorted[sorted.length / 2], samples);
   }
 
   private static void append(StringBuilder target, Object... fields) {
@@ -395,6 +570,8 @@ class StagedChunkPipelineEvidenceTest {
   }
 
   private record Fixture(Path file, long bytes, byte[] digest) {}
+
+  private record Calibration(long medianNanos, long[] samples) {}
 
   private record Trial(
       List<Publication> publications,

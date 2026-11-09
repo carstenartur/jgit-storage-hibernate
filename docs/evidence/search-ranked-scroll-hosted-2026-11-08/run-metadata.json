@@ -1,0 +1,447 @@
+{
+  "artifacts": [
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13639142461/zip",
+      "created_at": "2026-11-08T23:31:57Z",
+      "digest": "sha256:b12c1a55a677f6017a6db7d2ebe9432df418001b6a87f9eda96e61f1314c2358",
+      "expired": false,
+      "expires_at": "2027-02-06T23:30:52Z",
+      "id": 13639142461,
+      "name": "ranked-scroll-8.4.1.Final-65536-96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+      "size_in_bytes": 676555,
+      "updated_at": "2026-11-08T23:31:57Z",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13639142461",
+      "workflow_run": {
+        "head_branch": "evidence/search-ranked-scroll-20261108",
+        "head_repository_id": 1289770096,
+        "head_sha": "96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+        "id": 42535522871,
+        "repository_id": 1289770096
+      }
+    },
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13639092802/zip",
+      "created_at": "2026-11-08T23:31:28Z",
+      "digest": "sha256:66c3b078049852d04f7cb54c1d1c38c26daa9b3ea53f0dd84cb12e50e82aff2f",
+      "expired": false,
+      "expires_at": "2027-02-06T23:30:52Z",
+      "id": 13639092802,
+      "name": "ranked-scroll-8.4.0.Final-8192-96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+      "size_in_bytes": 507870,
+      "updated_at": "2026-11-08T23:31:28Z",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13639092802",
+      "workflow_run": {
+        "head_branch": "evidence/search-ranked-scroll-20261108",
+        "head_repository_id": 1289770096,
+        "head_sha": "96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+        "id": 42535522871,
+        "repository_id": 1289770096
+      }
+    },
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13638883695/zip",
+      "created_at": "2026-11-08T23:31:29Z",
+      "digest": "sha256:c7e656494f078b31ef7b007b4c4277c7c3a46ca71d6e3f1dff364abc08b6c096",
+      "expired": false,
+      "expires_at": "2027-02-06T23:30:52Z",
+      "id": 13638883695,
+      "name": "ranked-scroll-8.4.0.Final-65536-96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+      "size_in_bytes": 676501,
+      "updated_at": "2026-11-08T23:31:29Z",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13638883695",
+      "workflow_run": {
+        "head_branch": "evidence/search-ranked-scroll-20261108",
+        "head_repository_id": 1289770096,
+        "head_sha": "96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+        "id": 42535522871,
+        "repository_id": 1289770096
+      }
+    },
+    {
+      "archive_download_url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13638782906/zip",
+      "created_at": "2026-11-08T23:31:58Z",
+      "digest": "sha256:697795c6b3570562b5e6d74c81feb2490faf10453837e44e215462d9701beef5",
+      "expired": false,
+      "expires_at": "2027-02-06T23:30:52Z",
+      "id": 13638782906,
+      "name": "ranked-scroll-8.4.1.Final-8192-96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+      "size_in_bytes": 507425,
+      "updated_at": "2026-11-08T23:31:58Z",
+      "url": "https://api.github.com/repos/carstenartur/jgit-storage-hibernate/actions/artifacts/13638782906",
+      "workflow_run": {
+        "head_branch": "evidence/search-ranked-scroll-20261108",
+        "head_repository_id": 1289770096,
+        "head_sha": "96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+        "id": 42535522871,
+        "repository_id": 1289770096
+      }
+    }
+  ],
+  "conclusion": "success",
+  "created_at": "2026-11-08T23:30:52Z",
+  "event": "push",
+  "head_branch": "evidence/search-ranked-scroll-20261108",
+  "head_sha": "96760803b132e9902c22a3a2ccb0f2ceac0cc1ed",
+  "html_url": "https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42535522871",
+  "id": 42535522871,
+  "jobs": [
+    {
+      "conclusion": "success",
+      "id": 128898856007,
+      "logs_url": null,
+      "name": "Search 8.4.0.Final / 8192 documents",
+      "run_id": 42535522871,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout exact source",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check evidence validation contracts",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up pinned Temurin JDK",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Resolve and build only the standalone reproducer",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Observe ranked scroll retention in a separate 512 MiB JVM",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Record exact source and resolved JAR hashes",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Validate full traversal, native histograms, versions and lifecycle",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Scan all retained output for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload validated native observations",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up pinned Temurin JDK",
+          "number": 19,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout exact source",
+          "number": 20,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "id": 128898856146,
+      "logs_url": null,
+      "name": "Search 8.4.1.Final / 8192 documents",
+      "run_id": 42535522871,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout exact source",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check evidence validation contracts",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up pinned Temurin JDK",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Resolve and build only the standalone reproducer",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Observe ranked scroll retention in a separate 512 MiB JVM",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Record exact source and resolved JAR hashes",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Validate full traversal, native histograms, versions and lifecycle",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Scan all retained output for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload validated native observations",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up pinned Temurin JDK",
+          "number": 19,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout exact source",
+          "number": 20,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "id": 128898856253,
+      "logs_url": null,
+      "name": "Search 8.4.1.Final / 65536 documents",
+      "run_id": 42535522871,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout exact source",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check evidence validation contracts",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up pinned Temurin JDK",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Resolve and build only the standalone reproducer",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Observe ranked scroll retention in a separate 512 MiB JVM",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Record exact source and resolved JAR hashes",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Validate full traversal, native histograms, versions and lifecycle",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Scan all retained output for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload validated native observations",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up pinned Temurin JDK",
+          "number": 19,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout exact source",
+          "number": 20,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "id": 128898856438,
+      "logs_url": null,
+      "name": "Search 8.4.0.Final / 65536 documents",
+      "run_id": 42535522871,
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Checkout exact source",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Check evidence validation contracts",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Set up pinned Temurin JDK",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Resolve and build only the standalone reproducer",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Observe ranked scroll retention in a separate 512 MiB JVM",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Record exact source and resolved JAR hashes",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Validate full traversal, native histograms, versions and lifecycle",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Scan all retained output for connection details",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Upload validated native observations",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Set up pinned Temurin JDK",
+          "number": 19,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Checkout exact source",
+          "number": 20,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "status": "completed"
+        }
+      ]
+    }
+  ],
+  "name": "Ranked Search Scroll Retained Hits",
+  "path": ".github/workflows/search-ranked-scroll-memory.yml",
+  "run_attempt": 1,
+  "status": "completed",
+  "tree_sha": "2469214987803a7d941ab361196482793d095258",
+  "updated_at": "2026-11-08T23:32:02Z"
+}

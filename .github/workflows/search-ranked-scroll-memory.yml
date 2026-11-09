@@ -1,0 +1,115 @@
+name: Ranked Search Scroll Retained Hits
+
+# Diagnostic-only: this is observational evidence, not a bounded-memory CI claim.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['evidence/search-ranked-scroll-20261108']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retained-hits:
+    if: github.event_name == 'workflow_dispatch' || !github.event.deleted
+    name: Search ${{ matrix.search }} / ${{ matrix.documents }} documents
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        search: ['8.4.0.Final', '8.4.1.Final']
+        documents: [8192, 65536]
+    env:
+      SCROLL_SEARCH_VERSION: ${{ matrix.search }}
+      SCROLL_DOCUMENTS: ${{ matrix.documents }}
+      SCROLL_JAVA_VERSION: '21.0.13+9'
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check evidence validation contracts
+        run: python3 .github/scripts/test_validate_ranked_scroll_evidence.py
+
+      - name: Set up pinned Temurin JDK
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.SCROLL_JAVA_VERSION }}
+          cache: maven
+          cache-dependency-path: reproducers/hibernate-search-ranked-scroll/pom.xml
+
+      - name: Resolve and build only the standalone reproducer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          evidence="$GITHUB_WORKSPACE/target/search-ranked-scroll"
+          probe="$GITHUB_WORKSPACE/reproducers/hibernate-search-ranked-scroll"
+          mkdir -p "$evidence"
+          mvn -version > "$evidence/maven-version.txt"
+          java -version 2> "$evidence/java-version.txt"
+          mvn -B -ntp -f "$probe/pom.xml" \
+            -Dhibernate-search.version="$SCROLL_SEARCH_VERSION" \
+            compile dependency:build-classpath dependency:tree \
+            -Dmdep.outputFile="$evidence/runtime-classpath.txt" \
+            -DoutputFile="$evidence/dependency-tree.txt" -DoutputType=text \
+            2>&1 | tee "$evidence/maven-build.log"
+
+      - name: Observe ranked scroll retention in a separate 512 MiB JVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/target/search-ranked-scroll"
+          probe="$GITHUB_WORKSPACE/reproducers/hibernate-search-ranked-scroll"
+          classpath="$(cat "$evidence/runtime-classpath.txt")"
+          # No retained-hit budget: growing pages are observations, while real failures abort.
+          java -Xms256m -Xmx512m -Dorg.jboss.logging.provider=jdk \
+            "-Djava.util.logging.config.file=$probe/logging.properties" \
+            -cp "$probe/target/classes:$classpath" \
+            io.github.carstenartur.reproducer.RankedScrollMemoryProbe \
+            "$SCROLL_DOCUMENTS" 128 "$evidence" \
+            2>&1 | tee "$evidence/console.txt"
+
+      - name: Record exact source and resolved JAR hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/validate_ranked_scroll_evidence.py record \
+            target/search-ranked-scroll --source-root "$GITHUB_WORKSPACE" \
+            --commit "$GITHUB_SHA" --documents "$SCROLL_DOCUMENTS" \
+            --search-version "$SCROLL_SEARCH_VERSION" --java-version "$SCROLL_JAVA_VERSION"
+
+      - name: Validate full traversal, native histograms, versions and lifecycle
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/validate_ranked_scroll_evidence.py validate \
+            target/search-ranked-scroll --source-root "$GITHUB_WORKSPACE" \
+            --commit "$GITHUB_SHA" --documents "$SCROLL_DOCUMENTS" \
+            --search-version "$SCROLL_SEARCH_VERSION" --java-version "$SCROLL_JAVA_VERSION" \
+            | tee target/search-ranked-scroll/validation.txt
+
+      - name: Scan all retained output for connection details
+        id: privacy
+        if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/search-ranked-scroll
+
+      - name: Upload validated native observations
+        if: success() && steps.validate.outcome == 'success' && steps.privacy.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ranked-scroll-${{ matrix.search }}-${{ matrix.documents }}-${{ github.sha }}
+          path: target/search-ranked-scroll/
+          if-no-files-found: error

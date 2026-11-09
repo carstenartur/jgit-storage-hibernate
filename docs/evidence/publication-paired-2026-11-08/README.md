@@ -178,6 +178,12 @@ It proposes four separate diagnostic JVMs with unchanged load, heap and policy
 code and added GC/JNI logs. Their source and results, when available, have their
 own provenance. They must not resume, replace or qualify this failed study.
 
+Those [four original-runtime diagnostics](../publication-gc-diagnostic-2026-11-08/README.md)
+subsequently completed without OOM. Both policies exhibited JNI allocation
+stalls, and full collections returned occupancy to 83–96 MiB. These separate
+observations help distinguish allocation pressure from sustained retained heap;
+they do not change this study's incomplete-cell outcome or acceptance bounds.
+
 ## Acceptance and remaining scope
 
 The already merged selector remains opt-in, has bounded striped state and the

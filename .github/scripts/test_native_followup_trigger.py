@@ -61,6 +61,28 @@ def step_enabled(name, step, event, **kwargs):
 
 
 class NativeFollowupTriggerTest(unittest.TestCase):
+    def test_runner_context_is_not_used_in_job_level_environment(self):
+        # GitHub permits runner in step.env, but rejects it in jobs.<id>.env
+        # before creating any jobs. Keep this distinct from event selection.
+        for block in re.findall(r"(?m)^    env:\n((?: {6}[^\n]*\n|[ \t]*\n)*)",
+                                workflow("performance-investigations.yml")):
+            self.assertNotRegex(block, r"\$\{\{\s*runner\.")
+
+    def test_controlled_reftable_comparison_selects_only_the_eight_fork_job(self):
+        name = "performance-investigations.yml"
+        ref = "refs/heads/codex/publication-reftable-paired-20261108"
+        for event in ("push", "workflow_dispatch"):
+            self.assertTrue(job_enabled(name, "publication-reftable-comparison", event, ref=ref,
+                                        profile="publication-reftable-comparison"))
+            for job in ("investigate", "repository-aging-smoke", "repository-aging-full-shard",
+                        "stateless-threshold", "publication-nonregression", "publication-gc-diagnostic"):
+                self.assertFalse(job_enabled(name, job, event, ref=ref,
+                                             profile="publication-reftable-comparison"), job)
+        for event, candidate in (("push", ref + "-extra"), ("push", "refs/heads/main"),
+                                 ("pull_request", ref), ("schedule", ref)):
+            self.assertFalse(job_enabled(name, "publication-reftable-comparison", event, ref=candidate))
+        self.assertFalse(job_enabled(name, "publication-reftable-comparison", "push", ref=ref, deleted=True))
+
     def test_each_required_workflow_accepts_only_the_exact_named_branch(self):
         for name in ("performance-investigations.yml", "search-runtime-performance.yml",
                      "consumer-taxonomy-postgres.yml", "consumer-compatibility.yml"):
@@ -131,6 +153,46 @@ class NativeFollowupTriggerTest(unittest.TestCase):
             self.assertFalse(job_enabled(name, "publication-nonregression", event, ref=ref))
         self.assertTrue(job_enabled(name, "repository-aging-full-shard", "schedule", ref="refs/heads/main"))
         self.assertTrue(job_enabled(name, "stateless-threshold", "schedule", ref="refs/heads/main"))
+
+    def test_gc_diagnostic_mode_is_separate_from_all_qualification_workloads(self):
+        name = "performance-investigations.yml"
+        ref = "refs/heads/codex/publication-gc-diagnostic-20261108"
+        unrelated = ("investigate", "repository-aging-smoke", "repository-aging-full-shard",
+                     "stateless-threshold", "publication-nonregression")
+        for event in ("push", "workflow_dispatch"):
+            with self.subTest(event=event):
+                self.assertTrue(job_enabled(name, "publication-gc-diagnostic", event,
+                                            ref=ref, profile="publication-gc-diagnostic"))
+                for job in unrelated:
+                    self.assertFalse(job_enabled(name, job, event,
+                                                 ref=ref, profile="publication-gc-diagnostic"), job)
+        for event, candidate in (("push", "refs/heads/main"), ("push", ref + "-extra"),
+                                 ("pull_request", ref), ("schedule", ref)):
+            self.assertFalse(job_enabled(name, "publication-gc-diagnostic", event, ref=candidate))
+        self.assertFalse(job_enabled(name, "publication-gc-diagnostic", "push", ref=ref, deleted=True))
+        for mode in ("smoke", "full", "publication-nonregression"):
+            self.assertFalse(job_enabled(name, "publication-gc-diagnostic", "workflow_dispatch",
+                                         ref=ref, profile=mode))
+
+    def test_reftable_counterfactual_has_its_own_exact_trigger(self):
+        name = "performance-investigations.yml"
+        ref = "refs/heads/codex/publication-reftable-diagnostic-20261108"
+        variant = re.search(r"^      PUBLICATION_DIAGNOSTIC_VARIANT: (.+)$", workflow(name), re.MULTILINE)[1]
+        for event in ("push", "workflow_dispatch"):
+            self.assertTrue(job_enabled(name, "publication-gc-diagnostic", event, ref=ref,
+                                        profile="publication-gc-counterfactual"))
+            self.assertEqual(evaluate(variant, event, ref=ref, profile="publication-gc-counterfactual"),
+                             "reftable")
+            for job in ("investigate", "repository-aging-smoke", "repository-aging-full-shard",
+                        "stateless-threshold", "publication-nonregression"):
+                self.assertFalse(job_enabled(name, job, event, ref=ref,
+                                             profile="publication-gc-counterfactual"), job)
+        self.assertFalse(job_enabled(name, "publication-gc-diagnostic", "push", ref=ref + "-extra"))
+        self.assertFalse(job_enabled(name, "publication-gc-diagnostic", "push", ref=ref, deleted=True))
+        self.assertEqual(evaluate(variant, "push", ref="refs/heads/codex/publication-gc-diagnostic-20261108"),
+                         "original")
+        self.assertEqual(evaluate(variant, "workflow_dispatch", ref=ref, profile="publication-gc-diagnostic"),
+                         "original")
 
 
 if __name__ == "__main__":

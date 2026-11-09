@@ -9,16 +9,20 @@
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.carstenartur.jgit.storage.hibernate.benchmark.BenchmarkConnectionProperties;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateSessionFactoryProvider;
 import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -27,11 +31,131 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 class StagedChunkPipelineExperimentTest {
   private static final int CHUNK_BYTES = HibernateObjDatabase.PACK_CHUNK_SIZE;
+  @TempDir Path scratch;
+
+  @ParameterizedTest
+  @EnumSource(StagedChunkPipelineExperiment.Mode.class)
+  void recordsRollbackAfterAFlushedWindowForBothFailureDirections(
+      StagedChunkPipelineExperiment.Mode mode) throws Exception {
+    Path staged = scratch.resolve("rollback.pack");
+    try (var output = Files.newOutputStream(staged)) {
+      output.write(new byte[3 * CHUNK_BYTES + 1]);
+    }
+    for (var stage : StagedChunkPipelineExperiment.FailureStage.values()) {
+      try (var provider = new HibernateSessionFactoryProvider(properties());
+          var repository =
+              HibernateRepository.create(provider.getSessionFactory(), "measured-rollback")) {
+        repository.create(true);
+        long packsBefore = count(provider, "GitPackEntity");
+        long chunksBefore = count(provider, "GitPackChunkEntity");
+        var result =
+            StagedChunkPipelineExperiment.measureRollback(
+                provider.getSessionFactory(), repository, staged, mode, 0, 1, stage);
+        assertTrue(result.rollbackNanos() > 0);
+        assertTrue(result.firstWindowFlushedNanos() > 0);
+        assertTrue(result.failureDetectedNanos() >= result.firstWindowFlushedNanos());
+        assertTrue(result.failureToReturnNanos() >= result.rollbackNanos());
+        assertEquals(1, result.flushedChunks());
+        assertEquals(packsBefore, count(provider, "GitPackEntity"));
+        assertEquals(chunksBefore, count(provider, "GitPackChunkEntity"));
+        assertEquals(0, result.remainingPacks());
+        assertEquals(0, result.remainingChunks());
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = StagedChunkPipelineExperiment.Mode.class,
+      names = {"VIRTUAL", "PLATFORM"})
+  void injectedReaderFailureWaitsForTheFirstWindowFlush(StagedChunkPipelineExperiment.Mode mode)
+      throws Exception {
+    var probe = new StagedChunkPipelineExperiment.FailureProbe();
+    CountDownLatch readStarted = new CountDownLatch(1);
+    CountDownLatch readFinished = new CountDownLatch(1);
+    IOException actual =
+        assertThrows(
+            IOException.class,
+            () ->
+                StagedChunkPipelineExperiment.transfer(
+                    (position, buffer) -> {
+                      if (position == CHUNK_BYTES) {
+                        readStarted.countDown();
+                        try {
+                          probe.failReader();
+                        } finally {
+                          readFinished.countDown();
+                        }
+                      }
+                      return fill(position, buffer);
+                    },
+                    rows -> {
+                      await(readStarted);
+                      try {
+                        assertFalse(
+                            readFinished.await(100, TimeUnit.MILLISECONDS),
+                            "the injected failure must wait while the first JDBC window is active");
+                      } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new InterruptedIOException("writer test interrupted");
+                      }
+                      probe.flushed(rows.size());
+                    },
+                    1L,
+                    3L * CHUNK_BYTES,
+                    1,
+                    mode));
+    assertEquals("injected staging failure after the first window", actual.getMessage());
+    assertTrue(probe.firstWindowFlushedAt() != 0);
+    assertTrue(probe.detectedAt() >= probe.firstWindowFlushedAt());
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = StagedChunkPipelineExperiment.Mode.class,
+      names = {"VIRTUAL", "PLATFORM"})
+  void writerFailureCancelsInjectedReaderWaitingForFirstFlush(
+      StagedChunkPipelineExperiment.Mode mode) {
+    var probe = new StagedChunkPipelineExperiment.FailureProbe();
+    CountDownLatch readStarted = new CountDownLatch(1);
+    CountDownLatch cancelled = new CountDownLatch(1);
+    IOException writerFailure = new IOException("first JDBC window failed before flush completion");
+    IOException actual =
+        assertThrows(
+            IOException.class,
+            () ->
+                StagedChunkPipelineExperiment.transfer(
+                    (position, buffer) -> {
+                      if (position == CHUNK_BYTES) {
+                        readStarted.countDown();
+                        try {
+                          probe.failReader();
+                        } catch (InterruptedIOException interrupted) {
+                          cancelled.countDown();
+                          throw interrupted;
+                        }
+                      }
+                      return fill(position, buffer);
+                    },
+                    rows -> {
+                      await(readStarted);
+                      throw writerFailure;
+                    },
+                    1L,
+                    3L * CHUNK_BYTES,
+                    1,
+                    mode));
+    assertSame(writerFailure, actual);
+    assertEquals(0, cancelled.getCount(), "the blocked injected reader must terminate before return");
+    assertEquals(0, probe.firstWindowFlushedAt());
+    assertEquals(0, probe.detectedAt(), "cancellation must not fabricate the injected failure");
+  }
 
   @ParameterizedTest
   @EnumSource(
@@ -257,6 +381,7 @@ class StagedChunkPipelineExperimentTest {
   }
 
   private static Properties properties() {
+    BenchmarkConnectionProperties.suppressConnectionMetadataLogging();
     var properties = new Properties();
     properties.setProperty(
         "hibernate.connection.url", "jdbc:hsqldb:mem:chunk-pipeline-" + UUID.randomUUID());

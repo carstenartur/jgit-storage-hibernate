@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "diagnostic_only": true,
+  "started_at": "2026-11-09T00:00:54.709660+00:00",
+  "finished_at": "2026-11-09T00:01:32.553219+00:00",
+  "elapsed_seconds": 37.843553799999995,
+  "timed_out": false,
+  "return_code": 0,
+  "command_return_code": 0,
+  "termination_signal": null,
+  "process_group_cleanup_signal": null,
+  "thread_capture_count": 0,
+  "source_commit": "bc1adbc5e3d5739d1c5fe5cc0929242a4038c4d9"
+}

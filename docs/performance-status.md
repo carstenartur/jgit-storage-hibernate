@@ -214,9 +214,23 @@ to +41.082%). At 256 KiB, the independent 1-writer/0-ms, 1-writer/50-ms and
 16-writer/50-ms cells passed their corrected −5% non-regression bound. The
 16-writer/0-ms cell failed during pair four with a Java heap allocation error;
 its partial data is retained without an acceptance interval. The original
-five-cell study remains incomplete as a qualification, and #161 stays open for
-the separately scoped allocation diagnosis. Larger independent payloads and a
-global default change remain unqualified.
+five-cell study remains incomplete as a qualification. Larger independent
+payloads and a global default change remain unqualified.
+
+The separate [four-fork allocation diagnostic](evidence/publication-gc-diagnostic-2026-11-08/README.md)
+kept the original JDK and one-GiB heap. Both policies completed with substantial
+GCLocker allocation pressure; full collections returned occupancy to 83–96 MiB.
+This does not reproduce or erase the earlier failure. The separate
+[Reftable layout candidate](evidence/publication-reftable-diagnostic-2026-11-08/README.md)
+reduced measured allocation to 4.37–4.49 million bytes per operation, compared with
+6.80–7.15 million in the original diagnostic. Absolute throughput was also lower
+on a different host. JGit explicitly allows the existing alignment override, so
+this is a tuning tradeoff, not an independently established correctness fix.
+A same-host comparison must assess its insertion behavior, with separate
+compaction/read coverage before promotion. Production retains the existing
+one-MiB alignment; the candidate is preserved only in experimental sources.
+Issue #161 still needs a separately qualified source and a complete
+independent-repository comparison.
 
 ## Automatic stateful/stateless threshold
 
@@ -246,6 +260,11 @@ chunk writer. The paced 128 MiB trial at 51 ms RTT reduced staged publication
 from 1,993 ms to 1,181 ms with a virtual reader, with an additional 16 MiB
 payload window. This measures the staged transfer and transaction commit.
 [Raw evidence and phase charts](evidence/staging-pipeline-2026-11-07/README.md)
+
+[Repeatable native staging and rollback profiles](operations/staging-pipeline-evidence.md)
+extend the experiment to explicit 512 MiB, concurrency, storage and RTT coordinates.
+Their timing boundary remains staged transfer through commit; complete Git
+publication and repeatable non-regression remain acceptance gates for #189.
 
 ## Durable receiver batching
 
@@ -333,6 +352,17 @@ A successful million-result run within a 2 GiB heap does not prove constant
 space. The structured-cursor transaction-start failure now closes its newly
 opened session and preserves the original exception, with a regression test.
 
+The [hosted retained-hit matrix](evidence/search-ranked-scroll-hosted-2026-11-08/README.md)
+observed 4,096 and 32,768 live ranked hits at the sampled midpoints of 8,192- and
+65,536-document exports with the same 128-row chunks in both Search 8.4.0 and
+8.4.1. All four cells used the declared Maven dependency graph and pinned
+Temurin 21.0.13+9; they retain complete native histograms and exact source/JAR
+identities. The earlier cached-runtime observations remain separately labeled.
+Cursor cleanup now
+also preserves fetch failures and cancellation when closing throws an exception
+or error; twelve focused regression cases cover that correction. This cleanup
+fix does not supply the missing fixed-memory guarantee.
+
 ## Search runtime settings and recovery
 
 The [hosted runtime evidence](evidence/search-runtime-hosted-2026-11-07/README.md)
@@ -399,7 +429,7 @@ retaining a safe default is a valid outcome of a tuning experiment.
 
 | Issue area | Completed | Remaining |
 |---|---|---|
-| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, isolation/safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md): three independent bounds pass; shared throughput +38.594% with a positive 95% interval. | Still open: the 16-writer/0-ms independent cell aborted with a heap allocation failure; its original acceptance result is missing. Diagnose that failure separately. Larger payloads/provider combinations and any default promotion need separate qualification. |
+| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md); [four original-runtime GC diagnostic forks](evidence/publication-gc-diagnostic-2026-11-08/README.md), an independently recorded [Reftable allocation candidate](evidence/publication-reftable-diagnostic-2026-11-08/README.md), and layout/content integrity checks. | Still open: the 16-writer/0-ms independent cell aborted; its original acceptance result is missing. Candidate layout and selector qualification need separate controlled comparisons with their own protocols and identities. Larger payloads/provider combinations and any default promotion need separate qualification. |
 | [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Benchmark-only two-window prototype, cancellation/rollback/reopen tests and 27 retained native trials | Full Git publication, 512 MiB and multiwriter/storage comparisons, rollback latency and repeatable local non-regression; production stays synchronous. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
@@ -408,7 +438,7 @@ retaining a safe default is a valid outcome of a tuning experiment.
 | [Search runtime settings (#196)](https://github.com/carstenartur/jgit-storage-hibernate/issues/196) | Completed bounded evaluation: original settings/recovery matrix plus [eight sustained timing/activity passes](evidence/search-runtime-sustained-2026-11-08/README.md), actual PostgreSQL durability settings, observed queue backpressure, separately attributed Lucene activity and 2,500 exact Git/SQL/Lucene/reopen identities per pass. Keep `write-sync`; no new named profile. | Future deployment qualification before a default/profile change. The paced rate is not maximum capacity, sampled heap used is not retained live memory, and activity events do not establish universal lag or fsync guarantees. |
 | [Search routing and topology (#198)](https://github.com/carstenartur/jgit-storage-hibernate/issues/198) | Completed conservative evaluation: opt-in routing, exact repository isolation under database collations, transactional purge/replay, local writer-lock recovery, 48 large local observations and 42 remote burst/restart observations across 1/2/4 JVMs; defaults unchanged. | Future qualification: repeated workload-specific crossover, omitted million-document shard cells, large remote indexes and processor/backend outage recovery. These are not claimed by the completed evaluation. |
 | [Consumer-shaped profiles (#211)](https://github.com/carstenartur/jgit-storage-hibernate/issues/211) | Completed scoped acceptance: three deterministic shapes, bounded smoke/manual matrices and explicit Audio/Taxonomy/sandbox decisions; [54 native release/Main/Proposed observations](evidence/consumer-publication-2026-11-08/README.md) add concurrent workspace publication and Audio WAL, with all three real-consumer contracts on the exact measured source. A separate 23-observation integrated series retains its own source qualification. | Future qualification: larger native histories, higher analysis pressure, alternative physical chunk layouts and general semantic invalidation. Historical experiments keep their original source; Main/Proposed production trees are identical, so their timing differences do not establish a new library optimization. |
-| [History scroll/export (#230)](https://github.com/carstenartur/jgit-storage-hibernate/issues/230) | PostgreSQL/SQL Server 10k/100k/1m matrix, checked ordering/membership, resource release, measured deep-offset guidance and transaction-start cleanup; [upstream integration review](evidence/search-scroll-upstream-review-2026-11-08.md) confirms the growing scroll implementation is unchanged in 8.4.1. | Still open: a supported Lucene continuation that bounds retained hits while preserving snapshot/order, custom similarity and implicit-filter context; native statement/wait and genuinely cold-cache measurements. |
+| [History scroll/export (#230)](https://github.com/carstenartur/jgit-storage-hibernate/issues/230) | PostgreSQL/SQL Server 10k/100k/1m matrix, checked ordering/membership, resource release, measured deep-offset guidance, transaction-start and cursor-failure cleanup; [live ranked-hit reproduction](evidence/search-ranked-scroll-retained-2026-11-08/README.md) complements the [8.4.1 source review](evidence/search-scroll-upstream-review-2026-11-08.md). | Still open: a supported Lucene continuation that bounds retained hits while preserving snapshot/order, custom similarity and implicit-filter context; native statement/wait and genuinely cold-cache measurements. |
 
 ## Current distance to the useful ceiling
 

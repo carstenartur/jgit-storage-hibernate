@@ -8,6 +8,9 @@
  */
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
+import static io.github.carstenartur.jgit.storage.hibernate.benchmark.StagingPipelineDiagnostics.checkpoint;
+
+import io.github.carstenartur.jgit.storage.hibernate.config.HibernateStorageSettings;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackChunkEntity;
 import io.github.carstenartur.jgit.storage.hibernate.entity.GitPackEntity;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
@@ -24,16 +27,19 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.dfs.DfsPackDescription;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.hibernate.SessionFactory;
+import org.hibernate.exception.ConstraintViolationException;
 
 /** Benchmark-only staged chunk transfer. The owning thread performs every database write. */
 public final class StagedChunkPipelineExperiment {
@@ -47,6 +53,11 @@ public final class StagedChunkPipelineExperiment {
     PLATFORM
   }
 
+  public enum FailureStage {
+    READER,
+    JDBC
+  }
+
   public static Publication publish(
       SessionFactory factory,
       HibernateRepository repository,
@@ -55,29 +66,159 @@ public final class StagedChunkPipelineExperiment {
       long readBytesPerSecond)
       throws IOException {
     try (FileChannel channel = FileChannel.open(staged, StandardOpenOption.READ)) {
-      Source source =
-          (position, buffer) -> {
-            long started = System.nanoTime();
-            int count = channel.read(buffer, position);
-            if (count > 0 && readBytesPerSecond > 0) {
-              long delay =
-                  count * 1_000_000_000L / readBytesPerSecond - (System.nanoTime() - started);
-              if (delay > 0) {
-                try {
-                  Thread.sleep(Duration.ofNanos(delay));
-                } catch (InterruptedException interrupted) {
-                  throw interrupted(interrupted);
+      return publish(
+          factory, repository, channel.size(), mode, pacedSource(channel, readBytesPerSecond));
+    }
+  }
+
+  private static Source pacedSource(FileChannel channel, long readBytesPerSecond) {
+    return (position, buffer) -> {
+      long started = System.nanoTime();
+      int count = channel.read(buffer, position);
+      if (count > 0 && readBytesPerSecond > 0) {
+        long delay =
+            count * 1_000_000_000L / readBytesPerSecond - (System.nanoTime() - started);
+        if (delay > 0) {
+          try {
+            Thread.sleep(Duration.ofNanos(delay));
+          } catch (InterruptedException interrupted) {
+            throw interrupted(interrupted);
+          }
+        }
+      }
+      return count;
+    };
+  }
+
+  /** Measure detection-to-return and JDBC rollback separately, after one flushed window. */
+  public static Rollback measureRollback(
+      SessionFactory factory,
+      HibernateRepository repository,
+      Path staged,
+      Mode mode,
+      long readBytesPerSecond,
+      int windowMiB,
+      FailureStage stage)
+      throws IOException {
+    if (windowMiB != HibernateStorageSettings.resolvePackChunkBatchSize(factory.getProperties())) {
+      throw new IllegalArgumentException("failure boundary must match the configured writer window");
+    }
+    long failurePosition = (long) windowMiB * CHUNK_BYTES;
+    checkpoint("rollback:counts-before:begin");
+    long packsBefore = count(factory, "GitPackEntity");
+    long chunksBefore = count(factory, "GitPackChunkEntity");
+    checkpoint("rollback:counts-before:returned");
+    var probe = new FailureProbe();
+    try (FileChannel channel = FileChannel.open(staged, StandardOpenOption.READ)) {
+      if (channel.size() <= failurePosition) {
+        throw new IllegalArgumentException("rollback fixture must exceed one writer window");
+      }
+      boolean jdbcFailure = stage == FailureStage.JDBC;
+      if (jdbcFailure) {
+        checkpoint("rollback:constraint-add:begin");
+        constraint(
+            factory,
+            "ADD CONSTRAINT staging_pipeline_failure CHECK (chunk_index < " + windowMiB + ")");
+        checkpoint("rollback:constraint-add:returned");
+      }
+      long returned;
+      try {
+        Source source = pacedSource(channel, readBytesPerSecond);
+        try {
+          checkpoint("rollback:publication:begin");
+          publish(
+              factory,
+              repository,
+              channel.size(),
+              mode,
+              (position, target) -> {
+                if (!jdbcFailure && position >= failurePosition) {
+                  probe.failReader();
                 }
+                return source.read(position, target);
+              },
+              probe);
+          throw new AssertionError("injected publication failure was not observed");
+        } catch (IOException | ConstraintViolationException failure) {
+          returned = System.nanoTime();
+          checkpoint("rollback:publication:returned");
+          if (jdbcFailure != (failure instanceof ConstraintViolationException)) {
+            throw failure;
+          }
+        }
+      } finally {
+        if (jdbcFailure) {
+          checkpoint("rollback:constraint-drop:begin");
+          constraint(factory, "DROP CONSTRAINT staging_pipeline_failure");
+          checkpoint("rollback:constraint-drop:returned");
+        }
+      }
+      if (probe.detectedAt.get() == 0
+          || probe.firstWindowFlushedAt == 0
+          || probe.detectedAt.get() - probe.firstWindowFlushedAt < 0
+          || probe.rollbackNanos <= 0
+          || probe.flushedChunks != windowMiB) {
+        throw new AssertionError("failure did not roll back exactly one previously flushed window");
+      }
+      checkpoint("rollback:counts-after:begin");
+      long remainingPacks = count(factory, "GitPackEntity") - packsBefore;
+      long remainingChunks = count(factory, "GitPackChunkEntity") - chunksBefore;
+      checkpoint("rollback:counts-after:returned");
+      if (remainingPacks != 0 || remainingChunks != 0) {
+        throw new AssertionError("failed publication left pack or chunk rows behind");
+      }
+      return new Rollback(
+          probe.firstWindowFlushedAt - probe.startedAt,
+          probe.detectedAt.get() - probe.startedAt,
+          returned - probe.detectedAt.get(),
+          probe.rollbackNanos,
+          probe.flushedChunks,
+          remainingPacks,
+          remainingChunks);
+    }
+  }
+
+  private static void constraint(SessionFactory factory, String command) {
+    try (var session = factory.openSession()) {
+      var transaction = session.beginTransaction();
+      try {
+        session.doWork(
+            connection -> {
+              try (var statement = connection.createStatement()) {
+                statement.execute("ALTER TABLE git_pack_chunks " + command);
               }
-            }
-            return count;
-          };
-      return publish(factory, repository, channel.size(), mode, source);
+            });
+        transaction.commit();
+      } catch (RuntimeException failure) {
+        if (transaction.isActive()) {
+          transaction.rollback();
+        }
+        throw failure;
+      }
+    }
+  }
+
+  private static long count(SessionFactory factory, String entity) {
+    try (var session = factory.openSession()) {
+      return session
+          .createSelectionQuery("SELECT count(e) FROM " + entity + " e", Long.class)
+          .getSingleResult();
     }
   }
 
   static Publication publish(
       SessionFactory factory, HibernateRepository repository, long size, Mode mode, Source source)
+      throws IOException {
+    return publish(factory, repository, size, mode, source, null);
+  }
+
+  private static Publication publish(
+      SessionFactory factory,
+      HibernateRepository repository,
+      long size,
+      Mode mode,
+      Source source,
+      FailureProbe probe)
       throws IOException {
     var database = (HibernateObjDatabase) repository.getObjectDatabase();
     var description = database.newPack(PackSource.RECEIVE);
@@ -102,10 +243,20 @@ public final class StagedChunkPipelineExperiment {
               transfer(
                   source,
                   rows -> {
-                    writer.insert(rows);
-                    var last = rows.getLast();
-                    if ((long) last.getChunkIndex() * CHUNK_BYTES + last.getChunkSize() == size) {
-                      writer.close();
+                    try {
+                      writer.insert(rows);
+                      var last = rows.getLast();
+                      if ((long) last.getChunkIndex() * CHUNK_BYTES + last.getChunkSize() == size) {
+                        writer.close();
+                      }
+                      if (probe != null) {
+                        probe.flushed(rows.size());
+                      }
+                    } catch (RuntimeException failure) {
+                      if (probe != null) {
+                        probe.detected();
+                      }
+                      throw failure;
                     }
                   },
                   pack.getId(),
@@ -119,7 +270,11 @@ public final class StagedChunkPipelineExperiment {
       } catch (IOException | RuntimeException | Error failure) {
         if (transaction.isActive()) {
           try {
+            long rollbackStarted = System.nanoTime();
             transaction.rollback();
+            if (probe != null) {
+              probe.rollbackNanos = System.nanoTime() - rollbackStarted;
+            }
           } catch (RuntimeException rollback) {
             failure.addSuppressed(rollback);
           }
@@ -267,6 +422,57 @@ public final class StagedChunkPipelineExperiment {
   public record Transfer(int retainedWindows, long bufferBytesUpperBound, List<Span> spans) {}
 
   public record Publication(DfsPackDescription description, long elapsedNanos, Transfer transfer) {}
+
+  public record Rollback(
+      long firstWindowFlushedNanos,
+      long failureDetectedNanos,
+      long failureToReturnNanos,
+      long rollbackNanos,
+      int flushedChunks,
+      long remainingPacks,
+      long remainingChunks) {}
+
+  static final class FailureProbe {
+    private final long startedAt = System.nanoTime();
+    private final AtomicLong detectedAt = new AtomicLong();
+    private final CountDownLatch firstWindowFlushed = new CountDownLatch(1);
+    private long firstWindowFlushedAt;
+    private long rollbackNanos;
+    private int flushedChunks;
+
+    void flushed(int chunks) {
+      flushedChunks += chunks;
+      if (firstWindowFlushedAt == 0) {
+        firstWindowFlushedAt = System.nanoTime();
+        firstWindowFlushed.countDown();
+      }
+    }
+
+    void failReader() throws IOException {
+      try {
+        // Prefetch reaches this boundary before the owner finishes writing the first window.
+        // Cancellation interrupts the wait if that write fails, so joining the reader stays finite.
+        firstWindowFlushed.await();
+      } catch (InterruptedException interrupted) {
+        throw interrupted(interrupted);
+      }
+      checkInterrupted();
+      detected();
+      throw new IOException("injected staging failure after the first window");
+    }
+
+    long firstWindowFlushedAt() {
+      return firstWindowFlushedAt;
+    }
+
+    long detectedAt() {
+      return detectedAt.get();
+    }
+
+    private void detected() {
+      detectedAt.compareAndSet(0, System.nanoTime());
+    }
+  }
 
   private static final class Window {
     private final byte[][] buffers;

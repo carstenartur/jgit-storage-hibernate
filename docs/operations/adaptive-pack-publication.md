@@ -85,6 +85,25 @@ acceptance bound is available. A separate GC/JNI diagnosis does not replace the
 failed performance study. The selector stays opt-in, the one-MiB default stays
 unchanged, and larger independent payloads remain outside this new qualification.
 
+The [fixed four-fork GC/JNI diagnostic](../evidence/publication-gc-diagnostic-2026-11-08/README.md)
+subsequently completed under the original JDK 21 and one-GiB heap. Both policies
+exhibited hundreds of JNI allocation stalls; full collections returned heap
+occupancy to 83–96 MiB. These observations support an allocation-pressure
+investigation and do not supply the missing original acceptance result.
+
+The separate [reftable candidate and counterfactual](../evidence/publication-reftable-diagnostic-2026-11-08/README.md)
+retain JGit's configured/default logical reftable blocks while keeping pack
+alignment unchanged. Its four forks reported 4.37–4.49 million allocated
+bytes/publication, versus 6.80–7.15 million in the original diagnostic. One
+candidate-source fork still reached the heap ceiling and required full GC.
+The runs used different hosts and had different throughput; neither an OOM-free
+guarantee nor a policy non-regression result follows from this comparison.
+JGit permits the previous alignment recommendation too, and the changed block
+size also changes ref-table compaction thresholds. A controlled implementation
+comparison is needed to interpret the insertion results. Production retains
+the existing one-MiB alignment: the candidate also needs compaction and read
+coverage before promotion.
+
 Any tuning must preserve these invariants:
 
 - no successful acknowledgement before the authoritative database commit;

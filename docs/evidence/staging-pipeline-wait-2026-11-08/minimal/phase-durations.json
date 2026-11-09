@@ -1,0 +1,273 @@
+{
+  "pairs": [
+    {
+      "phase": "postgres:start",
+      "elapsed_seconds": 8.088358
+    },
+    {
+      "phase": "fixture:create",
+      "elapsed_seconds": 0.073701
+    },
+    {
+      "phase": "calibration",
+      "elapsed_seconds": 0.247369
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 1.504161
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.673079
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.031146
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.150644
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.019187
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.143965
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.025011
+    },
+    {
+      "phase": "sample:1:SYNCHRONOUS",
+      "elapsed_seconds": 2.601047
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.140163
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.024814
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.021366
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.13188
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.020963
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.090695
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.048994
+    },
+    {
+      "phase": "sample:1:VIRTUAL",
+      "elapsed_seconds": 0.486049
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.114397
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.023709
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.017511
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.139975
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.016687
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.112701
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.065667
+    },
+    {
+      "phase": "sample:1:PLATFORM",
+      "elapsed_seconds": 0.497135
+    },
+    {
+      "phase": "rollback-provider:open",
+      "elapsed_seconds": 0.118644
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.033227
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.268955
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002284
+    },
+    {
+      "phase": "rollback:1:SYNCHRONOUS:READER",
+      "elapsed_seconds": 0.308221
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001485
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.004813
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.485678
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.003137
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002409
+    },
+    {
+      "phase": "rollback:1:SYNCHRONOUS:JDBC",
+      "elapsed_seconds": 0.500991
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001494
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.232791
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001693
+    },
+    {
+      "phase": "rollback:1:VIRTUAL:READER",
+      "elapsed_seconds": 0.237432
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001196
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.013856
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.365981
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.003496
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002264
+    },
+    {
+      "phase": "rollback:1:VIRTUAL:JDBC",
+      "elapsed_seconds": 0.389029
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001162
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.214362
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001664
+    },
+    {
+      "phase": "rollback:1:PLATFORM:READER",
+      "elapsed_seconds": 0.218668
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001151
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.001963
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.331393
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.003183
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002792
+    },
+    {
+      "phase": "rollback:1:PLATFORM:JDBC",
+      "elapsed_seconds": 0.342665
+    },
+    {
+      "phase": "rollback-resources:close",
+      "elapsed_seconds": 0.050031
+    },
+    {
+      "phase": "native-test",
+      "elapsed_seconds": 14.740396
+    }
+  ],
+  "total_seconds_by_phase": {
+    "postgres:start": 8.088358,
+    "fixture:create": 0.073701,
+    "calibration": 0.247369,
+    "provider:open": 1.7587210000000002,
+    "repository-setup": 0.721602,
+    "telemetry:before": 0.070023,
+    "publication": 0.42249899999999996,
+    "telemetry:after": 0.056837,
+    "reopen:0": 0.34736100000000003,
+    "resources:close": 0.13967200000000002,
+    "sample:1:SYNCHRONOUS": 2.601047,
+    "sample:1:VIRTUAL": 0.486049,
+    "sample:1:PLATFORM": 0.497135,
+    "rollback-provider:open": 0.118644,
+    "rollback:counts-before": 0.03971500000000001,
+    "rollback:publication": 1.89916,
+    "rollback:counts-after": 0.013106,
+    "rollback:1:SYNCHRONOUS:READER": 0.308221,
+    "rollback:constraint-add": 0.020631999999999998,
+    "rollback:constraint-drop": 0.009816,
+    "rollback:1:SYNCHRONOUS:JDBC": 0.500991,
+    "rollback:1:VIRTUAL:READER": 0.237432,
+    "rollback:1:VIRTUAL:JDBC": 0.389029,
+    "rollback:1:PLATFORM:READER": 0.218668,
+    "rollback:1:PLATFORM:JDBC": 0.342665,
+    "rollback-resources:close": 0.050031,
+    "native-test": 14.740396
+  }
+}

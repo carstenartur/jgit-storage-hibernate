@@ -1,0 +1,172 @@
+name: Bounded Staging Pipeline Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'One smoke cell, eight coverage cells, or the explicit 216-cell matrix'
+        required: true
+        default: smoke
+        type: choice
+        options: [smoke, coverage, full]
+      repeats:
+        description: 'Retained repetitions per mode, after warm-up for coverage/full'
+        required: true
+        default: '3'
+        type: choice
+        options: ['1', '3', '5', '9']
+      expected_source_commit:
+        description: 'Optional exact commit that this run must execute'
+        required: false
+        type: string
+  push:
+    branches: ['evidence/staging-pipeline-*']
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/staging-pipeline-evidence.yml'
+      - '.github/scripts/staging_pipeline_evidence.py'
+      - '.github/scripts/test_staging_pipeline_evidence.py'
+      - '.github/scripts/run_with_bounded_console.py'
+      - '.github/scripts/test_run_with_bounded_console.py'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/StagedChunkPipelineEvidenceTest.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedChunkPipeline*.java'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Select bounded staging coordinates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify source and evidence selector
+        env:
+          EXPECTED_SOURCE_COMMIT: ${{ inputs.expected_source_commit }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$EXPECTED_SOURCE_COMMIT" ]]; then
+            [[ "$EXPECTED_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+            test "$GITHUB_SHA" = "$EXPECTED_SOURCE_COMMIT"
+          fi
+          python3 .github/scripts/test_staging_pipeline_evidence.py
+          python3 .github/scripts/test_run_with_bounded_console.py
+      - name: Select explicit profile
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+          REQUESTED_REPEATS: ${{ inputs.repeats }}
+        run: |
+          set -euo pipefail
+          profile=smoke
+          repeats=1
+          if [[ "$EVENT_NAME" = push ]]; then
+            profile=coverage
+            repeats=3
+          elif [[ "$EVENT_NAME" = workflow_dispatch ]]; then
+            profile="$REQUESTED_PROFILE"
+            repeats="$REQUESTED_REPEATS"
+          fi
+          selected=$(python3 .github/scripts/staging_pipeline_evidence.py matrix \
+            --profile "$profile" --repeats "$repeats")
+          echo "matrix=$selected" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$selected" > staging-matrix.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: staging-pipeline-matrix
+          path: staging-matrix.json
+          if-no-files-found: error
+
+  evidence:
+    name: Native staging ${{ matrix.id }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build the experiment and run its failure contracts
+        run: |
+          set -euo pipefail
+          mkdir -p target/staging-pipeline
+          python3 .github/scripts/run_with_bounded_console.py \
+            --log target/staging-pipeline/build.log --console-bytes 16384 -- \
+            mvn -B -pl jgit-storage-hibernate-benchmarks -am install \
+            -Dtest=StagedChunkPipelineExperimentTest,StagedChunkPipelineEvidenceTest \
+            -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Collect native transfer, reopen and rollback evidence
+        env:
+          CELL_STORAGE: ${{ matrix.storage }}
+          CELL_PAYLOAD: ${{ matrix.payload }}
+          CELL_WINDOW: ${{ matrix.window }}
+          CELL_WRITERS: ${{ matrix.writers }}
+          CELL_RTT: ${{ matrix.rtt }}
+          CELL_RATE: ${{ matrix.rate }}
+          CELL_REPEATS: ${{ matrix.repeats }}
+          CELL_WARMUPS: ${{ matrix.warmups }}
+          JGIT_EVIDENCE_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          staging_dir="$RUNNER_TEMP/staging-pipeline"
+          if [[ "$CELL_STORAGE" = tmpfs ]]; then
+            staging_dir="/dev/shm/staging-pipeline-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          fi
+          mkdir -p "$staging_dir"
+          trap 'rm -rf -- "$staging_dir"' EXIT
+          prefix=jgit.storage.benchmark.staging-pipeline
+          python3 .github/scripts/run_with_bounded_console.py \
+            --log target/staging-pipeline/native.log --console-bytes 16384 -- \
+            mvn -B -pl jgit-storage-hibernate-benchmarks test \
+            -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlPipelineEvidence' \
+            '-DargLine=-Xmx4g -XX:ActiveProcessorCount=4' \
+            "-D$prefix.enabled=true" "-D$prefix.payload_mib=$CELL_PAYLOAD" \
+            "-D$prefix.window_mib=$CELL_WINDOW" "-D$prefix.writers=$CELL_WRITERS" \
+            "-D$prefix.requested_rtt_millis=$CELL_RTT" "-D$prefix.read_mib_per_second=$CELL_RATE" \
+            "-D$prefix.repeats=$CELL_REPEATS" "-D$prefix.warmups=$CELL_WARMUPS" \
+            "-D$prefix.storage=$CELL_STORAGE" "-D$prefix.staging_directory=$staging_dir" \
+            "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-pipeline/raw"
+          python3 .github/scripts/staging_pipeline_evidence.py summarize \
+            target/staging-pipeline/raw --expected-commit "$GITHUB_SHA"
+      - name: Check all retained staging output for connection details
+        id: evidence-privacy
+        if: always()
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/staging-pipeline jgit-storage-hibernate-benchmarks/target/surefire-reports
+      - name: Upload raw observations and qualification
+        if: always() && steps.evidence-privacy.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: staging-pipeline-${{ matrix.id }}
+          path: |
+            target/staging-pipeline/**
+            jgit-storage-hibernate-benchmarks/target/surefire-reports/**
+          if-no-files-found: error
+      - name: Explain the evidence boundary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### Bounded staging pipeline experiment
+
+          Successful cells verify every reopened payload and both failure directions after a flushed writer window.
+          Raw timings cover staged transfer through transaction commit. Git construction, ref publication and protocol costs are excluded.
+          Rollback samples use one writer and report failure detection through return separately from the JDBC rollback call.
+          The production writer remains synchronous. A successful cell does not qualify full Git publication or a non-regression claim.
+          EOF

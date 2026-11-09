@@ -128,23 +128,25 @@ public class GitHistorySearchService {
   }
 
   /**
-   * Open a closeable, bounded cursor over compact history hits using a 100-hit chunk by default.
+   * Open a closeable cursor returning compact history hits in chunks of up to 100 by default.
    *
    * <p>The query's {@link CommitHistoryQuery#limit()} is the maximum number of hits the cursor will
    * expose. Use {@link CommitHistoryQuery.Builder#unbounded()} for a complete export. Offset must be
    * zero: scrolling is the replacement for deep offset traversal, not another way to implement it.
+   * Backend retained search state may grow during traversal.
    */
   public CommitSearchCursor scrollChangeSummaries(CommitHistoryQuery query) {
     return scrollChangeSummaries(query, DEFAULT_SCROLL_CHUNK_SIZE);
   }
 
   /**
-   * Open a closeable, bounded cursor over compact history hits.
+   * Open a closeable cursor returning bounded chunks of compact history hits.
    *
    * <p>Search-backed queries use Hibernate Search's stateful scroll and a stable score/time/object-id
    * sort. Structured-only queries use a forward-only Hibernate ORM cursor with the same chronological
-   * ordering as the existing list API. Both paths keep at most one configured chunk in application
-   * memory and release resources when the cursor is closed.
+   * ordering as the existing list API. Both paths return at most one configured chunk per call and
+   * release resources when the cursor is closed. Backend retained state, including Lucene ranked-hit
+   * pages and JDBC driver buffers, may grow during traversal.
    */
   public CommitSearchCursor scrollChangeSummaries(CommitHistoryQuery query, int chunkSize) {
     validateScrollQuery(query, chunkSize);

@@ -1,0 +1,116 @@
+{
+  "native_log_bytes": 37821317,
+  "native_log_lines": 605,
+  "postgres_batch_warning_lines": 18,
+  "large_lines": [
+    {
+      "line": 337,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 342,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 367,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 372,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 397,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 402,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 427,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 432,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 457,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 462,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 487,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 492,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 517,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 522,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 547,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 552,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 577,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 582,
+      "characters": 2097421,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    }
+  ],
+  "interpretation": "Full bytea parameter logging creates large console traffic. Original-round success with file capture supports bounding console output, but does not prove the original stalled stack location."
+}
