@@ -92,6 +92,14 @@ output, build/native logs and Surefire reports, and blocks artifact upload unles
 it succeeds. Both test fixtures suppress connection metadata before constructing
 their Hibernate provider.
 
+Build and native stdout/stderr are written directly to their complete retained
+log files. After each Maven command, the workflow emits at most 16,384 console
+bytes, including a short exit-status header. The tail is bounded by bytes after
+UTF-8 replacement; a single multi-MiB PostgreSQL error line cannot bypass the cap.
+The command's exit status is preserved even if the console pipe closes. This
+keeps large expected failure messages outside the Actions console while retaining
+their exact original bytes for the privacy scan and artifact.
+
 The standard-library [evidence tool](../../.github/scripts/staging_pipeline_evidence.py)
 produces a JSON summary and an SVG chart from qualified raw files. The chart shows
 staged transfer latency, heap upper estimates, process CPU and a same-writer phase
@@ -160,9 +168,11 @@ fallback in every reader mode, so it does not create a prefetch-reader executor.
 The preceding minimal diagnostic used no warm-up and one repetition. It completed
 in 28.743 seconds, with all lifecycle phases returned. Its
 [retained source, artifact digest, checkpoints and logging observations](../evidence/staging-pipeline-wait-2026-11-08/README.md)
-motivated this bounded continuation with the original repetition counts. Both
-diagnostics preserve the original failure-probe behavior to avoid mixing the
-separate rollback-timing correction into the wait investigation.
+motivated a bounded continuation with the original repetition counts. That
+continuation completed in 37.844 seconds, also returning from every phase. The two
+retained diagnostics used the original failure-probe behavior; their source and
+artifacts remain unchanged. Subsequent evidence uses the separate first-flush
+timing correction and the bounded console capture described above.
 
 ## Production decision
 

@@ -118,8 +118,30 @@ lines each embedded about two million characters of a binary parameter; this
 12.6 MB log volume is retained as a possible console-backpressure factor, not a
 proven wait cause.
 
-The next authorized diagnostic restores the original one warm-up round and three
-repetitions for this same cell, with a 240-second native deadline and the same
-phase/stack collection. It inherits the separately reviewed process-group cleanup
-fix and retains the original failure-probe behavior, keeping the independent
-rollback-metric correction outside this wait investigation.
+The separately declared next diagnostic restored the original one warm-up round
+and three repetitions with a 240-second native deadline and the same phase/stack
+collection. It inherited the reviewed process-group cleanup fix and retained the
+original failure probe, keeping the rollback-metric correction outside the wait
+investigation.
+
+## Original-round diagnostic and console capture
+
+Run 42537813528 at source bc1adbc5e3d5739d1c5fe5cc0929242a4038c4d9 restored the
+original warm-up/repetition counts and completed in 37.844 seconds. All 385 phase
+checkpoints returned. Its verified artifact contains 37,821,317 native log bytes,
+including eighteen 2,097,420-character PostgreSQL warnings. The full downloaded
+artifact passed the privacy scan, source/tree and archive digest matched, and
+the diagnostic-only boundary was rejected by the ordinary qualifier. Compact
+checkpoints, status, provenance and log-volume metadata are retained beside the
+minimal run, without duplicating the large synthetic binary literals.
+
+The normal workflow now retains complete build/native stdout and stderr directly
+in the original log files, then emits a valid UTF-8 console tail bounded to 16,384
+bytes including its header. Actual workflow-command regressions failed first on
+four build/native and exit-zero/exit-seven combinations, then passed with exact
+raw bytes and preserved status. A real closed-stdout regression exposed Python's
+shutdown changing exit seven to 120; redirecting that failed descriptor prevents
+the extra flush failure. All three capture tests pass, and independent review
+found no remaining important or critical issue. The existing privacy/upload gate
+is unchanged. Console volume is addressed directly; the original stalled stack
+location remains unknown and no prior run is relabeled as qualified.

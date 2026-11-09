@@ -59,8 +59,11 @@ jobs:
           python3 .github/scripts/test_summarize_publication_nonregression.py
           python3 .github/scripts/test_summarize_publication_gc_diagnostic.py
           python3 .github/scripts/test_verify_publication_diagnostic_source.py
+          python3 .github/scripts/test_prepare_publication_reftable_comparison.py
+          python3 .github/scripts/test_summarize_publication_reftable_comparison.py
           python3 .github/scripts/test_staging_pipeline_evidence.py
           python3 .github/scripts/test_run_staging_pipeline_diagnostic.py
+          python3 .github/scripts/test_run_with_bounded_console.py
           python3 .github/scripts/test_validate_ranked_scroll_evidence.py
           python3 .github/scripts/test_summarize_search_runtime_diagnostic.py
           node .github/benchmark-dashboard/dashboard.test.js

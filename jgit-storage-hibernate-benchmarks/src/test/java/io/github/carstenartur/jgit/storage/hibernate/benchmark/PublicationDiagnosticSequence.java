@@ -15,10 +15,15 @@ final class PublicationDiagnosticSequence {
       List.of("size", "contention-aware", "contention-aware", "size");
 
   static List<Outcome> run(ForkAction action, Checkpoint checkpoint) throws Exception {
+    return run(POLICIES, action, checkpoint);
+  }
+
+  static List<Outcome> run(List<String> coordinates, ForkAction action, Checkpoint checkpoint) throws Exception {
+    List<String> sequence = List.copyOf(coordinates);
     List<Outcome> outcomes = new ArrayList<>();
-    for (int index = 0; index < POLICIES.size(); index++) {
+    for (int index = 0; index < sequence.size(); index++) {
       int ordinal = index + 1;
-      String policy = POLICIES.get(index);
+      String policy = sequence.get(index);
       // Only started actions have a trial manifest. Do not invent an outcome for
       // a fork skipped because cancellation arrived before its action began.
       if (Thread.currentThread().isInterrupted()) throw new InterruptedException();

@@ -1,0 +1,822 @@
+{
+  "pairs": [
+    {
+      "phase": "postgres:start",
+      "elapsed_seconds": 8.754903
+    },
+    {
+      "phase": "fixture:create",
+      "elapsed_seconds": 0.076505
+    },
+    {
+      "phase": "calibration",
+      "elapsed_seconds": 0.288304
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 1.483678
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.761624
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.031047
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.152322
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.019882
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.129107
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.030458
+    },
+    {
+      "phase": "warmup:0:SYNCHRONOUS",
+      "elapsed_seconds": 2.670867
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.127511
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.026334
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.022091
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.131359
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.017526
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.116285
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.047427
+    },
+    {
+      "phase": "warmup:0:VIRTUAL",
+      "elapsed_seconds": 0.497678
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.117818
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.025272
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.01908
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.131306
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.019364
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.106301
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.063032
+    },
+    {
+      "phase": "warmup:0:PLATFORM",
+      "elapsed_seconds": 0.489237
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.108821
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.023477
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.0178
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.135788
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.023772
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.097573
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.03124
+    },
+    {
+      "phase": "sample:1:SYNCHRONOUS",
+      "elapsed_seconds": 0.44547
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.117256
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.033274
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.021774
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.169886
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.016919
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.105366
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.028186
+    },
+    {
+      "phase": "sample:1:VIRTUAL",
+      "elapsed_seconds": 0.500064
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.11662
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.026035
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.017508
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.137298
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.017566
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.092937
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.063145
+    },
+    {
+      "phase": "sample:1:PLATFORM",
+      "elapsed_seconds": 0.478067
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.115019
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.024531
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.021106
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.125131
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.016057
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.087989
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.037214
+    },
+    {
+      "phase": "sample:2:VIRTUAL",
+      "elapsed_seconds": 0.43275
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.104551
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.024219
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.018119
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.131991
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.021728
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.109853
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.052431
+    },
+    {
+      "phase": "sample:2:PLATFORM",
+      "elapsed_seconds": 0.468923
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.105251
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.024077
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.01533
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.123521
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.01933
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.089937
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.043068
+    },
+    {
+      "phase": "sample:2:SYNCHRONOUS",
+      "elapsed_seconds": 0.426044
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.109199
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.023342
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.015528
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.12453
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.017639
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.088827
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.043471
+    },
+    {
+      "phase": "sample:3:PLATFORM",
+      "elapsed_seconds": 0.428132
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.093443
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.022189
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.018961
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.131366
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.022078
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.110805
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.034381
+    },
+    {
+      "phase": "sample:3:SYNCHRONOUS",
+      "elapsed_seconds": 0.439343
+    },
+    {
+      "phase": "provider:open",
+      "elapsed_seconds": 0.095821
+    },
+    {
+      "phase": "repository-setup",
+      "elapsed_seconds": 0.022947
+    },
+    {
+      "phase": "telemetry:before",
+      "elapsed_seconds": 0.017551
+    },
+    {
+      "phase": "publication",
+      "elapsed_seconds": 0.127245
+    },
+    {
+      "phase": "telemetry:after",
+      "elapsed_seconds": 0.020798
+    },
+    {
+      "phase": "reopen:0",
+      "elapsed_seconds": 0.093505
+    },
+    {
+      "phase": "resources:close",
+      "elapsed_seconds": 0.039859
+    },
+    {
+      "phase": "sample:3:VIRTUAL",
+      "elapsed_seconds": 0.422931
+    },
+    {
+      "phase": "rollback-provider:open",
+      "elapsed_seconds": 0.109424
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.034073
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.24423
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002093
+    },
+    {
+      "phase": "rollback:1:SYNCHRONOUS:READER",
+      "elapsed_seconds": 0.283135
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001424
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.003698
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.433076
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.002936
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002196
+    },
+    {
+      "phase": "rollback:1:SYNCHRONOUS:JDBC",
+      "elapsed_seconds": 0.445832
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001179
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.272116
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002408
+    },
+    {
+      "phase": "rollback:1:VIRTUAL:READER",
+      "elapsed_seconds": 0.277461
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.0013
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.003076
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.373366
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.011605
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001945
+    },
+    {
+      "phase": "rollback:1:VIRTUAL:JDBC",
+      "elapsed_seconds": 0.393092
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001019
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.208071
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001541
+    },
+    {
+      "phase": "rollback:1:PLATFORM:READER",
+      "elapsed_seconds": 0.211908
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001235
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.012395
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.358292
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.002884
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002392
+    },
+    {
+      "phase": "rollback:1:PLATFORM:JDBC",
+      "elapsed_seconds": 0.379833
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001046
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.215804
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001534
+    },
+    {
+      "phase": "rollback:2:SYNCHRONOUS:READER",
+      "elapsed_seconds": 0.219484
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001105
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.001406
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.310574
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.002886
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001803
+    },
+    {
+      "phase": "rollback:2:SYNCHRONOUS:JDBC",
+      "elapsed_seconds": 0.319172
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001028
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.213514
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001483
+    },
+    {
+      "phase": "rollback:2:VIRTUAL:READER",
+      "elapsed_seconds": 0.217214
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001176
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.002105
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.339279
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.002509
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.003407
+    },
+    {
+      "phase": "rollback:2:VIRTUAL:JDBC",
+      "elapsed_seconds": 0.350832
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001517
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.209021
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001572
+    },
+    {
+      "phase": "rollback:2:PLATFORM:READER",
+      "elapsed_seconds": 0.213578
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001211
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.011736
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.300616
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.002539
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001958
+    },
+    {
+      "phase": "rollback:2:PLATFORM:JDBC",
+      "elapsed_seconds": 0.319631
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001087
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.223564
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001559
+    },
+    {
+      "phase": "rollback:3:SYNCHRONOUS:READER",
+      "elapsed_seconds": 0.227283
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001181
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.002189
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.309911
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.013215
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.00612
+    },
+    {
+      "phase": "rollback:3:SYNCHRONOUS:JDBC",
+      "elapsed_seconds": 0.335166
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.00106
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.215114
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001379
+    },
+    {
+      "phase": "rollback:3:VIRTUAL:READER",
+      "elapsed_seconds": 0.218797
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001367
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.002216
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.293052
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.001988
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001606
+    },
+    {
+      "phase": "rollback:3:VIRTUAL:JDBC",
+      "elapsed_seconds": 0.301495
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.000811
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.208018
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.001364
+    },
+    {
+      "phase": "rollback:3:PLATFORM:READER",
+      "elapsed_seconds": 0.211196
+    },
+    {
+      "phase": "rollback:counts-before",
+      "elapsed_seconds": 0.001121
+    },
+    {
+      "phase": "rollback:constraint-add",
+      "elapsed_seconds": 0.00259
+    },
+    {
+      "phase": "rollback:publication",
+      "elapsed_seconds": 0.297353
+    },
+    {
+      "phase": "rollback:constraint-drop",
+      "elapsed_seconds": 0.019322
+    },
+    {
+      "phase": "rollback:counts-after",
+      "elapsed_seconds": 0.002834
+    },
+    {
+      "phase": "rollback:3:PLATFORM:JDBC",
+      "elapsed_seconds": 0.325383
+    },
+    {
+      "phase": "rollback-resources:close",
+      "elapsed_seconds": 0.103693
+    },
+    {
+      "phase": "native-test",
+      "elapsed_seconds": 22.925593
+    }
+  ],
+  "total_seconds_by_phase": {
+    "postgres:start": 8.754903,
+    "fixture:create": 0.076505,
+    "calibration": 0.288304,
+    "provider:open": 2.694988,
+    "repository-setup": 1.037321,
+    "telemetry:before": 0.235895,
+    "publication": 1.6217430000000002,
+    "telemetry:after": 0.23265900000000003,
+    "reopen:0": 1.228485,
+    "resources:close": 0.513912,
+    "warmup:0:SYNCHRONOUS": 2.670867,
+    "warmup:0:VIRTUAL": 0.497678,
+    "warmup:0:PLATFORM": 0.489237,
+    "sample:1:SYNCHRONOUS": 0.44547,
+    "sample:1:VIRTUAL": 0.500064,
+    "sample:1:PLATFORM": 0.478067,
+    "sample:2:VIRTUAL": 0.43275,
+    "sample:2:PLATFORM": 0.468923,
+    "sample:2:SYNCHRONOUS": 0.426044,
+    "sample:3:PLATFORM": 0.428132,
+    "sample:3:SYNCHRONOUS": 0.439343,
+    "sample:3:VIRTUAL": 0.422931,
+    "rollback-provider:open": 0.109424,
+    "rollback:counts-before": 0.05393999999999999,
+    "rollback:publication": 5.024971,
+    "rollback:counts-after": 0.03919400000000001,
+    "rollback:1:SYNCHRONOUS:READER": 0.283135,
+    "rollback:constraint-add": 0.041411,
+    "rollback:constraint-drop": 0.059884,
+    "rollback:1:SYNCHRONOUS:JDBC": 0.445832,
+    "rollback:1:VIRTUAL:READER": 0.277461,
+    "rollback:1:VIRTUAL:JDBC": 0.393092,
+    "rollback:1:PLATFORM:READER": 0.211908,
+    "rollback:1:PLATFORM:JDBC": 0.379833,
+    "rollback:2:SYNCHRONOUS:READER": 0.219484,
+    "rollback:2:SYNCHRONOUS:JDBC": 0.319172,
+    "rollback:2:VIRTUAL:READER": 0.217214,
+    "rollback:2:VIRTUAL:JDBC": 0.350832,
+    "rollback:2:PLATFORM:READER": 0.213578,
+    "rollback:2:PLATFORM:JDBC": 0.319631,
+    "rollback:3:SYNCHRONOUS:READER": 0.227283,
+    "rollback:3:SYNCHRONOUS:JDBC": 0.335166,
+    "rollback:3:VIRTUAL:READER": 0.218797,
+    "rollback:3:VIRTUAL:JDBC": 0.301495,
+    "rollback:3:PLATFORM:READER": 0.211196,
+    "rollback:3:PLATFORM:JDBC": 0.325383,
+    "rollback-resources:close": 0.103693,
+    "native-test": 22.925593
+  }
+}

@@ -37,9 +37,9 @@ one core entry and runs a checked action with a temporary `java.class.path`.
 The identity profiler accepts an encoded expected record and writes actual
 child source/JAR/class/classpath identity before the first warmup.
 
-- [ ] Write/run failing source/JAR difference, missing/duplicate core entry,
+- [x] Write/run failing source/JAR difference, missing/duplicate core entry,
   Surefire-expanded classpath, restoration-on-failure and wrong identity tests.
-- [ ] Implement strict preparation, scoped classpath substitution and actual
+- [x] Implement strict preparation, scoped classpath substitution and actual
   child checks; run focused Python/Java checks.
 
 ## Task 2: Eight-attempt runner and measured validator
@@ -54,20 +54,41 @@ records. `summarize(root)` validates exact order, source/classpath/runtime/heap,
 all raw evidence and failures. With four complete pairs only, derive the fixed
 95% paired log-throughput interval and descriptive allocation ratios.
 
-- [ ] Add failing tests for eight-attempt order with retained failures,
+- [x] Add failing tests for eight-attempt order with retained failures,
   mismatched child class/JAR/classpath, missing identity and incomplete pairs.
-- [ ] Implement the runner and parser without changing production/workload
+- [x] Implement the runner and parser without changing production/workload
   classes or any previous study's stopping rule.
-- [ ] Verify parser fixtures and the actual Java classpath/sequence helpers.
+- [x] Verify parser fixtures and the actual Java classpath/sequence helpers:
+  394 Python tests and 21 directly compiled Java tests pass. Full runner
+  compilation requires uncached Testcontainers/Toxiproxy dependencies and remains
+  a mandatory hosted gate before any measurement.
 
 ## Task 3: Isolated native execution and archival evidence
 
 **Files:** Extend `.github/workflows/performance-investigations.yml` and the
 exact event-selection tests; retain a separate evidence directory after running.
 
-- [ ] Test exact branch/profile selection, then add source/JAR build guards,
+- [x] Test exact branch/profile selection, then add source/JAR build guards,
   pinned runtime, one comparison job and complete/partial artifact upload.
-- [ ] Run script tests, replay prior archives, review source and commit for
-  parent publication. Hosted compilation/audits must pass before measurement.
+- [x] Run script tests and replay prior archives: both hosted summaries reproduce
+  byte-identically, with 609/6 and 271/1 GC/full-GC events. Independent review
+  checked the source/classpath/JMH design; its required empty-log fix is included
+  separately. A fail-first review check also established the exact generated
+  compiler-blackhole argument suffix; both the child and parser now validate it
+  without permitting arbitrary extra JVM options. Commit the reviewed source for parent publication. Hosted
+  compilation/audits must pass before measurement.
 - [ ] Attempt the fixed study once; retain every outcome, source snapshot and
   original artifact/digest. Replay before reporting a merge recommendation.
+
+### Configuration-only launch failure
+
+The first published source `85865ead7c9c4c3fc4671866911a7745c58abf27`
+(tree `b3bbe8fabcf8b360bd366a50afd924a1188b3f15`) produced failed run
+[`42539933868`](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42539933868),
+attempt 1, with **zero jobs and zero measurement forks**. The job-level environment
+used `runner.temp`, which GitHub excludes from `jobs.<job_id>.env` but permits in
+`jobs.<job_id>.steps.env`; see the official
+[context availability table](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability).
+A fail-first workflow check now rejects that unsupported placement. The two
+temporary-directory expressions move to the build/audit steps without changing
+source references, measurement arguments, ordering or the eight-fork budget.

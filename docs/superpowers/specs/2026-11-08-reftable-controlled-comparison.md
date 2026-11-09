@@ -4,7 +4,7 @@
 
 The two four-fork diagnostics used different hosts. The candidate allocated less
 per publication but had lower absolute throughput. Compare the old and candidate
-core implementations on one host before a merge recommendation. JGit permits
+core implementations on one host to resolve that performance uncertainty. JGit permits
 the old alignment hint; the layout tests do not independently prove a correctness
 defect. This experiment addresses one concrete performance risk, not #161's
 size-versus-contention policy qualification or general read/compaction coverage.
@@ -17,7 +17,10 @@ Use the exact core sources from original diagnostic
 POMs, workload and profiler differ only in `ReadAheadHibernateObjDatabase.java`,
 candidate blob `69da64f8bb579d409ed975e338a35b40cf861f3b`. Both use the original
 JGit 7.8.0 dependency set, not the later integrated JGit 7.8.1. Record the actual
-harness checkout separately from these immutable library references.
+harness checkout separately from these immutable library references. Build both
+core JARs in detached reference checkouts; neither JAR comes from current
+integrated production. Guard the harness's three POMs and all benchmark main
+source against the candidate reference, and require a clean committed harness.
 
 Build two core JARs on the same runner/JDK. Compare every entry: class changes
 must be limited to `ReadAheadHibernateObjDatabase` and its nested classes. Record
@@ -34,8 +37,16 @@ ambiguity, retain every dependency path, and restore the original property in
 
 A benchmark-only internal profiler checks the actual child before its first
 warmup: unique core resource, CodeSource equal to the selected JAR, exact JAR and
-primary-class SHA-256, expected expanded classpath, and JVM identity. It writes
-a per-child identity record. A completed fork without that proof is invalid.
+primary-class SHA-256, expected expanded classpath, and JVM identity. Its per-child
+record includes the actual JVM input arguments and the one-GiB maximum heap.
+Require the exact declared arguments followed by JMH 1.37's compiler-blackhole
+options (`-XX:+UnlockDiagnosticVMOptions`, `-XX:+UnlockExperimentalVMOptions`,
+`-DcompilerBlackholesEnabled=true`) and one absolute `CompileCommandFile` path,
+in that order. These additions follow
+[JMH's CompilerHints implementation](https://github.com/openjdk/jmh/blob/1.37/jmh-core/src/main/java/org/openjdk/jmh/runner/CompilerHints.java);
+the retained original Java 21 log confirms compiler blackholes were auto-detected.
+Reject extra, duplicate, missing or changed options before warmup.
+A completed fork without that proof is invalid.
 The workload and existing publication profiler remain byte-identical. No
 production hook or selector option is added.
 
@@ -72,6 +83,9 @@ savings. Full-JVM GC counts and measurement-only counters have different windows
 No automatic merge/default decision follows from a successful workflow. The
 parent reviews the paired interval, any failures and the unresolved read/stack
 tradeoff; a negative or inconclusive result is preserved without extension.
+The current recommendation is to retain the candidate as an experiment and keep
+the production alignment. Even a positive insert-only result would leave its
+changed top-table compaction threshold and read behavior unqualified.
 
 ## Native scope and preservation
 

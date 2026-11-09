@@ -161,7 +161,7 @@ class PackPublicationGcDiagnosticIT {
     return new OptionsBuilder().parent(original).jvmArgs(args.toArray(String[]::new)).build();
   }
 
-  private static List<String> loggingOptions(Path base) {
+  static List<String> loggingOptions(Path base) {
     return List.of(
         "-Xlog:gc*=info,gc+heap=debug,gc+humongous=debug,gc+alloc=trace:file=" + base
             + "-gc.log:uptimemillis,level,tags:filecount=2,filesize=16m",
@@ -170,7 +170,7 @@ class PackPublicationGcDiagnosticIT {
         "-Xlog:gc+init=info:file=" + base + "-init.log:uptimemillis,level,tags");
   }
 
-  private static void requireOriginalRuntime() {
+  static void requireOriginalRuntime() {
     String version = System.getProperty("java.vm.version", "");
     if (!System.getProperty("java.version", "").equals("21.0.13")
         || !version.matches("21\\.0\\.13\\+9(?:-LTS)?")

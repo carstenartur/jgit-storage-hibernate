@@ -58,6 +58,72 @@ the observed failure logging would produce approximately 36 MiB of these warning
 Console backpressure is therefore a concrete hypothesis to investigate. Log volume
 alone does not establish the cause of the earlier wait.
 
+## Diagnostic with the original repetition counts
+
+[Run 42537813528, attempt 1](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42537813528)
+completed successfully at source
+[`bc1adbc5e3d5739d1c5fe5cc0929242a4038c4d9`](https://github.com/carstenartur/jgit-storage-hibernate/commit/bc1adbc5e3d5739d1c5fe5cc0929242a4038c4d9),
+tree `5890b353e6af8fd50d1e521a1580df40d13438f1`. It restored the original one
+warm-up round and three retained repetitions for the same cell and 4 GiB heap.
+It also included the wrapper's reviewed cleanup of surviving descendants after
+every leader exit. The benchmark retained the original failure probe.
+
+Artifact `13640281773` had verified ZIP SHA-256
+`c5b1d4ec96aed19d2d832147b9413e83220756ecd692620ae1711a8476594e0d`.
+The complete downloaded artifact passed the privacy scanner, and its status and
+raw environment matched the expected source and repetition counts. The ordinary
+performance qualifier rejected the diagnostic-only boundary. The
+[provenance record](original-rounds/provenance.json),
+[raw checkpoints](original-rounds/phase-checkpoints.tsv),
+[status](original-rounds/diagnostic-status.json) and
+[phase durations](original-rounds/phase-durations.json) retain the comparison.
+
+| Observation | Minimal diagnostic | Original-round diagnostic |
+| --- | ---: | ---: |
+| Warm-up rounds / repetitions per mode | 0 / 1 | 1 / 3 |
+| Entire Maven command, seconds | 28.743 | 37.844 |
+| Native checkpoint interval, seconds | 14.740 | 22.926 |
+| PostgreSQL startup, seconds | 8.088 | 8.755 |
+| Warm-up mode trials combined, seconds | None | 3.658 |
+| Retained mode trials combined, seconds | 3.584 | 4.042 |
+| Injected-failure trials combined, seconds | 1.997 | 5.250 |
+| Native output bytes | 12,625,415 | 37,821,317 |
+| Surefire XML bytes | 12,624,993 | 37,820,895 |
+| Native output lines | 281 | 605 |
+| Multi-MiB PostgreSQL warning lines | 6 | 18 |
+| Thread captures | 0 | 0 |
+
+Every one of the second run's 385 phase checkpoints completed. The command exited
+zero before the first 60-second stack-capture interval; no process-group cleanup
+signal was needed. Its eighteen large warning lines were each 2,097,420 characters,
+with exact positions retained in [log-volume.json](original-rounds/log-volume.json).
+The original repetition counts therefore completed with file-directed output.
+This narrows the investigation, but it does not identify a blocked stack in the
+separate original matrix run or establish a performance comparison.
+
+## Normal workflow capture correction
+
+The normal evidence workflow now sends complete build and native stdout/stderr
+directly to their existing artifact files. After each command exits, the capture
+helper emits a valid UTF-8 console tail capped at **16,384 bytes, including its
+status header**. The cap is applied after malformed-byte replacement, so neither
+a multi-MiB line nor UTF-8 expansion can bypass it. The child exit status is
+preserved, including when the console pipe closes during output or Python's
+shutdown. The existing always-run privacy scan and upload gate remain in place.
+
+The executable regression uses the actual build and native shell commands with
+real child processes producing a large single line, multibyte text and invalid
+UTF-8. Before the correction, all four command/exit-status cases emitted 2,100,617
+console bytes. Afterwards, those cases preserve every raw byte and exit status
+while respecting the 16 KiB cap. A real closed-pipe regression also failed with
+an incorrect exit 120 before the shutdown handling was corrected, then passed
+with the child's exit 7. These are capture tests, not benchmark evidence.
+
+The next matrix source also carries the independent first-flush timing correction.
+Its rollback rows must include monotonic first-flush and failure-detection
+chronology. The successful diagnostic rows above retain their original source
+and are not retroactively qualified under that correction.
+
 ## Boundaries and separate evidence
 
 Original native run
