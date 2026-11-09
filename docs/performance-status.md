@@ -232,6 +232,13 @@ one-MiB alignment; the candidate is preserved only in experimental sources.
 Issue #161 still needs a separately qualified source and a complete
 independent-repository comparison.
 
+The [9 November JGit buffer follow-up](evidence/publication-followup-2026-11-09.md#jgit-initial-buffer-candidates-161)
+adds two personal-fork drafts and a 221-test focused joint gate. In its separate
+native comparison all four combined-candidate forks and three baseline forks
+completed; the fourth baseline failed with an allocation OOM. Only three pairs
+are complete, so the overall effect and interval remain null. The full JGit core suite
+is not certified green, and the original policy qualification remains incomplete.
+
 ## Automatic stateful/stateless threshold
 
 The focused PostgreSQL + HikariCP matrix uses the production batch window of 16 and verifies close/reopen SHA-256 integrity.
@@ -263,8 +270,9 @@ payload window. This measures the staged transfer and transaction commit.
 
 [Repeatable native staging and rollback profiles](operations/staging-pipeline-evidence.md)
 extend the experiment to explicit 512 MiB, concurrency, storage and RTT coordinates.
-Their timing boundary remains staged transfer through commit; complete Git
-publication and repeatable non-regression remain acceptance gates for #189.
+Their raw-transfer timing boundary remains staged transfer through commit.
+Separate complete Git publication controls and their acceptance limits are
+recorded below.
 
 [Native run 42538734936](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42538734936)
 completed all eight selected coordinates at source `48c04baaef9352846df431eac712695d58be2680`:
@@ -287,9 +295,14 @@ This covers 8 of 216 requested coordinates and excludes Git construction/ref
 publication. The 16/32 single-window control executes the same synchronous
 transfer in all modes, so its large spread cannot establish a pipeline overhead.
 Local results do not establish non-regression; the paced gains support further
-measurement. Production remains synchronous. The separate complete Git publication
-controls described above now exercise the current policy, but need retained native
-results and repeatable comparisons before the acceptance gate can be resolved.
+measurement. Production remains synchronous.
+
+The [9 November full Git publication follow-up](evidence/publication-followup-2026-11-09.md#complete-git-publication-189)
+retains 18 new measurements through ref commit on two 128 MiB single-writer
+controls. Median latency was 12.01–12.40% lower with paced reads and 50 ms added
+RTT; local medians were 7.43–11.10% higher with substantial variability. These
+observations do not establish repeatable local non-regression. The new run uses
+its own recorded source and leaves the older transfer-only table above unchanged.
 
 ## Durable receiver batching
 
@@ -454,8 +467,8 @@ retaining a safe default is a valid outcome of a tuning experiment.
 
 | Issue area | Completed | Remaining |
 |---|---|---|
-| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md); [four original-runtime GC diagnostic forks](evidence/publication-gc-diagnostic-2026-11-08/README.md), an independently recorded [Reftable allocation candidate](evidence/publication-reftable-diagnostic-2026-11-08/README.md), and layout/content integrity checks. | Still open: the 16-writer/0-ms independent cell aborted; its original acceptance result is missing. Candidate layout and selector qualification need separate controlled comparisons with their own protocols and identities. Larger payloads/provider combinations and any default promotion need separate qualification. |
-| [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Two-window prototype; eight native coordinates with 72 transfer and 144 rollback samples; complete Git publication harness using the current policy | Retained full Git publication comparisons, remaining matrix coordinates and repeatable local non-regression; production stays synchronous. |
+| [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md); [four original-runtime GC diagnostic forks](evidence/publication-gc-diagnostic-2026-11-08/README.md), an independently recorded [Reftable allocation candidate](evidence/publication-reftable-diagnostic-2026-11-08/README.md), and layout/content integrity checks. The [JGit initial-buffer follow-up](evidence/publication-followup-2026-11-09.md#jgit-initial-buffer-candidates-161) adds two drafts, 221 focused tests and a separate native diagnostic. | Still open: the 16-writer/0-ms independent cell aborted; its original acceptance result is missing. Candidate layout and selector qualification need separate controlled comparisons with their own protocols and identities. The new diagnostic has only three complete pairs and no aggregate effect/interval; the full JGit core suite is not certified green. Larger payloads/provider combinations and any default promotion need separate qualification. |
+| [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Two-window prototype; eight native coordinates with 72 transfer and 144 rollback samples; [18 complete Git publication measurements](evidence/publication-followup-2026-11-09.md#complete-git-publication-189) through ref commit on two controls | Remaining matrix coordinates and repeatable local non-regression; the paced benefit is observational and production stays synchronous. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
 | Repository aging/repack | Full PostgreSQL/SQL Server/HSQLDB age matrix, repeated provider-restart evidence, and manual maintenance guidance | Broader large-repository repeats and operational budgets before considering automatic scheduling. |
