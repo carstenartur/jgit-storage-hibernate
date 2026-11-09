@@ -27,6 +27,8 @@ on:
       - '.github/workflows/staging-pipeline-evidence.yml'
       - '.github/scripts/staging_pipeline_evidence.py'
       - '.github/scripts/test_staging_pipeline_evidence.py'
+      - '.github/scripts/run_with_bounded_console.py'
+      - '.github/scripts/test_run_with_bounded_console.py'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/StagedChunkPipelineEvidenceTest.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedChunkPipeline*.java'
 
@@ -56,6 +58,7 @@ jobs:
             test "$GITHUB_SHA" = "$EXPECTED_SOURCE_COMMIT"
           fi
           python3 .github/scripts/test_staging_pipeline_evidence.py
+          python3 .github/scripts/test_run_with_bounded_console.py
       - name: Select explicit profile
         id: select
         env:
@@ -103,10 +106,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p target/staging-pipeline
-          mvn -B -pl jgit-storage-hibernate-benchmarks -am install \
+          python3 .github/scripts/run_with_bounded_console.py \
+            --log target/staging-pipeline/build.log --console-bytes 16384 -- \
+            mvn -B -pl jgit-storage-hibernate-benchmarks -am install \
             -Dtest=StagedChunkPipelineExperimentTest,StagedChunkPipelineEvidenceTest \
-            -Dsurefire.failIfNoSpecifiedTests=false \
-            2>&1 | tee target/staging-pipeline/build.log
+            -Dsurefire.failIfNoSpecifiedTests=false
       - name: Collect native transfer, reopen and rollback evidence
         env:
           CELL_STORAGE: ${{ matrix.storage }}
@@ -127,7 +131,9 @@ jobs:
           mkdir -p "$staging_dir"
           trap 'rm -rf -- "$staging_dir"' EXIT
           prefix=jgit.storage.benchmark.staging-pipeline
-          mvn -B -pl jgit-storage-hibernate-benchmarks test \
+          python3 .github/scripts/run_with_bounded_console.py \
+            --log target/staging-pipeline/native.log --console-bytes 16384 -- \
+            mvn -B -pl jgit-storage-hibernate-benchmarks test \
             -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlPipelineEvidence' \
             '-DargLine=-Xmx4g -XX:ActiveProcessorCount=4' \
             "-D$prefix.enabled=true" "-D$prefix.payload_mib=$CELL_PAYLOAD" \
@@ -135,8 +141,7 @@ jobs:
             "-D$prefix.requested_rtt_millis=$CELL_RTT" "-D$prefix.read_mib_per_second=$CELL_RATE" \
             "-D$prefix.repeats=$CELL_REPEATS" "-D$prefix.warmups=$CELL_WARMUPS" \
             "-D$prefix.storage=$CELL_STORAGE" "-D$prefix.staging_directory=$staging_dir" \
-            "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-pipeline/raw" \
-            2>&1 | tee target/staging-pipeline/native.log
+            "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-pipeline/raw"
           python3 .github/scripts/staging_pipeline_evidence.py summarize \
             target/staging-pipeline/raw --expected-commit "$GITHUB_SHA"
       - name: Check all retained staging output for connection details

@@ -64,3 +64,60 @@ tests and six existing privacy-scanner tests pass, all six workflow shell steps
 parse, the supplementary 88-source compilation succeeds, and the nine existing
 overlap/cancellation contract invocations still pass. Exact native Maven/rollback
 execution remains pending CI.
+
+## Bounded diagnostic continuation
+
+Native run 42534328623 completed its build and embedded contracts but its first
+two native cells remained in collection. The one-cell diagnostic preserves the
+16 MiB/32 MiB/single-writer/runner/0 ms coordinates and 4 GiB heap, removes warm-up,
+and takes one repetition. It adds opt-in phase checkpoints outside measured
+intervals, labels output diagnostic-only, and bounds Maven plus descendants in a
+fresh process group. Periodic and final JVM thread capture precede finite TERM/KILL
+cleanup. Only the exact diagnostic branch or manual dispatch can trigger this
+workflow; partial artifacts still require a successful whole-output privacy scan.
+
+Two executable runner regressions cover ordinary failure/output retention and a
+TERM-resistant parent/child that must stop at the deadline. A real Java sleeper
+also produced retained full JVM thread stacks and a timeout status. In this local
+sandbox jcmd attach encountered translated PID values; the SIGQUIT fallback
+retained the stacks in native stdout. These checks validate diagnostic plumbing,
+not the unresolved native wait. Production behavior and publication thresholds
+are unchanged, and the original native run remains independently unqualified.
+
+The minimal diagnostic completed successfully in native run 42537024048 at exact
+source 586e8088c8d849c9245ac178414156fa0301cda2. Downloaded archive SHA-256 and source
+identity were checked, its full content passed the privacy scanner, and the
+performance qualifier rejected its diagnostic-only boundary. All phases returned
+within the 28.743-second Maven command. Six expected PostgreSQL batch-warning
+lines each embedded about two million characters of a binary parameter; this
+12.6 MB log volume is retained as a possible console-backpressure factor, not a
+proven wait cause.
+
+The next authorized diagnostic restores the original one warm-up round and three
+repetitions for this same cell, with a 240-second native deadline and the same
+phase/stack collection. It inherits the separately reviewed process-group cleanup
+fix and retains the original failure-probe behavior, keeping the independent
+rollback-metric correction outside this wait investigation.
+
+## Review correction: reader-failure chronology
+
+Prefetch submits the second read before the owner writes the first window. The
+injected reader exception previously recorded detection immediately at that read
+boundary; the owner could then finish its ordinary first write before noticing
+the failed future. A final flushed-row count did not establish detection order.
+
+The rollback probe now signals first-window completion after the existing writer
+returns, and injected read failure waits interruptibly for that signal. A first
+write failure cancels the wait. Raw rows retain first-flush and failure-detection
+elapsed times from a shared monotonic origin; Java assertions and the evidence
+validator reject missing or reversed chronology.
+
+The ordering regression failed before the gate because detection returned while
+the first JDBC window was active. The validator regression also failed before its
+change on reversed, zero and absent chronology. After the correction, 13 pure
+transfer/ordering/cancellation contract invocations pass under the supplementary
+cached-dependency Java build, including waiting-reader cancellation for both
+virtual and platform threads. Ten staging evidence Python tests and six privacy
+tests pass. Exact Maven/native execution remains the coordinating CI gate; this
+change modifies benchmark diagnostics only and does not establish the cause of
+the separate long-running native collection.

@@ -1,0 +1,44 @@
+{
+  "native_log_bytes": 12625415,
+  "native_log_lines": 281,
+  "postgres_batch_warning_lines": 6,
+  "large_lines": [
+    {
+      "line": 193,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 198,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 223,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 228,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 253,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    },
+    {
+      "line": 258,
+      "characters": 2097420,
+      "postgres_batch_warning": true,
+      "contains_bytea": true
+    }
+  ],
+  "interpretation": "Full bytea parameter logging creates large console traffic. Backpressure remains a hypothesis until a stalled stack or controlled contrast identifies the wait."
+}

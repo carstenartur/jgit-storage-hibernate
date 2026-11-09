@@ -105,6 +105,7 @@ class StagingEvidenceTest(unittest.TestCase):
     def test_rejects_rollback_rows_that_leave_data_or_omit_a_direction(self):
         rows = [dict(sample="1", mode=mode, failure_stage=stage, window_mib="16",
                      payload_bytes=str(128 * 1024 * 1024 + 257), failure_to_return_nanos="20",
+                     first_window_flushed_nanos="30", failure_detected_nanos="40",
                      rollback_nanos="10", flushed_chunks="16", remaining_packs="0", remaining_chunks="0")
                 for mode in evidence.MODES for stage in ("READER", "JDBC")]
         evidence.validate_rollbacks(rows, 1, 16)
@@ -113,6 +114,25 @@ class StagingEvidenceTest(unittest.TestCase):
         rows[0]["remaining_chunks"] = "1"
         with self.assertRaisesRegex(ValueError, "rollback"):
             evidence.validate_rollbacks(rows, 1, 16)
+
+    def test_rollback_requires_detection_after_the_first_flush(self):
+        rows = [dict(sample="1", mode=mode, failure_stage=stage, window_mib="16",
+                     payload_bytes=str(128 * 1024 * 1024 + 257), failure_to_return_nanos="20",
+                     first_window_flushed_nanos="30", failure_detected_nanos="40",
+                     rollback_nanos="10", flushed_chunks="16", remaining_packs="0", remaining_chunks="0")
+                for mode in evidence.MODES for stage in ("READER", "JDBC")]
+        evidence.validate_rollbacks(rows, 1, 16)
+        for field, value in (("failure_detected_nanos", "29"),
+                             ("first_window_flushed_nanos", "0"),
+                             ("failure_detected_nanos", None)):
+            with self.subTest(field=field, value=value):
+                invalid = [dict(row) for row in rows]
+                if value is None:
+                    invalid[0].pop(field)
+                else:
+                    invalid[0][field] = value
+                with self.assertRaisesRegex(ValueError, "flush"):
+                    evidence.validate_rollbacks(invalid, 1, 16)
 
     def test_summary_qualifies_only_complete_native_transfer_evidence(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -162,6 +182,7 @@ class StagingEvidenceTest(unittest.TestCase):
         write_csv("rtt-calibration.csv", [dict(sample=n, rtt_nanos=100000) for n in range(1, 10)])
         write_csv("rollback.csv", [dict(sample=1, mode=mode, failure_stage=stage, window_mib=16,
                                         payload_bytes=128 * 1024 * 1024 + 257, failure_to_return_nanos=20,
+                                        first_window_flushed_nanos=30, failure_detected_nanos=40,
                                         rollback_nanos=10, flushed_chunks=16, remaining_packs=0, remaining_chunks=0)
                                    for mode in evidence.MODES for stage in ("READER", "JDBC")])
         (directory / "database-telemetry.json").write_text(json.dumps(dict(observations=[

@@ -9,6 +9,7 @@
 package io.github.carstenartur.jgit.storage.hibernate.objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,6 +58,8 @@ class StagedChunkPipelineExperimentTest {
             StagedChunkPipelineExperiment.measureRollback(
                 provider.getSessionFactory(), repository, staged, mode, 0, 1, stage);
         assertTrue(result.rollbackNanos() > 0);
+        assertTrue(result.firstWindowFlushedNanos() > 0);
+        assertTrue(result.failureDetectedNanos() >= result.firstWindowFlushedNanos());
         assertTrue(result.failureToReturnNanos() >= result.rollbackNanos());
         assertEquals(1, result.flushedChunks());
         assertEquals(packsBefore, count(provider, "GitPackEntity"));
@@ -65,6 +68,93 @@ class StagedChunkPipelineExperimentTest {
         assertEquals(0, result.remainingChunks());
       }
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = StagedChunkPipelineExperiment.Mode.class,
+      names = {"VIRTUAL", "PLATFORM"})
+  void injectedReaderFailureWaitsForTheFirstWindowFlush(StagedChunkPipelineExperiment.Mode mode)
+      throws Exception {
+    var probe = new StagedChunkPipelineExperiment.FailureProbe();
+    CountDownLatch readStarted = new CountDownLatch(1);
+    CountDownLatch readFinished = new CountDownLatch(1);
+    IOException actual =
+        assertThrows(
+            IOException.class,
+            () ->
+                StagedChunkPipelineExperiment.transfer(
+                    (position, buffer) -> {
+                      if (position == CHUNK_BYTES) {
+                        readStarted.countDown();
+                        try {
+                          probe.failReader();
+                        } finally {
+                          readFinished.countDown();
+                        }
+                      }
+                      return fill(position, buffer);
+                    },
+                    rows -> {
+                      await(readStarted);
+                      try {
+                        assertFalse(
+                            readFinished.await(100, TimeUnit.MILLISECONDS),
+                            "the injected failure must wait while the first JDBC window is active");
+                      } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new InterruptedIOException("writer test interrupted");
+                      }
+                      probe.flushed(rows.size());
+                    },
+                    1L,
+                    3L * CHUNK_BYTES,
+                    1,
+                    mode));
+    assertEquals("injected staging failure after the first window", actual.getMessage());
+    assertTrue(probe.firstWindowFlushedAt() != 0);
+    assertTrue(probe.detectedAt() >= probe.firstWindowFlushedAt());
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = StagedChunkPipelineExperiment.Mode.class,
+      names = {"VIRTUAL", "PLATFORM"})
+  void writerFailureCancelsInjectedReaderWaitingForFirstFlush(
+      StagedChunkPipelineExperiment.Mode mode) {
+    var probe = new StagedChunkPipelineExperiment.FailureProbe();
+    CountDownLatch readStarted = new CountDownLatch(1);
+    CountDownLatch cancelled = new CountDownLatch(1);
+    IOException writerFailure = new IOException("first JDBC window failed before flush completion");
+    IOException actual =
+        assertThrows(
+            IOException.class,
+            () ->
+                StagedChunkPipelineExperiment.transfer(
+                    (position, buffer) -> {
+                      if (position == CHUNK_BYTES) {
+                        readStarted.countDown();
+                        try {
+                          probe.failReader();
+                        } catch (InterruptedIOException interrupted) {
+                          cancelled.countDown();
+                          throw interrupted;
+                        }
+                      }
+                      return fill(position, buffer);
+                    },
+                    rows -> {
+                      await(readStarted);
+                      throw writerFailure;
+                    },
+                    1L,
+                    3L * CHUNK_BYTES,
+                    1,
+                    mode));
+    assertSame(writerFailure, actual);
+    assertEquals(0, cancelled.getCount(), "the blocked injected reader must terminate before return");
+    assertEquals(0, probe.firstWindowFlushedAt());
+    assertEquals(0, probe.detectedAt(), "cancellation must not fabricate the injected failure");
   }
 
   @ParameterizedTest

@@ -81,6 +81,10 @@ def validate_rollbacks(rows, repeats, window):
                 "rollback fixture must exceed its writer window")
         require(int(row["failure_to_return_nanos"]) >= int(row["rollback_nanos"]) > 0,
                 "rollback time must be positive and within detection-to-return")
+        require("first_window_flushed_nanos" in row and "failure_detected_nanos" in row,
+                "rollback needs first-flush and failure-detection chronology")
+        require(int(row["failure_detected_nanos"]) >= int(row["first_window_flushed_nanos"]) > 0,
+                "rollback failure detection must follow the completed first flush")
         require(int(row["flushed_chunks"]) == window, "rollback must follow one flushed window")
         require(int(row["remaining_packs"]) == int(row["remaining_chunks"]) == 0,
                 "rollback left durable pack/chunk rows")
