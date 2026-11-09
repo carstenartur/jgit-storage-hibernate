@@ -25,16 +25,18 @@ on:
   push:
     branches:
       - 'benchmark/history-scroll-full-*'
+      - 'evidence/history-scroll-search-candidate-20261109'
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/evidence/history-scroll-search-candidate-20261109' }}
 
 jobs:
   plan:
+    if: github.event_name != 'push' || github.ref != 'refs/heads/evidence/history-scroll-search-candidate-20261109'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -127,5 +129,267 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: history-scroll-${{ matrix.backend }}-${{ matrix.documents }}
+          path: target/history-scroll/
+          if-no-files-found: error
+
+  search-candidate:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/evidence/history-scroll-search-candidate-20261109' && !github.event.deleted
+    name: ${{ matrix.backend }} / Search base and source candidate / 10000 documents
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [postgresql, sqlserver]
+    env:
+      BENCHMARK_BACKEND: ${{ matrix.backend }}
+      SEARCH_CANDIDATE_COMMIT: 2e6751194ff514e4d3e6fc31b672acc68ae96997
+      SEARCH_CANDIDATE_VERSION: 8.4.2-SNAPSHOT
+
+    steps:
+      - name: Checkout application
+        id: application_checkout
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize raw evidence and isolated Maven repositories
+        id: evidence
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/target/history-scroll"
+          mkdir -p "$evidence/base" "$evidence/candidate"
+          git rev-parse HEAD > "$evidence/application-commit.txt"
+          git rev-parse 'HEAD^{tree}' > "$evidence/application-tree.txt"
+          test "$(cat "$evidence/application-commit.txt")" = "$GITHUB_SHA"
+          lscpu > "$evidence/cpu.txt"
+          test ! -e "$RUNNER_TEMP/history-scroll-base-m2"
+          test ! -e "$RUNNER_TEMP/history-scroll-candidate-m2"
+          mkdir "$RUNNER_TEMP/history-scroll-base-m2" "$RUNNER_TEMP/history-scroll-candidate-m2"
+
+      - name: Checkout pinned Hibernate Search candidate
+        id: candidate_checkout
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: carstenartur/hibernate-search
+          ref: 2e6751194ff514e4d3e6fc31b672acc68ae96997
+          path: target/search-candidate-source
+          persist-credentials: false
+
+      - name: Set up source bootstrap JDK 25
+        id: source_java
+        timeout-minutes: 10
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25.0.5+8'
+
+      - name: Verify, build and fingerprint the pinned source candidate
+        id: candidate_source
+        timeout-minutes: 40
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/target/history-scroll"
+          source_root="$GITHUB_WORKSPACE/target/search-candidate-source"
+          candidate_repo="$RUNNER_TEMP/history-scroll-candidate-m2"
+          set +e
+          (
+            set -euo pipefail
+            git -C "$source_root" rev-parse HEAD > "$evidence/candidate-source-commit.txt"
+            git -C "$source_root" rev-parse 'HEAD^{tree}' > "$evidence/candidate-source-tree.txt"
+            git -C "$source_root" status --short --untracked-files=no > "$evidence/candidate-source-tracked-status.txt"
+            test "$(cat "$evidence/candidate-source-commit.txt")" = "$SEARCH_CANDIDATE_COMMIT"
+            test ! -s "$evidence/candidate-source-tracked-status.txt"
+            for optional_config in extensions.xml develocity.xml; do
+              test ! -e "$source_root/.mvn/$optional_config"
+              test ! -L "$source_root/.mvn/$optional_config"
+            done
+            rg '^distributionUrl=' "$source_root/.mvn/wrapper/maven-wrapper.properties"
+            rg --quiet '^distributionUrl=.*/apache-maven-3\.9\.16-bin\.(zip|tar\.gz)$' \
+              "$source_root/.mvn/wrapper/maven-wrapper.properties"
+            cd "$source_root"
+            ./mvnw -B -Dstyle.color=never --version > "$evidence/candidate-source-maven-version.txt" 2>&1
+            cat "$evidence/candidate-source-maven-version.txt"
+            rg --quiet 'Apache Maven 3\.9\.16([[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
+            rg --quiet 'Java version: 25([.,[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
+            # Packaging only: this exact source commit already passed its full upstream CI.
+            ./mvnw -B -ntp -Pci-build -pl mapper/orm,backend/lucene -am clean install \
+              -DskipTests -Dmaven.javadoc.skip=true -Dmaven.repo.local="$candidate_repo"
+          ) 2>&1 | tee "$evidence/candidate-source-build.log"
+          source_status=("${PIPESTATUS[@]}")
+          set -e
+          printf '%s\n' "${source_status[0]}" > "$evidence/candidate-source-build.exit-code"
+          printf '%s\n' "${source_status[1]}" > "$evidence/candidate-source-log.exit-code"
+          # Preserve a partial source manifest even when the source preflight or build failed.
+          if python3 .github/scripts/history_scroll_candidate_provenance.py source \
+            --source-root "$source_root" --maven-repo "$candidate_repo" \
+            --commit "$SEARCH_CANDIDATE_COMMIT" --version "$SEARCH_CANDIDATE_VERSION" \
+            --output "$evidence/candidate-source.json" > "$evidence/candidate-source-provenance.log" 2>&1; then
+            provenance_status=0
+          else
+            provenance_status=$?
+          fi
+          cat "$evidence/candidate-source-provenance.log"
+          printf '%s\n' "$provenance_status" > "$evidence/candidate-source-provenance.exit-code"
+          if (( source_status[0] != 0 || source_status[1] != 0 || provenance_status != 0 )); then
+            exit 1
+          fi
+
+      - name: Set up application JDK 21 after source bootstrap
+        id: application_java
+        timeout-minutes: 5
+        if: always() && steps.application_checkout.outcome == 'success' && steps.evidence.outcome == 'success'
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21.0.13+9'
+
+      - name: Run native base then candidate with bounded evidence coordinates
+        timeout-minutes: 40
+        if: always() && steps.application_java.outcome == 'success' && steps.evidence.outcome == 'success'
+        shell: bash
+        env:
+          CANDIDATE_CHECKOUT_OUTCOME: ${{ steps.candidate_checkout.outcome }}
+          SOURCE_JAVA_OUTCOME: ${{ steps.source_java.outcome }}
+          SOURCE_BUILD_OUTCOME: ${{ steps.candidate_source.outcome }}
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/target/history-scroll"
+          printf 'checkout=%s\nsource_java=%s\nsource_build=%s\n' \
+            "$CANDIDATE_CHECKOUT_OUTCOME" "$SOURCE_JAVA_OUTCOME" "$SOURCE_BUILD_OUTCOME" \
+            > "$evidence/candidate-source-status.txt"
+          case "$BENCHMARK_BACKEND" in
+            postgresql) native_method=scrollingContractWorksOnPostgreSql ;;
+            sqlserver) native_method=scrollingContractWorksOnSqlServer ;;
+            *) exit 1 ;;
+          esac
+          overall_status=0
+          for variant in base candidate; do
+            variant_dir="$evidence/$variant"
+            if [[ "$variant" == base ]]; then
+              version=8.4.1.Final
+              maven_repo="$RUNNER_TEMP/history-scroll-base-m2"
+            else
+              version="$SEARCH_CANDIDATE_VERSION"
+              maven_repo="$RUNNER_TEMP/history-scroll-candidate-m2"
+            fi
+            # A root reactor clean would delete the evidence and the source checkout.
+            # Clear only these application modules to force fresh compilation and reports.
+            rm -f -- "$evidence/active-variant.txt"
+            rm -rf -- "$GITHUB_WORKSPACE/jgit-storage-hibernate-core/target" \
+              "$GITHUB_WORKSPACE/jgit-storage-hibernate-search/target"
+            printf '%s\n' "$variant" > "$evidence/active-variant.txt"
+            java -version > "$variant_dir/java-version.txt" 2>&1
+            mvn --version > "$variant_dir/maven-version.txt" 2>&1
+            if [[ "$variant" == candidate && "$SOURCE_BUILD_OUTCOME" != success ]]; then
+              printf 'Candidate not run: source bootstrap or provenance failed (%s).\n' \
+                "$SOURCE_BUILD_OUTCOME" | tee "$variant_dir/maven.log"
+              native_status=not-run
+              log_status=0
+              overall_status=1
+            else
+              set +e
+              mvn -B -ntp -pl jgit-storage-hibernate-search -am test-compile \
+                org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree \
+                org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath test \
+                -DoutputFile="$variant_dir/dependency-tree.txt" -DoutputType=text \
+                -Dmdep.outputFile="$variant_dir/runtime-classpath.txt" \
+                -Dtest="CommitSearchScrollingDatabaseIntegrationTest#$native_method,CommitSearchScrollingH2Test,HistoryScrollExportBenchmarkIT" \
+                -Dsurefire.failIfNoSpecifiedTests=false \
+                -Djacoco.skip=true \
+                -DargLine="-Xms1g -Xmx2g -Dorg.jboss.logging.provider=jdk -Djava.util.logging.config.file=$GITHUB_WORKSPACE/reproducers/hibernate-search-ranked-scroll/logging.properties -Xlog:class+load=info:file=$variant_dir/class-load-%p.log:uptime,level,tags" \
+                -Dhibernate-search.version="$version" -Dmaven.repo.local="$maven_repo" \
+                -Dbenchmark.scroll.backend="$BENCHMARK_BACKEND" \
+                -Dbenchmark.scroll.documents=10000 -Dbenchmark.scroll.chunkSizes=100 \
+                -Dbenchmark.scroll.repetitions=1 -Dbenchmark.scroll.output="$variant_dir" \
+                -Dbenchmark.commit="$GITHUB_SHA" 2>&1 | tee "$variant_dir/maven.log"
+              native_pipeline=("${PIPESTATUS[@]}")
+              set -e
+              native_status="${native_pipeline[0]}"
+              log_status="${native_pipeline[1]}"
+              if (( native_status != 0 || log_status != 0 )); then
+                overall_status=1
+              fi
+            fi
+            printf '%s\n' "$native_status" > "$variant_dir/maven.exit-code"
+            printf '%s\n' "$log_status" > "$variant_dir/maven-log.exit-code"
+            # Copy before the next variant removes the application module targets.
+            if [[ -d jgit-storage-hibernate-search/target/surefire-reports ]]; then
+              cp -a jgit-storage-hibernate-search/target/surefire-reports "$variant_dir/surefire-reports"
+            else
+              printf 'No native Surefire reports were produced.\n' > "$variant_dir/surefire-reports-missing.txt"
+              overall_status=1
+            fi
+            provenance_args=(runtime --application-root "$GITHUB_WORKSPACE" \
+              --artifacts "$variant_dir" --commit "$GITHUB_SHA" --version "$version" \
+              --variant "$variant" --backend "$BENCHMARK_BACKEND")
+            if [[ "$variant" == candidate ]]; then
+              provenance_args+=(--source-manifest "$evidence/candidate-source.json")
+            fi
+            if python3 .github/scripts/history_scroll_candidate_provenance.py "${provenance_args[@]}" \
+              > "$variant_dir/provenance-check.log" 2>&1; then
+              provenance_status=0
+            else
+              provenance_status=$?
+              overall_status=1
+            fi
+            cat "$variant_dir/provenance-check.log"
+            printf '%s\n' "$provenance_status" > "$variant_dir/provenance.exit-code"
+            if python3 .github/scripts/summarize-history-scroll-export.py "$variant_dir" \
+              --documents 10000 --chunks 100 --repetitions 1 > "$variant_dir/summary.log" 2>&1; then
+              summary_status=0
+            else
+              summary_status=$?
+              overall_status=1
+            fi
+            cat "$variant_dir/summary.log"
+            printf '%s\n' "$summary_status" > "$variant_dir/summary.exit-code"
+            {
+              printf '## %s / Search %s\n\n' "$BENCHMARK_BACKEND" "$version"
+              printf 'Native Maven exit: `%s`; provenance exit: `%s`; summary exit: `%s`.\n\n' \
+                "$native_status" "$provenance_status" "$summary_status"
+              if [[ -s "$variant_dir/comparison.md" ]]; then
+                cat "$variant_dir/comparison.md"
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit "$overall_status"
+
+      - name: Preserve partial native reports after a failed or timed out step
+        if: always() && steps.evidence.outcome == 'success'
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/target/history-scroll"
+          if [[ -f "$evidence/active-variant.txt" ]]; then
+            variant="$(cat "$evidence/active-variant.txt")"
+            case "$variant" in base|candidate) ;; *) exit 1 ;; esac
+            if [[ -d jgit-storage-hibernate-search/target/surefire-reports ]]; then
+              mkdir -p "$evidence/$variant/surefire-reports"
+              cp -a jgit-storage-hibernate-search/target/surefire-reports/. \
+                "$evidence/$variant/surefire-reports/"
+            fi
+          fi
+
+      - name: Scan all retained output for connection details
+        id: privacy
+        if: always()
+        timeout-minutes: 2
+        run: |
+          python3 .github/scripts/validate_search_database_telemetry.py --privacy-only \
+            target/history-scroll
+
+      - name: Upload all raw base and candidate evidence, including failures
+        if: always() && steps.privacy.outcome == 'success'
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: history-scroll-source-candidate-${{ matrix.backend }}-10000-${{ github.sha }}
           path: target/history-scroll/
           if-no-files-found: error
