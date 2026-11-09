@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: 'One smoke cell, eight coverage cells, or the explicit 216-cell matrix'
+        description: 'Smoke, eight coverage cells, six local Git forks, or the explicit 216-cell matrix'
         required: true
         default: smoke
         type: choice
-        options: [smoke, coverage, full]
+        options: [smoke, coverage, local-git, full]
       repeats:
-        description: 'Retained repetitions per mode, after warm-up for coverage/full'
+        description: 'Retained repetitions per mode (local-git requires 9)'
         required: true
         default: '3'
         type: choice
@@ -20,7 +20,7 @@ on:
         required: false
         type: string
   push:
-    branches: ['evidence/staging-pipeline-*']
+    branches: ['evidence/staging-pipeline-*', 'evidence/staging-local-git-20261109']
   pull_request:
     branches: [main]
     paths:
@@ -47,10 +47,12 @@ concurrency:
 jobs:
   plan:
     name: Select bounded staging coordinates
+    if: github.event_name != 'push' || !github.event.deleted
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
+      profile: ${{ steps.select.outputs.profile }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Verify source and evidence selector
@@ -74,7 +76,10 @@ jobs:
           set -euo pipefail
           profile=smoke
           repeats=1
-          if [[ "$EVENT_NAME" = push ]]; then
+          if [[ "$EVENT_NAME" = push && "$GITHUB_REF" = refs/heads/evidence/staging-local-git-20261109 ]]; then
+            profile=local-git
+            repeats=9
+          elif [[ "$EVENT_NAME" = push ]]; then
             profile=coverage
             repeats=3
           elif [[ "$EVENT_NAME" = workflow_dispatch ]]; then
@@ -83,11 +88,12 @@ jobs:
           fi
           selected=$(python3 .github/scripts/staging_pipeline_evidence.py matrix \
             --profile "$profile" --repeats "$repeats")
+          echo "profile=$profile" >> "$GITHUB_OUTPUT"
           echo "matrix=$selected" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$selected" > staging-matrix.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: staging-pipeline-matrix
+          name: staging-pipeline-matrix${{ steps.select.outputs.profile == 'local-git' && format('-attempt-{0}', github.run_attempt) || '' }}
           path: staging-matrix.json
           if-no-files-found: error
 
@@ -116,7 +122,7 @@ jobs:
             mvn -B -pl jgit-storage-hibernate-benchmarks -am install \
             -Dtest=StagedChunkPipelineExperimentTest,StagedChunkPipelineEvidenceTest,StagedGitPublicationExperimentTest \
             -Dsurefire.failIfNoSpecifiedTests=false
-      - name: Collect native transfer, reopen and rollback evidence
+      - name: Collect native staging or complete Git publication evidence
         env:
           CELL_STORAGE: ${{ matrix.storage }}
           CELL_PAYLOAD: ${{ matrix.payload }}
@@ -126,6 +132,7 @@ jobs:
           CELL_RATE: ${{ matrix.rate }}
           CELL_REPEATS: ${{ matrix.repeats }}
           CELL_WARMUPS: ${{ matrix.warmups }}
+          CELL_GIT_ONLY: ${{ matrix.git_only }}
           JGIT_EVIDENCE_SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -136,24 +143,29 @@ jobs:
           mkdir -p "$staging_dir"
           trap 'rm -rf -- "$staging_dir"' EXIT
           prefix=jgit.storage.benchmark.staging-pipeline
-          python3 .github/scripts/run_with_bounded_console.py \
-            --log target/staging-pipeline/native.log --console-bytes 16384 -- \
-            mvn -B -pl jgit-storage-hibernate-benchmarks test \
-            -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlPipelineEvidence' \
-            '-DargLine=-Xmx4g -XX:ActiveProcessorCount=4' \
-            "-D$prefix.enabled=true" "-D$prefix.payload_mib=$CELL_PAYLOAD" \
-            "-D$prefix.window_mib=$CELL_WINDOW" "-D$prefix.writers=$CELL_WRITERS" \
-            "-D$prefix.requested_rtt_millis=$CELL_RTT" "-D$prefix.read_mib_per_second=$CELL_RATE" \
-            "-D$prefix.repeats=$CELL_REPEATS" "-D$prefix.warmups=$CELL_WARMUPS" \
-            "-D$prefix.storage=$CELL_STORAGE" "-D$prefix.staging_directory=$staging_dir" \
-            "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-pipeline/raw"
-          python3 .github/scripts/staging_pipeline_evidence.py summarize \
-            target/staging-pipeline/raw --expected-commit "$GITHUB_SHA"
+          git_limit=()
+          if [[ "$CELL_GIT_ONLY" = true ]]; then
+            git_limit=(timeout --kill-after=30s 7m)
+          else
+            python3 .github/scripts/run_with_bounded_console.py \
+              --log target/staging-pipeline/native.log --console-bytes 16384 -- \
+              mvn -B -pl jgit-storage-hibernate-benchmarks test \
+              -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlPipelineEvidence' \
+              '-DargLine=-Xmx4g -XX:ActiveProcessorCount=4' \
+              "-D$prefix.enabled=true" "-D$prefix.payload_mib=$CELL_PAYLOAD" \
+              "-D$prefix.window_mib=$CELL_WINDOW" "-D$prefix.writers=$CELL_WRITERS" \
+              "-D$prefix.requested_rtt_millis=$CELL_RTT" "-D$prefix.read_mib_per_second=$CELL_RATE" \
+              "-D$prefix.repeats=$CELL_REPEATS" "-D$prefix.warmups=$CELL_WARMUPS" \
+              "-D$prefix.storage=$CELL_STORAGE" "-D$prefix.staging_directory=$staging_dir" \
+              "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-pipeline/raw"
+            python3 .github/scripts/staging_pipeline_evidence.py summarize \
+              target/staging-pipeline/raw --expected-commit "$GITHUB_SHA"
+          fi
           case "$CELL_PAYLOAD-$CELL_WINDOW-$CELL_WRITERS-$CELL_STORAGE-$CELL_RTT" in
             16-16-1-runner-0|128-16-1-runner-0|128-16-1-paced-50)
               python3 .github/scripts/run_with_bounded_console.py \
                 --log target/staging-pipeline/git-publication.log --console-bytes 16384 -- \
-                mvn -B -pl jgit-storage-hibernate-benchmarks test \
+                "${git_limit[@]}" mvn -B -pl jgit-storage-hibernate-benchmarks test \
                 -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlGitPublicationEvidence' \
                 "-DargLine=-Xmx4g -XX:ActiveProcessorCount=4 -Djava.io.tmpdir=$staging_dir" \
                 "-D$prefix.git_publication.enabled=true" "-D$prefix.payload_mib=$CELL_PAYLOAD" \
@@ -174,14 +186,24 @@ jobs:
         if: always() && steps.evidence-privacy.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: staging-pipeline-${{ matrix.id }}
+          name: staging-pipeline-${{ matrix.id }}${{ matrix.git_only && format('-attempt-{0}', github.run_attempt) || '' }}
           path: |
             target/staging-pipeline/**
             jgit-storage-hibernate-benchmarks/target/surefire-reports/**
           if-no-files-found: error
       - name: Explain the evidence boundary
         if: always()
+        env:
+          CELL_GIT_ONLY: ${{ matrix.git_only }}
         run: |
+          if [[ "$CELL_GIT_ONLY" = true ]]; then
+            cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### Complete Git publication, local single writer
+
+          This job runs one independent JVM and PostgreSQL container for the preregistered local comparison. See the aggregate job for the qualification across all six forks.
+          EOF
+            exit 0
+          fi
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ### Bounded staging pipeline experiment
 
@@ -191,3 +213,26 @@ jobs:
           The production writer remains synchronous. The raw-transfer summary does not qualify full Git publication or a non-regression claim.
           Selected single-writer controls also retain git-publication.csv: streamed blob/tree/commit creation through pack/index persistence and ref commit, using the current production publication policy. Protocol costs and cold-reopen verification are outside that timing. These separate samples do not change the raw-transfer qualification or establish non-regression.
           EOF
+
+  local-git-summary:
+    name: Qualify local complete Git publication
+    needs: [plan, evidence]
+    if: needs.plan.outputs.profile == 'local-git'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: staging-pipeline-p128-b16-w1-runner-r0-fork-*-attempt-${{ github.run_attempt }}
+          path: target/staging-local-git
+      - name: Validate and report paired effects
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/staging_pipeline_evidence.py summarize-local-git \
+            target/staging-local-git --expected-commit "$GITHUB_SHA" --attempt "$GITHUB_RUN_ATTEMPT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: staging-local-git-summary-attempt-${{ github.run_attempt }}
+          path: target/staging-local-git/local-git-summary.json
+          if-no-files-found: error

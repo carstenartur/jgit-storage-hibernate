@@ -220,3 +220,5 @@ ran all four Search 8.4.0/8.4.1 and 8,192/65,536-document cells with Maven-resol
 dependencies. Both versions reproduced the same growing native hit counts and
 released them after closure. Successful diagnostic jobs confirm those
 observations; the ranked-scroll bounded-memory requirement remains open.
+
+[Ranked page-size and native export follow-up](../evidence/open-performance-issues-2026-11-09.md#history-export-with-a-larger-ranked-page)

@@ -160,6 +160,55 @@ class PublicationNonregressionTest(unittest.TestCase):
         change(value[0])
         path.write_text(json.dumps(value), encoding="utf-8")
 
+    def configure_jdk25_replication(self):
+        self.protocol.update(schema="jgit-publication-paired-jdk25/v1",
+                             cell="independent-16w-0ms-jdk25", writers=16,
+                             jdkMajor=25, pairStages=[16])
+        self.environment.update(javaVersion="25.0.5", javaVmVersion="25.0.5+8-LTS")
+        for trial in self.trials[32:]:
+            (self.root / trial["result"]).unlink()
+            (self.root / trial["output"]).unlink()
+        self.trials = self.trials[:32]
+        for index in range(32):
+            def update(item):
+                item.update(jdkVersion="25.0.5", vmVersion="25.0.5+8-LTS", threads=16)
+                item["params"]["deployment"] = "paired-independent-16w-0ms-jdk25"
+                item["jvmArgs"].append("-XX:+UseG1GC")
+            self.change_result(index, update)
+        self.flush()
+
+    def test_jdk25_replication_retains_a_fixed_unfavorable_result(self):
+        self.configure_jdk25_replication()
+        for index, trial in enumerate(self.trials):
+            if trial["policy"] == "contention-aware":
+                self.change_result(index, lambda item: item["primaryMetric"].update(
+                    score=94.0, rawData=[[94.0] * 3]))
+        result = MODULE.summarize(self.root)
+        self.assertEqual(result["pairCount"], 16)
+        self.assertEqual(result["forkCount"], 32)
+        self.assertEqual(result["criticalValue"], 1.7530503556925547)
+        self.assertAlmostEqual(result["lowerBoundPercent"], -6.0)
+        self.assertFalse(result["nonRegressionEstablished"])
+        self.assertFalse(result["stoppedEarly"])
+
+    def test_jdk25_replication_rejects_wrong_runtime_or_incomplete_data(self):
+        self.configure_jdk25_replication()
+        self.assertTrue(MODULE.summarize(self.root)["nonRegressionEstablished"])
+        self.environment["javaVmVersion"] = "25.0.5+7-LTS"
+        self.flush()
+        with self.assertRaisesRegex(ValueError, "25.0.5"):
+            MODULE.summarize(self.root)
+        self.environment["javaVmVersion"] = "25.0.5+8-LTS"
+        removed = self.trials.pop()
+        self.flush()
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            MODULE.summarize(self.root)
+        self.trials.append(removed)
+        self.flush()
+        self.change_result(0, lambda item: item["jvmArgs"].remove("-XX:+UseG1GC"))
+        with self.assertRaisesRegex(ValueError, "G1"):
+            MODULE.summarize(self.root)
+
     def test_complete_pairs_are_the_independent_replicates(self):
         result = MODULE.summarize(self.root)
         self.assertEqual(result["pairCount"], 24)
