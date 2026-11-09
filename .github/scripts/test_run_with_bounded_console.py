@@ -17,12 +17,13 @@ class BoundedConsoleTest(unittest.TestCase):
         root = Path(__file__).parents[2]
         workflow = (root / ".github/workflows/staging-pipeline-evidence.yml").read_text()
         steps = re.split(r"(?m)^      - ", workflow)
-        for name, log in (("Build the experiment", "build.log"),
-                          ("Collect native transfer", "native.log")):
+        for name, log, git_only in (("Build the experiment", "build.log", False),
+                                    ("Collect native staging", "native.log", False),
+                                    ("Collect native staging", "git-publication.log", True)):
             step = next(step for step in steps if f"name: {name}" in step)
             command = textwrap.dedent(step.split("        run: |\n", 1)[1])
             for exit_code in (0, 7):
-                with self.subTest(step=name, exit_code=exit_code), tempfile.TemporaryDirectory() as temporary:
+                with self.subTest(step=name, git_only=git_only, exit_code=exit_code), tempfile.TemporaryDirectory() as temporary:
                     directory = Path(temporary)
                     (directory / "target/staging-pipeline").mkdir(parents=True)
                     scripts = directory / ".github/scripts"
@@ -36,7 +37,9 @@ class BoundedConsoleTest(unittest.TestCase):
                     binary.mkdir()
                     producer = binary / "mvn"
                     producer.write_text(
-                        f"#!{sys.executable}\nimport os\n"
+                        f"#!{sys.executable}\nimport os, sys\n"
+                        "if os.environ['CELL_GIT_ONLY'] == 'true':\n"
+                        "    assert '-Dtest=StagedChunkPipelineEvidenceTest#recordsPostgresqlGitPublicationEvidence' in sys.argv\n"
                         "os.write(1,b'x'*2_100_000 + '☃'.encode()*100 + b'\\xff'*300)\n"
                         "os.write(2,b'\\nretained stderr\\n')\n"
                         f"raise SystemExit({exit_code})\n")
@@ -44,15 +47,19 @@ class BoundedConsoleTest(unittest.TestCase):
                     environment = dict(os.environ, PATH=str(binary) + os.pathsep + os.environ["PATH"],
                                        RUNNER_TEMP=str(directory / "runner"), GITHUB_WORKSPACE=str(directory),
                                        GITHUB_SHA="a" * 40, GITHUB_RUN_ID="1", GITHUB_RUN_ATTEMPT="1",
-                                       CELL_STORAGE="runner", CELL_PAYLOAD="16", CELL_WINDOW="32",
-                                       CELL_WRITERS="1", CELL_RTT="0", CELL_RATE="0", CELL_REPEATS="1",
-                                       CELL_WARMUPS="0")
+                                       CELL_STORAGE="runner", CELL_PAYLOAD="128" if git_only else "16",
+                                       CELL_WINDOW="16" if git_only else "32", CELL_WRITERS="1",
+                                       CELL_RTT="0", CELL_RATE="0", CELL_REPEATS="9" if git_only else "1",
+                                       CELL_WARMUPS="2" if git_only else "0",
+                                       CELL_GIT_ONLY=str(git_only).lower())
                     result = subprocess.run(["bash", "-euo", "pipefail", "-c", command],
                                             cwd=directory, env=environment,
                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
                     self.assertEqual(exit_code, result.returncode)
                     expected = b"x" * 2_100_000 + "☃".encode() * 100 + b"\xff" * 300 + b"\nretained stderr\n"
                     self.assertEqual(expected, (directory / "target/staging-pipeline" / log).read_bytes())
+                    if git_only:
+                        self.assertFalse((directory / "target/staging-pipeline/native.log").exists())
                     self.assertLessEqual(len(result.stdout), 16_384,
                                          "a single multi-MiB line must not bypass the console byte limit")
                     result.stdout.decode("utf-8", errors="strict")

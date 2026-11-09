@@ -4,12 +4,17 @@ import argparse
 import csv
 import itertools
 import json
+import math
 from pathlib import Path
 import re
 import statistics
+import xml.etree.ElementTree as ET
 
 MIB = 1024 * 1024
 MODES = ("SYNCHRONOUS", "VIRTUAL", "PLATFORM")
+LOCAL_GIT_FORKS = 6
+LOCAL_GIT_REPEATS = 9
+LOCAL_GIT_WARMUPS = 2
 
 
 def require(condition, message):
@@ -18,8 +23,16 @@ def require(condition, message):
 
 
 def matrix(profile, repeats):
-    require(profile in ("smoke", "coverage", "full"), "unknown matrix profile")
+    require(profile in ("smoke", "coverage", "full", "local-git"), "unknown matrix profile")
     require(repeats in (1, 3, 5, 9), "repeats must be 1, 3, 5 or 9")
+    if profile == "local-git":
+        require(repeats == LOCAL_GIT_REPEATS, "local-git requires nine retained rounds per fork")
+        return {"include": [
+            dict(id=f"p128-b16-w1-runner-r0-fork-{fork}", payload=128, window=16,
+                 writers=1, storage="runner", rtt=0, rate=0, repeats=repeats,
+                 warmups=LOCAL_GIT_WARMUPS, git_only=True)
+            for fork in range(1, LOCAL_GIT_FORKS + 1)
+        ]}
     if profile == "full":
         coordinates = itertools.product((16, 128, 512), (16, 32), (1, 4, 16),
                                          ("runner", "tmpfs", "paced"), (0, 5, 20, 50))
@@ -39,6 +52,107 @@ def matrix(profile, repeats):
 def read_csv(path):
     with path.open(newline="", encoding="utf-8") as source:
         return list(csv.DictReader(source))
+
+
+def read_properties(path):
+    environment = {}
+    for line in path.read_text().splitlines():
+        if line and not line.startswith(("#", "!")):
+            key, value = line.split("=", 1)
+            environment[key] = value
+    return environment
+
+
+def local_git_fork(artifact, source_commit, coordinate):
+    report = artifact / "jgit-storage-hibernate-benchmarks/target/surefire-reports"
+    report /= "TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.StagedChunkPipelineEvidenceTest.xml"
+    junit = ET.parse(report).getroot()
+    require(junit.tag == "testsuite" and
+            all(junit.get(key) == value for key, value in
+                dict(tests="1", errors="0", skipped="0", failures="0").items()) and
+            [test.get("name") for test in junit.findall("testcase")]
+            == ["recordsPostgresqlGitPublicationEvidence"],
+            "each fork requires one successful complete Git publication JUnit test")
+
+    raw = artifact / "target/staging-pipeline/raw"
+    environment = read_properties(raw / "git-publication.properties")
+    required_environment = dict(
+        source_commit=source_commit, measurement_boundary="git-object-insertion-through-ref-commit",
+        publication_policy="production-configured", requested_rtt_ms=str(coordinate["rtt"]),
+        repeats=str(coordinate["repeats"]), warmup_rounds=str(coordinate["warmups"]))
+    require(all(environment.get(key) == value for key, value in required_environment.items()),
+            "fork source or measurement protocol differs")
+    filesystem = environment.get("staging_filesystem")
+    require(filesystem and filesystem not in ("tmpfs", "ramfs"), "runner disk staging is required")
+    require(0 < int(environment["rtt_nanos"]) < 5_000_000, "local RTT must be below 5 ms")
+
+    trials = read_csv(raw / "git-publication.csv")
+    expected = [(str(sample), MODES[(sample - 1 + offset) % len(MODES)])
+                for sample in range(1, coordinate["repeats"] + 1) for offset in range(len(MODES))]
+    require([(row["sample"], row["mode"]) for row in trials] == expected,
+            "fork rounds are incomplete or out of order")
+    identities = set()
+    for row in trials:
+        require(int(row["payload_bytes"]) == coordinate["payload"] * MIB + 257 and
+                int(row["window_mib"]) == coordinate["window"] and int(row["read_bytes_per_second"]) == 0,
+                "fork uses a different staging coordinate")
+        require(int(row["publication_nanos"]) > 0 and int(row["prepersisted_packs"]) == 1 and
+                int(row["retained_windows"]) == (1 if row["mode"] == "SYNCHRONOUS" else 2),
+                "fork elapsed time, publication policy or retained windows disagree")
+        identity = (row["commit"], row["blob"])
+        require(all(re.fullmatch(r"[0-9a-f]{40}", object_id) for object_id in identity), "invalid Git identity")
+        identities.add(identity)
+
+    observations = [json.loads(line) for line in (raw / "git-publication-telemetry.ndjson").read_text().splitlines()]
+    require([(item["coordinate"]["sample"], item["coordinate"]["mode"]) for item in observations] == expected,
+            "native observations do not match the fork rounds")
+    for item in observations:
+        require(item["backend"] == "postgresql" and item["enabled"] is True and
+                item["counters"].get("postgresql.wal.insert_lsn_bytes", 0) > 0,
+                "native PostgreSQL WAL movement is required")
+        require(item["metadata"].get("postgresql.server_version_num") == "170010",
+                "native PostgreSQL 17.10 is required")
+
+    elapsed = {(row["sample"], row["mode"]): int(row["publication_nanos"]) for row in trials}
+    ratios = {
+        mode: statistics.mean(math.log(elapsed[sample, mode] / elapsed[sample, "SYNCHRONOUS"])
+                              for sample in map(str, range(1, coordinate["repeats"] + 1)))
+        for mode in MODES[1:]
+    }
+    return ratios, identities, dict(staging_filesystem=filesystem, rtt_nanos=int(environment["rtt_nanos"]))
+
+
+def summarize_local_git(directory, expected_commit, attempt):
+    require(re.fullmatch(r"[0-9a-f]{40}", expected_commit), "exact source commit required")
+    require(attempt > 0, "workflow attempt must be positive")
+    coordinates = matrix("local-git", LOCAL_GIT_REPEATS)["include"]
+    expected = {f"staging-pipeline-{cell['id']}-attempt-{attempt}": cell for cell in coordinates}
+    actual = {artifact.name for artifact in directory.glob(f"staging-pipeline-*-fork-*-attempt-{attempt}")}
+    require(actual == set(expected), "all six forks from the same workflow attempt are required")
+    effects = {mode: [] for mode in MODES[1:]}
+    identities = set()
+    environments = {}
+    for name, cell in expected.items():
+        ratios, fork_identities, environment = local_git_fork(directory / name, expected_commit, cell)
+        identities.update(fork_identities)
+        environments[cell["id"]] = environment
+        for mode in effects:
+            effects[mode].append(ratios[mode])
+    require(len(identities) == 1, "all modes and forks must publish the same Git identity")
+    margin = 5.0
+    critical = 2.570581835636305  # t(5), one-sided 97.5% per mode; 95% family-wise
+    comparisons = {}
+    for mode, logs in effects.items():
+        mean = statistics.mean(logs)
+        upper = 100 * math.expm1(mean + critical * statistics.stdev(logs) / math.sqrt(len(logs)))
+        comparisons[mode] = dict(change_percent=100 * math.expm1(mean), upper_percent=upper,
+                                 non_regression=upper <= margin,
+                                 fork_change_percent=[100 * math.expm1(value) for value in logs])
+    return dict(schema_version=1, source_commit=expected_commit, run_attempt=attempt,
+                fork_count=LOCAL_GIT_FORKS, publications=LOCAL_GIT_FORKS * LOCAL_GIT_REPEATS * len(MODES),
+                margin_percent=margin, family_confidence=0.95, environments=environments,
+                commit=next(iter(identities))[0], blob=next(iter(identities))[1],
+                comparisons=comparisons, production_decision="keep synchronous")
 
 
 def validate_trials(rows, repeats):
@@ -121,11 +235,7 @@ def validate_timeline(rows, trials):
 
 
 def summarize(directory, expected_commit=None):
-    environment = {}
-    for line in (directory / "environment.properties").read_text().splitlines():
-        if line and not line.startswith(("#", "!")):
-            key, value = line.split("=", 1)
-            environment[key] = value
+    environment = read_properties(directory / "environment.properties")
     require(environment.get("measurement_boundary") == "staged-transfer-through-transaction-commit",
             "unrecognized measurement boundary")
     require(re.fullmatch(r"[0-9a-f]{40}", environment.get("source_commit", "")), "exact source commit is missing")
@@ -228,14 +338,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     select = sub.add_parser("matrix")
-    select.add_argument("--profile", choices=("smoke", "coverage", "full"), default="smoke")
+    select.add_argument("--profile", choices=("smoke", "coverage", "full", "local-git"), default="smoke")
     select.add_argument("--repeats", type=int, default=3)
     verify = sub.add_parser("summarize")
     verify.add_argument("directory", type=Path)
     verify.add_argument("--expected-commit")
+    local_git = sub.add_parser("summarize-local-git")
+    local_git.add_argument("directory", type=Path)
+    local_git.add_argument("--expected-commit", required=True)
+    local_git.add_argument("--attempt", type=int, required=True)
     args = parser.parse_args()
     if args.command == "matrix":
         print(json.dumps(matrix(args.profile, args.repeats), separators=(",", ":")))
+    elif args.command == "summarize-local-git":
+        result = summarize_local_git(args.directory, args.expected_commit, args.attempt)
+        summary = json.dumps(result, indent=2)
+        (args.directory / "local-git-summary.json").write_text(summary + "\n")
+        print(summary)
     else:
         result = summarize(args.directory, args.expected_commit)
         print(json.dumps({key: result[key] for key in ("qualified_transfer_samples", "verified_rollback_samples", "production_decision")}, indent=2))
