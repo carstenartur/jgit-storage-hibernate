@@ -266,6 +266,31 @@ extend the experiment to explicit 512 MiB, concurrency, storage and RTT coordina
 Their timing boundary remains staged transfer through commit; complete Git
 publication and repeatable non-regression remain acceptance gates for #189.
 
+[Native run 42538734936](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42538734936)
+completed all eight selected coordinates at source `48c04baaef9352846df431eac712695d58be2680`:
+72 retained transfer samples and 144 single-writer failure/rollback samples.
+The following are medians in milliseconds, with three samples per mode after one
+warm-up. The linked run retains each cell's raw data, native telemetry and charts.
+
+| Payload / window MiB | Writers | Staging / RTT ms | Synchronous | Virtual | Platform |
+| --- | ---: | --- | ---: | ---: | ---: |
+| 16 / 32 | 1 | runner / 0 | 257.1 | 440.2 | 480.3 |
+| 128 / 16 | 1 | runner / 0 | 839.8 | 904.9 | 805.6 |
+| 512 / 16 | 1 | runner / 0 | 5653.2 | 5729.1 | 6087.5 |
+| 128 / 32 | 4 | runner / 5 | 5780.3 | 5325.1 | 5841.6 |
+| 128 / 16 | 16 | runner / 20 | 14079.1 | 14082.3 | 14467.8 |
+| 128 / 32 | 4 | tmpfs / 20 | 2823.0 | 2875.8 | 2897.5 |
+| 128 / 16 | 1 | paced / 50 | 2161.5 | 1487.4 | 1460.0 |
+| 512 / 32 | 4 | paced / 50 | 16150.5 | 14063.5 | 13796.1 |
+
+This covers 8 of 216 requested coordinates and excludes Git construction/ref
+publication. The 16/32 single-window control executes the same synchronous
+transfer in all modes, so its large spread cannot establish a pipeline overhead.
+Local results do not establish non-regression; the paced gains support further
+measurement. Production remains synchronous. The separate complete Git publication
+controls described above now exercise the current policy, but need retained native
+results and repeatable comparisons before the acceptance gate can be resolved.
+
 ## Durable receiver batching
 
 The original benchmark queue only grouped scheduling; every command still executed its own transaction. That was insufficient for the receiver use case.
@@ -430,7 +455,7 @@ retaining a safe default is a valid outcome of a tuning experiment.
 | Issue area | Completed | Remaining |
 |---|---|---|
 | [Adaptive direct/pre-persisted publication (#161)](https://github.com/carstenartur/jgit-storage-hibernate/issues/161) | One-MiB default, bounded opt-in selector, safety regressions and [four complete preregistered cells](evidence/publication-paired-2026-11-08/README.md); [four original-runtime GC diagnostic forks](evidence/publication-gc-diagnostic-2026-11-08/README.md), an independently recorded [Reftable allocation candidate](evidence/publication-reftable-diagnostic-2026-11-08/README.md), and layout/content integrity checks. | Still open: the 16-writer/0-ms independent cell aborted; its original acceptance result is missing. Candidate layout and selector qualification need separate controlled comparisons with their own protocols and identities. Larger payloads/provider combinations and any default promotion need separate qualification. |
-| [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Benchmark-only two-window prototype, cancellation/rollback/reopen tests and 27 retained native trials | Full Git publication, 512 MiB and multiwriter/storage comparisons, rollback latency and repeatable local non-regression; production stays synchronous. |
+| [Staging read/JDBC overlap (#189)](https://github.com/carstenartur/jgit-storage-hibernate/issues/189) | Two-window prototype; eight native coordinates with 72 transfer and 144 rollback samples; complete Git publication harness using the current policy | Retained full Git publication comparisons, remaining matrix coordinates and repeatable local non-regression; production stays synchronous. |
 | Durable striped queue | Production generic 50-record atomic batch queue, Hibernate adapter, property limits, post-commit acknowledgement and JDBC-batch proof | A storage-specific processor for combining complete Git push/ref commands, plus production throughput measurements of that processor. |
 | End-to-end bytes/read-ahead | Staging/database/read-ahead counters, spill metrics, sequential/random/short profiles and write-amplification report | Physical PostgreSQL WAL/network/page bytes and a production telemetry exporter. |
 | Repository aging/repack | Full PostgreSQL/SQL Server/HSQLDB age matrix, repeated provider-restart evidence, and manual maintenance guidance | Broader large-repository repeats and operational budgets before considering automatic scheduling. |

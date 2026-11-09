@@ -56,6 +56,11 @@ public class HibernateRepository extends DfsRepository {
   private String gitwebDescription;
 
   HibernateRepository(HibernateRepositoryBuilder builder) throws IOException {
+    this(builder, ReadAheadHibernateObjDatabase::new);
+  }
+
+  HibernateRepository(HibernateRepositoryBuilder builder, ObjectDatabaseFactory databases)
+      throws IOException {
     super(builder);
     this.sessionFactory = builder.getSessionFactory();
     this.repositoryName = builder.getRepositoryName();
@@ -64,17 +69,23 @@ public class HibernateRepository extends DfsRepository {
     this.afterClose = Objects.requireNonNull(builder.getAfterClose(), "afterClose");
     this.transactionContext = new HibernateTransactionContext(sessionFactory);
     this.objectDatabase =
-        new ReadAheadHibernateObjDatabase(
-            this,
-            builder.getReaderOptions(),
-            sessionFactory,
-            repositoryName,
-            transactionContext);
+        databases.create(
+            this, builder.getReaderOptions(), sessionFactory, repositoryName, transactionContext);
     this.reflogWriter = new HibernateReflogWriter(transactionContext, repositoryName);
     this.refDatabase = new HibernateRefDatabase(this);
     if (builder.shouldInitializeRepositoryRows()) {
       ensureRepositoryRows();
     }
+  }
+
+  @FunctionalInterface
+  interface ObjectDatabaseFactory {
+    ReadAheadHibernateObjDatabase create(
+        DfsRepository repository,
+        org.eclipse.jgit.internal.storage.dfs.DfsReaderOptions options,
+        SessionFactory sessionFactory,
+        String repositoryName,
+        HibernateTransactionContext transactionContext);
   }
 
   public static HibernateRepository create(SessionFactory sessionFactory, String repositoryName)

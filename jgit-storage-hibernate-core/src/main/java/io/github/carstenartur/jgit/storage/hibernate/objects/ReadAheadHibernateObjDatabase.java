@@ -104,6 +104,22 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
       SessionFactory sessionFactory,
       String repositoryName,
       HibernateTransactionContext transactionContext) {
+    this(
+        repository,
+        options,
+        sessionFactory,
+        repositoryName,
+        transactionContext,
+        StagedPackExtensionStore::transferSynchronously);
+  }
+
+  ReadAheadHibernateObjDatabase(
+      DfsRepository repository,
+      DfsReaderOptions options,
+      SessionFactory sessionFactory,
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
+      StagedPackExtensionStore.ChunkTransfer chunkTransfer) {
     super(repository, options, sessionFactory, repositoryName, transactionContext);
     this.sessionFactory = sessionFactory;
     this.repositoryName = repositoryName;
@@ -115,7 +131,8 @@ public final class ReadAheadHibernateObjDatabase extends HibernateObjDatabase {
             transactionContext,
             storageByteCounters,
             PackPublicationSelector.configured(
-                sessionFactory, repositoryName, storageByteCounters.enabled()));
+                sessionFactory, repositoryName, storageByteCounters.enabled()),
+            chunkTransfer);
     this.packFileReadCounters = PackFileReadCounters.from(sessionFactory);
   }
 
