@@ -85,6 +85,11 @@ gave warmed medians of 6.734, 2.276 and 1.735 seconds at caps 512, 4,096 and
 16,384. The measured benefit comes from the larger page in this fixture.
 [Four-chunk source](https://github.com/carstenartur/hibernate-search/commit/2e6751194ff514e4d3e6fc31b672acc68ae96997) · [Standalone fixture](../../reproducers/hibernate-search-ranked-scroll/README.md)
 
+The retained evidence includes the exact timed, threshold and cap-overlay
+sources, launch scripts, raw CSVs, classpath and source fingerprints, and
+84 full class histograms. The verifier reproduces both derived summaries.
+[Standalone evidence and reproduction](https://github.com/carstenartur/jgit-storage-hibernate/blob/6857b83d22f1f6015ba3527f08b7ea4fb3734267/docs/evidence/search-ranked-page-local-2026-11-09/README.md)
+
 ### PostgreSQL and SQL Server spot check
 
 The application harness compares Search 8.4.1.Final with a pinned source build
@@ -94,3 +99,27 @@ candidate's 16,384-hit target rounds down to a 16,300-hit page so every
 interior page contains whole chunks. Surefire properties and class loading
 identify the explicit opt-in and the five executed Search JARs.
 [Application harness](https://github.com/carstenartur/jgit-storage-hibernate/commit/79c035f037a6e6605c47fce2cc9ce39b032bdba2) · [Candidate source](https://github.com/carstenartur/hibernate-search/commit/9f8ed03ffde4d8881331b3c45051761b171a57b2) · [Native run](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42610693833)
+
+Both hosted database jobs passed. The report compares the warm indexed
+export on each runner.
+
+| Database | Release full export | Larger page full export | Release first chunk | Larger page first chunk |
+| --- | ---: | ---: | ---: | ---: |
+| PostgreSQL 17.10 | 13.98 s | 23.28 s | 287 ms | 506 ms |
+| SQL Server 2022 CU20 | 15.85 s | 28.22 s | 296 ms | 712 ms |
+
+During the warm indexed exports, the sampled process heap peak fell from
+796 to 639 MiB on PostgreSQL and from 830 to 647 MiB on SQL Server. These are
+process observations at measurement points. The standalone histograms above
+measure ranked-hit objects separately.
+
+Across both engines and runtimes, the artifacts retain 28 successful test cases,
+40 validated exports and 212 offset observations. Release and candidate
+offsets have identical row counts and object-ID endpoints. The native contracts
+cover deterministic ordering, row equivalence and resource release. Both
+archives passed SHA-256 checks and the four offset comparison reports
+reproduced from the retained CSVs. The results cover one hosted spot check per
+database. The reopened-index observations reuse the database process and OS
+caches. Repeated candidate chunk-size comparisons, statement plans, waits and
+database restart measurements remain open.
+[PostgreSQL artifact](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42610693833/artifacts/13670264252) · [SQL Server artifact](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42610693833/artifacts/13671620395)
