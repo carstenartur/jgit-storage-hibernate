@@ -209,14 +209,14 @@ jobs:
               test ! -e "$source_root/.mvn/$optional_config"
               test ! -L "$source_root/.mvn/$optional_config"
             done
-            rg '^distributionUrl=' "$source_root/.mvn/wrapper/maven-wrapper.properties"
-            rg --quiet '^distributionUrl=.*/apache-maven-3\.9\.16-bin\.(zip|tar\.gz)$' \
+            grep -E '^distributionUrl=' "$source_root/.mvn/wrapper/maven-wrapper.properties"
+            grep -Eq '^distributionUrl=.*/apache-maven-3\.9\.16-bin\.(zip|tar\.gz)$' \
               "$source_root/.mvn/wrapper/maven-wrapper.properties"
             cd "$source_root"
             ./mvnw -B -Dstyle.color=never --version > "$evidence/candidate-source-maven-version.txt" 2>&1
             cat "$evidence/candidate-source-maven-version.txt"
-            rg --quiet 'Apache Maven 3\.9\.16([[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
-            rg --quiet 'Java version: 25([.,[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
+            grep -Eq 'Apache Maven 3\.9\.16([[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
+            grep -Eq 'Java version: 25([.,[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
             # Packaging only: this exact source commit already passed its full upstream CI.
             ./mvnw -B -ntp -Pci-build -pl mapper/orm,backend/lucene -am clean install \
               -DskipTests -Dmaven.javadoc.skip=true -Dmaven.repo.local="$candidate_repo"
