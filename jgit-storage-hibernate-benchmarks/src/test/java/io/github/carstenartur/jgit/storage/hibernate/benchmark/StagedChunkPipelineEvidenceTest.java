@@ -22,7 +22,9 @@ import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipeline
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment.Mode;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment.Publication;
 import io.github.carstenartur.jgit.storage.hibernate.objects.StagedChunkPipelineExperiment.Span;
+import io.github.carstenartur.jgit.storage.hibernate.objects.StagedGitPublicationExperiment;
 import io.github.carstenartur.jgit.storage.hibernate.repository.HibernateRepository;
+import io.github.carstenartur.jgit.storage.hibernate.repository.StagedGitRepositoryFactory;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryType;
 import java.nio.file.Files;
@@ -41,6 +43,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.eclipse.jgit.internal.storage.dfs.DfsBlockCache;
+import org.eclipse.jgit.internal.storage.dfs.DfsBlockCacheConfig;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
@@ -80,6 +86,21 @@ class StagedChunkPipelineEvidenceTest {
   @Test
   @EnabledIfSystemProperty(named = PREFIX + ".enabled", matches = "true")
   void recordsPostgresqlPipelineEvidence() throws Exception {
+    withPostgresql(this::record);
+  }
+
+  @Test
+  @EnabledIfSystemProperty(named = PREFIX + ".git_publication.enabled", matches = "true")
+  void recordsPostgresqlGitPublicationEvidence() throws Exception {
+    withPostgresql(this::recordGitPublication);
+  }
+
+  @FunctionalInterface
+  private interface NativeStudy {
+    void record(String routed, String direct, String user, String password) throws Exception;
+  }
+
+  private void withPostgresql(NativeStudy study) throws Exception {
     checkpoint("native-test:begin");
     String routed = System.getenv("JGIT_STAGING_PIPELINE_DISPOSABLE_JDBC_URL");
     if (routed != null) {
@@ -88,7 +109,7 @@ class StagedChunkPipelineEvidenceTest {
         throw new IllegalArgumentException(
             "use a dedicated loopback jgit_stage_pipeline_disposable database");
       }
-      record(routed, direct, "benchmark", "");
+      study.record(routed, direct, "benchmark", "");
       return;
     }
     try (var network = Network.newNetwork();
@@ -112,7 +133,7 @@ class StagedChunkPipelineEvidenceTest {
       checkpoint("postgres:start:returned");
       int requestedRtt = Integer.getInteger(PREFIX + ".requested_rtt_millis", 0);
       if (requestedRtt == 0) {
-        record(
+        study.record(
             postgres.getJdbcUrl(),
             postgres.getJdbcUrl(),
             postgres.getUsername(),
@@ -130,7 +151,7 @@ class StagedChunkPipelineEvidenceTest {
           route
               .toxics()
               .latency("downstream", ToxicDirection.DOWNSTREAM, requestedRtt - requestedRtt / 2);
-          record(
+          study.record(
               "jdbc:postgresql://"
                   + proxy.getHost()
                   + ":"
@@ -145,6 +166,133 @@ class StagedChunkPipelineEvidenceTest {
       checkpoint("containers:close:begin");
     } finally {
       checkpoint("native-test:returned");
+    }
+  }
+
+  private void recordGitPublication(String url, String telemetryUrl, String user, String password)
+      throws Exception {
+    int payloadMiB = Integer.getInteger(PREFIX + ".payload_mib", 16);
+    int windowMiB = Integer.getInteger(PREFIX + ".window_mib", 16);
+    int repeats = Integer.getInteger(PREFIX + ".repeats", 3);
+    int warmups = Integer.getInteger(PREFIX + ".warmups", 1);
+    long rate = Long.getLong(PREFIX + ".read_mib_per_second", 0) * MIB;
+    assertTrue(List.of(16, 128, 512).contains(payloadMiB));
+    assertTrue(List.of(16, 32).contains(windowMiB));
+    assertEquals(1, Integer.getInteger(PREFIX + ".writers", 1));
+    assertTrue(repeats > 0 && repeats <= 9 && warmups >= 0 && warmups <= 3 && rate >= 0);
+    Fixture fixture = fixture(payloadMiB);
+    url = withPostgresqlTimeouts(url);
+    var calibration = calibrate(url, user, password);
+    int requestedRtt = Integer.getInteger(PREFIX + ".requested_rtt_millis", 0);
+    double rtt = calibration.medianNanos() / 1_000_000.0;
+    assertTrue(requestedRtt == 0 ? rtt < 5 : rtt >= requestedRtt * .9 && rtt <= requestedRtt + 8);
+    Path output = Path.of(System.getProperty(PREFIX + ".output", "target/staging-pipeline"));
+    Files.createDirectories(output);
+    var environment = new Properties();
+    environment.setProperty(
+        "source_commit", System.getenv().getOrDefault("JGIT_EVIDENCE_SOURCE_SHA", "unrecorded"));
+    environment.setProperty("measurement_boundary", "git-object-insertion-through-ref-commit");
+    environment.setProperty("publication_policy", "production-configured");
+    environment.setProperty(
+        "staging_filesystem",
+        Files.getFileStore(Path.of(System.getProperty("java.io.tmpdir"))).type());
+    environment.setProperty("warmup_rounds", Integer.toString(warmups));
+    environment.setProperty("repeats", Integer.toString(repeats));
+    environment.setProperty("requested_rtt_ms", Integer.toString(requestedRtt));
+    environment.setProperty("rtt_nanos", Long.toString(calibration.medianNanos()));
+    try (var sink = Files.newOutputStream(output.resolve("git-publication.properties"))) {
+      environment.store(
+          sink, "Full single-writer Git publication; protocol and cold verification excluded");
+    }
+    var rows =
+        new StringBuilder(
+            "sample,mode,payload_bytes,window_mib,read_bytes_per_second,publication_nanos,cpu_nanos,allocated_bytes,heap_peak_upper_bytes,retained_windows,prepersisted_packs,commit,blob\n");
+    Path telemetryFile = output.resolve("git-publication-telemetry.ndjson");
+    Files.deleteIfExists(telemetryFile);
+    try (var telemetry =
+        DatabaseTelemetryCollectors.create(
+            "postgresql", true, withPostgresqlTimeouts(telemetryUrl), user, password)) {
+      for (int sample = 1 - warmups; sample <= repeats; sample++) {
+        for (int order = 0; order < Mode.values().length; order++) {
+          Mode mode = Mode.values()[Math.floorMod(sample - 1 + order, Mode.values().length)];
+          Properties properties =
+              connection(url, user, password, "org.postgresql.Driver", windowMiB);
+          properties.setProperty("jgit.storage.hibernate.metrics.enabled", "true");
+          try (var provider = new HibernateSessionFactoryProvider(properties)) {
+            var experiment = new StagedGitPublicationExperiment(mode, rate);
+            StagedGitPublicationExperiment.Publication publication;
+            try (var repository =
+                StagedGitRepositoryFactory.open(
+                    provider.getSessionFactory(), "stage-git-publication", experiment)) {
+              repository.create(true);
+              var heap =
+                  ManagementFactory.getMemoryPoolMXBeans().stream()
+                      .filter(pool -> pool.getType() == MemoryType.HEAP)
+                      .toList();
+              heap.forEach(pool -> pool.resetPeakUsage());
+              var system = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+              var threads = (ThreadMXBean) ManagementFactory.getThreadMXBean();
+              var before = telemetry.capture();
+              long cpu = system.getProcessCpuTime();
+              long allocation = threads.getTotalThreadAllocatedBytes();
+              publication = experiment.publish(repository, fixture.file());
+              cpu = system.getProcessCpuTime() - cpu;
+              allocation = threads.getTotalThreadAllocatedBytes() - allocation;
+              long heapPeak = heap.stream().mapToLong(pool -> pool.getPeakUsage().getUsed()).sum();
+              var delta = before.deltaTo(telemetry.capture());
+              assertTrue(delta.counters().getOrDefault("postgresql.wal.insert_lsn_bytes", 0L) > 0);
+              assertTrue(publication.retainedWindows() <= 2);
+              assertEquals(
+                  1, repository.getPackPublicationSelectionMetrics().prePersistedSelections());
+              if (sample > 0) {
+                append(
+                    rows,
+                    sample,
+                    mode,
+                    fixture.bytes(),
+                    windowMiB,
+                    rate,
+                    publication.elapsedNanos(),
+                    cpu,
+                    allocation,
+                    heapPeak,
+                    publication.retainedWindows(),
+                    repository.getPackPublicationSelectionMetrics().prePersistedSelections(),
+                    publication.commit().name(),
+                    publication.blob().name());
+                DatabaseTelemetryJson.appendNdjson(
+                    telemetryFile,
+                    new DatabaseTelemetryObservation(
+                        Map.of("sample", Integer.toString(sample), "mode", mode.name()), delta));
+              }
+            }
+            DfsBlockCache.reconfigure(new DfsBlockCacheConfig());
+            try (var reopened =
+                    HibernateRepository.create(
+                        provider.getSessionFactory(), "stage-git-publication");
+                var walk = new RevWalk(reopened)) {
+              assertEquals(
+                  publication.commit(), reopened.resolve(StagedGitPublicationExperiment.REF));
+              try (var tree =
+                      TreeWalk.forPath(
+                          reopened,
+                          "payload.bin",
+                          walk.parseCommit(publication.commit()).getTree());
+                  var stream = reopened.open(tree.getObjectId(0)).openStream()) {
+                assertEquals(publication.blob(), tree.getObjectId(0));
+                assertEquals(fixture.bytes(), stream.getSize());
+                var digest = MessageDigest.getInstance("SHA-256");
+                byte[] block = new byte[64 * 1024];
+                for (int count; (count = stream.read(block)) != -1; ) {
+                  digest.update(block, 0, count);
+                }
+                assertArrayEquals(fixture.digest(), digest.digest());
+              }
+            }
+            Files.writeString(output.resolve("git-publication.csv"), rows);
+          }
+        }
+      }
     }
   }
 

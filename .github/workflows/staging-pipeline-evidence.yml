@@ -31,6 +31,11 @@ on:
       - '.github/scripts/test_run_with_bounded_console.py'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/benchmark/StagedChunkPipelineEvidenceTest.java'
       - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedChunkPipeline*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedGitPublication*.java'
+      - 'jgit-storage-hibernate-benchmarks/src/test/java/io/github/carstenartur/jgit/storage/hibernate/repository/StagedGitRepositoryFactory.java'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/StagedPackExtensionStore.java'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/objects/ReadAheadHibernateObjDatabase.java'
+      - 'jgit-storage-hibernate-core/src/main/java/io/github/carstenartur/jgit/storage/hibernate/repository/HibernateRepository.java'
 
 permissions:
   contents: read
@@ -109,7 +114,7 @@ jobs:
           python3 .github/scripts/run_with_bounded_console.py \
             --log target/staging-pipeline/build.log --console-bytes 16384 -- \
             mvn -B -pl jgit-storage-hibernate-benchmarks -am install \
-            -Dtest=StagedChunkPipelineExperimentTest,StagedChunkPipelineEvidenceTest \
+            -Dtest=StagedChunkPipelineExperimentTest,StagedChunkPipelineEvidenceTest,StagedGitPublicationExperimentTest \
             -Dsurefire.failIfNoSpecifiedTests=false
       - name: Collect native transfer, reopen and rollback evidence
         env:
@@ -144,6 +149,21 @@ jobs:
             "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-pipeline/raw"
           python3 .github/scripts/staging_pipeline_evidence.py summarize \
             target/staging-pipeline/raw --expected-commit "$GITHUB_SHA"
+          case "$CELL_PAYLOAD-$CELL_WINDOW-$CELL_WRITERS-$CELL_STORAGE-$CELL_RTT" in
+            16-16-1-runner-0|128-16-1-runner-0|128-16-1-paced-50)
+              python3 .github/scripts/run_with_bounded_console.py \
+                --log target/staging-pipeline/git-publication.log --console-bytes 16384 -- \
+                mvn -B -pl jgit-storage-hibernate-benchmarks test \
+                -Dtest='StagedChunkPipelineEvidenceTest#recordsPostgresqlGitPublicationEvidence' \
+                "-DargLine=-Xmx4g -XX:ActiveProcessorCount=4 -Djava.io.tmpdir=$staging_dir" \
+                "-D$prefix.git_publication.enabled=true" "-D$prefix.payload_mib=$CELL_PAYLOAD" \
+                "-D$prefix.window_mib=$CELL_WINDOW" "-D$prefix.writers=1" \
+                "-D$prefix.requested_rtt_millis=$CELL_RTT" "-D$prefix.read_mib_per_second=$CELL_RATE" \
+                "-D$prefix.repeats=$CELL_REPEATS" "-D$prefix.warmups=$CELL_WARMUPS" \
+                "-D$prefix.staging_directory=$staging_dir" \
+                "-D$prefix.output=$GITHUB_WORKSPACE/target/staging-pipeline/raw"
+              ;;
+          esac
       - name: Check all retained staging output for connection details
         id: evidence-privacy
         if: always()
@@ -168,5 +188,6 @@ jobs:
           Successful cells verify every reopened payload and both failure directions after a flushed writer window.
           Raw timings cover staged transfer through transaction commit. Git construction, ref publication and protocol costs are excluded.
           Rollback samples use one writer and report failure detection through return separately from the JDBC rollback call.
-          The production writer remains synchronous. A successful cell does not qualify full Git publication or a non-regression claim.
+          The production writer remains synchronous. The raw-transfer summary does not qualify full Git publication or a non-regression claim.
+          Selected single-writer controls also retain git-publication.csv: streamed blob/tree/commit creation through pack/index persistence and ref commit, using the current production publication policy. Protocol costs and cold-reopen verification are outside that timing. These separate samples do not change the raw-transfer qualification or establish non-regression.
           EOF

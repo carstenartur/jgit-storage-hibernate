@@ -72,9 +72,13 @@ public final class StagedChunkPipelineExperiment {
   }
 
   private static Source pacedSource(FileChannel channel, long readBytesPerSecond) {
+    return pacedSource((position, target) -> channel.read(target, position), readBytesPerSecond);
+  }
+
+  static Source pacedSource(Source source, long readBytesPerSecond) {
     return (position, buffer) -> {
       long started = System.nanoTime();
-      int count = channel.read(buffer, position);
+      int count = source.read(position, buffer);
       if (count > 0 && readBytesPerSecond > 0) {
         long delay =
             count * 1_000_000_000L / readBytesPerSecond - (System.nanoTime() - started);

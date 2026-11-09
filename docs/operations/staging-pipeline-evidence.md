@@ -11,6 +11,33 @@ protocol negotiation or a complete Git push. They cannot establish a full Git
 publication gain. The earlier [27 native observations](../evidence/staging-pipeline-2026-11-07/README.md)
 retain the same narrower boundary.
 
+### Complete Git publication controls
+
+The workflow also records separate `git-publication.csv`, `git-publication.properties`
+and native telemetry for the smoke coordinate and the 128 MiB single-writer
+runner/0 ms and paced/50 ms controls. This interval starts before streaming the
+fixture into JGit and ends after its ref update commits. It includes blob, tree
+and commit creation, compression, PACK/INDEX staging, the current production pack
+publication policy and normal ref publication. Fixture generation, cold reopen
+verification and network protocol negotiation are outside the interval.
+
+Only the chunk-transfer strategy differs between the three modes. The synchronous
+control uses the existing production loop; all modes share the normal staging,
+publication selector, transaction, lease and cache paths. Constructor injection
+is package-private; there is no production option that enables the experiment.
+The contract tests cover both direct and pre-persisted publication, invisible
+in-flight rows, rollback and cold commit/tree/blob reopen. Native samples verify
+the actual pre-persistence selection, positive WAL movement and every payload byte.
+Their CPU/allocation and heap-peak upper estimates are retained beside elapsed time.
+
+Run `StagedChunkPipelineEvidenceTest#recordsPostgresqlGitPublicationEvidence`
+with `jgit.storage.benchmark.staging-pipeline.git_publication.enabled=true` and
+the existing single-writer coordinate properties to repeat these controls. Set
+the JVM's `java.io.tmpdir` to the desired staging filesystem. These are separate
+single-writer observations; they neither expand the raw-transfer matrix nor
+establish repeatable non-regression by themselves. A complete Git push remains
+outside this experiment.
+
 ## Native evidence profiles
 
 The [Bounded Staging Pipeline Evidence workflow](../../.github/workflows/staging-pipeline-evidence.yml)

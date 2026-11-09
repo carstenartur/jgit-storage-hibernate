@@ -77,6 +77,7 @@ final class StagedPackExtensionStore {
   private final PackPublicationSelector publicationSelector;
   private final StorageByteCounters storageByteCounters;
   private final PackPublicationSelectionCounters publicationSelectionCounters;
+  private final ChunkTransfer chunkTransfer;
   private final Map<ExtensionKey, StagedExtension> staged = new ConcurrentHashMap<>();
   private final Map<String, String> preparedTokensByPackName = new ConcurrentHashMap<>();
 
@@ -110,9 +111,24 @@ final class StagedPackExtensionStore {
     this(
         repositoryName,
         transactionContext,
+        storageByteCounters,
+        publicationSelector,
+        StagedPackExtensionStore::transferSynchronously);
+  }
+
+  StagedPackExtensionStore(
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
+      StorageByteCounters storageByteCounters,
+      PackPublicationSelector publicationSelector,
+      ChunkTransfer chunkTransfer) {
+    this(
+        repositoryName,
+        transactionContext,
         NO_PRE_PUBLICATION_HOOK,
         storageByteCounters,
-        publicationSelector);
+        publicationSelector,
+        chunkTransfer);
   }
 
   StagedPackExtensionStore(
@@ -164,12 +180,29 @@ final class StagedPackExtensionStore {
       PrePublicationHook prePublicationHook,
       StorageByteCounters storageByteCounters,
       PackPublicationSelector publicationSelector) {
+    this(
+        repositoryName,
+        transactionContext,
+        prePublicationHook,
+        storageByteCounters,
+        publicationSelector,
+        StagedPackExtensionStore::transferSynchronously);
+  }
+
+  private StagedPackExtensionStore(
+      String repositoryName,
+      HibernateTransactionContext transactionContext,
+      PrePublicationHook prePublicationHook,
+      StorageByteCounters storageByteCounters,
+      PackPublicationSelector publicationSelector,
+      ChunkTransfer chunkTransfer) {
     this.repositoryName = Objects.requireNonNull(repositoryName, "repositoryName");
     this.transactionContext = Objects.requireNonNull(transactionContext, "transactionContext");
     this.prePublicationHook = Objects.requireNonNull(prePublicationHook, "prePublicationHook");
     this.publicationSelector = Objects.requireNonNull(publicationSelector, "publicationSelector");
     this.storageByteCounters = Objects.requireNonNull(storageByteCounters, "storageByteCounters");
     this.publicationSelectionCounters = PackPublicationSelectionCounters.from(storageByteCounters);
+    this.chunkTransfer = Objects.requireNonNull(chunkTransfer, "chunkTransfer");
   }
 
   DfsOutputStream open(DfsPackDescription description, PackExt extension) throws IOException {
@@ -760,45 +793,56 @@ final class StagedPackExtensionStore {
     }
   }
 
-  private void persistChunks(
-      Session session, Long packId, StagedExtension stagedExtension) throws IOException {
-    long fileSize = stagedExtension.fileSize();
+  private void persistChunks(Session session, Long packId, StagedExtension stagedExtension)
+      throws IOException {
+    try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);
+        StagedPayloadReader reader = stagedExtension.openReader()) {
+      chunkTransfer.transfer(reader, chunkWriter, packId, stagedExtension.fileSize());
+    }
+  }
+
+  @FunctionalInterface
+  interface ChunkTransfer {
+    void transfer(
+        StagedPayloadReader reader, HibernatePackChunkWriter writer, Long packId, long fileSize)
+        throws IOException;
+  }
+
+  static void transferSynchronously(
+      StagedPayloadReader reader, HibernatePackChunkWriter chunkWriter, Long packId, long fileSize)
+      throws IOException {
     long position = 0;
     int chunkIndex = 0;
     List<GitPackChunkEntity> pendingChunks = new ArrayList<>(CHUNK_BATCH_SIZE);
-    try (HibernatePackChunkWriter chunkWriter = HibernatePackChunkWriter.open(session);
-        StagedPayloadReader reader = stagedExtension.openReader()) {
-      while (position < fileSize) {
-        int chunkLength =
-            (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
-        byte[] chunkData = new byte[chunkLength];
-        ByteBuffer destination = ByteBuffer.wrap(chunkData);
-        long chunkPosition = position;
-        while (destination.hasRemaining()) {
-          int count = reader.read(chunkPosition, destination);
-          if (count <= 0) {
-            throw new IOException("Staged pack payload ended before declared size " + fileSize);
-          }
-          chunkPosition += count;
+    while (position < fileSize) {
+      int chunkLength = (int) Math.min(HibernateObjDatabase.PACK_CHUNK_SIZE, fileSize - position);
+      byte[] chunkData = new byte[chunkLength];
+      ByteBuffer destination = ByteBuffer.wrap(chunkData);
+      long chunkPosition = position;
+      while (destination.hasRemaining()) {
+        int count = reader.read(chunkPosition, destination);
+        if (count <= 0) {
+          throw new IOException("Staged pack payload ended before declared size " + fileSize);
         }
-
-        GitPackChunkEntity chunk = new GitPackChunkEntity();
-        chunk.setPackId(packId);
-        chunk.setChunkIndex(chunkIndex);
-        chunk.setChunkSize(chunkLength);
-        chunk.setData(chunkData);
-        pendingChunks.add(chunk);
-
-        position += chunkLength;
-        chunkIndex++;
-        if (pendingChunks.size() == CHUNK_BATCH_SIZE) {
-          chunkWriter.insert(pendingChunks);
-          pendingChunks.clear();
-        }
+        chunkPosition += count;
       }
-      if (!pendingChunks.isEmpty()) {
+
+      GitPackChunkEntity chunk = new GitPackChunkEntity();
+      chunk.setPackId(packId);
+      chunk.setChunkIndex(chunkIndex);
+      chunk.setChunkSize(chunkLength);
+      chunk.setData(chunkData);
+      pendingChunks.add(chunk);
+
+      position += chunkLength;
+      chunkIndex++;
+      if (pendingChunks.size() == CHUNK_BATCH_SIZE) {
         chunkWriter.insert(pendingChunks);
+        pendingChunks.clear();
       }
+    }
+    if (!pendingChunks.isEmpty()) {
+      chunkWriter.insert(pendingChunks);
     }
   }
 
