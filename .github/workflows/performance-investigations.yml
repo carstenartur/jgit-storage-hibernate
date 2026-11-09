@@ -791,9 +791,6 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/codex/publication-reftable-paired-20261108' && !github.event.deleted)
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    env:
-      REFTABLE_BASELINE_SOURCE: ${{ runner.temp }}/reftable-baseline-source
-      REFTABLE_CANDIDATE_SOURCE: ${{ runner.temp }}/reftable-candidate-source
     steps:
       - name: Checkout immutable comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -814,6 +811,9 @@ jobs:
 
       - name: Build both immutable historical core implementations
         shell: bash
+        env:
+          REFTABLE_BASELINE_SOURCE: ${{ runner.temp }}/reftable-baseline-source
+          REFTABLE_CANDIDATE_SOURCE: ${{ runner.temp }}/reftable-candidate-source
         run: |
           git fetch --no-tags origin \
             96f1b08d5d0ca32f98508828c78074f12da688fc \
@@ -826,6 +826,9 @@ jobs:
             -f "$REFTABLE_CANDIDATE_SOURCE/pom.xml" -pl jgit-storage-hibernate-core -am package -DskipTests
 
       - name: Audit source and every compiled core entry before measurement
+        env:
+          REFTABLE_BASELINE_SOURCE: ${{ runner.temp }}/reftable-baseline-source
+          REFTABLE_CANDIDATE_SOURCE: ${{ runner.temp }}/reftable-candidate-source
         run: |
           python3 .github/scripts/prepare-publication-reftable-comparison.py \
             --baseline-source "$REFTABLE_BASELINE_SOURCE" \

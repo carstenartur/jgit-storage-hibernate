@@ -61,6 +61,13 @@ def step_enabled(name, step, event, **kwargs):
 
 
 class NativeFollowupTriggerTest(unittest.TestCase):
+    def test_runner_context_is_not_used_in_job_level_environment(self):
+        # GitHub permits runner in step.env, but rejects it in jobs.<id>.env
+        # before creating any jobs. Keep this distinct from event selection.
+        for block in re.findall(r"(?m)^    env:\n((?: {6}[^\n]*\n|[ \t]*\n)*)",
+                                workflow("performance-investigations.yml")):
+            self.assertNotRegex(block, r"\$\{\{\s*runner\.")
+
     def test_controlled_reftable_comparison_selects_only_the_eight_fork_job(self):
         name = "performance-investigations.yml"
         ref = "refs/heads/codex/publication-reftable-paired-20261108"

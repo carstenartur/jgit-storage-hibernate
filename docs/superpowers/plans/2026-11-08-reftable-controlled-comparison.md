@@ -79,3 +79,16 @@ exact event-selection tests; retain a separate evidence directory after running.
   compilation/audits must pass before measurement.
 - [ ] Attempt the fixed study once; retain every outcome, source snapshot and
   original artifact/digest. Replay before reporting a merge recommendation.
+
+### Configuration-only launch failure
+
+The first published source `85865ead7c9c4c3fc4671866911a7745c58abf27`
+(tree `b3bbe8fabcf8b360bd366a50afd924a1188b3f15`) produced failed run
+[`42539933868`](https://github.com/carstenartur/jgit-storage-hibernate/actions/runs/42539933868),
+attempt 1, with **zero jobs and zero measurement forks**. The job-level environment
+used `runner.temp`, which GitHub excludes from `jobs.<job_id>.env` but permits in
+`jobs.<job_id>.steps.env`; see the official
+[context availability table](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability).
+A fail-first workflow check now rejects that unsupported placement. The two
+temporary-directory expressions move to the build/audit steps without changing
+source references, measurement arguments, ordering or the eight-fork budget.
