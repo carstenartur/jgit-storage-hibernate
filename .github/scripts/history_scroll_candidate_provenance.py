@@ -92,6 +92,8 @@ def record_runtime(args, result):
         require(expected[name] is None or expected[name] in methods, f"Native method not executed: {name}")
         properties = {p.attrib["name"]: p.attrib["value"] for p in suite.findall("properties/property")}
         require(properties.get("java.specification.version") == "21", "Native JVM must be Java 21")
+        large_page = properties.get("ranked.scroll.experimental-large-page") == "true"
+        require(large_page == args.expect_large_page, f"Large page opt-in differs in {name}")
         classpath = properties["surefire.test.class.path"]
         orm = [Path(entry).name for entry in classpath.split(os.pathsep)
                if Path(entry).name.startswith("hibernate-core-")]
@@ -102,6 +104,7 @@ def record_runtime(args, result):
     require(suites.keys() == expected.keys(), "Missing native Surefire suite")
     result["jdk"] = "21"
     result["ormVersion"] = "7.4.14.Final"
+    result["experimentalLargePage"] = args.expect_large_page
     resolved = search_paths((args.artifacts / "runtime-classpath.txt").read_text(), args.version)
     require(actual_paths == resolved, "Resolved classpath differs from executed Surefire classpath")
     coordinates = set(re.findall(r"org\.hibernate\.search:([^:\s]+):jar:([^:\s]+):",
@@ -145,6 +148,7 @@ def main():
     runtime.add_argument("--variant", choices=VERSIONS, required=True)
     runtime.add_argument("--backend", choices=("postgresql", "sqlserver"), required=True)
     runtime.add_argument("--source-manifest", type=Path)
+    runtime.add_argument("--expect-large-page", action="store_true")
     for command in (source, runtime):
         command.add_argument("--commit", required=True)
         command.add_argument("--version", required=True)

@@ -25,18 +25,18 @@ on:
   push:
     branches:
       - 'benchmark/history-scroll-full-*'
-      - 'evidence/history-scroll-search-candidate-20261109'
+      - 'evidence/history-scroll-large-page-20261109'
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/evidence/history-scroll-search-candidate-20261109' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/evidence/history-scroll-large-page-20261109' }}
 
 jobs:
   plan:
-    if: github.event_name != 'push' || github.ref != 'refs/heads/evidence/history-scroll-search-candidate-20261109'
+    if: github.event_name != 'push' || github.ref != 'refs/heads/evidence/history-scroll-large-page-20261109'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -133,8 +133,8 @@ jobs:
           if-no-files-found: error
 
   search-candidate:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/evidence/history-scroll-search-candidate-20261109' && !github.event.deleted
-    name: ${{ matrix.backend }} / Search base and source candidate / ${{ matrix.documents }} documents
+    if: github.event_name == 'push' && github.ref == 'refs/heads/evidence/history-scroll-large-page-20261109' && !github.event.deleted
+    name: ${{ matrix.backend }} / Search release and large-page candidate / ${{ matrix.documents }} documents
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -145,7 +145,7 @@ jobs:
     env:
       BENCHMARK_BACKEND: ${{ matrix.backend }}
       BENCHMARK_DOCUMENTS: ${{ matrix.documents }}
-      SEARCH_CANDIDATE_COMMIT: 2e6751194ff514e4d3e6fc31b672acc68ae96997
+      SEARCH_CANDIDATE_COMMIT: 9f8ed03ffde4d8881331b3c45051761b171a57b2
       SEARCH_CANDIDATE_VERSION: 8.4.2-SNAPSHOT
 
     steps:
@@ -178,7 +178,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: carstenartur/hibernate-search
-          ref: 2e6751194ff514e4d3e6fc31b672acc68ae96997
+          ref: 9f8ed03ffde4d8881331b3c45051761b171a57b2
           path: target/search-candidate-source
           persist-credentials: false
 
@@ -219,7 +219,7 @@ jobs:
             cat "$evidence/candidate-source-maven-version.txt"
             grep -Eq 'Apache Maven 3\.9\.16([[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
             grep -Eq 'Java version: 25([.,[:space:]]|$)' "$evidence/candidate-source-maven-version.txt"
-            # Packaging only: this exact source commit already passed its full upstream CI.
+            # Build the pinned experimental source and verify the executed consumer suites below.
             ./mvnw -B -ntp -Pci-build -pl mapper/orm,backend/lucene -am clean install \
               -DskipTests -Dmaven.javadoc.skip=true -Dmaven.repo.local="$candidate_repo"
           ) 2>&1 | tee "$evidence/candidate-source-build.log"
@@ -273,11 +273,13 @@ jobs:
           overall_status=0
           for variant in base candidate; do
             variant_dir="$evidence/$variant"
+            scroll_args=""
             if [[ "$variant" == base ]]; then
               version=8.4.1.Final
               maven_repo="$RUNNER_TEMP/history-scroll-base-m2"
             else
               version="$SEARCH_CANDIDATE_VERSION"
+              scroll_args='-Dranked.scroll.experimental-large-page=true'
               maven_repo="$RUNNER_TEMP/history-scroll-candidate-m2"
             fi
             # A root reactor clean would delete the evidence and the source checkout.
@@ -304,7 +306,7 @@ jobs:
                 -Dtest="CommitSearchScrollingDatabaseIntegrationTest#$native_method,CommitSearchScrollingH2Test,HistoryScrollExportBenchmarkIT" \
                 -Dsurefire.failIfNoSpecifiedTests=false \
                 -Djacoco.skip=true \
-                -DargLine="-Xms1g -Xmx2g -Dorg.jboss.logging.provider=jdk -Djava.util.logging.config.file=$GITHUB_WORKSPACE/reproducers/hibernate-search-ranked-scroll/logging.properties -Xlog:class+load=info:file=$variant_dir/class-load-%p.log:uptime,level,tags" \
+                -DargLine="-Xms1g -Xmx2g $scroll_args -Dorg.jboss.logging.provider=jdk -Djava.util.logging.config.file=$GITHUB_WORKSPACE/reproducers/hibernate-search-ranked-scroll/logging.properties -Xlog:class+load=info:file=$variant_dir/class-load-%p.log:uptime,level,tags" \
                 -Dhibernate-search.version="$version" -Dmaven.repo.local="$maven_repo" \
                 -Dbenchmark.scroll.backend="$BENCHMARK_BACKEND" \
                 -Dbenchmark.scroll.documents="$BENCHMARK_DOCUMENTS" -Dbenchmark.scroll.chunkSizes=100 \
@@ -331,7 +333,7 @@ jobs:
               --artifacts "$variant_dir" --commit "$GITHUB_SHA" --version "$version" \
               --variant "$variant" --backend "$BENCHMARK_BACKEND")
             if [[ "$variant" == candidate ]]; then
-              provenance_args+=(--source-manifest "$evidence/candidate-source.json")
+              provenance_args+=(--source-manifest "$evidence/candidate-source.json" --expect-large-page)
             fi
             if python3 .github/scripts/history_scroll_candidate_provenance.py "${provenance_args[@]}" \
               > "$variant_dir/provenance-check.log" 2>&1; then
@@ -392,6 +394,6 @@ jobs:
         timeout-minutes: 5
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: history-scroll-source-candidate-${{ matrix.backend }}-${{ matrix.documents }}-${{ github.sha }}
+          name: history-scroll-large-page-${{ matrix.backend }}-${{ matrix.documents }}-${{ github.sha }}
           path: target/history-scroll/
           if-no-files-found: error

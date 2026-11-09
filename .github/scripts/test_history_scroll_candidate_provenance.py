@@ -88,13 +88,13 @@ class CandidateProvenanceTest(unittest.TestCase):
             ET.ElementTree(suite).write(reports / f"TEST-{name}.xml", encoding="utf-8")
         return output
 
-    def record_runtime(self, output, version="8.4.2-SNAPSHOT"):
+    def record_runtime(self, output, version="8.4.2-SNAPSHOT", extra=()):
         args = ["runtime", "--application-root", self.application, "--artifacts", output,
                 "--commit", self.app_commit, "--version", version,
                 "--variant", output.name, "--backend", "postgresql"]
         if output.name == "candidate":
             args += ["--source-manifest", self.source_record]
-        return self.run_script(*args)
+        return self.run_script(*args, *extra)
 
     def assert_recorded_failure(self, process, output):
         self.assertNotEqual(0, process.returncode, process.stdout)
@@ -118,6 +118,22 @@ class CandidateProvenanceTest(unittest.TestCase):
         backend = "hibernate-search-backend-lucene-8.4.2-SNAPSHOT.jar"
         self.assertEqual(hashlib.sha256(b"hibernate-search-backend-lucene:8.4.2-SNAPSHOT").hexdigest(),
                          recorded["searchJars"][backend]["sha256"])
+
+    def test_native_reports_must_prove_the_large_page_opt_in(self):
+        self.assertEqual(0, self.record_source().returncode)
+        output = self.runtime_fixture()
+        opt_in = ("--expect-large-page",)
+        missing = self.record_runtime(output, extra=opt_in)
+        self.assert_recorded_failure(missing, output / "provenance.json")
+        self.assertIn("Large page opt-in", missing.stderr)
+        for report in (output / "surefire-reports").glob("TEST-*.xml"):
+            tree = ET.parse(report)
+            ET.SubElement(tree.getroot().find("properties"), "property",
+                          name="ranked.scroll.experimental-large-page", value="true")
+            tree.write(report)
+        proven = self.record_runtime(output, extra=opt_in)
+        self.assertEqual(0, proven.returncode, proven.stderr)
+        self.assertTrue(json.loads((output / "provenance.json").read_text())["experimentalLargePage"])
 
     def test_release_needs_no_candidate_source_manifest(self):
         output = self.runtime_fixture("8.4.1.Final")
