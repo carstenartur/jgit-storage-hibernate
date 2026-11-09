@@ -104,6 +104,27 @@ comparison is needed to interpret the insertion results. Production retains
 the existing one-MiB alignment: the candidate also needs compaction and read
 coverage before promotion.
 
+### Independent writers on JDK 25
+
+Select `publication-jdk25-nonregression` in the Performance Investigations
+workflow to run the separate `independent-16w-0ms-jdk25` coordinate. It uses
+Temurin 25.0.5+8 with G1 and the released JGit selected by the project's POM.
+[Region pinning for G1](https://openjdk.org/jeps/423) lets G1 collect while JNI
+critical regions are active. The original JDK 21 cell remains an incomplete
+study with its own source, protocol and artifacts.
+
+The new study fixes 16 fresh-JVM pairs on one runner, alternating which policy
+runs first. It retains the 256 MiB initial and 1 GiB maximum heap, 16 independent
+writers, 256 KiB + 257-byte payloads, the stateful writer, and disk-backed
+PostgreSQL 17.10 with Hikari and no added RTT. Each fork has two three-second
+warm-ups and three five-second measurement iterations.
+
+The validator requires all 32 forks and uses the mean paired log-throughput
+ratio. Non-regression requires the one-sided 95% Student-t lower bound to exceed
+−5%. The workflow retains unfavorable and incomplete runs. The result applies
+to this runtime and workload, with latency, heap and path selection reported
+as secondary observations.
+
 Any tuning must preserve these invariants:
 
 - no successful acknowledgement before the authoritative database commit;

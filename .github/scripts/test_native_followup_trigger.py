@@ -61,6 +61,24 @@ def step_enabled(name, step, event, **kwargs):
 
 
 class NativeFollowupTriggerTest(unittest.TestCase):
+    def test_jdk25_publication_replication_selects_only_the_independent_cell(self):
+        name = "performance-investigations.yml"
+        ref = "refs/heads/evidence/publication-jdk25-20261109"
+        job = "publication-nonregression"
+        body = section(workflow(name), f"  {job}:\n", r"^  [a-zA-Z0-9_-]+:\s*$")
+        matrix = re.search(r"(?m)^        cell: (\$\{\{.*\}\})$", body)[1]
+        for event in ("push", "workflow_dispatch"):
+            with self.subTest(event=event):
+                kwargs = {"ref": ref, "profile": "publication-jdk25-nonregression"}
+                self.assertTrue(job_enabled(name, job, event, **kwargs))
+                self.assertEqual(evaluate(matrix, event, **kwargs), ["independent-16w-0ms-jdk25"])
+                for other in ("investigate", "repository-aging-smoke", "repository-aging-full-shard",
+                              "stateless-threshold", "publication-gc-diagnostic", "publication-reftable-comparison"):
+                    self.assertFalse(job_enabled(name, other, event, **kwargs), other)
+        self.assertFalse(job_enabled(name, job, "push", ref=ref, deleted=True))
+        self.assertFalse(job_enabled(name, job, "push", ref=ref + "-extra"))
+        self.assertNotIn("independent-16w-0ms-jdk25", evaluate(matrix, "push"))
+
     def test_runner_context_is_not_used_in_job_level_environment(self):
         # GitHub permits runner in step.env, but rejects it in jobs.<id>.env
         # before creating any jobs. Keep this distinct from event selection.
