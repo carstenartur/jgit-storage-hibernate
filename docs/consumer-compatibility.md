@@ -31,15 +31,20 @@ dependency management and tests.
 
 | Consumer | Immutable revision | Integration provenance |
 |---|---|---|
-| audio-analyzer | [e96ee4d](https://github.com/carstenartur/audio-analyzer/commit/e96ee4d832c912eec52fc8e9e5486efe106e3abd) | Merged upgrade [#386](https://github.com/carstenartur/audio-analyzer/pull/386) |
-| Taxonomy | [67fc112](https://github.com/carstenartur/Taxonomy/commit/67fc112217bf0f2decdcb36436f766ef9e66c27e) | Contract-verified head of [#1440](https://github.com/carstenartur/Taxonomy/pull/1440) |
+| audio-analyzer | [e4ee478](https://github.com/carstenartur/audio-analyzer/commit/e4ee478036b2b808a01623330c092a2055c5dc82) | Merged upgrade [#386](https://github.com/carstenartur/audio-analyzer/pull/386) and idempotent append correction [#387](https://github.com/carstenartur/audio-analyzer/pull/387) |
+| Taxonomy | [47d9466](https://github.com/carstenartur/Taxonomy/commit/47d94664f87ce3d0d5a932d96a0902d7139f1c9a) | Merged upgrade [#1440](https://github.com/carstenartur/Taxonomy/pull/1440) |
 | sandbox | [9f3a70a](https://github.com/carstenartur/sandbox/commit/9f3a70af0fed5b35f38f576d97a6607d54fc5249) | Merged upgrade [#1849](https://github.com/carstenartur/sandbox/pull/1849) |
 
-At this pin update, Taxonomy's complete project CI and merge were still pending.
-The linked PR records its current integration status. A pinned PR head remains
-an immutable compatibility input independently of its downstream merge status.
-Sandbox's merged revision has the exact fully verified PR tree
+All three pins identify merged consumer revisions with verified consumer-owned
+0.12.1 baselines. The linked PRs record their integration and qualification.
+Taxonomy's merged revision preserves the fully verified PR tree
+`b15b085c563b57fd70579ea974a0e413cd4d6924`; Sandbox's merged revision preserves
 `44a70819d3e878dc743782e7538c06aecb332cfc`.
+
+The Audio revision includes a deterministic H2 regression for an identical
+concurrent append that commits between the duplicate lookup and aggregate read.
+Its existing recovery now recognizes that committed operation as an idempotent
+retry while retaining the checks for genuine revision, content and outbox conflicts.
 
 The original qualification of release 0.12.1 against the consumers' 0.12.0
 baselines is retained in the

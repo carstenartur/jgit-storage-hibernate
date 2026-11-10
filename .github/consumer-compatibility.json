@@ -6,7 +6,7 @@
       "id": "audio-analyzer",
       "displayName": "audio-analyzer",
       "repository": "carstenartur/audio-analyzer",
-      "ref": "e96ee4d832c912eec52fc8e9e5486efe106e3abd",
+      "ref": "e4ee478036b2b808a01623330c092a2055c5dc82",
       "defaultBranch": "master",
       "contractScript": ".github/jgit-storage-hibernate-contract.sh",
       "expectedModules": [
@@ -18,7 +18,7 @@
       "id": "taxonomy",
       "displayName": "Taxonomy",
       "repository": "carstenartur/Taxonomy",
-      "ref": "67fc112217bf0f2decdcb36436f766ef9e66c27e",
+      "ref": "47d94664f87ce3d0d5a932d96a0902d7139f1c9a",
       "defaultBranch": "main",
       "contractScript": ".github/jgit-storage-hibernate-contract.sh",
       "expectedModules": [
