@@ -17,7 +17,6 @@
   </description>
 
   <properties>
-    <japicmp.skip>true</japicmp.skip>
     <jacoco.minimum.line>0.00</jacoco.minimum.line>
     <jacoco.minimum.branch>0.00</jacoco.minimum.branch>
   </properties>

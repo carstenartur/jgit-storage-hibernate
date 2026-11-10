@@ -12,7 +12,8 @@ The CI workflow `.github/workflows/jgit-compatibility.yml` verifies the full Mav
 | `7.6.0.202603022253-r` | Intermediate compatibility line. |
 | `7.7.0.202606012155-r` | Intermediate compatibility line. |
 | `7.7.1.202607240634-r` | Tested 7.7 maintenance release. |
-| `7.8.0.202609011348-r` | Current primary version used by the parent POM. |
+| `7.8.0.202609011348-r` | Tested 7.8 release used by existing consumers. |
+| `7.8.1.202611041320-r` | Current primary version used by the parent POM. |
 
 Each version is tested on Java 21. Java 21 is the project baseline for the storage, search and optional Java/JDT analysis modules.
 
@@ -40,15 +41,14 @@ mvn -B verify
 
 This is not a replacement for storage-specific integration tests. It is a fast early-warning test for dependency updates that would otherwise show up later as runtime linkage problems or subtle JGit API incompatibilities.
 
-## Optional linkage checker
+## Packaged linkage and released API checks
 
-For release candidates or suspicious dependency updates, run:
-
-```bash
-mvn -B -Pdependency-linkage -DskipTests verify
-```
-
-The linkage profile uses the Linkage Checker Enforcer Rule with `reportOnlyReachable=true`, so it focuses on reachable runtime linkage errors instead of every optional classpath edge.
+The normal `mvn -B verify` build runs the packaged-JAR linkage verification for
+Core, Search, Java Analysis and Architecture. It also compares the covered
+public library APIs with release 0.12.0 using `japicmp`. The old optional
+`dependency-linkage` profile is no longer used. See
+[API compatibility and quality gates](operations/api-compatibility-and-quality-gates.md)
+for the exact modules, exclusions and failure conditions.
 
 ## Maintainer checklist for dependency PRs
 
@@ -57,5 +57,5 @@ Before merging a dependency update:
 1. Check that the normal Maven workflow is green.
 2. Check that the JGit compatibility matrix is green.
 3. For JGit updates, confirm that the supported matrix in this document and the workflow still matches the support policy.
-4. For Hibernate, Hibernate Search, Lucene or JDT Core updates, consider running the optional linkage profile.
+4. For Hibernate, Hibernate Search, Lucene or JDT Core updates, inspect the packaged-JAR linkage and real-consumer contract results, including their resolved dependency trees.
 5. Do not merge JGit major-version jumps without an explicit compatibility review.

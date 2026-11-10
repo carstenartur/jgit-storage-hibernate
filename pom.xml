@@ -100,7 +100,7 @@
     <jacoco-maven-plugin.version>0.8.16</jacoco-maven-plugin.version>
     <japicmp-maven-plugin.version>0.27.0</japicmp-maven-plugin.version>
 
-    <api.baseline.version>0.1.13</api.baseline.version>
+    <api.baseline.version>0.12.0</api.baseline.version>
     <japicmp.skip>false</japicmp.skip>
     <jacoco.minimum.line>0.00</jacoco.minimum.line>
     <jacoco.minimum.branch>0.00</jacoco.minimum.branch>

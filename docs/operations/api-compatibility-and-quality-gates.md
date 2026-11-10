@@ -2,7 +2,9 @@
 
 ## Supported compatibility surface
 
-The `0.1.x` line is pre-1.0, but released consumer APIs are not changed silently. Every runtime artifact is compared with the documented released baseline (`0.1.13` while developing `0.1.14`).
+Released consumer APIs are not changed silently. The current API baseline is **0.12.0**, the preceding stable release for the 0.12.1 maintenance line. The normal Maven `verify` lifecycle compares the supported public API of Core, Security, Smart HTTP, Search, Spring Boot Autoconfigure, Testcontainers, Java Analysis and Architecture against that release.
+
+The parent/BOM and dependency-only Spring Boot Starter have no library API to compare. The executable Server and benchmark harness are outside this binary API gate; their packaging and application contracts remain separately verified. The gate retains its internal/incubating package exclusions below. Runtime tests and the consumer-owned contracts remain necessary because signature comparison does not detect behavioral changes or prove every mediated dependency graph.
 
 The supported compatibility surface includes public classes, constructors, methods and fields unless one of the following applies:
 
@@ -26,7 +28,7 @@ Exclusion is not permission to make arbitrary changes. Internal and incubating p
 
 ## Binary and source compatibility
 
-`japicmp` compares each packaged runtime artifact with the same artifact from the released baseline in the anonymous public Maven repository.
+`japicmp` compares each covered packaged library artifact with the same artifact from the released baseline in the anonymous public Maven repository.
 
 The build fails on:
 
