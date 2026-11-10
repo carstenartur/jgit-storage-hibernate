@@ -15,7 +15,7 @@
 
 JGit remains the authoritative engine for Git objects, commits, trees, refs, revision walking and repository operations. Core adds Hibernate-backed storage and transaction-safe pack/ref publication. Search adds persistent structured history queries and Lucene full-text search. Java Analysis and Architecture provide semantic in-memory APIs; their module-owned database persistence is still incubating.
 
-The documented release line is **0.12.0**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
+The documented release line is **0.12.1**. It publishes optional principal-bound Security and secured JGit Smart HTTP capabilities while keeping users, credentials, ACL persistence and Servlet/JGit HTTP dependencies outside Core.
 
 ## Choose your starting point
 
@@ -180,7 +180,7 @@ A released multi-architecture image is available for users who need a runnable P
 Smart HTTP endpoint rather than a Java library integration:
 
 ```text
-ghcr.io/carstenartur/jgit-storage-hibernate-server:0.12.0
+ghcr.io/carstenartur/jgit-storage-hibernate-server:0.12.1
 ```
 
 The image does not contain its own PostgreSQL server or the host-side Compose configuration. The
@@ -216,7 +216,7 @@ quick start, compatibility matrix, source-build override, digest pinning and pro
 
 ## Five-minute production setup
 
-The documented release line is **0.12.0**. Java 21 is required. This walkthrough uses PostgreSQL. See the [database support matrix](docs/consuming.md#supported-databases-and-operating-model) for all supported backends, tested release versions and the Spring Boot and server-image boundaries.
+The documented release line is **0.12.1**. Java 21 is required. This walkthrough uses PostgreSQL. See the [database support matrix](docs/consuming.md#supported-databases-and-operating-model) for all supported backends, tested release versions and the Spring Boot and server-image boundaries.
 
 ### 1. Configure the anonymous release repository
 
@@ -239,7 +239,7 @@ No GitHub token or Maven Central account is required.
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-core</artifactId>
-  <version>0.12.0</version>
+  <version>0.12.1</version>
 </dependency>
 ```
 
