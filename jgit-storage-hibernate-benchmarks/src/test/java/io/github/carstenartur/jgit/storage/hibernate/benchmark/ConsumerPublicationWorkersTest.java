@@ -61,6 +61,7 @@ class ConsumerPublicationWorkersTest {
   private static void checkJoinedFailure(boolean interruptOwner) throws Exception {
     var workers = new ConsumerPublicationWorkers(4);
     var entered = new CountDownLatch(4);
+    var cleanupReady = new CountDownLatch(interruptOwner ? 4 : 3);
     var cancellationObserved = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var finished = new CountDownLatch(4);
@@ -74,10 +75,12 @@ class ConsumerPublicationWorkersTest {
           entered.countDown();
           assertTrue(entered.await(5, TimeUnit.SECONDS));
           if (!interruptOwner && value == 0) {
+            assertTrue(cleanupReady.await(5, TimeUnit.SECONDS), "cleanup workers must be ready");
             throw new IOException("publication failed");
           }
           // Model a JDBC operation that observes cancellation but finishes its cleanup later.
           boolean interrupted = false;
+          cleanupReady.countDown();
           while (release.getCount() != 0) {
             try {
               release.await();
@@ -104,6 +107,7 @@ class ConsumerPublicationWorkersTest {
     });
     try {
       assertTrue(entered.await(5, TimeUnit.SECONDS), "the real worker tasks must begin");
+      assertTrue(cleanupReady.await(5, TimeUnit.SECONDS), "cleanup workers must be ready");
       if (interruptOwner) owner.interrupt();
       assertTrue(cancellationObserved.await(5, TimeUnit.SECONDS), "cancellation must reach workers");
       assertTrue(owner.isAlive(), "owner must join before repository resources can be closed");

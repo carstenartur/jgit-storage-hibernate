@@ -24,12 +24,26 @@ A baseline run executes the same consumer scripts without candidate substitution
 
 The exact commits live in `.github/consumer-compatibility.json` and are intentionally immutable during one library revision.
 
-The 0.12.1 qualification uses the 10 November 2026 consumer heads: audio-analyzer
-`14d01d71be83ed423fbc08281dc90b8a04110114`, Taxonomy
-`0bab7dce61a63a2fb2e0171187a86cfb0399a464`, and sandbox
-`e6ffe16fa879b42fb99bc18d201b994c3d4dc7f2`. All three select the released
-0.12.0 library as their baseline. Candidate tests substitute only the library
-version, preserving each application's own dependency management and tests.
+The 0.12.2 development line uses consumer-owned baselines verified on 10 November
+2026. All three pinned revisions select the released 0.12.1 library. Candidate
+tests substitute only the library version, preserving each application's own
+dependency management and tests.
+
+| Consumer | Immutable revision | Integration provenance |
+|---|---|---|
+| audio-analyzer | [e96ee4d](https://github.com/carstenartur/audio-analyzer/commit/e96ee4d832c912eec52fc8e9e5486efe106e3abd) | Merged upgrade [#386](https://github.com/carstenartur/audio-analyzer/pull/386) |
+| Taxonomy | [67fc112](https://github.com/carstenartur/Taxonomy/commit/67fc112217bf0f2decdcb36436f766ef9e66c27e) | Contract-verified head of [#1440](https://github.com/carstenartur/Taxonomy/pull/1440) |
+| sandbox | [9f3a70a](https://github.com/carstenartur/sandbox/commit/9f3a70af0fed5b35f38f576d97a6607d54fc5249) | Merged upgrade [#1849](https://github.com/carstenartur/sandbox/pull/1849) |
+
+At this pin update, Taxonomy's complete project CI and merge were still pending.
+The linked PR records its current integration status. A pinned PR head remains
+an immutable compatibility input independently of its downstream merge status.
+Sandbox's merged revision has the exact fully verified PR tree
+`44a70819d3e878dc743782e7538c06aecb332cfc`.
+
+The original qualification of release 0.12.1 against the consumers' 0.12.0
+baselines is retained in the
+[tagged compatibility record](https://github.com/carstenartur/jgit-storage-hibernate/blob/v0.12.1/docs/consumer-compatibility.md).
 
 | Consumer | Library modules expected by the central gate | Consumer-owned authority |
 |---|---|---|
@@ -37,9 +51,9 @@ version, preserving each application's own dependency management and tests.
 | Taxonomy | Core + Smart HTTP | Taxonomy's catalogue-driven schema/migration/Hibernate Search/PostgreSQL contract |
 | sandbox | Core + Search + Java Analysis | Core-only OSGi bridge, released server REST/search/analysis, legacy adoption and executable-JAR contracts |
 
-Taxonomy and Sandbox run their consumer-owned contracts on Java 25; audio-analyzer uses Java 21. The pinned audio-analyzer and Taxonomy POMs select the published 0.12.0 runtime dependencies. Their baseline runs keep those version selectors, while candidate runs substitute the isolated library build into the same pinned checkouts.
+Taxonomy and Sandbox run their consumer-owned contracts on Java 25; audio-analyzer uses Java 21. All three pinned consumers select the published 0.12.1 library modules. Their baseline runs keep those version selectors and their consumer-owned dependency management, while candidate runs substitute the isolated library build into the same pinned checkouts.
 
-Both central Sandbox matrix legs provide Elasticsearch 8.19.12, matching the consumer's own CI, so its real Elasticsearch test runs alongside the Surefire and Failsafe contracts. The Sandbox baseline also resolves the published 0.12.0 dependencies; its candidate substitutes the isolated library build into the same pinned checkout.
+Both central Sandbox matrix legs provide Elasticsearch 8.19.12, matching the consumer's own CI, so its real Elasticsearch test runs alongside the Surefire and Failsafe contracts.
 
 Taxonomy's Hibernate Search projection belongs to the application and does not select the library's Search module. Its declared Smart HTTP dependency is part of the module compatibility check; the storage contract does not establish coverage of every Smart HTTP behavior or other optional library capability.
 

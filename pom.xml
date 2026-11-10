@@ -6,7 +6,7 @@
 
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-parent</artifactId>
-  <version>0.12.1</version>
+  <version>0.12.2-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>jgit-storage-hibernate Parent</name>
@@ -59,7 +59,7 @@
     <maven.compiler.release>${java.version}</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <project.build.outputTimestamp>2026-11-10T10:50:30Z</project.build.outputTimestamp>
+    <project.build.outputTimestamp>2026-11-10T11:32:55Z</project.build.outputTimestamp>
 
     <jgit.version>7.8.1.202611041320-r</jgit.version>
     <hibernate.version>7.4.14.Final</hibernate.version>
@@ -100,7 +100,7 @@
     <jacoco-maven-plugin.version>0.8.16</jacoco-maven-plugin.version>
     <japicmp-maven-plugin.version>0.27.0</japicmp-maven-plugin.version>
 
-    <api.baseline.version>0.12.0</api.baseline.version>
+    <api.baseline.version>0.12.1</api.baseline.version>
     <japicmp.skip>false</japicmp.skip>
     <jacoco.minimum.line>0.00</jacoco.minimum.line>
     <jacoco.minimum.branch>0.00</jacoco.minimum.branch>
