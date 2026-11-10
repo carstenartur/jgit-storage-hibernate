@@ -10,7 +10,7 @@ io.github.carstenartur:jgit-storage-hibernate-search
 
 Core provides database-backed JGit repositories. Security is optional and adds a framework-neutral principal/group ACL schema plus deterministic repository/ref decisions. Search is optional and adds generic relational and Hibernate Search/Lucene projections. The higher-level `java-analysis` and `architecture` modules build on this foundation, but their module-owned persistence remains incubating; consult their module guides before registering those entities.
 
-The documented release line is **0.12.1**. It uses Java 21, JGit 7.8.0.202609011348-r, Hibernate ORM 7.4.12.Final and Hibernate Search 8.4.0.Final. Keep those versions aligned through the published BOM and tested deployment stack instead of overriding only one side of the stack.
+The documented release line is **0.12.1**. It uses Java 21, JGit 7.8.1.202611041320-r, Hibernate ORM 7.4.14.Final and Hibernate Search 8.4.1.Final. Keep those versions aligned through the published BOM and tested deployment stack instead of overriding only one side of the stack.
 
 ## Supported databases and operating model
 
@@ -21,7 +21,7 @@ This is the canonical support matrix for the library artifacts. Where support st
 | PostgreSQL | Supported | Supported | Supported | PostgreSQL 17.10 through Testcontainers; persistent development, staging and production |
 | Microsoft SQL Server (MSSQL) | Supported | Supported from 0.1.16 | Supported | SQL Server 2022 through Testcontainers; persistent deployments, copied-Sandbox Core adoption and Search rebuild cut-over |
 | HSQLDB | Supported | Supported from 0.11.6; new Search installation | Supported | HSQLDB 2.7.4; embedded persistent deployments, file-database and Lucene restart tests; see the Spring Boot limitation below |
-| H2 | Supported | Supported | Supported | H2 2.5.252 in 0.12.0; tests, demos and lightweight/disposable development |
+| H2 | Supported | Supported | Supported | H2 2.5.252; tests, demos and lightweight/disposable development |
 | Oracle | Supported from 0.12.0; new installation | Supported from 0.12.0; new installation | Supported from 0.12.0; new installation | Oracle Free 23.26.3 (`gvenzl/oracle-free:23.26.3-slim-faststart`), AL32UTF8/AL16UTF16, through Testcontainers; see [Oracle deployment](operations/oracle.md) |
 
 Support means that the artifact ships dialect-specific Flyway migrations and automated integration coverage for the listed module. H2 and HSQLDB use embedded database tests; PostgreSQL, SQL Server and Oracle use real databases through Testcontainers. The public `CoreSchemaMigrations`, `SearchSchemaMigrations` and `SecuritySchemaMigrations` constants identify the [packaged migration locations](#packaged-migration-locations). A Hibernate dialect alone does not establish backend support. Oracle support is qualified on the listed version and character sets; older Oracle releases and arbitrary existing Oracle schemas are outside this initial contract.
