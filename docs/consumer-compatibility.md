@@ -31,7 +31,7 @@ dependency management and tests.
 
 | Consumer | Immutable revision | Integration provenance |
 |---|---|---|
-| audio-analyzer | [e96ee4d](https://github.com/carstenartur/audio-analyzer/commit/e96ee4d832c912eec52fc8e9e5486efe106e3abd) | Merged upgrade [#386](https://github.com/carstenartur/audio-analyzer/pull/386) |
+| audio-analyzer | [e4ee478](https://github.com/carstenartur/audio-analyzer/commit/e4ee478036b2b808a01623330c092a2055c5dc82) | Merged 0.12.1 upgrade [#386](https://github.com/carstenartur/audio-analyzer/pull/386), concurrent-append fix and regression test [#387](https://github.com/carstenartur/audio-analyzer/pull/387) |
 | Taxonomy | [67fc112](https://github.com/carstenartur/Taxonomy/commit/67fc112217bf0f2decdcb36436f766ef9e66c27e) | Contract-verified head of [#1440](https://github.com/carstenartur/Taxonomy/pull/1440) |
 | sandbox | [9f3a70a](https://github.com/carstenartur/sandbox/commit/9f3a70af0fed5b35f38f576d97a6607d54fc5249) | Merged upgrade [#1849](https://github.com/carstenartur/sandbox/pull/1849) |
 

@@ -6,7 +6,7 @@
       "id": "audio-analyzer",
       "displayName": "audio-analyzer",
       "repository": "carstenartur/audio-analyzer",
-      "ref": "e96ee4d832c912eec52fc8e9e5486efe106e3abd",
+      "ref": "e4ee478036b2b808a01623330c092a2055c5dc82",
       "defaultBranch": "master",
       "contractScript": ".github/jgit-storage-hibernate-contract.sh",
       "expectedModules": [
