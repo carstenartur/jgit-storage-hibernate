@@ -45,7 +45,7 @@ This is not a replacement for storage-specific integration tests. It is a fast e
 
 The normal `mvn -B verify` build runs the packaged-JAR linkage verification for
 Core, Search, Java Analysis and Architecture. It also compares the covered
-public library APIs with release 0.12.0 using `japicmp`. The old optional
+public library APIs with release 0.12.1 using `japicmp`. The old optional
 `dependency-linkage` profile is no longer used. See
 [API compatibility and quality gates](operations/api-compatibility-and-quality-gates.md)
 for the exact modules, exclusions and failure conditions.
