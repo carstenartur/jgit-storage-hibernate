@@ -129,6 +129,8 @@ for line in Path(sys.argv[1]).read_text().splitlines():
     elif fields[0] == "fpr" and primary:
         fingerprints.append(fields[9].upper())
         primary = False
+if not fingerprints:
+    raise SystemExit("No private signing key found. Set MAVEN_GPG_KEY to the complete contents of private-key.asc.")
 expected = os.environ.get("MAVEN_GPG_FINGERPRINT", "").upper()
 if expected:
     if expected not in fingerprints:

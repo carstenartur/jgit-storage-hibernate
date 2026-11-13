@@ -71,6 +71,22 @@ class ReleaseCentralUploadWorkflowTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('ready=true', output)
 
+    def test_public_only_import_reports_missing_private_key(self):
+        source = (ROOT / '.github/scripts/run-central-published-release.sh').read_text()
+        selector = source.split('fingerprint=$(python3', 1)[1].split("<<'PY'\n", 1)[1].split('\nPY\n', 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            # GnuPG lists no secret keys after importing a public-only certificate.
+            listing = Path(directory) / 'keys.txt'
+            listing.write_text('')
+            for expected in ('', 'A' * 40):
+                with self.subTest(expected=expected):
+                    result = subprocess.run(
+                        [sys.executable, '-', str(listing)], input=selector, text=True,
+                        capture_output=True, env=dict(os.environ, MAVEN_GPG_FINGERPRINT=expected))
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('private-key.asc', result.stderr)
+                    self.assertNotIn('MAVEN_GPG_FINGERPRINT', result.stderr)
+
     def retry(self, jobs):
         return self.gate('release.yml', 'Avoid duplicate Central dispatch on reruns',
                          {'GITHUB_RUN_ATTEMPT':'2'}, jobs)
