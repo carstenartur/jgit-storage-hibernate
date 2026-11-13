@@ -5,11 +5,10 @@ The project publishes immutable Maven releases to an anonymous static repository
 multi-architecture OCI image in GitHub Container Registry. Development snapshots may continue to use
 GitHub Packages for Maven artifacts.
 
-After a successful release, GitHub dispatches the [Maven Central workflow](maven-central.md)
-for the finalized version. With the repository's signing key and Central user token
-configured, it verifies the signed artifacts and submits them for automatic
-publication after Sonatype validation. The same workflow can be started manually
-for an existing version.
+After successful finalization, the release job runs Maven on the same release
+commit with the `maven-central` profile and requests automatic publication.
+Maven waits for Sonatype to confirm publication. The same Maven command works
+from a release checkout outside GitHub. See [Publish to Maven Central](maven-central.md).
 
 ## Public artifacts
 
@@ -75,8 +74,9 @@ The root POM keeps Maven publication behind explicit profiles:
 
 - `public-repository-release` deploys to a local file repository for immutable public releases;
 - `github-packages` supplies authenticated snapshot distribution metadata.
-- `maven-central` prepares a signed local Central bundle by default; only
-  `-Dcentral.skipUpload=false` uploads it, and Portal publication remains manual.
+- `maven-central` prepares a signed local Central bundle by default; use
+  `-Dcentral.skipUpload=false` for Portal staging and add `-Dcentral.autoPublish=true
+  -Dcentral.waitUntil=published` for automatic publication.
 
 No Sonatype account, Central token, PGP key or consumer credential is part of the
 default branch-backed release path. The Central profile must be selected on its
@@ -143,7 +143,7 @@ The same CI job additionally verifies the optional Central profile with empty
 Maven settings and a temporary signing key. It checks every reactor module,
 required checksum and GPG signature without uploading anything. The temporary
 key and test-signed bundle are not retained as release artifacts. See
-[Maven Central preparation](maven-central.md#how-ci-verifies-this-without-your-account).
+[Maven Central preparation](maven-central.md).
 
 `Server image publication contract` statically verifies immutable source selection, first-write
 version-tag behavior, full-SHA action pins, tag/reactor validation, non-rollback aliases,
