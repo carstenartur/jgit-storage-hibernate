@@ -1,9 +1,85 @@
 # Optional Maven Central publishing
 
-The existing release workflow still publishes to the anonymous `maven-repository`
-branch. Maven Central is an additional, explicitly selected profile. Central account
-availability, credentials and signing keys do not affect normal builds or the
-existing release channel.
+After the Release workflow finalizes a stable version in the public
+`maven-repository` branch, it starts the **Maven Central** workflow for the same
+version. With the repository secrets below, GitHub signs the original JARs and
+POMs, verifies their signatures and submits the bundle to Sonatype. Sonatype
+publishes it automatically after validation. The Central run records the
+deployment ID and checks the publication status. A Central failure leaves the GitHub Release and its existing
+Maven artifacts available.
+
+If no publishing credentials are configured, the automatic run skips Central.
+If only some required credentials are present, the Central run reports which
+are missing. A separate manual run can submit a version that already exists on
+the public branch, including one released before enabling Central.
+
+## Publish an existing release from a phone or tablet
+
+Open **Actions → Maven Central → Run workflow** on the default branch.
+Enter an existing release version such as `0.12.1`. The workflow uses the annotated
+release tag to identify the reactor and signs the original JAR and POM bytes from
+the commit that published that version on `maven-repository`.
+
+For a new key, open this repository in your own GitHub Codespace and run:
+
+```bash
+bash .github/scripts/setup-central-signing-key.sh
+```
+
+This creates a passphrase-protected **Ed25519 primary signing key**. Enter the
+passphrase directly in your terminal. The script prints the backup directory and
+offers to set the Actions secrets and publish the public key to the Ubuntu keyserver.
+Save the backup files to your device before deleting the Codespace. To reuse an
+existing RSA or Ed25519 signing key, supply its export directly in the settings below.
+
+To sign and download the original files in the same Codespace, run:
+
+```bash
+bash .github/scripts/run-central-published-release.sh 0.12.1
+```
+
+If an earlier key setup stopped before saving the fingerprint, this command
+finishes the backup using the existing key. Once it prints **Signed bundle**,
+download `target/central-publishing/central-bundle.zip` and use **Publish Component**
+in the [Central Portal](https://central.sonatype.com/publishing/deployments).
+This local command does not require Actions secrets or a Portal token.
+
+The four backup files are `private-key.asc`, `revocation.rev`, `public-key.asc`
+and `fingerprint.txt`. The private export and its passphrase allow you to sign
+again. The revocation certificate can revoke this key if you lose it and must
+also stay private. The public key and fingerprint can be recovered from the
+private key. To download all four together from the Codespace, create one archive
+in the private backup directory and download it from **File → Open Folder**:
+
+```bash
+(cd ~/.local/share/jgit-storage-hibernate/central-key && umask 077 && tar -czf jgit-signing-backup.tar.gz private-key.asc revocation.rev public-key.asc fingerprint.txt && tar -tzf jgit-signing-backup.tar.gz)
+```
+
+Keep that archive in private storage and keep its key's passphrase in your password
+manager. GitHub does not offer a download of saved Actions secret values. On a
+Codespaces `403` while setting secrets, use **New repository secret** in the
+GitHub repository settings. A token already stored under the required names
+can be reused if it is still valid.
+
+For the GitHub Actions workflow, set these values once under **Settings → Secrets and variables → Actions**:
+
+| Repository secret | Value |
+|---|---|
+| `MAVEN_GPG_KEY` | Complete ASCII-armored private OpenPGP key used for signing |
+| `MAVEN_GPG_PASSPHRASE` | Passphrase, if the private key is protected |
+| `MAVEN_GPG_FINGERPRINT` | Optional full fingerprint of the signing primary key. Supply it when importing several primary keys. |
+| `CENTRAL_USERNAME`, `CENTRAL_PASSWORD` | Username and password from the Central Portal **user token**, for Central uploads |
+
+Publish the corresponding **public** key on a [Central-supported keyserver](https://central.sonatype.org/publish/requirements/gpg/#distributing-your-public-key).
+Keep a passphrase-protected backup of the private key so that you can use it for future releases.
+
+- Choose **bundle** to download the workflow artifact. Extract `central-bundle.zip`
+  from it and select that inner ZIP under **Publish Component** in the Central Portal.
+- Choose **release-upload** to submit an existing version for automatic publication after validation.
+- Choose **upload** to send the signed bundle directly to Central for manual approval. The run summary
+  records the deployment ID. Once validation succeeds, choose **Publish** in
+  [Deployments](https://central.sonatype.com/publishing/deployments). If an upload is
+  interrupted, check that page for an existing deployment before repeating it.
 
 ## Choose the publication path
 
@@ -86,9 +162,9 @@ The temporary private key is removed when the script exits. The job retains the
 verification log alongside the public-repository evidence, not the temporary key
 or its test-signed bundle. These keys are never sent to a public keyserver.
 
-No Central token or production signing key is needed in GitHub Secrets for this
-preparation. There is no automatic Central publication on pushes, tags or releases.
-The current release workflow remains usable if Central is unavailable.
+The preparation checks use neither a Central token nor a production signing key.
+The production credentials are used by the separate Maven Central workflow after
+release finalization or on manual dispatch.
 
 ## References
 

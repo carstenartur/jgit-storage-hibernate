@@ -5,9 +5,11 @@ The project publishes immutable Maven releases to an anonymous static repository
 multi-architecture OCI image in GitHub Container Registry. Development snapshots may continue to use
 GitHub Packages for Maven artifacts.
 
-An optional [Maven Central profile](maven-central.md) can prepare a signed local
-bundle or explicitly upload it for manual Portal publication. It is independent
-of the default release workflow described here.
+After a successful release, GitHub dispatches the [Maven Central workflow](maven-central.md)
+for the finalized version. With the repository's signing key and Central user token
+configured, it verifies the signed artifacts and submits them for automatic
+publication after Sonatype validation. The same workflow can be started manually
+for an existing version.
 
 ## Public artifacts
 

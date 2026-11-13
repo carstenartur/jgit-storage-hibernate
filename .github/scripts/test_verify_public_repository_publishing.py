@@ -35,6 +35,9 @@ class PublicationPolicyTest(unittest.TestCase):
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / relative, destination)
+        # Construct the optional trailing dispatcher independently in the focused cases.
+        release = self.root / ".github/workflows/release.yml"
+        release.write_text(release.read_text().split("\n  central-upload:\n", 1)[0] + "\n")
         self.pom = ET.parse(self.root / "pom.xml")
         profiles = self.pom.find("m:profiles", NS)
         self.central = profiles.find("m:profile[m:id='maven-central']", NS)
@@ -135,6 +138,68 @@ class PublicationPolicyTest(unittest.TestCase):
         signer = self.central.find("m:build/m:plugins/m:plugin[m:artifactId='maven-gpg-plugin']", NS)
         signer.find("m:configuration/m:skip", NS).text = "true"
         self.assert_rejected("Central signing must not be skipped")
+
+    def add_central_job(self, needs="finalize"):
+        workflow = self.root / ".github/workflows/release.yml"
+        workflow.write_text(workflow.read_text() + f'''
+  central-upload:
+    needs: {needs}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{{{ github.token }}}}
+        run: gh workflow run maven-central.yml --ref main -f release_version=0.12.1 -f mode=upload
+''')
+
+    def test_allows_independent_central_job_after_finalize(self):
+        self.add_central_job()
+        result = self.run_policy()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_central_job_must_depend_on_finalize(self):
+        self.add_central_job(needs="prepare")
+        self.assert_rejected("central-upload must depend on finalize")
+
+    def test_central_secret_in_existing_release_job_is_rejected(self):
+        self.add_central_job()
+        path = self.root / ".github/workflows/release.yml"
+        for job in ("prepare", "finalize"):
+            with self.subTest(job=job):
+                original = path.read_text()
+                path.write_text(original.replace(f"  {job}:\n", f"  {job}:\n    env:\n      MAVEN_GPG_KEY: forbidden\n", 1))
+                self.assert_rejected("release workflow retains MAVEN_GPG")
+                path.write_text(original)
+
+    def test_central_dispatcher_cannot_access_production_signing_secrets(self):
+        self.add_central_job()
+        path = self.root / ".github/workflows/release.yml"
+        path.write_text(path.read_text().replace("  central-upload:\n", "  central-upload:\n    env:\n      MAVEN_GPG_KEY: forbidden\n"))
+        self.assert_rejected("release workflow retains MAVEN_GPG")
+
+    def test_central_dispatch_cannot_move_into_existing_release_job(self):
+        path = self.root / ".github/workflows/release.yml"
+        original = path.read_text()
+        for job in ("prepare", "finalize"):
+            with self.subTest(job=job):
+                path.write_text(original.replace(f"  {job}:\n", f"  {job}:\n    env:\n      CHILD: maven-central.yml\n", 1))
+                self.assert_rejected("Central reference must remain inside central-upload")
+
+    def test_central_exception_does_not_cover_other_or_global_workflow_content(self):
+        self.add_central_job()
+        path = self.root / ".github/workflows/release.yml"
+        original = path.read_text()
+        for text in (
+            "env:\n  CENTRAL_USERNAME: forbidden\n" + original,
+            original + "\n  unrelated:\n    env:\n      CENTRAL_USERNAME: forbidden\n",
+        ):
+            path.write_text(text)
+            self.assert_rejected("release workflow retains CENTRAL_USERNAME")
+
+    def test_central_exception_does_not_allow_secrets_in_release_script(self):
+        self.add_central_job()
+        path = self.root / ".github/scripts/release.sh"
+        path.write_text(path.read_text() + "\nCENTRAL_USERNAME=forbidden\n")
+        self.assert_rejected("release script retains CENTRAL_USERNAME")
 
 
 if __name__ == "__main__":

@@ -243,6 +243,8 @@ jobs:
   finalize:
     if: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/prepare-') }}
     name: Publish merged immutable release
+    outputs:
+      release_version: ${{ steps.candidate.outputs.release_version }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -353,3 +355,62 @@ jobs:
           chmod +x .github/scripts/dispatch-generated-pr-checks.sh
           .github/scripts/dispatch-generated-pr-checks.sh \
             "release/next-${NEXT_VERSION%-SNAPSHOT}"
+
+  central-upload:
+    name: Dispatch published release to Maven Central
+    needs: finalize
+    if: ${{ needs.finalize.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Avoid duplicate Central dispatch on reruns
+        id: retry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          from pathlib import Path
+          ready = True
+          for attempt in range(1, int(os.environ["GITHUB_RUN_ATTEMPT"])):
+              endpoint = (f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+                          f"{os.environ['GITHUB_RUN_ID']}/attempts/{attempt}/jobs?per_page=100")
+              pages = json.loads(subprocess.check_output(
+                  ["gh", "api", "--paginate", "--slurp", endpoint], text=True))
+              for page in pages:
+                  for job in page["jobs"]:
+                      if job["name"] != "Dispatch published release to Maven Central":
+                          continue
+                      for step in job.get("steps", []):
+                          if (step["name"] != "Dispatch Central upload and automatic publication"
+                                  or not step.get("started_at") or step.get("conclusion") == "skipped"):
+                              continue
+                          if step.get("conclusion") != "success":
+                              raise SystemExit("Previous Central dispatch has an uncertain result. Check Maven Central runs and the Portal before dispatching manually; no automatic retry was made.")
+                          ready = False
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"ready={str(ready).lower()}", file=output)
+          if not ready:
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+                  summary.write("Central upload was already dispatched by an earlier attempt; not repeated. Check the Maven Central workflow for its result.\n")
+          PYTHON
+
+      - name: Dispatch Central upload and automatic publication
+        if: steps.retry.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_VERSION: ${{ needs.finalize.outputs.release_version }}
+        shell: bash
+        run: |
+          gh workflow run maven-central.yml --ref "$DEFAULT_BRANCH" \
+            -f release_version="$RELEASE_VERSION" -f mode=release-upload
+          {
+            printf 'Central upload requested for `%s` after successful immutable GitHub publication.\n\n' "$RELEASE_VERSION"
+            printf '[Follow the independent Central workflow](https://github.com/%s/actions/workflows/maven-central.yml). Missing credentials skip automatic upload; configured failures remain visible there. Central publishes automatically after successful validation.\n' "$GH_REPO"
+          } >> "$GITHUB_STEP_SUMMARY"
