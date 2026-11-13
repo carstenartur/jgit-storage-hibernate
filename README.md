@@ -218,22 +218,9 @@ quick start, compatibility matrix, source-build override, digest pinning and pro
 
 The documented release line is **0.12.2**. Java 21 is required. This walkthrough uses PostgreSQL. See the [database support matrix](docs/consuming.md#supported-databases-and-operating-model) for all supported backends, tested release versions and the Spring Boot and server-image boundaries.
 
-### 1. Configure the anonymous release repository
+### 1. Add the Core dependency from Maven Central
 
-```xml
-<repositories>
-  <repository>
-    <id>jgit-storage-hibernate-public</id>
-    <url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</url>
-    <releases><enabled>true</enabled></releases>
-    <snapshots><enabled>false</enabled></snapshots>
-  </repository>
-</repositories>
-```
-
-No GitHub token or Maven Central account is required.
-
-### 2. Add the Core dependency
+Maven resolves this release from Central by default. Add the following dependency to your application's `pom.xml`. No additional `<repositories>` entry or credentials are required.
 
 ```xml
 <dependency>
@@ -243,9 +230,11 @@ No GitHub token or Maven Central account is required.
 </dependency>
 ```
 
+If you use several modules, import the [project BOM](https://central.sonatype.com/artifact/io.github.carstenartur/jgit-storage-hibernate-bom) in `<dependencyManagement>` to manage their versions together. For releases up to and including `0.12.1`, use the [static Maven repository configuration](https://github.com/carstenartur/jgit-storage-hibernate/blob/v0.12.1/docs/consuming.md#anonymous-public-maven-repository).
+
 Add `jgit-storage-hibernate-search` when the persistent generic query layer is needed. Java Analysis and Architecture can be added for their analysis APIs, but their entity mappings do not yet constitute a module-owned production schema. Security and Smart HTTP have been independently selectable since `0.11.0`; source/reactor builds keep them aligned through `${project.version}`.
 
-### 3. Apply the packaged migration before Hibernate starts
+### 2. Apply the packaged migration before Hibernate starts
 
 ```java
 Flyway.configure()
@@ -258,7 +247,7 @@ Flyway.configure()
 
 Select the matching location from the [packaged migration locations](docs/consuming.md#packaged-migration-locations) for H2, HSQLDB, Microsoft SQL Server or Oracle (from 0.12.0). A shared schema, an existing 0.1.4 installation or a copied pre-library Taxonomy schema requires a deliberate one-time procedure. Do not enable `baselineOnMigrate` blindly; follow [docs/consuming.md](docs/consuming.md) and the [Taxonomy adoption runbook](docs/taxonomy-adoption.md).
 
-### 4. Make Hibernate validate, not mutate, the production schema
+### 3. Make Hibernate validate, not mutate, the production schema
 
 ```properties
 hibernate.hbm2ddl.auto=validate
@@ -266,7 +255,7 @@ hibernate.hbm2ddl.auto=validate
 
 `update` and `create-drop` are reserved for disposable local databases and isolated tests.
 
-### 5. Open the repository through the public facade
+### 4. Open the repository through the public facade
 
 ```java
 try (HibernateSessionFactoryProvider provider =
@@ -343,7 +332,7 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lifecycle`, `git_repos
 - [Capacity and recovery](docs/operations/capacity-and-recovery.md)
 - [Taxonomy/Spring adoption runbook](docs/taxonomy-adoption.md)
 - [Release process](docs/release-process.md)
-- [Optional Maven Central preparation and publishing](docs/maven-central.md)
+- [Release publishing to Maven Central](docs/maven-central.md)
 - [Cite this project](https://doi.org/10.5281/zenodo.21210131)
 
 ## Design boundaries
