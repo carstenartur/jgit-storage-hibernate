@@ -62,7 +62,7 @@ Java 21 is required. Configure the [anonymous release repository](../docs/consum
 <dependency>
   <groupId>io.github.carstenartur</groupId>
   <artifactId>jgit-storage-hibernate-java-analysis</artifactId>
-  <version>0.12.1</version>
+  <version>0.12.2</version>
 </dependency>
 ```
 
