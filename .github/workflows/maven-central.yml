@@ -18,6 +18,8 @@ on:
     paths:
       - '.github/workflows/maven-central.yml'
       - '.github/scripts/run-central-published-release.sh'
+      - '.github/scripts/setup-central-signing-key.sh'
+      - '.github/scripts/test_setup_central_signing_key.py'
       - '.github/scripts/bundle-published-release.py'
       - '.github/scripts/test_bundle_published_release.py'
       - '.github/scripts/verify-central-bundle.py'
@@ -42,6 +44,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Test Codespace key setup and recovery with disposable credentials
+        run: python3 .github/scripts/test_setup_central_signing_key.py -v
       - name: Verify complete immutable release without secrets or upload
         run: bash .github/scripts/run-central-published-release.sh 0.12.1 fixture
 

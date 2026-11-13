@@ -6,11 +6,16 @@ fail() { printf '%s\n' "$*" >&2; exit 1; }
 [[ -t 0 && -t 1 ]] || fail 'Run this interactively in your personal terminal.'
 command -v gpg >/dev/null || fail 'Install GnuPG first (on Debian/Ubuntu: sudo apt-get install gnupg).'
 command -v flock >/dev/null || fail 'Install util-linux for the setup lock before continuing.'
+[[ $# == 0 || ( $# == 1 && $1 == --resume ) ]] || fail 'Usage: setup-central-signing-key.sh [--resume]'
+mode=${1:-setup}
 repository=carstenartur/jgit-storage-hibernate
 state="$HOME/.local/share/jgit-storage-hibernate/central-key"
 export GNUPGHOME="$state/gnupg" GPG_TTY
 GPG_TTY=$(tty)
 [[ ! -L "$state" && ! -L "$GNUPGHOME" ]] || fail 'Refusing a symbolic-link key directory.'
+if [[ "$mode" == --resume && ! -d "$GNUPGHOME" ]]; then
+  fail "No existing signing key directory at $GNUPGHOME. Open the Codespace in which you ran setup."
+fi
 mkdir -p "$GNUPGHOME"
 chmod 700 "$state" "$GNUPGHOME"
 [[ ! -L "$state/.setup.lock" ]] || fail 'Refusing a symbolic-link setup lock.'
@@ -22,24 +27,37 @@ for file in fingerprint.txt public-key.asc private-key.asc revocation.rev; do
   [[ ! -e "$state/$file" || -s "$state/$file" ]] || fail "Existing backup is empty; recover it before continuing: $file"
 done
 temporary=$(mktemp -d "$state/.setup-XXXXXXXX")
+check_home=''
+step='reading the existing signing key'
 cleanup() {
   unset passphrase confirmation
   gpgconf --homedir "$GNUPGHOME" --kill gpg-agent >/dev/null 2>&1 || true
-  gpgconf --homedir "$temporary/check-home" --kill gpg-agent >/dev/null 2>&1 || true
+  if [[ -n "$check_home" ]]; then
+    gpgconf --homedir "$check_home" --kill all >/dev/null 2>&1 || true
+    rm -rf "$check_home"
+  fi
   rm -rf "$temporary"
 }
 trap cleanup EXIT
-trap 'printf "%s\n" "Setup stopped. Existing keys and backups remain in $state; rerun to resume." >&2' ERR
-read -rs -p 'Signing-key passphrase (never pasted into chat): ' passphrase </dev/tty; printf '\n' >/dev/tty
-read -rs -p 'Repeat passphrase: ' confirmation </dev/tty; printf '\n' >/dev/tty
-[[ -n "$passphrase" && "$passphrase" == "$confirmation" ]] || fail 'Passphrases must match and must not be empty.'
-unset confirmation
+trap 'printf "Setup stopped while %s (line %s). Your signing key is in %s.\n" "$step" "$LINENO" "$GNUPGHOME" >&2' ERR
 list_keys() {
   gpg --batch --with-colons --list-secret-keys > "$temporary/keys"
   mapfile -t fingerprints < <(awk -F: '$1=="sec"{primary=1} $1=="ssb"{primary=0} $1=="fpr"&&primary{print $10;primary=0}' "$temporary/keys")
 }
 list_keys
+if [[ ${#fingerprints[@]} == 0 && "$mode" == --resume ]]; then
+  fail "No existing private signing key was found in $GNUPGHOME. Open the original Codespace or restore its backup."
+fi
+if [[ ${#fingerprints[@]} -gt 1 ]]; then
+  fail 'More than one primary key was found in the dedicated directory.'
+fi
+read -rs -p 'Signing-key passphrase: ' passphrase </dev/tty; printf '\n' >/dev/tty
+[[ -n "$passphrase" ]] || fail 'The signing-key passphrase is required.'
 if [[ ${#fingerprints[@]} == 0 ]]; then
+  step='creating the repository signing key'
+  read -rs -p 'Repeat passphrase: ' confirmation </dev/tty; printf '\n' >/dev/tty
+  [[ "$passphrase" == "$confirmation" ]] || fail 'The passphrases must match.'
+  unset confirmation
   for file in fingerprint.txt public-key.asc private-key.asc revocation.rev; do
     [[ ! -e "$state/$file" ]] || fail 'Backups exist but the persistent key is missing; restore it instead of generating another key.'
   done
@@ -54,6 +72,7 @@ awk -F: '$1=="sec" && $4==22 && $17=="ed25519" && index($12,"s") && $2!~/^[red]$
 grep -Fq 'jgit-storage-hibernate Maven Central' "$temporary/keys" || fail 'The existing key is not the repository signing key.'
 fingerprint=${fingerprints[0]}
 [[ ! -e "$state/fingerprint.txt" || "$(cat "$state/fingerprint.txt")" == "$fingerprint" ]] || fail 'Saved fingerprint does not match the persistent key.'
+step='exporting the key and its backups'
 printf '%s\n' "$fingerprint" > "$temporary/fingerprint.txt"
 gpg --batch --armor --output "$temporary/public-key.asc" --export "$fingerprint"
 printf '%s\n' "$passphrase" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 \
@@ -63,12 +82,17 @@ revocation="$GNUPGHOME/openpgp-revocs.d/$fingerprint.rev"
 cp "$revocation" "$temporary/revocation.rev"
 backup="$temporary/private-key.asc"
 [[ ! -e "$state/private-key.asc" ]] || backup="$state/private-key.asc"
-mkdir -m 700 "$temporary/check-home"
-printf '%s\n' "$passphrase" | gpg --homedir "$temporary/check-home" --batch --pinentry-mode loopback --passphrase-fd 0 --import "$backup"
+# Long GnuPG home paths can exceed the Unix socket limit for the agent.
+# Keep exports on the backup filesystem for atomic links; shorten only the test keyring path.
+check_home=$(mktemp -d /tmp/jgit-gpg.XXXXXXXX)
+step='importing the private backup into the temporary verification keyring'
+printf '%s\n' "$passphrase" | gpg --homedir "$check_home" --batch --pinentry-mode loopback --passphrase-fd 0 --import "$backup"
+step='signing and verifying with the restored backup'
 printf 'Central signing backup check\n' > "$temporary/probe"
-printf '%s\n' "$passphrase" | gpg --homedir "$temporary/check-home" --batch --pinentry-mode loopback --passphrase-fd 0 \
+printf '%s\n' "$passphrase" | gpg --homedir "$check_home" --batch --pinentry-mode loopback --passphrase-fd 0 \
   --local-user "$fingerprint!" --output "$temporary/probe.sig" --detach-sign "$temporary/probe"
-gpg --homedir "$temporary/check-home" --batch --verify "$temporary/probe.sig" "$temporary/probe"
+gpg --homedir "$check_home" --batch --verify "$temporary/probe.sig" "$temporary/probe"
+step='saving the verified backup files'
 for file in fingerprint.txt public-key.asc private-key.asc revocation.rev; do
   [[ -s "$temporary/$file" ]] || fail "Empty export: $file"
   if [[ ! -e "$state/$file" ]]; then
@@ -94,6 +118,7 @@ if [[ "${answer,,}" == y ]]; then
 fi
 read -r -p 'Publish ONLY the public key to keyserver.ubuntu.com now? [y/N] ' answer </dev/tty
 if [[ "${answer,,}" == y ]]; then
+  step='sending the public key to the Ubuntu keyserver'
   gpg --batch --keyserver hkps://keyserver.ubuntu.com --send-keys "$fingerprint"
   printf '%s\n' 'Public key sent. This does not upload a release or any private key.'
 fi

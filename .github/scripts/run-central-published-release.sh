@@ -4,11 +4,26 @@ set -euo pipefail
 umask 077
 
 fail() { echo "::error::$*" >&2; exit 1; }
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 version=${1:-}
-mode=${2:-}
+mode=${2:-local}
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'release_version must use X.Y.Z (no SNAPSHOT)'
-[[ "$mode" == fixture || "$mode" == bundle || "$mode" == upload ]] || fail 'mode must be bundle or upload'
-if [[ "$mode" != fixture ]]; then
+[[ "$mode" == fixture || "$mode" == bundle || "$mode" == upload || "$mode" == local || "$mode" == --check-only ]] || fail 'mode must be local, --check-only, bundle or upload'
+if [[ "$mode" == local ]]; then
+  [[ "${GITHUB_ACTIONS:-}" != true && -t 0 && -t 1 ]] || fail 'Run the personal bundle command interactively in your terminal; use --check-only for input validation.'
+  state="$HOME/.local/share/jgit-storage-hibernate/central-key"
+  [[ ! -L "$state" && ! -L "$state/gnupg" && ! -L "$state/fingerprint.txt" ]] || fail 'Refusing a symbolic-link signing-key directory or fingerprint.'
+  if [[ -d "$state/gnupg" && ! -s "$state/fingerprint.txt" ]]; then
+    echo 'Finishing the backup of your existing signing key; no new key will be created.'
+    bash "$root/.github/scripts/setup-central-signing-key.sh" --resume
+  fi
+  [[ -d "$state/gnupg" && -s "$state/fingerprint.txt" ]] || fail 'Finish the one-time setup first: bash .github/scripts/setup-central-signing-key.sh'
+  export MAVEN_GPG_FINGERPRINT
+  MAVEN_GPG_FINGERPRINT=$(cat "$state/fingerprint.txt")
+  [[ "$MAVEN_GPG_FINGERPRINT" =~ ^([[:xdigit:]]{40}|[[:xdigit:]]{64})$ ]] || fail 'Saved signing fingerprint is invalid; rerun the one-time setup.'
+  unset MAVEN_GPG_KEY MAVEN_GPG_PASSPHRASE CENTRAL_USERNAME CENTRAL_PASSWORD
+fi
+if [[ "$mode" == bundle || "$mode" == upload ]]; then
   [[ "${GITHUB_EVENT_NAME:-}" == workflow_dispatch &&
      "${GITHUB_REF:-}" == "refs/heads/${DEFAULT_BRANCH:-main}" ]] || fail 'Run manually from the default branch'
   [[ -n "${MAVEN_GPG_KEY:-}" ]] || fail 'Set the MAVEN_GPG_KEY repository secret to the armored private signing key'
@@ -20,13 +35,20 @@ if [[ "$mode" != fixture ]]; then
   fi
 fi
 
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$root"
 work=$(mktemp -d)
-export GNUPGHOME="$work/gnupg"
-mkdir -m 700 "$GNUPGHOME"
+if [[ "$mode" == local ]]; then
+  export GNUPGHOME="$state/gnupg" GPG_TTY
+  GPG_TTY=$(tty)
+else
+  export GNUPGHOME="$work/gnupg"
+  mkdir -m 700 "$GNUPGHOME"
+fi
 cleanup() {
-  gpgconf --homedir "$GNUPGHOME" --kill all >/dev/null 2>&1 || true
+  unset MAVEN_GPG_PASSPHRASE
+  if [[ "$mode" != local ]]; then
+    gpgconf --homedir "$GNUPGHOME" --kill all >/dev/null 2>&1 || true
+  fi
   git worktree remove --force "$work/release-source" >/dev/null 2>&1 || true
   rm -rf "$work"
 }
@@ -36,7 +58,12 @@ trap 'echo "::error::Central preparation failed; no automatic upload retry was p
 # Fetch public data anonymously; never force-update an existing release tag.
 tag="v$version"
 publication_ref=refs/remotes/origin/maven-repository
-git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag" \
+fetch_options=(--no-tags)
+if [[ "$(git rev-parse --is-shallow-repository)" == true ]]; then
+  # A shallow boundary can masquerade as the manifest's first addition.
+  fetch_options+=(--unshallow)
+fi
+git fetch "${fetch_options[@]}" origin "refs/tags/$tag:refs/tags/$tag" \
   "refs/heads/maven-repository:$publication_ref"
 [[ "$(git cat-file -t "refs/tags/$tag")" == tag ]] || fail 'The release must have an annotated immutable release tag'
 release_commit=$(git rev-parse --verify "refs/tags/$tag^{commit}")
@@ -55,12 +82,27 @@ if manifest.get("version") != sys.argv[2] or manifest.get("groupId") != "io.gith
 PY
 git worktree add --detach "$work/release-source" "$release_commit"
 
+# This mode validates original inputs without opening a key or prompting.
+if [[ "$mode" == --check-only ]]; then
+  python3 .github/scripts/bundle-published-release.py --repository "$root" \
+    --commit "$publication_commit" --project-root "$work/release-source" --version "$version" --check-only
+  echo 'Published release inputs verified. No key was used, no bundle was signed and nothing was uploaded.'
+  exit 0
+fi
+
 if [[ "$mode" == fixture ]]; then
   unset MAVEN_GPG_KEY MAVEN_GPG_FINGERPRINT CENTRAL_USERNAME CENTRAL_PASSWORD
   export MAVEN_GPG_PASSPHRASE=''
   gpg --batch --pinentry-mode loopback --passphrase '' --quick-generate-key \
     'Central published-release CI fixture <central-fixture@example.invalid>' ed25519 sign 1d
   output="$work/fixture-bundle.zip"
+elif [[ "$mode" == local ]]; then
+  read -rs -p 'Signing-key passphrase (never pasted into chat): ' MAVEN_GPG_PASSPHRASE </dev/tty
+  printf '\n' >/dev/tty
+  [[ -n "$MAVEN_GPG_PASSPHRASE" ]] || fail 'Enter the passphrase used by the signing-key setup.'
+  export MAVEN_GPG_PASSPHRASE
+  output="$root/target/central-publishing/central-bundle.zip"
+  mkdir -p "$(dirname "$output")"
 else
   # An empty passphrase supports an unprotected key without permitting interactive prompts.
   export MAVEN_GPG_PASSPHRASE="${MAVEN_GPG_PASSPHRASE:-}"
@@ -125,7 +167,10 @@ if os.environ.get("GITHUB_STEP_SUMMARY"):
                       f"Public Maven publication: `{publication}`\n\nSigning fingerprint: `{fingerprint}`\n\n"
                       "Download the signed bundle from this run's artifacts. No private key is included.\n\n")
 PY
-[[ "$mode" == upload ]] || exit 0
+if [[ "$mode" != upload ]]; then
+  printf 'Signed bundle: %s\nIn the Codespaces Explorer: target → central-publishing → central-bundle.zip → Download.\nNothing was uploaded. Upload this ZIP in Central Portal.\n' "$output"
+  exit 0
+fi
 
 # Fixed HTTPS endpoint, no redirects, no token on argv, and exactly one upload attempt.
 python3 - "$output" "$version" <<'PY'

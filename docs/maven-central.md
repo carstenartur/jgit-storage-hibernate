@@ -24,7 +24,19 @@ offers to set the Actions secrets and publish the public key to the Ubuntu keyse
 Download the backup files to your device before deleting the Codespace. To reuse an
 existing RSA or Ed25519 signing key, supply its export directly in the settings below.
 
-Set these values once under **Settings → Secrets and variables → Actions**:
+To sign and download the original files in the same Codespace, run:
+
+```bash
+bash .github/scripts/run-central-published-release.sh 0.12.1
+```
+
+If an earlier key setup stopped before saving the fingerprint, this command
+finishes the backup using the existing key. Once it prints **Signed bundle**,
+download `target/central-publishing/central-bundle.zip` and use **Publish Component**
+in the [Central Portal](https://central.sonatype.com/publishing/deployments).
+This local command does not require Actions secrets or a Portal token.
+
+For the GitHub Actions workflow, set these values once under **Settings → Secrets and variables → Actions**:
 
 | Repository secret | Value |
 |---|---|
