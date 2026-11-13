@@ -71,6 +71,35 @@ class ReleaseCentralUploadWorkflowTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('ready=true', output)
 
+    def test_passphrase_handling_before_import_and_signing(self):
+        source = (ROOT / '.github/scripts/run-central-published-release.sh').read_text()
+        start = source.index('  # An empty passphrase')
+        end = source.index('  rm -f "$work/key.asc"', start)
+        shell = """
+            fail() { echo "$*" >&2; exit 1; }
+            gpg() {
+                # Check both the import file's bytes and the environment inherited by the signer.
+                printf '%s\\n' "$EXPECTED" | cmp -s - "$work/passphrase"
+                python3 -c 'import os; assert os.environ["MAVEN_GPG_PASSPHRASE"] == os.environ["EXPECTED"]'
+            }
+        """ + source[start:end]
+        phrase = '  fixture passphrase  '
+        cases = [(phrase, phrase), (phrase + '\n', phrase), (phrase + '\r\n', phrase), ('', '')]
+        cases += [(value, None) for value in (phrase + '\n\n', phrase + '\r', 'first\nsecond', 'first\rsecond')]
+        with tempfile.TemporaryDirectory() as work:
+            for value, expected in cases:
+                with self.subTest(value=value):
+                    result = subprocess.run(
+                        ['bash', '-euc', shell], capture_output=True, text=True,
+                        env=dict(os.environ, work=work, MAVEN_GPG_KEY='fixture',
+                                 MAVEN_GPG_PASSPHRASE=value, EXPECTED=expected or ''))
+                    if expected is None:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn('line break', result.stderr)
+                    else:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertNotIn(phrase, result.stdout + result.stderr)
+
     def test_public_only_import_reports_missing_private_key(self):
         source = (ROOT / '.github/scripts/run-central-published-release.sh').read_text()
         selector = source.split('fingerprint=$(python3', 1)[1].split("<<'PY'\n", 1)[1].split('\nPY\n', 1)[0]

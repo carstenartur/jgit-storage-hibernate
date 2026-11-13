@@ -106,6 +106,12 @@ elif [[ "$mode" == local ]]; then
 else
   # An empty passphrase supports an unprotected key without permitting interactive prompts.
   export MAVEN_GPG_PASSPHRASE="${MAVEN_GPG_PASSPHRASE:-}"
+  # A pasted one-line secret may carry its final line ending. Preserve spaces.
+  case "$MAVEN_GPG_PASSPHRASE" in
+    *$'\r\n') MAVEN_GPG_PASSPHRASE=${MAVEN_GPG_PASSPHRASE%$'\r\n'} ;;
+    *$'\n')   MAVEN_GPG_PASSPHRASE=${MAVEN_GPG_PASSPHRASE%$'\n'} ;;
+  esac
+  [[ "$MAVEN_GPG_PASSPHRASE" != *[$'\r\n']* ]] || fail 'MAVEN_GPG_PASSPHRASE contains a line break. Enter the signing passphrase on a single line.'
   printf '%s\n' "$MAVEN_GPG_KEY" > "$work/key.asc"
   printf '%s\n' "$MAVEN_GPG_PASSPHRASE" > "$work/passphrase"
   unset MAVEN_GPG_KEY
