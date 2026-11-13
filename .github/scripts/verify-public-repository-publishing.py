@@ -48,9 +48,9 @@ def verify_release_central_isolation(release, errors):
                 errors.append("central-upload must depend on finalize")
             protected = release[:body_start + job.start()] + release[body_start + job.end():]
     for forbidden in ("MAVEN_CENTRAL_", "CENTRAL_USERNAME", "MAVEN_GPG"):
-        if forbidden in release:
+        if forbidden in protected:
             errors.append(f"release workflow retains {forbidden}")
-    for reference in ("maven-central.yml", "run-central-published-release.sh", "-Pmaven-central"):
+    for reference in ("maven-central.yml", "-Pmaven-central"):
         if reference in protected:
             errors.append(f"Central reference must remain inside central-upload: {reference}")
 
@@ -75,11 +75,14 @@ def verify_optional_central(root, errors):
         return
     if txt(publisher, "m:configuration/m:skipUpload") != "${central.skipUpload}":
         errors.append("Central skipUpload must use ${central.skipUpload}")
-    for option in ("autoPublish", "waitForPublishCompletion", "ignorePublishedComponents"):
+    for option, default in (("autoPublish", "false"), ("waitUntil", "validated")):
+        property_name = "central." + option
+        if (txt(central, "m:properties/m:" + property_name) != default
+                or txt(publisher, "m:configuration/m:" + option) != "${" + property_name + "}"):
+            errors.append(f"Central {option} must use {property_name} with default {default}")
+    for option in ("waitForPublishCompletion", "ignorePublishedComponents"):
         if txt(publisher, "m:configuration/m:" + option) != "false":
             errors.append(f"Central {option} must remain false")
-    if txt(publisher, "m:configuration/m:waitUntil") != "validated":
-        errors.append("Central uploads must wait for validation")
     if txt(publisher, "m:configuration/m:publishingServerId") != "central":
         errors.append("Central credentials must come from Maven server central")
     if txt(signer, "m:configuration/m:skip") != "false":

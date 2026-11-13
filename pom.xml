@@ -101,6 +101,7 @@
     <japicmp-maven-plugin.version>0.27.0</japicmp-maven-plugin.version>
 
     <api.baseline.version>0.12.1</api.baseline.version>
+    <api.baseline.repository.url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</api.baseline.repository.url>
     <japicmp.skip>false</japicmp.skip>
     <jacoco.minimum.line>0.00</jacoco.minimum.line>
     <jacoco.minimum.branch>0.00</jacoco.minimum.branch>
@@ -115,7 +116,7 @@
     </repository>
     <repository>
       <id>jgit-storage-hibernate-public</id>
-      <url>https://raw.githubusercontent.com/carstenartur/jgit-storage-hibernate/maven-repository/</url>
+      <url>${api.baseline.repository.url}</url>
       <releases><enabled>true</enabled></releases>
       <snapshots><enabled>false</enabled></snapshots>
     </repository>
@@ -567,11 +568,13 @@
       </distributionManagement>
     </profile>
 
-    <!-- Optional preparation: no activation and no upload unless explicitly requested. -->
+    <!-- An explicit release build can prepare, upload for approval, or publish. -->
     <profile>
       <id>maven-central</id>
       <properties>
         <central.skipUpload>true</central.skipUpload>
+        <central.autoPublish>false</central.autoPublish>
+        <central.waitUntil>validated</central.waitUntil>
       </properties>
       <build>
         <plugins>
@@ -611,8 +614,8 @@
             <configuration>
               <publishingServerId>central</publishingServerId>
               <skipUpload>${central.skipUpload}</skipUpload>
-              <autoPublish>false</autoPublish>
-              <waitUntil>validated</waitUntil>
+              <autoPublish>${central.autoPublish}</autoPublish>
+              <waitUntil>${central.waitUntil}</waitUntil>
               <waitForPublishCompletion>false</waitForPublishCompletion>
               <ignorePublishedComponents>false</ignorePublishedComponents>
             </configuration>

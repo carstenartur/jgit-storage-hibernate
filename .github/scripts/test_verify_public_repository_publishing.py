@@ -45,7 +45,10 @@ class PublicationPolicyTest(unittest.TestCase):
             self.central = ET.fromstring('''
               <profile xmlns="http://maven.apache.org/POM/4.0.0">
                 <id>maven-central</id>
-                <properties><central.skipUpload>true</central.skipUpload></properties>
+                <properties><central.skipUpload>true</central.skipUpload>
+                  <central.autoPublish>false</central.autoPublish>
+                  <central.waitUntil>validated</central.waitUntil>
+                </properties>
                 <build><plugins>
                   <plugin>
                     <groupId>org.sonatype.central</groupId>
@@ -54,8 +57,8 @@ class PublicationPolicyTest(unittest.TestCase):
                     <configuration>
                       <publishingServerId>central</publishingServerId>
                       <skipUpload>${central.skipUpload}</skipUpload>
-                      <autoPublish>false</autoPublish>
-                      <waitUntil>validated</waitUntil>
+                      <autoPublish>${central.autoPublish}</autoPublish>
+                      <waitUntil>${central.waitUntil}</waitUntil>
                       <waitForPublishCompletion>false</waitForPublishCompletion>
                       <ignorePublishedComponents>false</ignorePublishedComponents>
                     </configuration>
@@ -122,13 +125,17 @@ class PublicationPolicyTest(unittest.TestCase):
         self.publisher.find("m:configuration/m:skipUpload", NS).text = "false"
         self.assert_rejected("Central skipUpload must use ${central.skipUpload}")
 
-    def test_rejects_automatic_publication_including_legacy_switch(self):
-        for field in ("autoPublish", "waitForPublishCompletion"):
-            with self.subTest(field=field):
-                element = self.publisher.find("m:configuration/m:" + field, NS)
-                element.text = "true"
-                self.assert_rejected("Central " + field + " must remain false")
-                element.text = "false"
+    def test_rejects_automatic_publication_by_default(self):
+        self.central.find("m:properties/m:central.autoPublish", NS).text = "true"
+        self.assert_rejected("Central autoPublish must use central.autoPublish with default false")
+
+    def test_rejects_hardcoded_wait_or_legacy_switch(self):
+        wait = self.publisher.find("m:configuration/m:waitUntil", NS)
+        wait.text = "uploaded"
+        self.assert_rejected("Central waitUntil must use central.waitUntil with default validated")
+        wait.text = "${central.waitUntil}"
+        self.publisher.find("m:configuration/m:waitForPublishCompletion", NS).text = "true"
+        self.assert_rejected("Central waitForPublishCompletion must remain false")
 
     def test_rejects_credential_lookup_for_existing_components_during_preparation(self):
         self.publisher.find("m:configuration/m:ignorePublishedComponents", NS).text = "true"
@@ -148,7 +155,7 @@ class PublicationPolicyTest(unittest.TestCase):
     steps:
       - env:
           GH_TOKEN: ${{{{ github.token }}}}
-        run: gh workflow run maven-central.yml --ref main -f release_version=0.12.1 -f mode=upload
+        run: mvn -Pmaven-central -Dcentral.skipUpload=false deploy
 ''')
 
     def test_allows_independent_central_job_after_finalize(self):
@@ -170,11 +177,11 @@ class PublicationPolicyTest(unittest.TestCase):
                 self.assert_rejected("release workflow retains MAVEN_GPG")
                 path.write_text(original)
 
-    def test_central_dispatcher_cannot_access_production_signing_secrets(self):
+    def test_central_job_can_receive_the_signing_secret(self):
         self.add_central_job()
         path = self.root / ".github/workflows/release.yml"
         path.write_text(path.read_text().replace("  central-upload:\n", "  central-upload:\n    env:\n      MAVEN_GPG_KEY: forbidden\n"))
-        self.assert_rejected("release workflow retains MAVEN_GPG")
+        self.assertEqual(0, self.run_policy().returncode)
 
     def test_central_dispatch_cannot_move_into_existing_release_job(self):
         path = self.root / ".github/workflows/release.yml"
