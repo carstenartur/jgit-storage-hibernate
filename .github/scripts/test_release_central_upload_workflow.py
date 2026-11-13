@@ -54,6 +54,12 @@ class ReleaseCentralUploadWorkflowTest(unittest.TestCase):
     def credentials(self, values=None):
         return self.gate('maven-central.yml', 'Check optional automatic-upload credentials', values)
 
+    def test_unselected_destination_fails_before_signing(self):
+        result, output = self.credentials({'CENTRAL_MODE': 'Select a destination'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Choose a destination', result.stderr)
+        self.assertNotIn('ready=true', output)
+
     def test_no_credentials_skips_without_failing_release(self):
         result, output = self.credentials()
         self.assertEqual(result.returncode, 0, result.stderr)
