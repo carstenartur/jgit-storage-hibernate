@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Static checks for the anonymous branch-backed Maven repository contract."""
 from __future__ import annotations
-import sys, xml.etree.ElementTree as ET
+import re, sys, xml.etree.ElementTree as ET
 from pathlib import Path
 NS={"m":"http://maven.apache.org/POM/4.0.0"}
 ROOT=Path("pom.xml")
@@ -28,6 +28,31 @@ def profile(root,pid):
 def read(path,errors):
     if not path.is_file(): errors.append(f"missing {path}"); return ""
     return path.read_text(encoding="utf-8")
+
+def verify_release_central_isolation(release, errors):
+    """Scope the exception to the independent job in this workflow's jobs mapping."""
+    protected = release
+    jobs = re.search(r"(?m)^jobs:[ \t]*(?:#.*)?$", release)
+    if jobs:
+        body_start = jobs.end()
+        next_root = re.search(r"(?m)^[^ \t\r\n]", release[body_start:])
+        body_end = body_start + next_root.start() if next_root else len(release)
+        body = release[body_start:body_end]
+        central_jobs = list(re.finditer(
+            r"(?ms)^  central-upload:[^\n]*\n.*?(?=^  [A-Za-z_][A-Za-z0-9_-]*:|\Z)", body))
+        if len(central_jobs) > 1:
+            errors.append("release workflow must not duplicate central-upload")
+        elif central_jobs:
+            job = central_jobs[0]
+            if not re.search(r"(?m)^    needs:[ \t]*(?:finalize|\[finalize\])[ \t]*(?:#.*)?$", job.group()):
+                errors.append("central-upload must depend on finalize")
+            protected = release[:body_start + job.start()] + release[body_start + job.end():]
+    for forbidden in ("MAVEN_CENTRAL_", "CENTRAL_USERNAME", "MAVEN_GPG"):
+        if forbidden in release:
+            errors.append(f"release workflow retains {forbidden}")
+    for reference in ("maven-central.yml", "run-central-published-release.sh", "-Pmaven-central"):
+        if reference in protected:
+            errors.append(f"Central reference must remain inside central-upload: {reference}")
 
 def verify_optional_central(root, errors):
     """Allow Central preparation without leaking publishing into other builds."""
@@ -94,8 +119,7 @@ def main():
     release=read(RELEASE,errors)
     for fragment in ("release-request/**","ref: main","verify-public-repository-consumption.sh","PUBLIC_REPOSITORY_URL"):
         if fragment not in release: errors.append(f"release workflow missing {fragment}")
-    for forbidden in ("MAVEN_CENTRAL_","CENTRAL_USERNAME","MAVEN_GPG"):
-        if forbidden in release: errors.append(f"release workflow retains {forbidden}")
+    verify_release_central_isolation(release, errors)
     maven=read(MAVEN,errors)
     for fragment in ("Public Maven repository contract","DRY_RUN=true","target/public-repository-evidence/manifest.json"):
         if fragment not in maven: errors.append(f"Maven workflow missing {fragment}")

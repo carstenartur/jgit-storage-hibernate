@@ -1,4 +1,4 @@
-name: Maven Central (manual)
+name: Maven Central
 
 on:
   workflow_dispatch:
@@ -8,11 +8,11 @@ on:
         required: true
         type: string
       mode:
-        description: 'Bundle downloads a signed ZIP; upload sends USER_MANAGED for a final Portal click'
+        description: 'bundle: download ZIP; upload: manual Portal publish; release-upload: automatic publish after validation'
         required: true
         type: choice
         default: bundle
-        options: [bundle, upload]
+        options: [bundle, upload, release-upload]
   pull_request:
     branches: [main]
     paths:
@@ -63,8 +63,37 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Sign release and optionally upload for manual publication
+      - name: Check optional automatic-upload credentials
+        id: credentials
+        env:
+          CENTRAL_MODE: ${{ inputs.mode }}
+          MAVEN_GPG_KEY: ${{ secrets.MAVEN_GPG_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+          MAVEN_GPG_FINGERPRINT: ${{ secrets.MAVEN_GPG_FINGERPRINT }}
+          CENTRAL_USERNAME: ${{ inputs.mode != 'bundle' && secrets.CENTRAL_USERNAME || '' }}
+          CENTRAL_PASSWORD: ${{ inputs.mode != 'bundle' && secrets.CENTRAL_PASSWORD || '' }}
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          required = ("MAVEN_GPG_KEY", "CENTRAL_USERNAME", "CENTRAL_PASSWORD")
+          ready = True
+          if os.environ.get("CENTRAL_MODE") == "release-upload":
+              if not any(os.environ.get(name) for name in (*required, "MAVEN_GPG_PASSPHRASE", "MAVEN_GPG_FINGERPRINT")):
+                  ready = False
+                  with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+                      summary.write("Automatic Central upload skipped: no signing or Central credentials are configured. The GitHub release and public Maven repository remain available.\n")
+              else:
+                  missing = [name for name in required if not os.environ.get(name)]
+                  if missing:
+                      raise SystemExit("Incomplete automatic Central configuration; missing repository secrets: " + ", ".join(missing))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"ready={str(ready).lower()}", file=output)
+          PYTHON
+
+      - name: Sign release and upload using the selected publication mode
         id: prepare
+        if: steps.credentials.outputs.ready == 'true'
         env:
           RELEASE_VERSION: ${{ inputs.release_version }}
           CENTRAL_MODE: ${{ inputs.mode }}
@@ -72,8 +101,8 @@ jobs:
           MAVEN_GPG_KEY: ${{ secrets.MAVEN_GPG_KEY }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
           MAVEN_GPG_FINGERPRINT: ${{ secrets.MAVEN_GPG_FINGERPRINT }}
-          CENTRAL_USERNAME: ${{ inputs.mode == 'upload' && secrets.CENTRAL_USERNAME || '' }}
-          CENTRAL_PASSWORD: ${{ inputs.mode == 'upload' && secrets.CENTRAL_PASSWORD || '' }}
+          CENTRAL_USERNAME: ${{ inputs.mode != 'bundle' && secrets.CENTRAL_USERNAME || '' }}
+          CENTRAL_PASSWORD: ${{ inputs.mode != 'bundle' && secrets.CENTRAL_PASSWORD || '' }}
         run: bash .github/scripts/run-central-published-release.sh "$RELEASE_VERSION" "$CENTRAL_MODE"
       - name: Downloadable production-signed bundle and public provenance
         if: ${{ always() && steps.prepare.outputs.bundle_ready == 'true' }}

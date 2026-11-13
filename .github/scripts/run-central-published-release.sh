@@ -8,7 +8,7 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 version=${1:-}
 mode=${2:-local}
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'release_version must use X.Y.Z (no SNAPSHOT)'
-[[ "$mode" == fixture || "$mode" == bundle || "$mode" == upload || "$mode" == local || "$mode" == --check-only ]] || fail 'mode must be local, --check-only, bundle or upload'
+[[ "$mode" == fixture || "$mode" == bundle || "$mode" == upload || "$mode" == release-upload || "$mode" == local || "$mode" == --check-only ]] || fail 'mode must be local, --check-only, bundle, upload or release-upload'
 if [[ "$mode" == local ]]; then
   [[ "${GITHUB_ACTIONS:-}" != true && -t 0 && -t 1 ]] || fail 'Run the personal bundle command interactively in your terminal; use --check-only for input validation.'
   state="$HOME/.local/share/jgit-storage-hibernate/central-key"
@@ -23,14 +23,14 @@ if [[ "$mode" == local ]]; then
   [[ "$MAVEN_GPG_FINGERPRINT" =~ ^([[:xdigit:]]{40}|[[:xdigit:]]{64})$ ]] || fail 'Saved signing fingerprint is invalid; rerun the one-time setup.'
   unset MAVEN_GPG_KEY MAVEN_GPG_PASSPHRASE CENTRAL_USERNAME CENTRAL_PASSWORD
 fi
-if [[ "$mode" == bundle || "$mode" == upload ]]; then
+if [[ "$mode" == bundle || "$mode" == upload || "$mode" == release-upload ]]; then
   [[ "${GITHUB_EVENT_NAME:-}" == workflow_dispatch &&
      "${GITHUB_REF:-}" == "refs/heads/${DEFAULT_BRANCH:-main}" ]] || fail 'Run manually from the default branch'
   [[ -n "${MAVEN_GPG_KEY:-}" ]] || fail 'Set the MAVEN_GPG_KEY repository secret to the armored private signing key'
   if [[ -n "${MAVEN_GPG_FINGERPRINT:-}" ]]; then
     [[ "$MAVEN_GPG_FINGERPRINT" =~ ^([[:xdigit:]]{40}|[[:xdigit:]]{64})$ ]] || fail 'MAVEN_GPG_FINGERPRINT must be a full fingerprint'
   fi
-  if [[ "$mode" == upload ]]; then
+  if [[ "$mode" == upload || "$mode" == release-upload ]]; then
     [[ -n "${CENTRAL_USERNAME:-}" && -n "${CENTRAL_PASSWORD:-}" ]] || fail 'Upload requires CENTRAL_USERNAME and CENTRAL_PASSWORD repository secrets; select bundle to download without a Portal token'
   fi
 fi
@@ -167,24 +167,25 @@ if os.environ.get("GITHUB_STEP_SUMMARY"):
                       f"Public Maven publication: `{publication}`\n\nSigning fingerprint: `{fingerprint}`\n\n"
                       "Download the signed bundle from this run's artifacts. No private key is included.\n\n")
 PY
-if [[ "$mode" != upload ]]; then
+if [[ "$mode" != upload && "$mode" != release-upload ]]; then
   printf 'Signed bundle: %s\nIn the Codespaces Explorer: target → central-publishing → central-bundle.zip → Download.\nNothing was uploaded. Upload this ZIP in Central Portal.\n' "$output"
   exit 0
 fi
 
 # Fixed HTTPS endpoint, no redirects, no token on argv, and exactly one upload attempt.
-python3 - "$output" "$version" <<'PY'
-import base64, os, secrets, sys, urllib.error, urllib.parse, urllib.request, uuid
+python3 - "$output" "$version" "$mode" <<'PY'
+import base64, json, os, secrets, sys, time, urllib.error, urllib.parse, urllib.request, uuid
 from pathlib import Path
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
-bundle, version = sys.argv[1:]
+bundle, version, mode = sys.argv[1:]
+publishing_type = "AUTOMATIC" if mode == "release-upload" else "USER_MANAGED"
 token = base64.b64encode((os.environ["CENTRAL_USERNAME"] + ":" + os.environ["CENTRAL_PASSWORD"]).encode()).decode()
 boundary = "central-" + secrets.token_hex(24)
 body = (f'--{boundary}\r\nContent-Disposition: form-data; name="bundle"; filename="central-bundle.zip"\r\n'
         'Content-Type: application/octet-stream\r\n\r\n').encode() + Path(bundle).read_bytes() + f"\r\n--{boundary}--\r\n".encode()
-query = urllib.parse.urlencode(dict(name=f"jgit-storage-hibernate-{version}", publishingType="USER_MANAGED"))
+query = urllib.parse.urlencode(dict(name=f"jgit-storage-hibernate-{version}", publishingType=publishing_type))
 request = urllib.request.Request("https://central.sonatype.com/api/v1/publisher/upload?" + query, data=body,
           headers={"Authorization": "Bearer " + token, "Content-Type": "multipart/form-data; boundary=" + boundary}, method="POST")
 try:
@@ -192,10 +193,46 @@ try:
         deployment = str(uuid.UUID(response.read(256).decode().strip()))
 except (OSError, ValueError, urllib.error.URLError):
     raise SystemExit("Upload did not return a confirmed deployment ID. No retry was attempted. Check Central Portal before running again.")
-print("Uploaded USER_MANAGED deployment " + deployment + "; review validation and click Publish in Central Portal.")
+instruction = ("automatic publication follows successful validation" if mode == "release-upload"
+               else "review validation and publish manually in Central Portal")
+print(f"Uploaded {publishing_type} deployment {deployment}; {instruction}.")
 if os.environ.get("GITHUB_STEP_SUMMARY"):
     with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
         summary.write(f"Uploaded deployment: `{deployment}`\n\n"
-                      "[Review validation and publish manually](https://central.sonatype.com/publishing/deployments). "
-                      "The workflow does not publish automatically.\n")
+                      f"{instruction.capitalize()}. "
+                      "[Track deployment](https://central.sonatype.com/publishing/deployments).\n")
+if mode == "release-upload":
+    portal = "https://central.sonatype.com/publishing/deployments"
+    def status_failure(reason):
+        message = f"{reason}. Deployment {deployment}: {portal}. No reupload was attempted."
+        if os.environ.get("GITHUB_STEP_SUMMARY"):
+            with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+                summary.write(message + "\n")
+        raise SystemExit(message)
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        status_request = urllib.request.Request(
+            "https://central.sonatype.com/api/v1/publisher/status?" + urllib.parse.urlencode(dict(id=deployment)),
+            data=b"", headers={"Authorization": "Bearer " + token}, method="POST")
+        try:
+            with urllib.request.build_opener(NoRedirect).open(status_request, timeout=30) as response:
+                status = json.loads(response.read(1048576))
+            if not isinstance(status, dict) or status.get("deploymentId") != deployment:
+                status_failure("Central returned an unexpected deployment status")
+            state = status.get("deploymentState")
+        except (OSError, ValueError, urllib.error.URLError):
+            status_failure("Could not confirm Central publication status; check the existing deployment before retrying")
+        if state == "PUBLISHED":
+            print(f"Maven Central confirmed PUBLISHED for {deployment}.")
+            if os.environ.get("GITHUB_STEP_SUMMARY"):
+                with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+                    summary.write(f"Maven Central confirmed **PUBLISHED** for `{deployment}`.\n")
+            break
+        if state == "FAILED":
+            status_failure("Central validation or publication FAILED; inspect the Portal validation errors")
+        if state not in {"PENDING", "VALIDATING", "VALIDATED", "PUBLISHING"}:
+            status_failure("Central returned an unknown deployment state")
+        time.sleep(10)
+    else:
+        status_failure("Central publication was not confirmed within five minutes; it may still complete")
 PY
