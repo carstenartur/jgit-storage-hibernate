@@ -12,7 +12,19 @@ Enter an existing release version such as `0.12.1`. The workflow uses the annota
 release tag to identify the reactor and signs the original JAR and POM bytes from
 the commit that published that version on `maven-repository`.
 
-Set the following values once under **Settings → Secrets and variables → Actions**:
+For a new key, open this repository in your own GitHub Codespace and run:
+
+```bash
+bash .github/scripts/setup-central-signing-key.sh
+```
+
+This creates a passphrase-protected **Ed25519 primary signing key**. Enter the
+passphrase directly in your terminal. The script prints the backup directory and
+offers to set the Actions secrets and publish the public key to the Ubuntu keyserver.
+Download the backup files to your device before deleting the Codespace. To reuse an
+existing RSA or Ed25519 signing key, supply its export directly in the settings below.
+
+Set these values once under **Settings → Secrets and variables → Actions**:
 
 | Repository secret | Value |
 |---|---|
