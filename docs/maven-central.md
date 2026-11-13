@@ -5,6 +5,32 @@ branch. Maven Central is an additional, explicitly selected profile. Central acc
 availability, credentials and signing keys do not affect normal builds or the
 existing release channel.
 
+## Publish an existing release from a phone or tablet
+
+Open **Actions → Maven Central (manual) → Run workflow** on the default branch.
+Enter an existing release version such as `0.12.1`. The workflow uses the annotated
+release tag to identify the reactor and signs the original JAR and POM bytes from
+the commit that published that version on `maven-repository`.
+
+Set the following values once under **Settings → Secrets and variables → Actions**:
+
+| Repository secret | Value |
+|---|---|
+| `MAVEN_GPG_KEY` | Complete ASCII-armored private OpenPGP key used for signing |
+| `MAVEN_GPG_PASSPHRASE` | Passphrase, if the private key is protected |
+| `MAVEN_GPG_FINGERPRINT` | Optional full fingerprint of the signing primary key. Supply it when importing several primary keys. |
+| `CENTRAL_USERNAME`, `CENTRAL_PASSWORD` | Username and password from the Central Portal **user token**, for upload mode |
+
+Publish the corresponding **public** key on a [Central-supported keyserver](https://central.sonatype.org/publish/requirements/gpg/#distributing-your-public-key).
+Keep a passphrase-protected backup of the private key so that you can use it for future releases.
+
+- Choose **bundle** to download the workflow artifact. Extract `central-bundle.zip`
+  from it and select that inner ZIP under **Publish Component** in the Central Portal.
+- Choose **upload** to send the signed bundle directly to Central. The run summary
+  records the deployment ID. Once validation succeeds, choose **Publish** in
+  [Deployments](https://central.sonatype.com/publishing/deployments). If an upload is
+  interrupted, check that page for an existing deployment before repeating it.
+
 ## Choose the publication path
 
 Run these commands from the repository root, on a **release candidate with the same
