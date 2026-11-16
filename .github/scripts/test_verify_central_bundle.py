@@ -69,6 +69,21 @@ class CentralBundleTest(unittest.TestCase):
         result = self.gate()
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_standalone_server_is_excluded_from_the_bundle(self):
+        server = "jgit-storage-hibernate-server"
+        self.pom.write_text(self.pom.read_text().replace("</modules>", f"<module>{server}</module></modules>"))
+        (self.root / server).mkdir()
+        core_pom = (self.root / "core/pom.xml").read_text()
+        (self.root / server / "pom.xml").write_text(
+            core_pom.replace("<artifactId>core</artifactId>", f"<artifactId>{server}</artifactId>")
+        )
+
+        result = self.gate()
+        self.assertEqual(0, result.returncode, result.stderr)
+        name = BASE + f"{server}/1.2.3/{server}-1.2.3.jar"
+        self.add_artifact(name, b"executable server jar")
+        self.assert_rejected(self.gate(), "Unexpected bundle path: " + name)
+
     def test_missing_each_primary_parent_bom_and_module_artifact_is_rejected(self):
         for name in PRIMARY:
             with self.subTest(name=name):
