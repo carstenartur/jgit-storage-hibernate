@@ -618,6 +618,9 @@
               <waitUntil>${central.waitUntil}</waitUntil>
               <waitForPublishCompletion>false</waitForPublishCompletion>
               <ignorePublishedComponents>false</ignorePublishedComponents>
+              <excludeArtifacts>
+                <excludeArtifact>jgit-storage-hibernate-server</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
           <plugin>
