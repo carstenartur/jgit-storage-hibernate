@@ -102,7 +102,7 @@ class StagingEvidenceTest(unittest.TestCase):
             directory = Path(temporary)
             for index in range(1, 7):
                 self.write_git_fork(directory, index)
-            result = evidence.summarize_local_git(directory, "a" * 40, 1)
+            result = evidence.summarize_git(directory, "a" * 40, 1, "local-git")
             self.assertEqual(6, result["fork_count"])
             self.assertEqual(162, result["publications"])
             self.assertAlmostEqual(2.4857699250, result["comparisons"]["VIRTUAL"]["change_percent"])
@@ -117,10 +117,10 @@ class StagingEvidenceTest(unittest.TestCase):
                 self.write_git_fork(directory, index)
             self.write_git_fork(directory, 6, attempt=2)
             with self.assertRaisesRegex(ValueError, "forks"):
-                evidence.summarize_local_git(directory, "a" * 40, 1)
+                evidence.summarize_git(directory, "a" * 40, 1, "local-git")
             self.write_git_fork(directory, 6, failed=True)
             with self.assertRaisesRegex(ValueError, "JUnit"):
-                evidence.summarize_local_git(directory, "a" * 40, 1)
+                evidence.summarize_git(directory, "a" * 40, 1, "local-git")
 
     def test_local_git_requires_native_wal_and_common_git_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -129,10 +129,10 @@ class StagingEvidenceTest(unittest.TestCase):
                 self.write_git_fork(directory, index)
             self.write_git_fork(directory, 6, wal=0)
             with self.assertRaisesRegex(ValueError, "WAL"):
-                evidence.summarize_local_git(directory, "a" * 40, 1)
+                evidence.summarize_git(directory, "a" * 40, 1, "local-git")
             self.write_git_fork(directory, 6, blob="d" * 40)
             with self.assertRaisesRegex(ValueError, "identity"):
-                evidence.summarize_local_git(directory, "a" * 40, 1)
+                evidence.summarize_git(directory, "a" * 40, 1, "local-git")
 
     def test_local_git_requires_the_declared_postgresql_version(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -141,27 +141,51 @@ class StagingEvidenceTest(unittest.TestCase):
                 self.write_git_fork(directory, index)
             self.write_git_fork(directory, 6, version="170009")
             with self.assertRaisesRegex(ValueError, "PostgreSQL 17.10"):
-                evidence.summarize_local_git(directory, "a" * 40, 1)
+                evidence.summarize_git(directory, "a" * 40, 1, "local-git")
+
+    def test_paced_git_pairs_require_the_declared_read_rate_and_measured_rtt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for index in range(1, 7):
+                self.write_git_fork(directory, index, profile="paced-git")
+            result = evidence.summarize_git(directory, "a" * 40, 1, "paced-git")
+            self.assertEqual(162, result["publications"])
+            self.assertTrue(result["comparisons"]["VIRTUAL"]["repeatable_improvement"])
+            self.assertFalse(result["comparisons"]["PLATFORM"]["repeatable_improvement"])
+
+            self.write_git_fork(directory, 6, profile="paced-git", rate=0)
+            with self.assertRaisesRegex(ValueError, "different staging coordinate"):
+                evidence.summarize_git(directory, "a" * 40, 1, "paced-git")
+            self.write_git_fork(directory, 6, profile="paced-git", rtt_nanos=153_000)
+            with self.assertRaisesRegex(ValueError, "paced RTT"):
+                evidence.summarize_git(directory, "a" * 40, 1, "paced-git")
 
     @staticmethod
-    def write_git_fork(directory, index, attempt=1, failed=False, wal=1, blob="c" * 40, version="170010"):
+    def write_git_fork(directory, index, attempt=1, failed=False, wal=1, blob="c" * 40,
+                       version="170010", profile="local-git", rate=None, rtt_nanos=None):
         # Synthetic validator fixtures are never retained as performance evidence.
-        artifact = directory / f"staging-pipeline-p128-b16-w1-runner-r0-fork-{index}-attempt-{attempt}"
+        cell = evidence.matrix(profile, 9)["include"][index - 1]
+        artifact = directory / f"staging-pipeline-{cell['id']}-attempt-{attempt}"
+        if rate is None:
+            rate = cell["rate"] * evidence.MIB
+        if rtt_nanos is None:
+            rtt_nanos = cell["rtt"] * 1_000_000 + 153_000
         raw = artifact / "target/staging-pipeline/raw"
         raw.mkdir(parents=True, exist_ok=True)
         (raw / "git-publication.properties").write_text(
             f"source_commit={'a' * 40}\nmeasurement_boundary=git-object-insertion-through-ref-commit\n"
             "publication_policy=production-configured\nstaging_filesystem=ext4\n"
-            "warmup_rounds=2\nrepeats=9\nrequested_rtt_ms=0\nrtt_nanos=153000\n")
+            f"warmup_rounds=2\nrepeats=9\nrequested_rtt_ms={cell['rtt']}\nrtt_nanos={rtt_nanos}\n")
         modes = evidence.MODES
         rows = []
         observations = []
         for sample in range(1, 10):
             for offset in range(3):
                 mode = modes[(sample - 1 + offset) % 3]
-                duration = dict(SYNCHRONOUS=100, VIRTUAL=99 + index, PLATFORM=110)[mode]
+                virtual = (85 if profile == "paced-git" else 99) + index
+                duration = dict(SYNCHRONOUS=100, VIRTUAL=virtual, PLATFORM=110)[mode]
                 rows.append(dict(sample=sample, mode=mode, payload_bytes=128 * 1024 * 1024 + 257,
-                                 window_mib=16, read_bytes_per_second=0, publication_nanos=duration,
+                                 window_mib=16, read_bytes_per_second=rate, publication_nanos=duration,
                                  cpu_nanos=100, allocated_bytes=150, heap_peak_upper_bytes=200,
                                  retained_windows=1 if mode == "SYNCHRONOUS" else 2,
                                  prepersisted_packs=1, commit="b" * 40, blob=blob))

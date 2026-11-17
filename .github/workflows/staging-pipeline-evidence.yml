@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: 'Smoke, eight coverage cells, six local Git forks, or the explicit 216-cell matrix'
+        description: 'Smoke, eight coverage cells, six complete Git forks, or the 216-cell matrix'
         required: true
         default: smoke
         type: choice
-        options: [smoke, coverage, local-git, full]
+        options: [smoke, coverage, local-git, paced-git, full]
       repeats:
-        description: 'Retained repetitions per mode (local-git requires 9)'
+        description: 'Retained repetitions per mode (local-git and paced-git require 9)'
         required: true
         default: '3'
         type: choice
@@ -79,6 +79,9 @@ jobs:
           if [[ "$EVENT_NAME" = push && "$GITHUB_REF" = refs/heads/evidence/staging-local-git-20261109 ]]; then
             profile=local-git
             repeats=9
+          elif [[ "$EVENT_NAME" = push && "$GITHUB_REF" = refs/heads/evidence/staging-pipeline-paced-git-* ]]; then
+            profile=paced-git
+            repeats=9
           elif [[ "$EVENT_NAME" = push ]]; then
             profile=coverage
             repeats=3
@@ -93,7 +96,7 @@ jobs:
           printf '%s\n' "$selected" > staging-matrix.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: staging-pipeline-matrix${{ steps.select.outputs.profile == 'local-git' && format('-attempt-{0}', github.run_attempt) || '' }}
+          name: staging-pipeline-matrix${{ endsWith(steps.select.outputs.profile, '-git') && format('-attempt-{0}', github.run_attempt) || '' }}
           path: staging-matrix.json
           if-no-files-found: error
 
@@ -145,7 +148,11 @@ jobs:
           prefix=jgit.storage.benchmark.staging-pipeline
           git_limit=()
           if [[ "$CELL_GIT_ONLY" = true ]]; then
-            git_limit=(timeout --kill-after=30s 7m)
+            git_timeout=7m
+            if [[ "$CELL_RTT" = 50 ]]; then
+              git_timeout=15m
+            fi
+            git_limit=(timeout --kill-after=30s "$git_timeout")
           else
             python3 .github/scripts/run_with_bounded_console.py \
               --log target/staging-pipeline/native.log --console-bytes 16384 -- \
@@ -198,9 +205,9 @@ jobs:
         run: |
           if [[ "$CELL_GIT_ONLY" = true ]]; then
             cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ### Complete Git publication, local single writer
+          ### Complete Git publication, single writer
 
-          This job runs one independent JVM and PostgreSQL container for the preregistered local comparison. See the aggregate job for the qualification across all six forks.
+          Each job runs its own JVM and PostgreSQL container. The aggregate job qualifies the result across all six forks.
           EOF
             exit 0
           fi
@@ -214,25 +221,27 @@ jobs:
           Selected single-writer controls also retain git-publication.csv: streamed blob/tree/commit creation through pack/index persistence and ref commit, using the current production publication policy. Protocol costs and cold-reopen verification are outside that timing. These separate samples do not change the raw-transfer qualification or establish non-regression.
           EOF
 
-  local-git-summary:
-    name: Qualify local complete Git publication
+  git-summary:
+    name: Qualify complete Git publication
     needs: [plan, evidence]
-    if: needs.plan.outputs.profile == 'local-git'
+    if: endsWith(needs.plan.outputs.profile, '-git')
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      GIT_STAGING_PROFILE: ${{ needs.plan.outputs.profile }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          pattern: staging-pipeline-p128-b16-w1-runner-r0-fork-*-attempt-${{ github.run_attempt }}
-          path: target/staging-local-git
+          pattern: staging-pipeline-p128-b16-w1-*-fork-*-attempt-${{ github.run_attempt }}
+          path: target/staging-git
       - name: Validate and report paired effects
         run: |
           set -euo pipefail
-          python3 .github/scripts/staging_pipeline_evidence.py summarize-local-git \
-            target/staging-local-git --expected-commit "$GITHUB_SHA" --attempt "$GITHUB_RUN_ATTEMPT"
+          python3 .github/scripts/staging_pipeline_evidence.py "summarize-$GIT_STAGING_PROFILE" \
+            target/staging-git --expected-commit "$GITHUB_SHA" --attempt "$GITHUB_RUN_ATTEMPT"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: staging-local-git-summary-attempt-${{ github.run_attempt }}
-          path: target/staging-local-git/local-git-summary.json
+          name: staging-${{ needs.plan.outputs.profile }}-summary-attempt-${{ github.run_attempt }}
+          path: target/staging-git/${{ needs.plan.outputs.profile }}-summary.json
           if-no-files-found: error
