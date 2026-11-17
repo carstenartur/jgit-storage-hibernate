@@ -134,7 +134,11 @@ walks the fixture one row at a time.
 For each shape, warm runs exercise chunks of 25, 100 and 500. Before warming,
 each full export path also gets a first-query trial on a freshly opened
 Hibernate session factory. This reopens the persisted index and leaves the
-database process and OS caches in place.
+database process and OS caches in place. The native runner then restarts the
+database container separately for each full export path. It verifies that the
+database's own startup timestamp advanced and queries the same fixture and index
+after reconnecting. These trials start a fresh database process while retaining
+the host OS page cache.
 
 The artifact contains:
 
@@ -164,6 +168,9 @@ The artifact contains:
   ends before any nonempty page beyond the guard.
 - `environment.properties` and `cpu.txt` with database and JDBC versions,
   JVM, heap, CPU and runner, fixture version, guard values and source commit.
+- `database-restarts.csv` with database startup timestamps before and after each
+  restart and time from restart request to SQL readiness. The report compares
+  first-chunk and full-export times for the factory reopen and database restart.
 
 Use a single offset page for random access if the cost to traverse the prefix
 exceeds the measured page cost. For an ongoing sequential export, compare
@@ -189,12 +196,12 @@ mvn -B -pl jgit-storage-hibernate-search -am test \
   -Dbenchmark.scroll.output="$evidence" \
   -Dbenchmark.commit="$(git rev-parse HEAD)"
 python3 .github/scripts/summarize-history-scroll-export.py "$evidence" \
-  --documents 10000 --repetitions 3
+  --documents 10000 --repetitions 3 --require-database-restart
 ```
 
 The benchmark compares a single offset page with two cursor costs and leaves
-repeated deep offset scans, native statement-plan and wait measurements,
-database restart trials and a fixed heap bound tracked in #230. Hibernate
+repeated deep offset scans, native statement-plan and wait measurements, cold
+OS-cache trials and a fixed heap bound tracked in #230. Hibernate
 Search exposes a snapshot-consistent scroll and separate offset queries.
 Replacing the scroll with multiple public query calls would change the
 consistency contract as the index changes.
