@@ -29,12 +29,14 @@ from a release checkout outside GitHub. See [Publish to Maven Central](maven-cen
 The parent and BOM are POM-only artifacts. The benchmark artifact is for CI and release review, not
 normal runtime use. Smart HTTP, the Spring Boot integration, the standalone server and Testcontainers
 support are optional product paths and are versioned with the same reactor release as Core.
+Maven Central excludes the standalone server module. For a server deployment, use the OCI image.
 
 ## Distribution channels
 
 | Channel | Role | Consumer authentication |
 |---|---|---|
-| Static `maven-repository` branch | Primary immutable public Maven release channel | none |
+| Maven Central | Public Maven releases except the standalone server module | none |
+| Static `maven-repository` branch | Immutable public Maven releases for the full reactor | none |
 | GHCR server image | Runnable PostgreSQL-backed Git Smart HTTP server | none after public-visibility verification |
 | GitHub Packages | Development Maven snapshots | GitHub token |
 | GitHub Releases | Notes and convenience artifacts | none |

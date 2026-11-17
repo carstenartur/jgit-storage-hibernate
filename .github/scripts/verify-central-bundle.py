@@ -13,8 +13,11 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 
+STANDALONE_SERVER = "jgit-storage-hibernate-server"
+
+
 def reactor(root):
-    """Read this repository's explicit reactor coordinates, including POM modules."""
+    """Read the reactor coordinates expected in the Central bundle."""
     modules, seen = [], set()
 
     def visit(pom):
@@ -39,7 +42,8 @@ def reactor(root):
         if packaging not in ("pom", "jar"):
             raise ValueError(f"Unsupported packaging {packaging}: {pom}")
         stem = f"{group.replace('.', '/')}/{artifact}/{version}/{artifact}-{version}"
-        modules.append((stem, packaging))
+        if artifact != STANDALONE_SERVER:
+            modules.append((stem, packaging))
         for child in project.findall("modules/module"):
             visit(pom.parent / child.text.strip() / "pom.xml")
 
@@ -104,7 +108,7 @@ def verify(bundle, root, signatures):
                 actual = archive.read(entries[name]).decode("ascii").strip().lower()
                 if actual != hashlib.new(suffix, archive.read(entries[payload])).hexdigest():
                     raise ValueError(f"Invalid checksum: {name}")
-    print(f"Verified {len(artifacts)} artifacts for {len(modules)} reactor modules" +
+    print(f"Verified {len(artifacts)} artifacts for {len(modules)} Central modules" +
           (" and their GPG signatures" if signatures else " (signature presence only)"))
 
 

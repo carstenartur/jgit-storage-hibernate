@@ -3,8 +3,10 @@
 Run Maven from the root of a release checkout with the same non-SNAPSHOT version
 in all modules. Use JDK 21 and Maven 3.9.x. The `maven-central` profile binds
 the Maven GPG plugin to `verify` and the official Sonatype publishing plugin to
-`deploy`. Maven builds, signs and publishes the reactor. These commands work
-in a local checkout or any CI environment.
+`deploy`. Maven builds the full reactor and stages its artifacts except the
+`jgit-storage-hibernate-server` module. Deploy the standalone server using
+the [published OCI image](../jgit-storage-hibernate-server/README.md#run-the-published-release).
+These commands work in a local checkout or any CI environment.
 
 | Operation | Maven command |
 |---|---|
