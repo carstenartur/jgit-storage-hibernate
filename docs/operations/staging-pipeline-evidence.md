@@ -78,12 +78,23 @@ At most two cells run concurrently, and each cell has a 60-minute limit.
 | `smoke` | 1 | 16 MiB, 16 MiB window, one writer, runner storage, direct PostgreSQL |
 | `coverage` | 8 | Includes 512 MiB, 4/16 writers, 16/32 MiB windows, runner/tmpfs/paced staging and 0/5/20/50 ms RTT |
 | `local-git` | 1, with 6 forks | Repeat the local single-writer complete Git control |
+| `paced-git` | 1, with 6 forks | Repeat 128 MiB complete Git publication with a 16 MiB window, one writer, a 150 MiB/s staging rate and 50 ms added RTT |
 | `full` | 216 | The Cartesian product of the original issue's payload, window, writer, storage and RTT dimensions |
 
 Coverage and full profiles execute one unretained warm-up round per mode, followed
 by the selected 1, 3, 5 or 9 repetitions. Mode order rotates between retained
 rounds. A single-window control uses 16 MiB with a 32 MiB window. Coverage is a
 bounded selection of useful controls; it does not qualify all 216 coordinates.
+
+The complete Git profiles measure from object insertion through durable ref
+commit. They use two warm-ups and nine retained rounds per mode in each of six
+independent JVM and database forks. Every fork checks Git identities, byte
+integrity on reopen, PostgreSQL WAL movement and retained windows. The
+`paced-git` study calls a reader mode an improvement at this coordinate when its
+one-sided upper bound is at or below −5% elapsed time. The bounds control the
+family-wise error at 5% for the two reader modes. The workflow retains all
+observed outcomes and holds the production decision open across the other
+coordinates.
 
 PostgreSQL 17.10 runs with `fsync`, synchronous commit and I/O timing enabled.
 Toxiproxy 2.12.0 supplies the requested RTT, and nine retained `SELECT 1` samples

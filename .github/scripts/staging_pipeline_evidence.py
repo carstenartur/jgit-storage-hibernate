@@ -12,9 +12,10 @@ import xml.etree.ElementTree as ET
 
 MIB = 1024 * 1024
 MODES = ("SYNCHRONOUS", "VIRTUAL", "PLATFORM")
-LOCAL_GIT_FORKS = 6
-LOCAL_GIT_REPEATS = 9
-LOCAL_GIT_WARMUPS = 2
+GIT_FORKS = 6
+GIT_REPEATS = 9
+GIT_WARMUPS = 2
+GIT_PROFILES = {"local-git": ("runner", 0, 0), "paced-git": ("paced", 50, 150)}
 
 
 def require(condition, message):
@@ -23,15 +24,16 @@ def require(condition, message):
 
 
 def matrix(profile, repeats):
-    require(profile in ("smoke", "coverage", "full", "local-git"), "unknown matrix profile")
+    require(profile in ("smoke", "coverage", "full", *GIT_PROFILES), "unknown matrix profile")
     require(repeats in (1, 3, 5, 9), "repeats must be 1, 3, 5 or 9")
-    if profile == "local-git":
-        require(repeats == LOCAL_GIT_REPEATS, "local-git requires nine retained rounds per fork")
+    if profile in GIT_PROFILES:
+        require(repeats == GIT_REPEATS, f"{profile} requires nine retained rounds per fork")
+        storage, rtt, rate = GIT_PROFILES[profile]
         return {"include": [
-            dict(id=f"p128-b16-w1-runner-r0-fork-{fork}", payload=128, window=16,
-                 writers=1, storage="runner", rtt=0, rate=0, repeats=repeats,
-                 warmups=LOCAL_GIT_WARMUPS, git_only=True)
-            for fork in range(1, LOCAL_GIT_FORKS + 1)
+            dict(id=f"p128-b16-w1-{storage}-r{rtt}-fork-{fork}", payload=128, window=16,
+                 writers=1, storage=storage, rtt=rtt, rate=rate, repeats=repeats,
+                 warmups=GIT_WARMUPS, git_only=True)
+            for fork in range(1, GIT_FORKS + 1)
         ]}
     if profile == "full":
         coordinates = itertools.product((16, 128, 512), (16, 32), (1, 4, 16),
@@ -63,7 +65,7 @@ def read_properties(path):
     return environment
 
 
-def local_git_fork(artifact, source_commit, coordinate):
+def git_publication_fork(artifact, source_commit, coordinate):
     report = artifact / "jgit-storage-hibernate-benchmarks/target/surefire-reports"
     report /= "TEST-io.github.carstenartur.jgit.storage.hibernate.benchmark.StagedChunkPipelineEvidenceTest.xml"
     junit = ET.parse(report).getroot()
@@ -84,7 +86,13 @@ def local_git_fork(artifact, source_commit, coordinate):
             "fork source or measurement protocol differs")
     filesystem = environment.get("staging_filesystem")
     require(filesystem and filesystem not in ("tmpfs", "ramfs"), "runner disk staging is required")
-    require(0 < int(environment["rtt_nanos"]) < 5_000_000, "local RTT must be below 5 ms")
+    rtt = int(environment["rtt_nanos"])
+    requested = coordinate["rtt"]
+    if requested:
+        require(requested * 900_000 <= rtt <= (requested + 8) * 1_000_000,
+                "paced RTT is outside the declared measurement range")
+    else:
+        require(0 < rtt < 5_000_000, "local RTT must be below 5 ms")
 
     trials = read_csv(raw / "git-publication.csv")
     expected = [(str(sample), MODES[(sample - 1 + offset) % len(MODES)])
@@ -94,7 +102,8 @@ def local_git_fork(artifact, source_commit, coordinate):
     identities = set()
     for row in trials:
         require(int(row["payload_bytes"]) == coordinate["payload"] * MIB + 257 and
-                int(row["window_mib"]) == coordinate["window"] and int(row["read_bytes_per_second"]) == 0,
+                int(row["window_mib"]) == coordinate["window"] and
+                int(row["read_bytes_per_second"]) == coordinate["rate"] * MIB,
                 "fork uses a different staging coordinate")
         require(int(row["publication_nanos"]) > 0 and int(row["prepersisted_packs"]) == 1 and
                 int(row["retained_windows"]) == (1 if row["mode"] == "SYNCHRONOUS" else 2),
@@ -119,13 +128,14 @@ def local_git_fork(artifact, source_commit, coordinate):
                               for sample in map(str, range(1, coordinate["repeats"] + 1)))
         for mode in MODES[1:]
     }
-    return ratios, identities, dict(staging_filesystem=filesystem, rtt_nanos=int(environment["rtt_nanos"]))
+    return ratios, identities, dict(staging_filesystem=filesystem, rtt_nanos=rtt)
 
 
-def summarize_local_git(directory, expected_commit, attempt):
+def summarize_git(directory, expected_commit, attempt, profile):
     require(re.fullmatch(r"[0-9a-f]{40}", expected_commit), "exact source commit required")
     require(attempt > 0, "workflow attempt must be positive")
-    coordinates = matrix("local-git", LOCAL_GIT_REPEATS)["include"]
+    require(profile in GIT_PROFILES, "complete Git publication profile required")
+    coordinates = matrix(profile, GIT_REPEATS)["include"]
     expected = {f"staging-pipeline-{cell['id']}-attempt-{attempt}": cell for cell in coordinates}
     actual = {artifact.name for artifact in directory.glob(f"staging-pipeline-*-fork-*-attempt-{attempt}")}
     require(actual == set(expected), "all six forks from the same workflow attempt are required")
@@ -133,23 +143,25 @@ def summarize_local_git(directory, expected_commit, attempt):
     identities = set()
     environments = {}
     for name, cell in expected.items():
-        ratios, fork_identities, environment = local_git_fork(directory / name, expected_commit, cell)
+        ratios, fork_identities, environment = git_publication_fork(directory / name, expected_commit, cell)
         identities.update(fork_identities)
         environments[cell["id"]] = environment
         for mode in effects:
             effects[mode].append(ratios[mode])
     require(len(identities) == 1, "all modes and forks must publish the same Git identity")
-    margin = 5.0
+    paced = profile == "paced-git"
+    margin = -5.0 if paced else 5.0
+    criterion = "repeatable_improvement" if paced else "non_regression"
     critical = 2.570581835636305  # t(5), one-sided 97.5% per mode; 95% family-wise
     comparisons = {}
     for mode, logs in effects.items():
         mean = statistics.mean(logs)
         upper = 100 * math.expm1(mean + critical * statistics.stdev(logs) / math.sqrt(len(logs)))
         comparisons[mode] = dict(change_percent=100 * math.expm1(mean), upper_percent=upper,
-                                 non_regression=upper <= margin,
+                                 **{criterion: upper <= margin},
                                  fork_change_percent=[100 * math.expm1(value) for value in logs])
     return dict(schema_version=1, source_commit=expected_commit, run_attempt=attempt,
-                fork_count=LOCAL_GIT_FORKS, publications=LOCAL_GIT_FORKS * LOCAL_GIT_REPEATS * len(MODES),
+                fork_count=GIT_FORKS, publications=GIT_FORKS * GIT_REPEATS * len(MODES),
                 margin_percent=margin, family_confidence=0.95, environments=environments,
                 commit=next(iter(identities))[0], blob=next(iter(identities))[1],
                 comparisons=comparisons, production_decision="keep synchronous")
@@ -338,22 +350,24 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     select = sub.add_parser("matrix")
-    select.add_argument("--profile", choices=("smoke", "coverage", "full", "local-git"), default="smoke")
+    select.add_argument("--profile", choices=("smoke", "coverage", "full", *GIT_PROFILES), default="smoke")
     select.add_argument("--repeats", type=int, default=3)
     verify = sub.add_parser("summarize")
     verify.add_argument("directory", type=Path)
     verify.add_argument("--expected-commit")
-    local_git = sub.add_parser("summarize-local-git")
-    local_git.add_argument("directory", type=Path)
-    local_git.add_argument("--expected-commit", required=True)
-    local_git.add_argument("--attempt", type=int, required=True)
+    for profile in GIT_PROFILES:
+        git_parser = sub.add_parser(f"summarize-{profile}")
+        git_parser.add_argument("directory", type=Path)
+        git_parser.add_argument("--expected-commit", required=True)
+        git_parser.add_argument("--attempt", type=int, required=True)
+        git_parser.set_defaults(git_profile=profile)
     args = parser.parse_args()
     if args.command == "matrix":
         print(json.dumps(matrix(args.profile, args.repeats), separators=(",", ":")))
-    elif args.command == "summarize-local-git":
-        result = summarize_local_git(args.directory, args.expected_commit, args.attempt)
+    elif args.command != "summarize":
+        result = summarize_git(args.directory, args.expected_commit, args.attempt, args.git_profile)
         summary = json.dumps(result, indent=2)
-        (args.directory / "local-git-summary.json").write_text(summary + "\n")
+        (args.directory / f"{args.git_profile}-summary.json").write_text(summary + "\n")
         print(summary)
     else:
         result = summarize(args.directory, args.expected_commit)
