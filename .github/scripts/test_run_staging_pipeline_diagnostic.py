@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
     "diagnostic", Path(__file__).with_name("run_staging_pipeline_diagnostic.py"))
@@ -93,14 +94,18 @@ class DiagnosticRunnerTest(unittest.TestCase):
                 f"child=subprocess.Popen([sys.executable,'-c',{child!r}]);"
                 f"pathlib.Path({str(child_file)!r}).write_text(str(child.pid));"
                 "print('partial diagnostic output',flush=True);time.sleep(60)")
-            started = time.monotonic()
-            result = diagnostic.run([sys.executable, "-c", parent], root,
-                                    timeout=.5, dump_after=.2, grace=.1)
+            # Measure process-group cleanup independently of the host-wide JVM scan.
+            with patch.object(diagnostic, "dump_threads") as capture_threads:
+                started = time.monotonic()
+                result = diagnostic.run([sys.executable, "-c", parent], root,
+                                        timeout=.5, dump_after=.2, grace=.1)
+                self.assertLess(time.monotonic() - started, 5)
             self.assertEqual(124, result)
-            self.assertLess(time.monotonic() - started, 5)
             status = json.loads((root / "diagnostic-status.json").read_text())
             self.assertTrue(status["timed_out"])
             self.assertEqual("SIGKILL", status["termination_signal"])
+            capture_threads.assert_called()
+            self.assertEqual(capture_threads.call_count, status["thread_capture_count"])
             self.assertIn("partial diagnostic output", (root / "native.log").read_text())
             self.assertTrue(child_file.is_file())
             before = (root / "native.log").stat().st_size
