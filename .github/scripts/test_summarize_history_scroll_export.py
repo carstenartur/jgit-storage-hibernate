@@ -120,6 +120,34 @@ class HistoryScrollEvidenceTest(unittest.TestCase):
                 )
                 self.assertEqual(median + 10_100, deep["median_offset_page_ns"])
 
+    def test_native_evidence_requires_a_distinct_database_restart_per_path(self):
+        exports, offsets = fixture(1)
+        exports.extend(dict(row, cache="database-restarted") for row in exports[:]
+                       if row["cache"] == "reopened")
+        write_csv(self.root / "exports.csv", exports)
+        write_csv(self.root / "offsets.csv", offsets)
+        restarts = [dict(scenario=scenario, started_before_epoch_ms=before,
+                         started_after_epoch_ms=after, ready_elapsed_ns=2_000_000)
+                    for scenario, before, after in
+                    (("repository", 10, 20), ("indexed-export", 20, 30))]
+        evidence = self.root / "database-restarts.csv"
+        write_csv(evidence, restarts)
+        summary = TOOL.validate(self.root, DOCUMENTS, [CHUNK], 1, require_database_restart=True)
+        TOOL.report(self.root, DOCUMENTS, 1, [CHUNK], summary, require_database_restart=True)
+        self.assertIn("| repository | 2.000 | 1.000 / 1.000 |",
+                      (self.root / "comparison.md").read_text())
+
+        broken = [dict(row) for row in restarts]
+        broken[1]["started_after_epoch_ms"] = 20
+        write_csv(evidence, broken)
+        with self.assertRaisesRegex(ValueError, "No verified database restart"):
+            TOOL.validate(self.root, DOCUMENTS, [CHUNK], 1, require_database_restart=True)
+
+        write_csv(evidence, restarts)
+        write_csv(self.root / "exports.csv", exports[:-1])
+        with self.assertRaisesRegex(ValueError, "Incomplete database-restarted export matrix"):
+            TOOL.validate(self.root, DOCUMENTS, [CHUNK], 1, require_database_restart=True)
+
     def test_missing_export_measurements_are_rejected(self):
         for field in (
             "first_chunk_ns", "api_total_ns", "wall_total_ns", "rows_per_second",

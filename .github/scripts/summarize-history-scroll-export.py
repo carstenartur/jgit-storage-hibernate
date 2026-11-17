@@ -31,6 +31,10 @@ OFFSET_COLUMNS = (
     "engine,scenario,cache,documents,chunk_size,repeat,offset,rows,scroll_chunk_ns,"
     "scroll_prefix_ns,offset_page_ns,first_object_id,last_object_id"
 ).split(",")
+RESTART_COLUMNS = (
+    "scenario,started_before_epoch_ms,started_after_epoch_ms,ready_elapsed_ns"
+).split(",")
+FULL_EXPORTS = ("repository", "indexed-export")
 TEXT_COLUMNS = {"engine", "scenario", "cache", "first_object_id", "last_object_id"}
 
 
@@ -95,9 +99,27 @@ def sample_offsets(result_rows, chunk):
     }
 
 
-def validate(root, documents, chunks, repetitions):
-    warm = {}
-    reopened = {}
+def read_database_restarts(root):
+    restarts = measurements(root / "database-restarts.csv", RESTART_COLUMNS)
+    require(tuple(row["scenario"] for row in restarts) == FULL_EXPORTS,
+            "Each full export requires its own database restart")
+    previous_start = None
+    for row in restarts:
+        before = row["started_before_epoch_ms"]
+        after = row["started_after_epoch_ms"]
+        require(0 < before < after and row["ready_elapsed_ns"] > 0,
+                f"No verified database restart for {row['scenario']}")
+        require(previous_start is None or before == previous_start,
+                "Database startup timestamps are discontinuous between measured restarts")
+        previous_start = after
+    return restarts
+
+
+def validate(root, documents, chunks, repetitions, require_database_restart=False):
+    groups = {"warm": {}, "reopened": {}}
+    if require_database_restart:
+        groups["database-restarted"] = {}
+        read_database_restarts(root)
     for row in measurements(root / "exports.csv", EXPORT_COLUMNS):
         scenario, chunk, repeat = coordinate(row)
         count = int(row["rows"])
@@ -107,7 +129,7 @@ def validate(root, documents, chunks, repetitions):
                 f"Wrong export fixture at {check}")
         require(0 <= count <= documents and (count == 0) == (scenario == "empty"),
                 f"Unexpected result count at {check}")
-        if scenario in ("repository", "indexed-export"):
+        if scenario in FULL_EXPORTS:
             require(count == documents, f"Missing full export results at {check}")
         require(int(row["chunks"]) == (count + chunk - 1) // chunk
                 and int(row["max_chunk_rows"]) == min(chunk, count),
@@ -133,11 +155,12 @@ def validate(root, documents, chunks, repetitions):
         require(row["transactions_during"] == row["transactions_before"]
                 and row["transactions_after"] - row["transactions_before"]
                 == row["transactions_completed"], f"Invalid transaction counters at {check}")
-        require(row["cache"] in ("warm", "reopened"), f"Unexpected cache state at {check}")
-        group = warm if row["cache"] == "warm" else reopened
+        require(row["cache"] in groups, f"Unexpected cache state at {check}")
+        group = groups[row["cache"]]
         key = (scenario, chunk, repeat)
         require(key not in group, f"Duplicate export at {check}")
         group[key] = row
+    warm = groups.pop("warm")
     require(warm.keys() == {
         (scenario, chunk, repeat)
         for scenario in SCENARIOS
@@ -145,8 +168,9 @@ def validate(root, documents, chunks, repetitions):
         for repeat in range(1, repetitions + 1)
     }, "Incomplete warmed export matrix")
     reopen_chunk = 100 if 100 in chunks else chunks[0]
-    require(reopened.keys() == {("repository", reopen_chunk, 1), ("indexed-export", reopen_chunk, 1)},
-            "Incomplete reopened export matrix")
+    for state, group in groups.items():
+        require(group.keys() == {(scenario, reopen_chunk, 1) for scenario in FULL_EXPORTS},
+                f"Incomplete {state} export matrix")
     for scenario in SCENARIOS:
         counts = {int(row["rows"]) for key, row in warm.items() if key[0] == scenario}
         require(len(counts) == 1, f"Result counts vary for {scenario}")
@@ -194,7 +218,7 @@ def validate(root, documents, chunks, repetitions):
     return summary
 
 
-def report(root, documents, repetitions, chunks, summary):
+def report(root, documents, repetitions, chunks, summary, require_database_restart=False):
     with (root / "comparisons.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=summary[0].keys())
         writer.writeheader()
@@ -213,7 +237,7 @@ def report(root, documents, repetitions, chunks, summary):
         "| First sampled prefix faster than a page | Deepest offset | Page / chunk / prefix (ms) |",
         "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
-    for scenario in ("repository", "indexed-export"):
+    for scenario in FULL_EXPORTS:
         for chunk in chunks:
             subset = [row for row in summary if row["scenario"] == scenario and row["chunk_size"] == chunk]
             deepest = subset[-1]
@@ -227,6 +251,24 @@ def report(root, documents, repetitions, chunks, summary):
                          f"| {deepest['offset']:,} | {deepest_times} |")
     lines.extend(("", "Thresholds describe sampled windows. A faster continuation does not include "
                   "the work of reaching its offset, and timings may vary at later samples."))
+    if require_database_restart:
+        exports = {(row["scenario"], row["cache"]): row
+                   for row in measurements(root / "exports.csv", EXPORT_COLUMNS)
+                   if row["cache"] in ("reopened", "database-restarted")}
+        lines.extend(("", "### First full exports after a database restart", "",
+                      "The same index and database files are reused. The host cache is retained.", "",
+                      "| Path | DB restart to ready (ms) | First chunk, reopen / restart (ms) "
+                      "| Full export, reopen / restart (ms) |",
+                      "| --- | ---: | ---: | ---: |"))
+        for restart in read_database_restarts(root):
+            scenario = restart["scenario"]
+            reopen = exports[scenario, "reopened"]
+            after_restart = exports[scenario, "database-restarted"]
+            first, total = (" / ".join(f"{row[name] / 1_000_000:.3f}"
+                                     for row in (reopen, after_restart))
+                            for name in ("first_chunk_ns", "wall_total_ns"))
+            lines.append(f"| {scenario} | {restart['ready_elapsed_ns'] / 1_000_000:.3f} "
+                         f"| {first} | {total} |")
     (root / "comparison.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -236,9 +278,12 @@ def main():
     parser.add_argument("--documents", type=int, required=True)
     parser.add_argument("--repetitions", type=int, required=True)
     parser.add_argument("--chunks", type=int, nargs="+", default=[25, 100, 500])
+    parser.add_argument("--require-database-restart", action="store_true")
     args = parser.parse_args()
-    summary = validate(args.directory, args.documents, args.chunks, args.repetitions)
-    report(args.directory, args.documents, args.repetitions, args.chunks, summary)
+    summary = validate(args.directory, args.documents, args.chunks, args.repetitions,
+                       args.require_database_restart)
+    report(args.directory, args.documents, args.repetitions, args.chunks, summary,
+           args.require_database_restart)
 
 
 if __name__ == "__main__":

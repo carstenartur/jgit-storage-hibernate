@@ -59,6 +59,18 @@ public final class HistoryScrollExportBenchmark {
       List<Integer> chunkSizes,
       int repetitions)
       throws IOException {
+    run(database, index, output, documents, chunkSizes, repetitions, null);
+  }
+
+  static void run(
+      Properties database,
+      Path index,
+      Path output,
+      int documents,
+      List<Integer> chunkSizes,
+      int repetitions,
+      DatabaseRestart restart)
+      throws IOException {
     if (documents < 1
         || documents > 1_000_000
         || chunkSizes.isEmpty()
@@ -114,6 +126,8 @@ public final class HistoryScrollExportBenchmark {
     offsets.add(
         "engine,scenario,cache,documents,chunk_size,repeat,offset,rows,scroll_chunk_ns,"
             + "scroll_prefix_ns,offset_page_ns,first_object_id,last_object_id");
+    List<String> restarts = new ArrayList<>();
+    restarts.add("scenario,started_before_epoch_ms,started_after_epoch_ms,ready_elapsed_ns");
 
     int reopenChunk =
         chunkSizes.contains(GitHistorySearchService.DEFAULT_SCROLL_CHUNK_SIZE)
@@ -123,21 +137,16 @@ public final class HistoryScrollExportBenchmark {
     try {
       // The first query on each new factory is measured before warming any query shape.
       for (Scenario scenario : List.of(Scenario.REPOSITORY, Scenario.INDEXED_EXPORT)) {
-        try (var provider = provider(properties)) {
-          var factory = provider.getSessionFactory();
-          var service = new GitHistorySearchService(factory);
-          measure(
-              service,
-              factory.getStatistics(),
-              scenario,
-              documents,
-              documents,
-              reopenChunk,
-              1,
-              "reopened",
-              List.of(),
-              exports,
-              offsets);
+        measureFirstExport(properties, scenario, documents, reopenChunk, "reopened", exports, offsets);
+      }
+      if (restart != null) {
+        for (Scenario scenario : List.of(Scenario.REPOSITORY, Scenario.INDEXED_EXPORT)) {
+          var observation = restart.restart(properties);
+          restarts.add(
+              csv(scenario.label, observation.startedBeforeEpochMillis(),
+                  observation.startedAfterEpochMillis(), observation.readyElapsedNanos()));
+          measureFirstExport(
+              properties, scenario, documents, reopenChunk, "database-restarted", exports, offsets);
         }
       }
 
@@ -188,10 +197,37 @@ public final class HistoryScrollExportBenchmark {
     Files.createDirectories(output);
     Files.write(output.resolve("exports.csv"), exports);
     Files.write(output.resolve("offsets.csv"), offsets);
+    if (restart != null) {
+      Files.write(output.resolve("database-restarts.csv"), restarts);
+    }
     try (var writer = Files.newBufferedWriter(output.resolve("environment.properties"))) {
       metadata.store(writer, "History scroll/export benchmark");
     }
   }
+
+  private static void measureFirstExport(
+      Properties properties,
+      Scenario scenario,
+      int documents,
+      int chunk,
+      String cache,
+      List<String> exports,
+      List<String> offsets) {
+    try (var provider = provider(properties)) {
+      var factory = provider.getSessionFactory();
+      measure(
+          new GitHistorySearchService(factory), factory.getStatistics(), scenario, documents,
+          documents, chunk, 1, cache, List.of(), exports, offsets);
+    }
+  }
+
+  @FunctionalInterface
+  interface DatabaseRestart {
+    RestartObservation restart(Properties properties) throws IOException;
+  }
+
+  record RestartObservation(
+      long startedBeforeEpochMillis, long startedAfterEpochMillis, long readyElapsedNanos) {}
 
   private static void measure(
       GitHistorySearchService service,
