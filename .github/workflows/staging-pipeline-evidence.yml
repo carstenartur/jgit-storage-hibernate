@@ -148,7 +148,11 @@ jobs:
           prefix=jgit.storage.benchmark.staging-pipeline
           git_limit=()
           if [[ "$CELL_GIT_ONLY" = true ]]; then
-            git_limit=(timeout --kill-after=30s 7m)
+            git_timeout=7m
+            if [[ "$CELL_RTT" = 50 ]]; then
+              git_timeout=15m
+            fi
+            git_limit=(timeout --kill-after=30s "$git_timeout")
           else
             python3 .github/scripts/run_with_bounded_console.py \
               --log target/staging-pipeline/native.log --console-bytes 16384 -- \
