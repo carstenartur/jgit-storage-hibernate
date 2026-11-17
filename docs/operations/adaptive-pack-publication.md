@@ -132,6 +132,22 @@ as secondary observations.
 
 [Measured JDK 25 outcome](../evidence/open-performance-issues-2026-11-09.md#independent-publication-on-jdk-25)
 
+### Independent 16 MiB publications by connection pool
+
+Select `publication-pool-nonregression` in the Performance Investigations
+workflow to compare the size rule and contention-aware policy with four
+independent writers, 16 MiB + 257-byte payloads and 20 ms added RTT.
+Separate jobs use Hibernate's built-in PostgreSQL pool and HikariCP. Each
+job runs 16 fresh-JVM pairs on Temurin 25.0.5+8, with G1 and a 1 GiB heap,
+against disk-backed PostgreSQL 17.10. Policy order alternates by pair.
+
+The validator requires all 32 forks per pool and checks the executed
+connection provider, payload, JVM and paired order. A pool qualifies when
+its one-sided 97.5% lower bound exceeds the −5% throughput margin. The two
+bounds control the family-wise error at 5%. The artifacts retain original
+JMH results, publication paths, transaction counts, latency, allocation
+and heap observations for both policies.
+
 Any tuning must preserve these invariants:
 
 - no successful acknowledgement before the authoritative database commit;

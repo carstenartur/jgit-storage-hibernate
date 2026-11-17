@@ -61,6 +61,26 @@ def step_enabled(name, step, event, **kwargs):
 
 
 class NativeFollowupTriggerTest(unittest.TestCase):
+    def test_pool_study_selects_only_the_two_declared_provider_cells(self):
+        name = "performance-investigations.yml"
+        ref = "refs/heads/evidence/publication-pools-20261117"
+        profile = "publication-pool-nonregression"
+        job = "publication-nonregression"
+        body = section(workflow(name), f"  {job}:\n", r"^  [a-zA-Z0-9_-]+:\s*$")
+        matrix = re.search(r"(?m)^        cell: (\$\{\{.*\}\})$", body)[1]
+        for event in ("push", "workflow_dispatch"):
+            with self.subTest(event=event):
+                kwargs = {"ref": ref, "profile": profile}
+                self.assertTrue(job_enabled(name, job, event, **kwargs))
+                self.assertEqual(evaluate(matrix, event, **kwargs),
+                                 ["independent-4w-20ms-16m-internal", "independent-4w-20ms-16m-hikari"])
+                for other in ("investigate", "repository-aging-smoke", "repository-aging-full-shard",
+                              "stateless-threshold", "publication-gc-diagnostic", "publication-reftable-comparison"):
+                    self.assertFalse(job_enabled(name, other, event, **kwargs), other)
+        self.assertFalse(job_enabled(name, job, "push", ref=ref, deleted=True))
+        self.assertFalse(job_enabled(name, job, "push", ref=ref + "-extra"))
+        self.assertFalse(job_enabled(name, job, "pull_request", ref=ref))
+
     def test_jdk25_publication_replication_selects_only_the_independent_cell(self):
         name = "performance-investigations.yml"
         ref = "refs/heads/evidence/publication-jdk25-20261109"

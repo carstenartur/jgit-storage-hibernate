@@ -106,10 +106,12 @@ class PerformanceInvestigationsWorkflowTest(unittest.TestCase):
 
     def test_paired_publication_dispatch_does_not_launch_unrelated_matrices(self) -> None:
         self.assertIn("- publication-nonregression", self.workflow)
+        self.assertIn("- publication-pool-nonregression", self.workflow)
+        generic_profiles = "inputs.profile == 'smoke' || inputs.profile == 'full'"
         generic = self.section("  investigate:\n", "  repository-aging-smoke:\n")
-        self.assertIn("inputs.profile != 'publication-nonregression'", generic)
+        self.assertIn(generic_profiles, generic)
         threshold = self.section("  stateless-threshold:\n", "  publication-nonregression:\n")
-        self.assertIn("inputs.profile != 'publication-nonregression'", threshold)
+        self.assertIn(generic_profiles, threshold)
 
     def test_paired_publication_native_results_are_validated_before_upload(self) -> None:
         self.assertIn("  publication-nonregression:\n", self.workflow)

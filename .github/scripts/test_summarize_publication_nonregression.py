@@ -177,6 +177,31 @@ class PublicationNonregressionTest(unittest.TestCase):
             self.change_result(index, update)
         self.flush()
 
+    def test_pool_study_validates_each_connector_and_fixed_interval(self):
+        self.configure_jdk25_replication()
+        rtt = [20.4 + index / 100 for index in range(20)]
+        self.environment.update(rttSamplesMillis=rtt, finalRttSamplesMillis=rtt)
+        for pool, backend in (("internal", "postgresql"), ("hikari", "postgresql-hikari")):
+            with self.subTest(pool=pool):
+                cell = f"independent-4w-20ms-16m-{pool}"
+                self.protocol.update(schema="jgit-publication-paired-pools/v1", cell=cell,
+                                     writers=4, payloadKiB=16384, requestedRttMillis=20,
+                                     backend=backend)
+                for index in range(32):
+                    def update(item):
+                        item["threads"] = 4
+                        item["params"].update(backend=backend, payloadKiB="16384",
+                                              deployment=f"paired-{cell}")
+                    self.change_result(index, update)
+                self.flush()
+                result = MODULE.summarize(self.root)
+                self.assertEqual(16, result["pairCount"])
+                self.assertIn("97.5%", result["intervalMethod"])
+                self.assertTrue(result["nonRegressionEstablished"])
+        self.change_result(0, lambda item: item["params"].update(backend="postgresql"))
+        with self.assertRaisesRegex(ValueError, "Fork parameter coordinate"):
+            MODULE.summarize(self.root)
+
     def test_jdk25_replication_retains_a_fixed_unfavorable_result(self):
         self.configure_jdk25_replication()
         for index, trial in enumerate(self.trials):
