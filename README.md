@@ -313,6 +313,8 @@ Core owns `git_packs`, `git_pack_chunks`, `git_repository_lifecycle`, `git_repos
 
 ## Verification
 
+Building from source requires JDK 21 or later and Maven 3.9.0 or later. Within the Maven 3.9 series, use 3.9.16.
+
 `mvn verify` exercises H2 and HSQLDB, including file-backed restart and Search migration/query paths, plus PostgreSQL, Microsoft SQL Server and Oracle through Testcontainers when Docker is available. CI also checks JGit 7.5, 7.6, 7.7 and 7.8 compatibility, dependency changes, release consistency and repeatable JMH workloads. The existing performance workflow additionally runs the 1/16/128 MiB pack-capacity profile manually and weekly.
 
 ## Documentation

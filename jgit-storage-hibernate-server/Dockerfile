@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-21 AS build
+FROM --platform=$BUILDPLATFORM maven:3.9.16-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY . .
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
