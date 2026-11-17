@@ -3,12 +3,12 @@
 ## Prerequisites
 
 - Java 21
-- Maven 3.8+
+- Maven 3.9.0 or later
 
-## Build
+## Build and install the modules locally
 
 ```bash
-mvn -B verify
+mvn -B install
 ```
 
 ## Run the Demo

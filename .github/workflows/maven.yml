@@ -86,6 +86,7 @@ jobs:
         run: python3 .github/scripts/verify-public-repository-publishing.py
       - name: Build
         run: |
+          mvn --version
           set +e; mvn -B -q verify > build.log 2>&1; status=$?; tail -n 80 build.log; exit $status
       - name: Verify Oracle and SQL Server test evidence
         run: python3 .github/scripts/verify-database-test-evidence.py
