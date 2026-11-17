@@ -18,8 +18,13 @@ POLICIES = ["size", "contention-aware"]
 INDEPENDENT_CRITICAL = {24: 2.709720420119227, 96: 2.5461530351050503}
 SHARED_CRITICAL = 2.0686576104190486  # t(23), two-sided 95%
 JDK25_CELL = "independent-16w-0ms-jdk25"
-JDK25_PAIRS = 16
+FIXED_PAIRS = 16
 JDK25_CRITICAL = 1.7530503556925547  # t(15), one-sided 95% lower bound
+POOLS_CRITICAL = 2.131449545559323  # t(15), one-sided 97.5% for each of two pools
+POOL_BACKENDS = {
+    "independent-4w-20ms-16m-internal": "postgresql",
+    "independent-4w-20ms-16m-hikari": "postgresql-hikari",
+}
 CELLS = {
     "independent-1w-0ms": ("independent", 1, 256, 0),
     "independent-1w-50ms": ("independent", 1, 256, 50),
@@ -27,6 +32,7 @@ CELLS = {
     JDK25_CELL: ("independent", 16, 256, 0),
     "independent-16w-50ms": ("independent", 16, 256, 50),
     "shared-8w-5ms": ("shared", 8, 768, 5),
+    **{cell: ("independent", 4, 16 * 1024, 20) for cell in POOL_BACKENDS},
 }
 SECONDARY_UNITS = {
     "publications": "#",
@@ -83,7 +89,7 @@ def timestamp(value: str) -> datetime:
 
 def paired_interval(ratios: list[float], critical: float) -> dict:
     count = len(ratios)
-    require(count in (JDK25_PAIRS, *PAIR_STAGES), "Expected a preregistered pair count")
+    require(count in (FIXED_PAIRS, *PAIR_STAGES), "Expected a preregistered pair count")
     logs = [math.log(number(value, "paired ratio", positive=True)) for value in ratios]
     mean = statistics.mean(logs)
     half_width = critical * statistics.stdev(logs) / math.sqrt(count)
@@ -100,12 +106,14 @@ def validate_protocol(protocol: dict) -> tuple:
     cell = protocol.get("cell")
     require(cell in CELLS, f"Unknown preregistered cell: {cell}")
     layout, writers, payload, rtt = CELLS[cell]
-    jdk25_replication = cell == JDK25_CELL
+    uses_jdk25 = cell == JDK25_CELL or cell in POOL_BACKENDS
     pair_stages = PAIR_STAGES if layout == "independent" else [24]
-    if jdk25_replication:
-        pair_stages = [JDK25_PAIRS]
+    schema = "jgit-publication-paired/v1"
+    if uses_jdk25:
+        pair_stages = [FIXED_PAIRS]
+        schema = "jgit-publication-paired-pools/v1" if cell in POOL_BACKENDS else "jgit-publication-paired-jdk25/v1"
     expected = {
-        "schema": "jgit-publication-paired-jdk25/v1" if jdk25_replication else "jgit-publication-paired/v1",
+        "schema": schema,
         "pairStages": pair_stages,
         "warmupIterations": 2,
         "warmupSeconds": 3,
@@ -116,13 +124,13 @@ def validate_protocol(protocol: dict) -> tuple:
         "marginPercent": -5.0,
         "heapMiB": 1024,
         "initialHeapMiB": 256,
-        "jdkMajor": 25 if jdk25_replication else 21,
+        "jdkMajor": 25 if uses_jdk25 else 21,
         "jmhVersion": "1.37",
         "layout": layout,
         "writers": writers,
         "payloadKiB": payload,
         "requestedRttMillis": rtt,
-        "backend": "postgresql-hikari",
+        "backend": POOL_BACKENDS.get(cell, "postgresql-hikari"),
         "writeMode": "stateful",
     }
     for key, value in expected.items():
@@ -136,10 +144,10 @@ def validate_environment(environment: dict, protocol: dict, rtt: int) -> None:
     require(isinstance(environment, dict), "Environment must be an object")
     for key in ("sourceCommit", "sourceTree"):
         require(environment.get(key) == protocol[key], f"Environment {key} differs")
-    if protocol["cell"] == JDK25_CELL:
+    if protocol["jdkMajor"] == 25:
         require(environment.get("javaVersion") == "25.0.5"
                 and environment.get("javaVmVersion") == "25.0.5+8-LTS",
-                "The separate replication requires Temurin 25.0.5+8")
+                "This publication study requires Temurin 25.0.5+8")
     else:
         require(str(environment.get("javaVersion", "")).startswith("21."), "JDK 21 is required")
     for key in ("javaVm", "javaVmVersion", "osName", "osArch", "osVersion", "cpuMax",
@@ -198,7 +206,7 @@ def validate_fork(item: dict, protocol: dict, policy: str, environment: dict) ->
     for key, value in expected.items():
         require(item.get(key) == value, f"Unexpected JMH {key}: {item.get(key)}")
     expected_params = {
-        "backend": "postgresql-hikari",
+        "backend": protocol["backend"],
         "writeMode": "stateful",
         "payloadKiB": str(protocol["payloadKiB"]),
         "payloadMiB": "0",
@@ -215,7 +223,7 @@ def validate_fork(item: dict, protocol: dict, policy: str, environment: dict) ->
                                     "-XX:MaxRAM=", "-XX:InitialRAMPercentage=", "-XX:MaxRAMPercentage=",
                                     "-XX:MinRAMPercentage=")) for arg in args), "Conflicting heap option")
     require(not any("jdbc:" in arg or ".password=" in arg for arg in args), "JMH arguments contain connection details")
-    if protocol["cell"] == JDK25_CELL:
+    if protocol["jdkMajor"] == 25:
         collectors = [arg for arg in args if re.fullmatch(r"-XX:[+-]Use\w+GC", arg)]
         require(collectors == ["-XX:+UseG1GC"], "The replication requires explicit G1")
     metric = item.get("primaryMetric", {})
@@ -243,7 +251,8 @@ def summarize(root: Path) -> dict:
     validate_environment(environment, protocol, rtt)
     trials = load_json(root / "trials.json")
     independent = layout == "independent"
-    jdk25_replication = protocol["cell"] == JDK25_CELL
+    fixed_independent = independent and protocol["jdkMajor"] == 25
+    pool_comparison = protocol["cell"] in POOL_BACKENDS
     stages = protocol["pairStages"]
     expected_lengths = [2 * count for count in stages]
     require(isinstance(trials, list) and len(trials) in expected_lengths, "Incomplete preregistered fork stage")
@@ -297,7 +306,9 @@ def summarize(root: Path) -> dict:
     for count in stages:
         if count > len(rows):
             break
-        if jdk25_replication:
+        if pool_comparison:
+            critical = POOLS_CRITICAL
+        elif fixed_independent:
             critical = JDK25_CRITICAL
         else:
             critical = INDEPENDENT_CRITICAL[count] if independent else SHARED_CRITICAL
@@ -308,13 +319,15 @@ def summarize(root: Path) -> dict:
             **interval,
             "nonRegressionEstablished": independent and interval["lowerPercent"] > -5.0,
         })
-    if independent and not jdk25_replication:
+    if independent and not fixed_independent:
         if len(rows) == 24:
             require(looks[0]["nonRegressionEstablished"], "First look did not pass; the preregistered 96-pair stage is required")
         else:
             require(not looks[0]["nonRegressionEstablished"], "Unplanned extension after a first-look pass")
     final = looks[-1]
-    if jdk25_replication:
+    if pool_comparison:
+        interval_method = "fixed 16 pairs per pool, one-sided 97.5% lower bound"
+    elif fixed_independent:
         interval_method = "fixed 16 pairs, one-sided 95% lower bound"
     elif independent:
         interval_method = "preregistered sequential lower bound, Bonferroni alpha=.05/(4 cells * 2 looks)"

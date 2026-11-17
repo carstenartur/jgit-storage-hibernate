@@ -52,15 +52,16 @@ class PackPublicationPairedBenchmarkIT {
       "jgit.storage.benchmark.connection-properties-file";
   private static final int PROXY_DATA_PORT = 8666;
   private static final String JDK25_CELL = "independent-16w-0ms-jdk25";
-  private static final int JDK25_PAIRS = 16;
+  private static final String POOL_CELL_PREFIX = "independent-4w-20ms-16m-";
+  private static final int FIXED_PAIRS = 16;
 
   @Test
   @Timeout(value = 145, unit = TimeUnit.MINUTES)
   void retainsPreregisteredPairedForks() throws Exception {
     Cell cell = Cell.parse(System.getProperty("jgit.storage.benchmark.publication.cell"));
-    if (cell.jdk25Replication()
+    if (cell.usesJdk25()
         && !"25.0.5+8-LTS".equals(System.getProperty("java.vm.version"))) {
-      throw new IllegalStateException("The separate replication requires Temurin 25.0.5+8");
+      throw new IllegalStateException("This publication study requires Temurin 25.0.5+8");
     }
     String source = sourceProperty("jgit.storage.benchmark.source");
     String tree = sourceProperty("jgit.storage.benchmark.sourceTree");
@@ -198,14 +199,14 @@ class PackPublicationPairedBenchmarkIT {
         cell.shared() ? "publishToSameRepository" : "publishToDifferentRepositories";
     List<String> jvmArgs =
         new ArrayList<>(List.of("-Xms256m", "-Xmx1024m", "-D" + CONNECTION_FILE + "=" + connectionFile));
-    if (cell.jdk25Replication()) {
+    if (cell.usesJdk25()) {
       jvmArgs.add("-XX:+UseG1GC");
     }
     return new OptionsBuilder()
         .include(Pattern.quote(ConcurrentPublicationBenchmark.class.getName() + "." + method) + "$")
         .mode(Mode.Throughput)
         .threads(cell.writers())
-        .param("backend", "postgresql-hikari")
+        .param("backend", cell.backend())
         .param("writeMode", "stateful")
         .param("payloadKiB", Integer.toString(cell.payloadKiB()))
         .param("payloadMiB", "0")
@@ -229,9 +230,7 @@ class PackPublicationPairedBenchmarkIT {
 
   static Map<String, Object> protocol(Cell cell, String source, String tree) {
     Map<String, Object> values = new LinkedHashMap<>();
-    values.put(
-        "schema",
-        cell.jdk25Replication() ? "jgit-publication-paired-jdk25/v1" : "jgit-publication-paired/v1");
+    values.put("schema", cell.protocolSchema());
     values.put("cell", cell.id());
     values.put("sourceCommit", source);
     values.put("sourceTree", tree);
@@ -245,13 +244,13 @@ class PackPublicationPairedBenchmarkIT {
     values.put("marginPercent", -5.0);
     values.put("heapMiB", 1024);
     values.put("initialHeapMiB", 256);
-    values.put("jdkMajor", cell.jdk25Replication() ? 25 : 21);
+    values.put("jdkMajor", cell.usesJdk25() ? 25 : 21);
     values.put("jmhVersion", "1.37");
     values.put("layout", cell.shared() ? "shared" : "independent");
     values.put("writers", cell.writers());
     values.put("payloadKiB", cell.payloadKiB());
     values.put("requestedRttMillis", cell.rttMillis());
-    values.put("backend", "postgresql-hikari");
+    values.put("backend", cell.backend());
     values.put("writeMode", "stateful");
     return values;
   }
@@ -391,14 +390,29 @@ class PackPublicationPairedBenchmarkIT {
     Files.writeString(path, JSON.toJson(value) + "\n", StandardCharsets.UTF_8);
   }
 
-  record Cell(String id, boolean shared, int writers, int payloadKiB, int rttMillis) {
-    boolean jdk25Replication() {
-      return JDK25_CELL.equals(id);
+  record Cell(String id, boolean shared, int writers, int payloadKiB, int rttMillis, String backend) {
+    private Cell(String id, boolean shared, int writers, int payloadKiB, int rttMillis) {
+      this(id, shared, writers, payloadKiB, rttMillis, HibernateRepositoryBenchmark.POSTGRESQL_HIKARI);
+    }
+
+    private boolean poolComparison() {
+      return id.startsWith(POOL_CELL_PREFIX);
+    }
+
+    boolean usesJdk25() {
+      return JDK25_CELL.equals(id) || poolComparison();
+    }
+
+    String protocolSchema() {
+      if (poolComparison()) {
+        return "jgit-publication-paired-pools/v1";
+      }
+      return usesJdk25() ? "jgit-publication-paired-jdk25/v1" : "jgit-publication-paired/v1";
     }
 
     List<Integer> pairStages() {
-      if (jdk25Replication()) {
-        return List.of(JDK25_PAIRS);
+      if (usesJdk25()) {
+        return List.of(FIXED_PAIRS);
       }
       return shared ? List.of(24) : List.of(24, 96);
     }
@@ -414,6 +428,9 @@ class PackPublicationPairedBenchmarkIT {
         case JDK25_CELL -> new Cell(id, false, 16, 256, 0);
         case "independent-16w-50ms" -> new Cell(id, false, 16, 256, 50);
         case "shared-8w-5ms" -> new Cell(id, true, 8, 768, 5);
+        case POOL_CELL_PREFIX + "internal" ->
+            new Cell(id, false, 4, 16 * 1024, 20, HibernateRepositoryBenchmark.POSTGRESQL);
+        case POOL_CELL_PREFIX + "hikari" -> new Cell(id, false, 4, 16 * 1024, 20);
         default -> throw new IllegalArgumentException("Unknown preregistered publication cell: " + id);
       };
     }
