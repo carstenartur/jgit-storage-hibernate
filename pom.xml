@@ -110,9 +110,11 @@
   </properties>
 
   <repositories>
+    <!-- Resolve public dependencies before consulting the project-specific fallbacks. -->
     <repository>
-      <id>jgit-releases</id>
-      <url>https://repo.eclipse.org/content/repositories/jgit-releases/</url>
+      <id>central</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+      <snapshots><enabled>false</enabled></snapshots>
     </repository>
     <repository>
       <id>jgit-storage-hibernate-public</id>
@@ -535,6 +537,16 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>eclipse-jgit-releases</id>
+      <repositories>
+        <repository>
+          <id>jgit-releases</id>
+          <url>https://repo.eclipse.org/content/repositories/jgit-releases/</url>
+        </repository>
+      </repositories>
+    </profile>
+
     <profile>
       <id>github-packages</id>
       <properties>
