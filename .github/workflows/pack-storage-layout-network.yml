@@ -69,7 +69,8 @@ jobs:
           python3 .github/scripts/test_convert_jmh_pack_storage_layout.py
 
       - name: Build benchmark module
-        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+        run: |
+          timeout --verbose --signal=QUIT --kill-after=10s 10m mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
 
       - name: Run calibrated RTT matrix
         run: |

@@ -72,7 +72,7 @@ jobs:
         run: |
           mkdir -p target/search-performance
           set -o pipefail
-          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+          timeout --verbose --signal=QUIT --kill-after=10s 10m mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
             | tee target/search-performance/maven-build.log
 
       - name: Run PostgreSQL and Lucene Search comparison

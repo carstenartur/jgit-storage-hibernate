@@ -72,7 +72,8 @@ jobs:
           python3 .github/scripts/test_convert_jmh_pack_storage_layout_concurrency.py
 
       - name: Build benchmark module
-        run: mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
+        run: |
+          timeout --verbose --signal=QUIT --kill-after=10s 10m mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests
 
       - name: Run 1/4/16-worker matrix
         run: |

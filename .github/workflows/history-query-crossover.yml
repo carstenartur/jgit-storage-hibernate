@@ -109,7 +109,7 @@ jobs:
         run: |
           mkdir -p target/history-query-crossover
           set -o pipefail
-          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+          timeout --verbose --signal=QUIT --kill-after=10s 10m mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
             | tee target/history-query-crossover/maven-build.log
 
       - name: Run crossover matrix on PostgreSQL and local filesystem
