@@ -99,7 +99,7 @@ jobs:
         run: |
           mkdir -p target/reflog-performance
           set -o pipefail
-          mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
+          timeout --verbose --signal=QUIT --kill-after=10s 10m mvn -B -pl jgit-storage-hibernate-benchmarks -am install -DskipTests 2>&1 \
             | tee target/reflog-performance/maven-build.log
           mvn -B dependency:get \
             -Dartifact=com.microsoft.sqlserver:mssql-jdbc:13.4.0.jre11

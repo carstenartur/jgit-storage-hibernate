@@ -21,6 +21,9 @@ Each version is tested on Java 21. Java 21 is the project baseline for the stora
 
 The parent POM manages the JGit version through the `jgit.version` property and dependency management. Module POMs should not hard-code their own JGit versions.
 
+The supported JGit releases are resolved from Maven Central. For an experimental version
+available only from Eclipse, pass `-Peclipse-jgit-releases` alongside the `-Djgit.version` override.
+
 The default Maven build runs the Enforcer plugin during `validate` and fails on:
 
 - unsupported Maven versions,
