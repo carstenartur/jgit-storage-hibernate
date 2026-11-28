@@ -3,13 +3,18 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / ".github" / "consumer-compatibility.json"
-EXPECTED = {"audio-analyzer", "taxonomy", "sandbox"}
+REPOSITORIES = {
+    "audio-analyzer": "carstenartur/audio-analyzer",
+    "taxonomy": "carstenartur/Taxonomy",
+    "sandbox": "carstenartur/sandbox",
+}
 SHA = re.compile(r"^[0-9a-f]{40}$")
 PREFIX = "jgit-storage-hibernate-"
 
@@ -24,18 +29,17 @@ def text(value: object, field: str) -> str:
     return value.strip()
 
 
-def matrix() -> dict[str, object]:
+def matrix() -> dict[str, list[dict[str, object]]]:
     data = json.loads(CONTRACT.read_text(encoding="utf-8"))
     if data.get("schemaVersion") != 2:
         fail("schemaVersion must be 2")
     if data.get("candidateSource") != "same-run isolated Maven install":
         fail("candidateSource must identify the same-run isolated Maven install")
     consumers = data.get("consumers")
-    if not isinstance(consumers, list) or len(consumers) != 3:
+    if not isinstance(consumers, list) or len(consumers) != len(REPOSITORIES):
         fail("exactly three consumers must be declared")
     ids: set[str] = set()
     display_names: set[str] = set()
-    repositories: set[str] = set()
     normalized: list[dict[str, object]] = []
     for index, raw in enumerate(consumers):
         if not isinstance(raw, dict):
@@ -43,6 +47,8 @@ def matrix() -> dict[str, object]:
         consumer_id = text(raw.get("id"), f"consumers[{index}].id")
         display_name = text(raw.get("displayName", consumer_id), f"{consumer_id}.displayName")
         repository = text(raw.get("repository"), f"{consumer_id}.repository")
+        if repository != REPOSITORIES.get(consumer_id):
+            fail(f"unexpected repository {repository!r} for {consumer_id}")
         ref = text(raw.get("ref"), f"{consumer_id}.ref")
         if SHA.fullmatch(ref) is None:
             fail(f"{consumer_id}.ref must be an immutable 40-character SHA")
@@ -62,11 +68,10 @@ def matrix() -> dict[str, object]:
             normalized_modules.append(value)
         if len(normalized_modules) != len(set(normalized_modules)):
             fail(f"{consumer_id}.expectedModules must not contain duplicates")
-        if consumer_id in ids or repository in repositories or display_name in display_names:
-            fail(f"duplicate consumer id/display name/repository for {consumer_id}")
+        if consumer_id in ids or display_name in display_names:
+            fail(f"duplicate consumer id/display name for {consumer_id}")
         ids.add(consumer_id)
         display_names.add(display_name)
-        repositories.add(repository)
         normalized.append(
             {
                 "id": consumer_id,
@@ -79,14 +84,23 @@ def matrix() -> dict[str, object]:
                 "expectedModules": sorted(normalized_modules),
             }
         )
-    if ids != EXPECTED:
-        fail(f"consumer ids must be exactly {sorted(EXPECTED)}")
     return {"include": normalized}
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--checkout", choices=sorted(REPOSITORIES),
+        help="emit the validated repository and pinned revision as GitHub step outputs",
+    )
+    args = parser.parse_args()
     payload = matrix()
-    print(json.dumps(payload, separators=(",", ":")))
+    if args.checkout is None:
+        print(json.dumps(payload, separators=(",", ":")))
+        return
+    consumer = next(entry for entry in payload["include"] if entry["id"] == args.checkout)
+    print(f"repository={consumer['repository']}")
+    print(f"revision={consumer['ref']}")
 
 
 if __name__ == "__main__":

@@ -38,6 +38,9 @@ concurrency:
 permissions:
   contents: read
 
+# Downstream contracts execute on these runners. Deny cache access by default.
+cache-mode: none
+
 jobs:
   prepare-candidate:
     name: Build isolated library candidate
@@ -124,13 +127,22 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: library
+          persist-credentials: false
+
+      - name: Resolve the reviewed consumer pin
+        id: consumer
+        shell: bash
+        env:
+          CONSUMER_ID: ${{ matrix.id }}
+        run: python3 library/.github/scripts/verify-consumer-compatibility.py --checkout "$CONSUMER_ID" >> "$GITHUB_OUTPUT"
 
       - name: Checkout pinned consumer
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ matrix.repository }}
-          ref: ${{ matrix.ref }}
+          repository: ${{ steps.consumer.outputs.repository }}
+          ref: ${{ steps.consumer.outputs.revision }}
           path: consumer
+          persist-credentials: false
 
       - name: Set up JDK ${{ matrix.javaVersion }}
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
@@ -201,7 +213,7 @@ jobs:
         if: always()
         shell: bash
         env:
-          SOURCE_REF: ${{ matrix.ref }}
+          SOURCE_REF: ${{ steps.consumer.outputs.revision }}
           DEFAULT_BRANCH: ${{ matrix.defaultBranch }}
         run: |
           evidence="$GITHUB_WORKSPACE/consumer-evidence/${{ matrix.id }}"
@@ -261,6 +273,8 @@ jobs:
     if: github.event_name != 'push' || !github.event.deleted
     name: Baseline — ${{ matrix.id }}
     needs: prepare-baseline
+    # Reuse Maven dependencies without letting consumer code publish cache entries.
+    cache-mode: read
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare-baseline.outputs.matrix) }}
@@ -287,6 +301,7 @@ jobs:
         with:
           repository: ${{ matrix.repository }}
           ref: ${{ github.event_name == 'schedule' && matrix.defaultBranch || matrix.ref }}
+          persist-credentials: false
 
       - name: Set up JDK ${{ matrix.javaVersion }}
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
